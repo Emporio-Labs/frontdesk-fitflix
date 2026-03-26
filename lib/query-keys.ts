@@ -33,4 +33,12 @@ export const queryKeys = {
     mine: () => ['schedules', 'me'] as const,
     user: (userId: string) => ['schedules', userId] as const,
   },
+  memberships: {
+    all: () => ['memberships'] as const,
+    detail: (id: string) => ['memberships', id] as const,
+  },
+  therapies: {
+    all: () => ['therapies'] as const,
+    detail: (id: string) => ['therapies', id] as const,
+  },
 }

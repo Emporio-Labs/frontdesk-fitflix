@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { mockTherapies, Therapy } from '@/lib/mock-data'
 import {
   Table,
   TableBody,
@@ -22,10 +21,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { IconPlus, IconEdit, IconTrash } from '@tabler/icons-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { IconPlus, IconEdit, IconTrash, IconRefresh } from '@tabler/icons-react'
+import { toast } from 'sonner'
+import { Therapy } from '@/lib/services/therapy.service'
+import { useCreateTherapy, useDeleteTherapy, useTherapies, useUpdateTherapy } from '@/hooks/use-therapies'
 
 export default function TherapiesPage() {
-  const [therapies, setTherapies] = useState<Therapy[]>(mockTherapies)
   const [searchTerm, setSearchTerm] = useState('')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingTherapy, setEditingTherapy] = useState<Therapy | null>(null)
@@ -37,26 +39,42 @@ export default function TherapiesPage() {
     duration: 60,
   })
 
+  const { data: therapies = [], isLoading, isError, refetch } = useTherapies()
+  const createTherapy = useCreateTherapy()
+  const updateTherapy = useUpdateTherapy()
+  const deleteTherapy = useDeleteTherapy()
+
   const filteredTherapies = therapies.filter(t =>
     t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.category.toLowerCase().includes(searchTerm.toLowerCase())
+    t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.description.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleAddTherapy = () => {
-    if (formData.name && formData.category) {
-      const newTherapy: Therapy = {
-        id: `th${therapies.length + 1}`,
-        name: formData.name,
-        category: formData.category,
-        description: formData.description,
-        price: formData.price,
-        duration: formData.duration,
-        status: 'active',
-      }
-      setTherapies([...therapies, newTherapy])
-      resetForm()
-      setIsAddDialogOpen(false)
+  const handleAddTherapy = async () => {
+    if (!formData.name.trim() || !formData.category.trim()) {
+      toast.error('Name and category are required')
+      return
     }
+    if (!Number.isFinite(formData.price) || formData.price <= 0) {
+      toast.error('Please enter a valid price greater than 0')
+      return
+    }
+    if (!Number.isFinite(formData.duration) || formData.duration <= 0) {
+      toast.error('Please enter a valid duration greater than 0')
+      return
+    }
+
+    await createTherapy.mutateAsync({
+      name: formData.name.trim(),
+      category: formData.category.trim(),
+      description: formData.description.trim(),
+      price: formData.price,
+      duration: formData.duration,
+      status: 'active',
+    })
+
+    resetForm()
+    setIsAddDialogOpen(false)
   }
 
   const handleEditTherapy = (therapy: Therapy) => {
@@ -71,28 +89,39 @@ export default function TherapiesPage() {
     setIsAddDialogOpen(true)
   }
 
-  const handleSaveEdit = () => {
-    if (editingTherapy && formData.name && formData.category) {
-      setTherapies(therapies.map(t =>
-        t.id === editingTherapy.id
-          ? {
-            ...t,
-            name: formData.name,
-            category: formData.category,
-            description: formData.description,
-            price: formData.price,
-            duration: formData.duration,
-          }
-          : t
-      ))
-      setEditingTherapy(null)
-      resetForm()
-      setIsAddDialogOpen(false)
+  const handleSaveEdit = async () => {
+    if (!editingTherapy) return
+    if (!formData.name.trim() || !formData.category.trim()) {
+      toast.error('Name and category are required')
+      return
     }
+    if (!Number.isFinite(formData.price) || formData.price <= 0) {
+      toast.error('Please enter a valid price greater than 0')
+      return
+    }
+    if (!Number.isFinite(formData.duration) || formData.duration <= 0) {
+      toast.error('Please enter a valid duration greater than 0')
+      return
+    }
+
+    await updateTherapy.mutateAsync({
+      id: editingTherapy.id,
+      payload: {
+        name: formData.name.trim(),
+        category: formData.category.trim(),
+        description: formData.description.trim(),
+        price: formData.price,
+        duration: formData.duration,
+      },
+    })
+
+    setEditingTherapy(null)
+    resetForm()
+    setIsAddDialogOpen(false)
   }
 
   const handleDeleteTherapy = (id: string) => {
-    setTherapies(therapies.filter(t => t.id !== id))
+    deleteTherapy.mutate(id)
   }
 
   const resetForm = () => {
@@ -113,162 +142,198 @@ export default function TherapiesPage() {
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-bold tracking-tight">Therapies</h2>
-                <p className="text-muted-foreground">Manage available therapy services</p>
-              </div>
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => setEditingTherapy(null)}>
-                    <IconPlus className="w-4 h-4 mr-2" />
-                    Add Therapy
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{editingTherapy ? 'Edit Therapy' : 'Add New Therapy'}</DialogTitle>
-                    <DialogDescription>
-                      {editingTherapy ? 'Update therapy service information' : 'Create a new therapy service'}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium">Name</label>
-                      <Input
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Therapy name"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Category</label>
-                      <Input
-                        value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        placeholder="Mental Health, Physical Wellness, etc."
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Description</label>
-                      <textarea
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        placeholder="Therapy description"
-                        className="w-full px-3 py-2 border rounded-md h-20 resize-none"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium">Price ($)</label>
-                        <Input
-                          type="number"
-                          value={formData.price}
-                          onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-                          placeholder="100"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Duration (mins)</label>
-                        <Input
-                          type="number"
-                          value={formData.duration}
-                          onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
-                          placeholder="60"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-2 pt-4">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setIsAddDialogOpen(false)
-                          setEditingTherapy(null)
-                          resetForm()
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button onClick={editingTherapy ? handleSaveEdit : handleAddTherapy}>
-                        {editingTherapy ? 'Save Changes' : 'Add Therapy'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            {/* Search Bar */}
-            <Card>
-              <CardHeader>
-                <Input
-                  placeholder="Search by name or category..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="max-w-sm"
-                />
-              </CardHeader>
-            </Card>
-
-            {/* Therapies Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>All Therapies</CardTitle>
-                <CardDescription>Total: {filteredTherapies.length} therapies</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Duration</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredTherapies.map((therapy) => (
-                        <TableRow key={therapy.id}>
-                          <TableCell className="font-medium">{therapy.name}</TableCell>
-                          <TableCell>{therapy.category}</TableCell>
-                          <TableCell className="max-w-xs truncate">{therapy.description}</TableCell>
-                          <TableCell>${therapy.price}</TableCell>
-                          <TableCell>{therapy.duration} mins</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(therapy.status)}>
-                              {therapy.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEditTherapy(therapy)}
-                              >
-                                <IconEdit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => handleDeleteTherapy(therapy.id)}
-                              >
-                                <IconTrash className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Therapies</h2>
+          <p className="text-muted-foreground">Manage available therapy services</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <IconRefresh className="w-4 h-4 mr-1" /> Refresh
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setEditingTherapy(null)}>
+                <IconPlus className="w-4 h-4 mr-2" />
+                Add Therapy
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingTherapy ? 'Edit Therapy' : 'Add New Therapy'}</DialogTitle>
+                <DialogDescription>
+                  {editingTherapy ? 'Update therapy service information' : 'Create a new therapy service'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Name</label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Therapy name"
+                  />
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <label className="text-sm font-medium">Category</label>
+                  <Input
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    placeholder="Mental Health, Physical Wellness, etc."
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Therapy description"
+                    className="w-full px-3 py-2 border rounded-md h-20 resize-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Price ($)</label>
+                    <Input
+                      type="number"
+                      value={formData.price}
+                      onChange={(e) =>
+                        setFormData({ ...formData, price: Number.parseFloat(e.target.value) || 0 })
+                      }
+                      placeholder="100"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Duration (mins)</label>
+                    <Input
+                      type="number"
+                      value={formData.duration}
+                      onChange={(e) =>
+                        setFormData({ ...formData, duration: Number.parseInt(e.target.value, 10) || 0 })
+                      }
+                      placeholder="60"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsAddDialogOpen(false)
+                      setEditingTherapy(null)
+                      resetForm()
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={editingTherapy ? handleSaveEdit : handleAddTherapy}
+                    disabled={createTherapy.isPending || updateTherapy.isPending}
+                  >
+                    {editingTherapy
+                      ? updateTherapy.isPending
+                        ? 'Saving...'
+                        : 'Save Changes'
+                      : createTherapy.isPending
+                        ? 'Adding...'
+                        : 'Add Therapy'}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <Card>
+        <CardHeader>
+          <Input
+            placeholder="Search by name, category, or description..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
+        </CardHeader>
+      </Card>
+
+      {/* Therapies Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>All Therapies</CardTitle>
+          <CardDescription>
+            {isLoading ? 'Loading therapies...' : `Total: ${filteredTherapies.length} therapies`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isError && (
+            <div className="text-center py-8 text-red-500">
+              Failed to load therapies/services. Please check API connectivity.
+            </div>
+          )}
+          {isLoading ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTherapies.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        No therapies/services found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredTherapies.map((therapy) => (
+                      <TableRow key={therapy.id}>
+                        <TableCell className="font-medium">{therapy.name}</TableCell>
+                        <TableCell>{therapy.category}</TableCell>
+                        <TableCell className="max-w-xs truncate">{therapy.description}</TableCell>
+                        <TableCell>${therapy.price}</TableCell>
+                        <TableCell>{therapy.duration} mins</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(therapy.status)}>{therapy.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleEditTherapy(therapy)}>
+                              <IconEdit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteTherapy(therapy.id)}
+                              disabled={deleteTherapy.isPending}
+                            >
+                              <IconTrash className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
