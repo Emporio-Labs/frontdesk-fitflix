@@ -1,131 +1,99 @@
 import { apiClient } from '@/lib/api-client'
-import { mockMemberships } from '@/lib/mock-data'
 
-export type MembershipPlanType = 'basic' | 'standard' | 'premium'
-export type MembershipStatus = 'active' | 'inactive' | 'expired'
+export type MembershipStatus = 'Active' | 'Paused' | 'Cancelled' | 'Expired'
 
 export interface Membership {
   id: string
   userId: string
-  planType: MembershipPlanType
+  planName: string
   price: number
+  currency: string
+  status: MembershipStatus
   startDate: string
   endDate: string
-  status: MembershipStatus
+  features: string[]
   notes: string
 }
 
 export interface CreateMembershipPayload {
   userId: string
-  planType: MembershipPlanType
+  planName: string
   price: number
+  currency: string
+  status: MembershipStatus
   startDate: string
   endDate: string
+  features?: string[]
   notes?: string
 }
 
 export interface UpdateMembershipPayload {
   userId?: string
-  planType?: MembershipPlanType
+  planName?: string
   price?: number
+  currency?: string
+  status?: MembershipStatus
   startDate?: string
   endDate?: string
-  status?: MembershipStatus
+  features?: string[]
   notes?: string
 }
 
-let fallbackStore: Membership[] = [...mockMemberships]
-
 function normalizeMembership(raw: any): Membership {
+  const legacyPlan = raw?.planType || 'Standard Plan'
+  const normalizedStatus = String(raw?.status || 'Active')
+
   return {
-    id: raw?.id || raw?._id || '',
+    id: raw?._id || raw?.id || '',
     userId: raw?.userId || raw?.user || '',
-    planType: raw?.planType || 'standard',
+    planName: raw?.planName || legacyPlan,
     price: Number(raw?.price ?? 0),
+    currency: raw?.currency || 'USD',
+    status: (['Active', 'Paused', 'Cancelled', 'Expired'].includes(normalizedStatus)
+      ? normalizedStatus
+      : 'Active') as MembershipStatus,
     startDate: raw?.startDate || '',
     endDate: raw?.endDate || '',
-    status: raw?.status || 'active',
+    features: Array.isArray(raw?.features) ? raw.features : [],
     notes: raw?.notes || '',
   }
 }
 
-function nextFallbackId() {
-  return `m${fallbackStore.length + 1}`
-}
-
 export const membershipService = {
   getAll: async (): Promise<{ memberships: Membership[] }> => {
-    try {
-      const { data } = await apiClient.get('/memberships')
-      if (Array.isArray(data?.memberships)) {
-        return { memberships: data.memberships.map(normalizeMembership) }
-      }
-      if (Array.isArray(data)) {
-        return { memberships: data.map(normalizeMembership) }
-      }
-      return { memberships: [] }
-    } catch {
-      return { memberships: [...fallbackStore] }
+    const { data } = await apiClient.get('/memberships')
+    if (Array.isArray(data?.memberships)) {
+      return { memberships: data.memberships.map(normalizeMembership) }
     }
+    if (Array.isArray(data)) {
+      return { memberships: data.map(normalizeMembership) }
+    }
+    return { memberships: [] }
   },
 
   getById: async (id: string): Promise<{ membership: Membership }> => {
-    try {
-      const { data } = await apiClient.get(`/memberships/${id}`)
-      return { membership: normalizeMembership(data?.membership || data) }
-    } catch {
-      const membership = fallbackStore.find((m) => m.id === id)
-      if (!membership) throw new Error('Membership not found')
-      return { membership }
-    }
+    const { data } = await apiClient.get(`/memberships/${id}`)
+    return { membership: normalizeMembership(data?.membership || data) }
   },
 
   create: async (payload: CreateMembershipPayload): Promise<{ message: string; membership: Membership }> => {
-    try {
-      const { data } = await apiClient.post('/memberships', payload)
-      return {
-        message: data?.message || 'Membership created successfully',
-        membership: normalizeMembership(data?.membership || data),
-      }
-    } catch {
-      const membership: Membership = {
-        id: nextFallbackId(),
-        userId: payload.userId,
-        planType: payload.planType,
-        price: payload.price,
-        startDate: payload.startDate,
-        endDate: payload.endDate,
-        status: 'active',
-        notes: payload.notes || '',
-      }
-      fallbackStore = [membership, ...fallbackStore]
-      return { message: 'Membership created locally', membership }
+    const { data } = await apiClient.post('/memberships', payload)
+    return {
+      message: data?.message || 'Membership created successfully',
+      membership: normalizeMembership(data?.membership || data),
     }
   },
 
   update: async (id: string, payload: UpdateMembershipPayload): Promise<{ message: string; membership: Membership }> => {
-    try {
-      const { data } = await apiClient.patch(`/memberships/${id}`, payload)
-      return {
-        message: data?.message || 'Membership updated successfully',
-        membership: normalizeMembership(data?.membership || data),
-      }
-    } catch {
-      const current = fallbackStore.find((m) => m.id === id)
-      if (!current) throw new Error('Membership not found')
-      const updated: Membership = { ...current, ...payload }
-      fallbackStore = fallbackStore.map((m) => (m.id === id ? updated : m))
-      return { message: 'Membership updated locally', membership: updated }
+    const { data } = await apiClient.patch(`/memberships/${id}`, payload)
+    return {
+      message: data?.message || 'Membership updated successfully',
+      membership: normalizeMembership(data?.membership || data),
     }
   },
 
   delete: async (id: string): Promise<{ message: string }> => {
-    try {
-      const { data } = await apiClient.delete(`/memberships/${id}`)
-      return { message: data?.message || 'Membership deleted successfully' }
-    } catch {
-      fallbackStore = fallbackStore.filter((m) => m.id !== id)
-      return { message: 'Membership deleted locally' }
-    }
+    const { data } = await apiClient.delete(`/memberships/${id}`)
+    return { message: data?.message || 'Membership deleted successfully' }
   },
 }

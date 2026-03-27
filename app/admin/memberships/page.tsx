@@ -22,42 +22,48 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconPlus, IconTrash, IconEye, IconRefresh } from '@tabler/icons-react'
+import { IconPlus, IconTrash, IconEye, IconRefresh, IconEdit } from '@tabler/icons-react'
 import { toast } from 'sonner'
-import { Membership, MembershipPlanType } from '@/lib/services/membership.service'
+import { Membership, MembershipStatus } from '@/lib/services/membership.service'
 import {
   useMemberships,
   useCreateMembership,
+  useUpdateMembership,
   useDeleteMembership,
 } from '@/hooks/use-memberships'
 
 export default function MembershipsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedMembership, setSelectedMembership] = useState<Membership | null>(null)
+  const [editingMembership, setEditingMembership] = useState<Membership | null>(null)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [formData, setFormData] = useState({
     userId: '',
-    planType: 'standard' as MembershipPlanType,
+    planName: '',
     price: 199.99,
+    currency: 'USD',
+    status: 'Active' as MembershipStatus,
     startDate: '',
     endDate: '',
+    features: '',
     notes: '',
   })
 
   const { data: memberships = [], isLoading, isError, refetch } = useMemberships()
   const createMembership = useCreateMembership()
+  const updateMembership = useUpdateMembership()
   const deleteMembership = useDeleteMembership()
 
   const filteredMemberships = memberships.filter(m =>
     m.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.planType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    m.planName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.notes.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleAddMembership = async () => {
+  const handleSaveMembership = async () => {
     if (!formData.userId.trim() || !formData.startDate || !formData.endDate) {
       toast.error('Member ID, start date, and end date are required')
       return
@@ -68,17 +74,46 @@ export default function MembershipsPage() {
       return
     }
 
-    await createMembership.mutateAsync({
+    const payload = {
       userId: formData.userId.trim(),
-      planType: formData.planType,
+      planName: formData.planName.trim() || 'Standard Plan',
       price: formData.price,
+      currency: formData.currency.trim() || 'USD',
+      status: formData.status,
       startDate: formData.startDate,
       endDate: formData.endDate,
+      features: formData.features
+        .split(',')
+        .map((token) => token.trim())
+        .filter(Boolean),
       notes: formData.notes,
-    })
+    }
+
+    if (editingMembership) {
+      await updateMembership.mutateAsync({ id: editingMembership.id, payload })
+    } else {
+      await createMembership.mutateAsync(payload)
+    }
 
     resetForm()
+    setEditingMembership(null)
     setIsAddDialogOpen(false)
+  }
+
+  const handleEditMembership = (membership: Membership) => {
+    setEditingMembership(membership)
+    setFormData({
+      userId: membership.userId,
+      planName: membership.planName,
+      price: membership.price,
+      currency: membership.currency,
+      status: membership.status,
+      startDate: membership.startDate,
+      endDate: membership.endDate,
+      features: membership.features.join(', '),
+      notes: membership.notes,
+    })
+    setIsAddDialogOpen(true)
   }
 
   const handleDeleteMembership = (id: string) => {
@@ -88,35 +123,27 @@ export default function MembershipsPage() {
   const resetForm = () => {
     setFormData({
       userId: '',
-      planType: 'standard',
+      planName: '',
       price: 199.99,
+      currency: 'USD',
+      status: 'Active',
       startDate: '',
       endDate: '',
+      features: '',
       notes: '',
     })
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active':
+      case 'Active':
         return 'bg-green-100 text-green-800'
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800'
-      case 'expired':
+      case 'Paused':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'Cancelled':
         return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getPlanColor = (plan: string) => {
-    switch (plan) {
-      case 'basic':
-        return 'bg-blue-100 text-blue-800'
-      case 'standard':
-        return 'bg-purple-100 text-purple-800'
-      case 'premium':
-        return 'bg-amber-100 text-amber-800'
+      case 'Expired':
+        return 'bg-gray-200 text-gray-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
@@ -135,15 +162,22 @@ export default function MembershipsPage() {
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetForm}>
+              <Button
+                onClick={() => {
+                  setEditingMembership(null)
+                  resetForm()
+                }}
+              >
                 <IconPlus className="w-4 h-4 mr-2" />
                 Add Membership
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Membership</DialogTitle>
-                <DialogDescription>Add a new membership plan for a member</DialogDescription>
+                <DialogTitle>{editingMembership ? 'Edit Membership' : 'Create New Membership'}</DialogTitle>
+                <DialogDescription>
+                  {editingMembership ? 'Update membership details' : 'Add a new membership plan for a member'}
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -156,16 +190,12 @@ export default function MembershipsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">Plan Type</label>
-                    <select
-                      value={formData.planType}
-                      onChange={(e) => setFormData({ ...formData, planType: e.target.value as MembershipPlanType })}
-                      className="w-full px-3 py-2 border rounded-md"
-                    >
-                      <option value="basic">Basic</option>
-                      <option value="standard">Standard</option>
-                      <option value="premium">Premium</option>
-                    </select>
+                    <label className="text-sm font-medium">Plan Name</label>
+                    <Input
+                      value={formData.planName}
+                      onChange={(e) => setFormData({ ...formData, planName: e.target.value })}
+                      placeholder="Gold Plan"
+                    />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Price</label>
@@ -177,6 +207,29 @@ export default function MembershipsPage() {
                       }
                       placeholder="199.99"
                     />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Currency</label>
+                    <Input
+                      value={formData.currency}
+                      onChange={(e) => setFormData({ ...formData, currency: e.target.value.toUpperCase() })}
+                      placeholder="USD"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as MembershipStatus })}
+                      className="w-full rounded-md border px-3 py-2"
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Paused">Paused</option>
+                      <option value="Cancelled">Cancelled</option>
+                      <option value="Expired">Expired</option>
+                    </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -198,6 +251,14 @@ export default function MembershipsPage() {
                   </div>
                 </div>
                 <div>
+                  <label className="text-sm font-medium">Features (comma separated)</label>
+                  <Input
+                    value={formData.features}
+                    onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+                    placeholder="unlimited-sessions, priority-support"
+                  />
+                </div>
+                <div>
                   <label className="text-sm font-medium">Notes</label>
                   <textarea
                     value={formData.notes}
@@ -211,13 +272,23 @@ export default function MembershipsPage() {
                     variant="outline"
                     onClick={() => {
                       setIsAddDialogOpen(false)
+                      setEditingMembership(null)
                       resetForm()
                     }}
                   >
                     Cancel
                   </Button>
-                  <Button onClick={handleAddMembership} disabled={createMembership.isPending}>
-                    {createMembership.isPending ? 'Adding...' : 'Add Membership'}
+                  <Button
+                    onClick={handleSaveMembership}
+                    disabled={createMembership.isPending || updateMembership.isPending}
+                  >
+                    {editingMembership
+                      ? updateMembership.isPending
+                        ? 'Saving...'
+                        : 'Save Changes'
+                      : createMembership.isPending
+                        ? 'Adding...'
+                        : 'Add Membership'}
                   </Button>
                 </div>
               </div>
@@ -265,8 +336,9 @@ export default function MembershipsPage() {
                   <TableRow>
                     <TableHead>ID</TableHead>
                     <TableHead>Member ID</TableHead>
-                    <TableHead>Plan Type</TableHead>
+                    <TableHead>Plan Name</TableHead>
                     <TableHead>Price</TableHead>
+                    <TableHead>Currency</TableHead>
                     <TableHead>Start Date</TableHead>
                     <TableHead>End Date</TableHead>
                     <TableHead>Status</TableHead>
@@ -276,7 +348,7 @@ export default function MembershipsPage() {
                 <TableBody>
                   {filteredMemberships.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                         No memberships found
                       </TableCell>
                     </TableRow>
@@ -285,10 +357,9 @@ export default function MembershipsPage() {
                       <TableRow key={membership.id}>
                         <TableCell className="font-medium">{membership.id}</TableCell>
                         <TableCell>{membership.userId}</TableCell>
-                        <TableCell>
-                          <Badge className={getPlanColor(membership.planType)}>{membership.planType}</Badge>
-                        </TableCell>
+                        <TableCell>{membership.planName}</TableCell>
                         <TableCell>${membership.price.toFixed(2)}</TableCell>
+                        <TableCell>{membership.currency}</TableCell>
                         <TableCell>{membership.startDate}</TableCell>
                         <TableCell>{membership.endDate}</TableCell>
                         <TableCell>
@@ -296,6 +367,13 @@ export default function MembershipsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditMembership(membership)}
+                            >
+                              <IconEdit className="w-4 h-4" />
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
@@ -342,8 +420,8 @@ export default function MembershipsPage() {
                   <p className="text-sm">{selectedMembership.userId}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Plan Type</label>
-                  <p className="text-sm">{selectedMembership.planType}</p>
+                  <label className="text-sm font-medium">Plan Name</label>
+                  <p className="text-sm">{selectedMembership.planName}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -359,12 +437,16 @@ export default function MembershipsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Price</label>
-                  <p className="text-sm">${selectedMembership.price.toFixed(2)}</p>
+                  <p className="text-sm">${selectedMembership.price.toFixed(2)} {selectedMembership.currency}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Status</label>
                   <p className="text-sm">{selectedMembership.status}</p>
                 </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Features</label>
+                <p className="text-sm">{selectedMembership.features.join(', ') || '-'}</p>
               </div>
               <div>
                 <label className="text-sm font-medium">Notes</label>

@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { IconPlus, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { useBookings, useCreateBooking, useDeleteBooking, useChangeBookingStatus } from '@/hooks/use-bookings'
 import { useSlots } from '@/hooks/use-slots'
+import { useServices } from '@/hooks/use-services'
 import { BOOKING_STATUS, BookingStatusValue } from '@/lib/services/booking.service'
 
 const STATUS_COLORS: Record<number, string> = {
@@ -53,6 +54,7 @@ export default function BookingsPage() {
 
   const { data: bookings = [], isLoading, isError, refetch } = useBookings()
   const { data: slots = [] } = useSlots()
+  const { data: services = [] } = useServices()
   const createBooking = useCreateBooking()
   const deleteBooking = useDeleteBooking()
   const changeStatus = useChangeBookingStatus()
@@ -128,12 +130,27 @@ export default function BookingsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Service ID</label>
-                  <Input
-                    placeholder="MongoDB ObjectId of the service"
-                    value={formData.serviceId}
-                    onChange={(e) => setFormData({ ...formData, serviceId: e.target.value })}
-                  />
+                  <label className="text-sm font-medium">Service</label>
+                  {services.length > 0 ? (
+                    <Select onValueChange={(v) => setFormData({ ...formData, serviceId: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a service" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {services.map((service) => (
+                          <SelectItem key={service.id} value={service.id}>
+                            {service.name} ({service.time} mins)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      placeholder="MongoDB ObjectId of the service"
+                      value={formData.serviceId}
+                      onChange={(e) => setFormData({ ...formData, serviceId: e.target.value })}
+                    />
+                  )}
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>

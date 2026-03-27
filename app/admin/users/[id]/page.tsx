@@ -60,7 +60,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
             </div>
             <div>
               <p className="text-sm text-gray-500">Join Date</p>
-              <p className="font-medium">{user.joinDate}</p>
+              <p className="font-medium">{user.createdAt}</p>
             </div>
           </div>
         </CardContent>
@@ -129,7 +129,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
                     >
                       <div>
-                        <p className="font-medium">{membership.type}</p>
+                        <p className="font-medium">{membership.planType}</p>
                         <p className="text-sm text-gray-500">
                           {membership.startDate} to {membership.endDate}
                         </p>

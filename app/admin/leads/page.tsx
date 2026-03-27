@@ -36,8 +36,8 @@ export default function LeadsPage() {
     name: '',
     email: '',
     phone: '',
-    source: 'website' as const,
-    status: 'new' as const,
+    source: 'website' as Lead['source'],
+    status: 'new' as Lead['status'],
     notes: '',
   })
 

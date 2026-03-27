@@ -2,7 +2,7 @@
 
 **Base URL:** `http://localhost:3000`  
 **API Version:** 1.0.0  
-**Last Updated:** March 21, 2026
+**Last Updated:** March 26, 2026
 
 ---
 
@@ -16,11 +16,15 @@
 6. [Doctor Routes](#doctor-routes)
 7. [Trainer Routes](#trainer-routes)
 8. [Slot Routes](#slot-routes)
-9. [Booking Routes](#booking-routes)
-10. [Appointment Routes](#appointment-routes)
-11. [Schedule Routes](#schedule-routes)
-12. [Enums & Status Codes](#enums--status-codes)
-13. [Error Handling](#error-handling)
+9. [Membership Routes](#membership-routes)
+10. [Service Routes](#service-routes)
+11. [Therapy Routes](#therapy-routes)
+12. [Lead Routes](#lead-routes)
+13. [Booking Routes](#booking-routes)
+14. [Appointment Routes](#appointment-routes)
+15. [Schedule Routes](#schedule-routes)
+16. [Enums & Status Codes](#enums--status-codes)
+17. [Error Handling](#error-handling)
 
 ---
 
@@ -59,16 +63,20 @@ The system supports 4 role types:
 |-------|---------|------|-----------|
 | `/auth` | User authentication | ❌ No | 2 endpoints |
 | `/admins` | Admin management | ✅ Admin only | 5 endpoints |
-| `/users` | Member management | ✅ Admin only | 5 endpoints |
+| `/users` | Member management | ✅ Admin + Doctor (read) | 5 endpoints |
 | `/doctors` | Doctor management | ✅ Admin + Role-based | 5 endpoints |
 | `/trainers` | Trainer management | ✅ Admin + Role-based | 5 endpoints |
 | `/slots` | Time slot management | ✅ Admin only | 5 endpoints |
+| `/memberships` | Membership plans per user | ✅ Mixed roles | 6 endpoints |
+| `/services` | Catalog of services | ✅ Mixed roles | 5 endpoints |
+| `/therapies` | Catalog of therapies | ✅ Mixed roles | 5 endpoints |
+| `/leads` | Lead intake and conversion | ✅ Mixed roles | 6 endpoints |
 | `/bookings` | Service bookings | ✅ Mixed roles | 7 endpoints |
 | `/appointments` | Doctor appointments | ✅ Mixed roles | 7 endpoints |
 | `/schedules` | User schedules/todos | ✅ All authenticated | 6 endpoints |
 | `/health` | Health check | ❌ No | 1 endpoint |
 
-**Total Endpoints:** 48
+**Total Endpoints:** 70
 
 ---
 
@@ -111,7 +119,7 @@ POST /auth/signup
 
 ---
 
-#### 2. Unified Login (User/Admin)
+#### 2. Unified Login (User/Admin/Doctor/Trainer)
 ```
 POST /auth/login
 ```
@@ -147,6 +155,30 @@ POST /auth/login
     "id": "507f1f77bcf86cd799439099",
     "email": "admin@hybridhuman.com",
     "role": "admin"
+  }
+}
+```
+
+**Doctor Login Response Example (200 OK):**
+```json
+{
+  "message": "Login successful",
+  "user": {
+    "id": "507f1f77bcf86cd799439055",
+    "email": "dr.jane@hybridhuman.com",
+    "role": "doctor"
+  }
+}
+```
+
+**Trainer Login Response Example (200 OK):**
+```json
+{
+  "message": "Login successful",
+  "user": {
+    "id": "507f1f77bcf86cd799439077",
+    "email": "coach.mike@hybridhuman.com",
+    "role": "trainer"
   }
 }
 ```
@@ -295,7 +327,8 @@ DELETE /admins/:id
 
 **Global Requirements:**
 - ✅ Basic Authentication required
-- ✅ Admin role required for all endpoints
+- ✅ Admin role required for create/update/delete endpoints
+- ✅ Doctor role can read users (`GET /users`, `GET /users/:id`)
 
 #### 1. Create User
 ```
@@ -340,6 +373,8 @@ POST /users
 GET /users
 ```
 
+**Authorization:** Admin, Doctor
+
 **Response (200 OK):**
 ```json
 {
@@ -365,6 +400,8 @@ GET /users
 ```
 GET /users/:id
 ```
+
+**Authorization:** Admin, Doctor
 
 **URL Params:**
 - `id` (string, required) — User MongoDB ObjectId
@@ -393,6 +430,8 @@ GET /users/:id
 PATCH /users/:id
 ```
 
+**Authorization:** Admin only
+
 **URL Params:**
 - `id` (string, required) — User MongoDB ObjectId
 
@@ -419,6 +458,8 @@ PATCH /users/:id
 ```
 DELETE /users/:id
 ```
+
+**Authorization:** Admin only
 
 **URL Params:**
 - `id` (string, required) — User MongoDB ObjectId
@@ -717,6 +758,306 @@ PATCH /slots/:id
 ```
 DELETE /slots/:id
 ```
+
+---
+
+## Membership Routes
+
+### Base Path: `/memberships`
+
+**Global Requirements:**
+- ✅ Basic Authentication required
+- ✅ Role-based: `admin` for admin endpoints; users can only view their memberships
+
+**Membership Status Values:** `Active`, `Paused`, `Cancelled`, `Expired`
+
+#### 1. Create Membership (Admin)
+```
+POST /memberships
+```
+
+**Authorization:** Admin only
+
+**Request Body:**
+```json
+{
+  "userId": "507f1f77bcf86cd799439011",
+  "planName": "Gold Plan",
+  "price": 49.99,
+  "currency": "USD",
+  "status": "Active",
+  "startDate": "2026-04-01",
+  "endDate": "2026-07-01",
+  "features": ["unlimited-sessions", "priority-support"],
+  "notes": "Spring promo"
+}
+```
+
+**Responses:**
+- `201` — Created; returns membership
+- `400` — Invalid payload, invalid dates, or missing `userId`
+- `401` — Unauthorized
+
+#### 2. Get All Memberships (Admin)
+```
+GET /memberships
+```
+
+**Authorization:** Admin
+
+**Responses:**
+- `200` — `{ memberships: [...] }`
+- `401` / `403` — Unauthorized / Forbidden
+
+#### 3. Get My Memberships (User)
+```
+GET /memberships/me
+```
+
+**Authorization:** User
+
+**Responses:**
+- `200` — Memberships for the authenticated user
+- `403` — If role is not `user`
+
+#### 4. Get Membership by ID (Admin)
+```
+GET /memberships/:id
+```
+
+**Authorization:** Admin
+
+**Responses:**
+- `200` — Returns membership
+- `400` — Invalid id
+- `404` — Not found
+
+#### 5. Update Membership (Admin)
+```
+PATCH /memberships/:id
+```
+
+**Authorization:** Admin
+
+**Request Body:** Any subset of fields from create payload; at least one field required.
+
+**Responses:**
+- `200` — Updated membership
+- `400` — Invalid payload/ids/dates
+- `404` — Not found
+
+#### 6. Delete Membership (Admin)
+```
+DELETE /memberships/:id
+```
+
+**Authorization:** Admin
+
+**Responses:**
+- `200` — Deleted
+- `400` — Invalid id
+- `404` — Not found
+
+---
+
+## Service Routes
+
+### Base Path: `/services`
+
+**Global Requirements:**
+- ✅ Basic Authentication required
+- ✅ Admin creates/updates/deletes; all roles can read
+
+#### 1. Create Service
+```
+POST /services
+```
+
+**Authorization:** Admin only
+
+**Request Body:**
+```json
+{
+  "serviceName": "Body Composition Analysis",
+  "serviceTime": 45,
+  "description": "Includes BMI, body fat %, muscle mass",
+  "tags": ["assessment", "baseline"],
+  "slots": ["507f1f77bcf86cd799439020"]
+}
+```
+
+#### 2. Get All Services
+```
+GET /services
+```
+
+**Authorization:** Admin, Doctor, Trainer, User
+
+#### 3. Get Service by ID
+```
+GET /services/:id
+```
+
+**Authorization:** Admin, Doctor, Trainer, User
+
+#### 4. Update Service
+```
+PATCH /services/:id
+```
+
+**Authorization:** Admin only
+
+**Notes:** Any subset of fields from create payload; at least one field required.
+
+#### 5. Delete Service
+```
+DELETE /services/:id
+```
+
+**Authorization:** Admin only
+
+---
+
+## Therapy Routes
+
+### Base Path: `/therapies`
+
+**Global Requirements:**
+- ✅ Basic Authentication required
+- ✅ Admin creates/updates/deletes; all roles can read
+
+#### 1. Create Therapy
+```
+POST /therapies
+```
+
+**Authorization:** Admin only
+
+**Request Body:**
+```json
+{
+  "therapyName": "Deep Tissue Massage",
+  "therapyTime": 60,
+  "description": "Focus on muscle recovery",
+  "tags": ["recovery", "massage"],
+  "slots": ["507f1f77bcf86cd799439020"]
+}
+```
+
+#### 2. Get All Therapies
+```
+GET /therapies
+```
+
+**Authorization:** Admin, Doctor, Trainer, User
+
+#### 3. Get Therapy by ID
+```
+GET /therapies/:id
+```
+
+**Authorization:** Admin, Doctor, Trainer, User
+
+#### 4. Update Therapy
+```
+PATCH /therapies/:id
+```
+
+**Authorization:** Admin only
+
+**Notes:** Any subset of fields from create payload; at least one field required.
+
+#### 5. Delete Therapy
+```
+DELETE /therapies/:id
+```
+
+**Authorization:** Admin only
+
+---
+
+## Lead Routes
+
+### Base Path: `/leads`
+
+**Global Requirements:**
+- ✅ Basic Authentication required
+- ✅ Admin can list/delete/convert; Admin/Doctor/Trainer can create/read/update
+- **Lead Status Values:** `New`, `Contacted`, `Qualified`, `Converted`, `Lost`
+
+#### 1. Create Lead
+```
+POST /leads
+```
+
+**Authorization:** Admin, Doctor, Trainer
+
+**Request Body:**
+```json
+{
+  "leadName": "Jane Prospect",
+  "email": "jane@example.com",
+  "phone": "+1234567890",
+  "source": "Landing Page",
+  "interestedIn": "Premium Membership",
+  "notes": "Prefers evening calls",
+  "tags": ["premium", "warm"],
+  "ownerId": "507f1f77bcf86cd799439099"
+}
+```
+
+#### 2. Get All Leads
+```
+GET /leads
+```
+
+**Authorization:** Admin only
+
+#### 3. Get Lead by ID
+```
+GET /leads/:id
+```
+
+**Authorization:** Admin, Doctor, Trainer
+
+#### 4. Update Lead
+```
+PATCH /leads/:id
+```
+
+**Authorization:** Admin, Doctor, Trainer
+
+**Notes:** Any subset of fields from create payload; at least one field required.
+
+#### 5. Delete Lead
+```
+DELETE /leads/:id
+```
+
+**Authorization:** Admin only
+
+#### 6. Convert Lead to User
+```
+POST /leads/:id/convert
+```
+
+**Authorization:** Admin only
+
+**Request Body:**
+```json
+{
+  "username": "jane_member", // optional, defaults to leadName
+  "phone": "+1234567890",
+  "age": "32",
+  "gender": 1,
+  "healthGoals": ["weight loss", "sleep"],
+  "password": "securePass"
+}
+```
+
+**Behavior:**
+- If a user already exists with the lead email, the lead links to that user and is marked `Converted`.
+- Otherwise, a new user is created with the provided details and the lead is marked `Converted`.
 
 ---
 
@@ -1157,6 +1498,17 @@ DELETE /schedules/:userId
   0: "Male",
   1: "Female",
   2: "Others"
+}
+```
+
+### Lead Status
+```javascript
+{
+  "New": "New",
+  "Contacted": "Contacted",
+  "Qualified": "Qualified",
+  "Converted": "Converted",
+  "Lost": "Lost"
 }
 ```
 

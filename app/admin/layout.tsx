@@ -1,6 +1,7 @@
 'use client'
 
 import { AppSidebar } from '@/components/app-sidebar'
+import { SidebarRouteSync } from '@/components/sidebar-route-sync'
 import { SiteHeader } from '@/components/site-header'
 import {
   SidebarInset,
@@ -14,7 +15,7 @@ export default function AdminLayout({
 }) {
   return (
     <SidebarProvider
-      defaultOpen={true}
+      defaultOpen={false}
       style={
         {
           "--sidebar-width": "calc(var(--spacing) * 72)",
@@ -22,6 +23,7 @@ export default function AdminLayout({
         } as React.CSSProperties
       }
     >
+      <SidebarRouteSync />
       <AppSidebar variant="inset" collapsible="icon" />
       <SidebarInset>
         <SiteHeader />

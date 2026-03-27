@@ -72,8 +72,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'reports', action: 'read' },
   ],
   clinician: [
+    { resource: 'users', action: 'read' },
     { resource: 'bookings', action: 'read' },
     { resource: 'bookings', action: 'update' },
+    { resource: 'schedules', action: 'read' },
+    { resource: 'schedules', action: 'update' },
     { resource: 'dna', action: 'read' },
     { resource: 'dna', action: 'update' },
     { resource: 'reports', action: 'read' },

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,145 +24,198 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IconPlus, IconEdit, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { toast } from 'sonner'
-import { Therapy } from '@/lib/services/therapy.service'
-import { useCreateTherapy, useDeleteTherapy, useTherapies, useUpdateTherapy } from '@/hooks/use-therapies'
+import {
+  useCreateTherapy,
+  useDeleteTherapy,
+  useTherapies,
+  useUpdateTherapy,
+} from '@/hooks/use-therapies'
+import {
+  useCreateService,
+  useDeleteService,
+  useServices,
+  useUpdateService,
+} from '@/hooks/use-services'
+
+type CatalogMode = 'services' | 'therapies'
+
+type CatalogItem = {
+  id: string
+  name: string
+  time: number
+  description: string
+  tags: string[]
+  slots: string[]
+}
 
 export default function TherapiesPage() {
+  const [mode, setMode] = useState<CatalogMode>('services')
   const [searchTerm, setSearchTerm] = useState('')
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [editingTherapy, setEditingTherapy] = useState<Therapy | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<CatalogItem | null>(null)
   const [formData, setFormData] = useState({
     name: '',
-    category: '',
+    time: 60,
     description: '',
-    price: 100,
-    duration: 60,
+    tags: '',
+    slots: '',
   })
 
-  const { data: therapies = [], isLoading, isError, refetch } = useTherapies()
+  const {
+    data: services = [],
+    isLoading: isLoadingServices,
+    isError: isServicesError,
+    refetch: refetchServices,
+  } = useServices()
+  const {
+    data: therapies = [],
+    isLoading: isLoadingTherapies,
+    isError: isTherapiesError,
+    refetch: refetchTherapies,
+  } = useTherapies()
+
+  const createService = useCreateService()
+  const updateService = useUpdateService()
+  const deleteService = useDeleteService()
+
   const createTherapy = useCreateTherapy()
   const updateTherapy = useUpdateTherapy()
   const deleteTherapy = useDeleteTherapy()
 
-  const filteredTherapies = therapies.filter(t =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const items = mode === 'services' ? services : therapies
+  const isLoading = mode === 'services' ? isLoadingServices : isLoadingTherapies
+  const isError = mode === 'services' ? isServicesError : isTherapiesError
+
+  const filteredItems = useMemo(
+    () =>
+      items.filter((item) => {
+        const query = searchTerm.toLowerCase()
+        return (
+          item.name.toLowerCase().includes(query) ||
+          item.description.toLowerCase().includes(query) ||
+          item.tags.some((tag) => tag.toLowerCase().includes(query))
+        )
+      }),
+    [items, searchTerm]
   )
 
-  const handleAddTherapy = async () => {
-    if (!formData.name.trim() || !formData.category.trim()) {
-      toast.error('Name and category are required')
-      return
-    }
-    if (!Number.isFinite(formData.price) || formData.price <= 0) {
-      toast.error('Please enter a valid price greater than 0')
-      return
-    }
-    if (!Number.isFinite(formData.duration) || formData.duration <= 0) {
-      toast.error('Please enter a valid duration greater than 0')
-      return
-    }
-
-    await createTherapy.mutateAsync({
-      name: formData.name.trim(),
-      category: formData.category.trim(),
-      description: formData.description.trim(),
-      price: formData.price,
-      duration: formData.duration,
-      status: 'active',
-    })
-
-    resetForm()
-    setIsAddDialogOpen(false)
-  }
-
-  const handleEditTherapy = (therapy: Therapy) => {
-    setEditingTherapy(therapy)
-    setFormData({
-      name: therapy.name,
-      category: therapy.category,
-      description: therapy.description,
-      price: therapy.price,
-      duration: therapy.duration,
-    })
-    setIsAddDialogOpen(true)
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editingTherapy) return
-    if (!formData.name.trim() || !formData.category.trim()) {
-      toast.error('Name and category are required')
-      return
-    }
-    if (!Number.isFinite(formData.price) || formData.price <= 0) {
-      toast.error('Please enter a valid price greater than 0')
-      return
-    }
-    if (!Number.isFinite(formData.duration) || formData.duration <= 0) {
-      toast.error('Please enter a valid duration greater than 0')
-      return
-    }
-
-    await updateTherapy.mutateAsync({
-      id: editingTherapy.id,
-      payload: {
-        name: formData.name.trim(),
-        category: formData.category.trim(),
-        description: formData.description.trim(),
-        price: formData.price,
-        duration: formData.duration,
-      },
-    })
-
-    setEditingTherapy(null)
-    resetForm()
-    setIsAddDialogOpen(false)
-  }
-
-  const handleDeleteTherapy = (id: string) => {
-    deleteTherapy.mutate(id)
-  }
+  const parseCsvInput = (value: string) =>
+    value
+      .split(',')
+      .map((token) => token.trim())
+      .filter(Boolean)
 
   const resetForm = () => {
     setFormData({
       name: '',
-      category: '',
+      time: 60,
       description: '',
-      price: 100,
-      duration: 60,
+      tags: '',
+      slots: '',
     })
   }
 
-  const getStatusColor = (status: string) => {
-    return status === 'active'
-      ? 'bg-green-100 text-green-800'
-      : 'bg-gray-100 text-gray-800'
+  const openCreateDialog = () => {
+    setEditingItem(null)
+    resetForm()
+    setIsDialogOpen(true)
   }
+
+  const openEditDialog = (item: CatalogItem) => {
+    setEditingItem(item)
+    setFormData({
+      name: item.name,
+      time: item.time,
+      description: item.description,
+      tags: item.tags.join(', '),
+      slots: item.slots.join(', '),
+    })
+    setIsDialogOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Name is required')
+      return
+    }
+
+    if (!Number.isFinite(formData.time) || formData.time <= 0) {
+      toast.error('Please enter a valid duration greater than 0')
+      return
+    }
+
+    const payload = {
+      name: formData.name.trim(),
+      time: formData.time,
+      description: formData.description.trim(),
+      tags: parseCsvInput(formData.tags),
+      slots: parseCsvInput(formData.slots),
+    }
+
+    if (mode === 'services') {
+      if (editingItem) {
+        await updateService.mutateAsync({ id: editingItem.id, payload })
+      } else {
+        await createService.mutateAsync(payload)
+      }
+    } else if (editingItem) {
+      await updateTherapy.mutateAsync({ id: editingItem.id, payload })
+    } else {
+      await createTherapy.mutateAsync(payload)
+    }
+
+    setEditingItem(null)
+    setIsDialogOpen(false)
+    resetForm()
+  }
+
+  const handleDelete = (id: string) => {
+    if (mode === 'services') {
+      deleteService.mutate(id)
+    } else {
+      deleteTherapy.mutate(id)
+    }
+  }
+
+  const handleRefresh = () => {
+    if (mode === 'services') {
+      refetchServices()
+    } else {
+      refetchTherapies()
+    }
+  }
+
+  const isPending =
+    createService.isPending ||
+    updateService.isPending ||
+    deleteService.isPending ||
+    createTherapy.isPending ||
+    updateTherapy.isPending ||
+    deleteTherapy.isPending
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Therapies</h2>
-          <p className="text-muted-foreground">Manage available therapy services</p>
+          <h2 className="text-3xl font-bold tracking-tight">Therapies & Services</h2>
+          <p className="text-muted-foreground">Manage both catalogs from one screen</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <IconRefresh className="w-4 h-4 mr-1" /> Refresh
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <IconRefresh className="mr-1 h-4 w-4" /> Refresh
           </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => setEditingTherapy(null)}>
-                <IconPlus className="w-4 h-4 mr-2" />
-                Add Therapy
+              <Button onClick={openCreateDialog}>
+                <IconPlus className="mr-2 h-4 w-4" />
+                Add {mode === 'services' ? 'Service' : 'Therapy'}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{editingTherapy ? 'Edit Therapy' : 'Add New Therapy'}</DialogTitle>
+                <DialogTitle>{editingItem ? 'Edit' : 'Create'} {mode === 'services' ? 'Service' : 'Therapy'}</DialogTitle>
                 <DialogDescription>
-                  {editingTherapy ? 'Update therapy service information' : 'Create a new therapy service'}
+                  Fill in the catalog details required by the updated API.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -171,15 +224,16 @@ export default function TherapiesPage() {
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Therapy name"
+                    placeholder={mode === 'services' ? 'Body Composition Analysis' : 'Deep Tissue Massage'}
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Category</label>
+                  <label className="text-sm font-medium">Time (minutes)</label>
                   <Input
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="Mental Health, Physical Wellness, etc."
+                    type="number"
+                    value={formData.time}
+                    onChange={(e) => setFormData({ ...formData, time: Number.parseInt(e.target.value, 10) || 0 })}
+                    placeholder="60"
                   />
                 </div>
                 <div>
@@ -187,56 +241,39 @@ export default function TherapiesPage() {
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Therapy description"
-                    className="w-full px-3 py-2 border rounded-md h-20 resize-none"
+                    placeholder="Describe this item"
+                    className="h-20 w-full resize-none rounded-md border px-3 py-2"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Price ($)</label>
-                    <Input
-                      type="number"
-                      value={formData.price}
-                      onChange={(e) =>
-                        setFormData({ ...formData, price: Number.parseFloat(e.target.value) || 0 })
-                      }
-                      placeholder="100"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Duration (mins)</label>
-                    <Input
-                      type="number"
-                      value={formData.duration}
-                      onChange={(e) =>
-                        setFormData({ ...formData, duration: Number.parseInt(e.target.value, 10) || 0 })
-                      }
-                      placeholder="60"
-                    />
-                  </div>
+                <div>
+                  <label className="text-sm font-medium">Tags (comma separated)</label>
+                  <Input
+                    value={formData.tags}
+                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                    placeholder="assessment, baseline"
+                  />
                 </div>
-                <div className="flex gap-2 pt-4">
+                <div>
+                  <label className="text-sm font-medium">Slot IDs (comma separated)</label>
+                  <Input
+                    value={formData.slots}
+                    onChange={(e) => setFormData({ ...formData, slots: e.target.value })}
+                    placeholder="507f1f77bcf86cd799439020"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setIsAddDialogOpen(false)
-                      setEditingTherapy(null)
+                      setIsDialogOpen(false)
+                      setEditingItem(null)
                       resetForm()
                     }}
                   >
                     Cancel
                   </Button>
-                  <Button
-                    onClick={editingTherapy ? handleSaveEdit : handleAddTherapy}
-                    disabled={createTherapy.isPending || updateTherapy.isPending}
-                  >
-                    {editingTherapy
-                      ? updateTherapy.isPending
-                        ? 'Saving...'
-                        : 'Save Changes'
-                      : createTherapy.isPending
-                        ? 'Adding...'
-                        : 'Add Therapy'}
+                  <Button onClick={handleSave} disabled={isPending}>
+                    {isPending ? 'Saving...' : editingItem ? 'Save Changes' : 'Create'}
                   </Button>
                 </div>
               </div>
@@ -245,11 +282,26 @@ export default function TherapiesPage() {
         </div>
       </div>
 
-      {/* Search Bar */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-2">
+            <Button
+              variant={mode === 'services' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setMode('services')}
+            >
+              Services
+            </Button>
+            <Button
+              variant={mode === 'therapies' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setMode('therapies')}
+            >
+              Therapies
+            </Button>
+          </div>
           <Input
-            placeholder="Search by name, category, or description..."
+            placeholder={`Search ${mode}...`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-sm"
@@ -257,18 +309,17 @@ export default function TherapiesPage() {
         </CardHeader>
       </Card>
 
-      {/* Therapies Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Therapies</CardTitle>
+          <CardTitle>{mode === 'services' ? 'Services' : 'Therapies'} Catalog</CardTitle>
           <CardDescription>
-            {isLoading ? 'Loading therapies...' : `Total: ${filteredTherapies.length} therapies`}
+            {isLoading ? 'Loading...' : `${filteredItems.length} ${mode} found`}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isError && (
-            <div className="text-center py-8 text-red-500">
-              Failed to load therapies/services. Please check API connectivity.
+            <div className="py-8 text-center text-red-500">
+              Failed to load {mode}. Please check API connectivity.
             </div>
           )}
           {isLoading ? (
@@ -283,45 +334,51 @@ export default function TherapiesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Tags</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Slots</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTherapies.length === 0 ? (
+                  {filteredItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        No therapies/services found
+                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                        No {mode} found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredTherapies.map((therapy) => (
-                      <TableRow key={therapy.id}>
-                        <TableCell className="font-medium">{therapy.name}</TableCell>
-                        <TableCell>{therapy.category}</TableCell>
-                        <TableCell className="max-w-xs truncate">{therapy.description}</TableCell>
-                        <TableCell>${therapy.price}</TableCell>
-                        <TableCell>{therapy.duration} mins</TableCell>
+                    filteredItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell>{item.time} mins</TableCell>
                         <TableCell>
-                          <Badge className={getStatusColor(therapy.status)}>{therapy.status}</Badge>
+                          <div className="flex flex-wrap gap-1">
+                            {item.tags.length ? (
+                              item.tags.map((tag) => (
+                                <Badge key={tag} variant="outline">{tag}</Badge>
+                              ))
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
+                          </div>
                         </TableCell>
+                        <TableCell className="max-w-xs truncate">{item.description || '-'}</TableCell>
+                        <TableCell>{item.slots.length}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleEditTherapy(therapy)}>
-                              <IconEdit className="w-4 h-4" />
+                            <Button size="sm" variant="outline" onClick={() => openEditDialog(item)}>
+                              <IconEdit className="h-4 w-4" />
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
                               className="text-red-600 hover:text-red-700"
-                              onClick={() => handleDeleteTherapy(therapy.id)}
-                              disabled={deleteTherapy.isPending}
+                              onClick={() => handleDelete(item.id)}
+                              disabled={isPending}
                             >
-                              <IconTrash className="w-4 h-4" />
+                              <IconTrash className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>

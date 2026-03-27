@@ -1,47 +1,50 @@
 import { apiClient } from '@/lib/api-client'
 import { mockTherapies } from '@/lib/mock-data'
 
-export type TherapyStatus = 'active' | 'inactive'
-
-export interface Therapy {
+export interface TherapyCatalogItem {
   id: string
   name: string
-  category: string
+  time: number
   description: string
-  price: number
-  duration: number
-  status: TherapyStatus
+  tags: string[]
+  slots: string[]
 }
 
 export interface CreateTherapyPayload {
   name: string
-  category: string
+  time: number
   description?: string
-  price: number
-  duration: number
-  status?: TherapyStatus
+  tags?: string[]
+  slots?: string[]
 }
 
 export interface UpdateTherapyPayload {
   name?: string
-  category?: string
+  time?: number
   description?: string
-  price?: number
-  duration?: number
-  status?: TherapyStatus
+  tags?: string[]
+  slots?: string[]
 }
 
-let fallbackStore: Therapy[] = [...mockTherapies]
+let fallbackStore: TherapyCatalogItem[] = mockTherapies.map((item) => ({
+  id: item.id,
+  name: item.name,
+  time: item.duration,
+  description: item.description,
+  tags: item.category ? [item.category.toLowerCase().replace(/\s+/g, '-')] : [],
+  slots: [],
+}))
 
-function normalizeTherapy(raw: any): Therapy {
+function normalizeTherapy(raw: any): TherapyCatalogItem {
   return {
-    id: raw?.id || raw?._id || '',
-    name: raw?.name || '',
-    category: raw?.category || '',
+    id: raw?._id || raw?.id || '',
+    name: raw?.therapyName || raw?.name || '',
+    time: Number(raw?.therapyTime ?? raw?.time ?? 0),
     description: raw?.description || '',
-    price: Number(raw?.price ?? 0),
-    duration: Number(raw?.duration ?? 0),
-    status: raw?.status === 'inactive' ? 'inactive' : 'active',
+    tags: Array.isArray(raw?.tags) ? raw.tags : [],
+    slots: Array.isArray(raw?.slots)
+      ? raw.slots.map((slot: unknown) => String((slot as any)?._id || slot || ''))
+      : [],
   }
 }
 
@@ -49,113 +52,89 @@ function nextFallbackId() {
   return `th${fallbackStore.length + 1}`
 }
 
-async function getFromApi(): Promise<Therapy[]> {
-  const candidates = ['/services', '/therapies']
-
-  for (const path of candidates) {
-    try {
-      const { data } = await apiClient.get(path)
-      if (Array.isArray(data?.services)) return data.services.map(normalizeTherapy)
-      if (Array.isArray(data?.therapies)) return data.therapies.map(normalizeTherapy)
-      if (Array.isArray(data)) return data.map(normalizeTherapy)
-    } catch {
-      // Try the next endpoint candidate.
-    }
-  }
-
-  throw new Error('No services endpoint available')
-}
-
 export const therapyService = {
-  getAll: async (): Promise<{ therapies: Therapy[] }> => {
+  getAll: async (): Promise<{ therapies: TherapyCatalogItem[] }> => {
     try {
-      const therapies = await getFromApi()
-      return { therapies }
+      const { data } = await apiClient.get('/therapies')
+      if (Array.isArray(data?.therapies)) return { therapies: data.therapies.map(normalizeTherapy) }
+      if (Array.isArray(data)) return { therapies: data.map(normalizeTherapy) }
+      return { therapies: [] }
     } catch {
       return { therapies: [...fallbackStore] }
     }
   },
 
-  getById: async (id: string): Promise<{ therapy: Therapy }> => {
-    const candidates = [`/services/${id}`, `/therapies/${id}`]
-
-    for (const path of candidates) {
-      try {
-        const { data } = await apiClient.get(path)
-        return { therapy: normalizeTherapy(data?.service || data?.therapy || data) }
-      } catch {
-        // Try the next endpoint candidate.
-      }
+  getById: async (id: string): Promise<{ therapy: TherapyCatalogItem }> => {
+    try {
+      const { data } = await apiClient.get(`/therapies/${id}`)
+      return { therapy: normalizeTherapy(data?.therapy || data) }
+    } catch {
+      const therapy = fallbackStore.find((item) => item.id === id)
+      if (!therapy) throw new Error('Therapy not found')
+      return { therapy }
     }
-
-    const therapy = fallbackStore.find((t) => t.id === id)
-    if (!therapy) throw new Error('Therapy not found')
-    return { therapy }
   },
 
-  create: async (payload: CreateTherapyPayload): Promise<{ message: string; therapy: Therapy }> => {
-    const candidates = ['/services', '/therapies']
-
-    for (const path of candidates) {
-      try {
-        const { data } = await apiClient.post(path, payload)
-        return {
-          message: data?.message || 'Therapy created successfully',
-          therapy: normalizeTherapy(data?.service || data?.therapy || data),
-        }
-      } catch {
-        // Try the next endpoint candidate.
-      }
-    }
-
-    const therapy: Therapy = {
-      id: nextFallbackId(),
-      name: payload.name,
-      category: payload.category,
+  create: async (payload: CreateTherapyPayload): Promise<{ message: string; therapy: TherapyCatalogItem }> => {
+    const apiPayload = {
+      therapyName: payload.name,
+      therapyTime: payload.time,
       description: payload.description || '',
-      price: payload.price,
-      duration: payload.duration,
-      status: payload.status || 'active',
+      tags: payload.tags || [],
+      slots: payload.slots || [],
     }
-    fallbackStore = [therapy, ...fallbackStore]
-    return { message: 'Therapy created locally', therapy }
+
+    try {
+      const { data } = await apiClient.post('/therapies', apiPayload)
+      return {
+        message: data?.message || 'Therapy created successfully',
+        therapy: normalizeTherapy(data?.therapy || data),
+      }
+    } catch {
+      const therapy: TherapyCatalogItem = {
+        id: nextFallbackId(),
+        name: payload.name,
+        time: payload.time,
+        description: payload.description || '',
+        tags: payload.tags || [],
+        slots: payload.slots || [],
+      }
+      fallbackStore = [therapy, ...fallbackStore]
+      return { message: 'Therapy created locally', therapy }
+    }
   },
 
-  update: async (id: string, payload: UpdateTherapyPayload): Promise<{ message: string; therapy: Therapy }> => {
-    const candidates = [`/services/${id}`, `/therapies/${id}`]
-
-    for (const path of candidates) {
-      try {
-        const { data } = await apiClient.patch(path, payload)
-        return {
-          message: data?.message || 'Therapy updated successfully',
-          therapy: normalizeTherapy(data?.service || data?.therapy || data),
-        }
-      } catch {
-        // Try the next endpoint candidate.
-      }
+  update: async (id: string, payload: UpdateTherapyPayload): Promise<{ message: string; therapy: TherapyCatalogItem }> => {
+    const apiPayload = {
+      ...(payload.name !== undefined ? { therapyName: payload.name } : {}),
+      ...(payload.time !== undefined ? { therapyTime: payload.time } : {}),
+      ...(payload.description !== undefined ? { description: payload.description } : {}),
+      ...(payload.tags !== undefined ? { tags: payload.tags } : {}),
+      ...(payload.slots !== undefined ? { slots: payload.slots } : {}),
     }
 
-    const current = fallbackStore.find((t) => t.id === id)
-    if (!current) throw new Error('Therapy not found')
-    const updated: Therapy = { ...current, ...payload }
-    fallbackStore = fallbackStore.map((t) => (t.id === id ? updated : t))
-    return { message: 'Therapy updated locally', therapy: updated }
+    try {
+      const { data } = await apiClient.patch(`/therapies/${id}`, apiPayload)
+      return {
+        message: data?.message || 'Therapy updated successfully',
+        therapy: normalizeTherapy(data?.therapy || data),
+      }
+    } catch {
+      const current = fallbackStore.find((item) => item.id === id)
+      if (!current) throw new Error('Therapy not found')
+      const updated: TherapyCatalogItem = { ...current, ...payload }
+      fallbackStore = fallbackStore.map((item) => (item.id === id ? updated : item))
+      return { message: 'Therapy updated locally', therapy: updated }
+    }
   },
 
   delete: async (id: string): Promise<{ message: string }> => {
-    const candidates = [`/services/${id}`, `/therapies/${id}`]
-
-    for (const path of candidates) {
-      try {
-        const { data } = await apiClient.delete(path)
-        return { message: data?.message || 'Therapy deleted successfully' }
-      } catch {
-        // Try the next endpoint candidate.
-      }
+    try {
+      const { data } = await apiClient.delete(`/therapies/${id}`)
+      return { message: data?.message || 'Therapy deleted successfully' }
+    } catch {
+      fallbackStore = fallbackStore.filter((item) => item.id !== id)
+      return { message: 'Therapy deleted locally' }
     }
-
-    fallbackStore = fallbackStore.filter((t) => t.id !== id)
-    return { message: 'Therapy deleted locally' }
   },
 }
