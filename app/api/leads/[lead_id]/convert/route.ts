@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { convertLead } from '@/lib/server/leads-store'
 
-type Params = { params: { lead_id: string } }
+type Params = { params: Promise<{ lead_id: string }> }
 
 export async function POST(_req: NextRequest, { params }: Params) {
   try {
-    const updated = await convertLead(params.lead_id)
+    const { lead_id } = await params
+    const updated = await convertLead(lead_id)
     if (!updated) {
       return NextResponse.json({ message: 'Lead not found' }, { status: 404 })
     }

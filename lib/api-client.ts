@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { AxiosHeaders } from 'axios'
 
 const DEFAULT_API_BASE_URL = 'http://localhost:3000'
 
@@ -57,14 +57,9 @@ apiClient.interceptors.request.use((config) => {
     const credentials = localStorage.getItem('hh_credentials')
     let hasAuthHeader = false
     if (credentials) {
-      if (config.headers && typeof (config.headers as any).set === 'function') {
-        ;(config.headers as any).set('Authorization', `Basic ${credentials}`)
-      } else {
-        config.headers = {
-          ...(config.headers ?? {}),
-          Authorization: `Basic ${credentials}`,
-        }
-      }
+      const headers = AxiosHeaders.from(config.headers)
+      headers.set('Authorization', `Basic ${credentials}`)
+      config.headers = headers
       hasAuthHeader = true
     }
 

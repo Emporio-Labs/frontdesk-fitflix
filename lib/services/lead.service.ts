@@ -47,6 +47,7 @@ export interface CreateLeadPayload {
   email: string
   phone?: string
   source?: string
+  status?: LeadStatus
   interestedIn?: string
   temperature?: LeadTemperature
   notes?: string
@@ -207,6 +208,7 @@ function toCreatePayload(payload: CreateLeadPayload) {
     email: payload.email,
     ...(payload.phone ? { phone: payload.phone } : {}),
     ...(payload.source ? { source: payload.source } : {}),
+    ...(payload.status ? { status: toApiStatus(payload.status) } : {}),
     ...(payload.interestedIn ? { interestedIn: payload.interestedIn } : {}),
     ...(payload.notes ? { notes: payload.notes } : {}),
     ...(tags.length ? { tags } : {}),

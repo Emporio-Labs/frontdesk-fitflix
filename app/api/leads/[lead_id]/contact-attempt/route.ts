@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { recordContactAttempt } from '@/lib/server/leads-store'
 
-type Params = { params: { lead_id: string } }
+type Params = { params: Promise<{ lead_id: string }> }
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
+    const { lead_id } = await params
     const body = await req.json()
-    const updated = await recordContactAttempt(params.lead_id, {
+    const updated = await recordContactAttempt(lead_id, {
       channel: body?.channel,
       note: body?.note,
       createdBy: body?.createdBy,

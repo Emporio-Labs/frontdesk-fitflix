@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { deletePlanById, getPlanById, updatePlanById } from '@/lib/server/membership-plans-store'
 
-type Params = { params: { plan_id: string } }
+type Params = { params: Promise<{ plan_id: string }> }
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    const plan = await getPlanById(params.plan_id)
+    const { plan_id } = await params
+    const plan = await getPlanById(plan_id)
     if (!plan) {
       return NextResponse.json({ message: 'Plan not found' }, { status: 404 })
     }
@@ -17,8 +18,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
+    const { plan_id } = await params
     const body = await req.json()
-    const updated = await updatePlanById(params.plan_id, {
+    const updated = await updatePlanById(plan_id, {
       total_price: body?.total_price,
       duration_months: body?.duration_months,
       features: body?.features,
@@ -40,7 +42,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
-    const deleted = await deletePlanById(params.plan_id)
+    const { plan_id } = await params
+    const deleted = await deletePlanById(plan_id)
     if (!deleted) {
       return NextResponse.json({ message: 'Plan not found' }, { status: 404 })
     }

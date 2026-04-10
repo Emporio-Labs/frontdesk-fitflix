@@ -1119,9 +1119,9 @@ export default function LeadsPage() {
                 <CardDescription>Lead loss between stages</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between"><span>New -> Contacted</span><span>{leadAnalytics?.dropOff?.newToContacted || 0}</span></div>
-                <div className="flex justify-between"><span>Contacted -> Qualified</span><span>{leadAnalytics?.dropOff?.contactedToQualified || 0}</span></div>
-                <div className="flex justify-between"><span>Qualified -> Converted</span><span>{leadAnalytics?.dropOff?.qualifiedToConverted || 0}</span></div>
+                <div className="flex justify-between"><span>New -&gt; Contacted</span><span>{leadAnalytics?.dropOff?.newToContacted || 0}</span></div>
+                <div className="flex justify-between"><span>Contacted -&gt; Qualified</span><span>{leadAnalytics?.dropOff?.contactedToQualified || 0}</span></div>
+                <div className="flex justify-between"><span>Qualified -&gt; Converted</span><span>{leadAnalytics?.dropOff?.qualifiedToConverted || 0}</span></div>
               </CardContent>
             </Card>
 

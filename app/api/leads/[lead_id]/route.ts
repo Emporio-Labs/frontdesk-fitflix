@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getLeadById, softDeleteLead, updateLead } from '@/lib/server/leads-store'
 
-type Params = { params: { lead_id: string } }
+type Params = { params: Promise<{ lead_id: string }> }
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
+    const { lead_id } = await params
     const notesLimitParam = req.nextUrl.searchParams.get('notesLimit')
     const notesLimit = notesLimitParam ? Number(notesLimitParam) : 10
-    const lead = await getLeadById(params.lead_id, Number.isFinite(notesLimit) ? notesLimit : 10)
+    const lead = await getLeadById(lead_id, Number.isFinite(notesLimit) ? notesLimit : 10)
     if (!lead) {
       return NextResponse.json({ message: 'Lead not found' }, { status: 404 })
     }
@@ -19,10 +20,11 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
+    const { lead_id } = await params
     const body = await req.json()
     const expectedRevision = body?.expectedRevision
 
-    const updated = await updateLead(params.lead_id, {
+    const updated = await updateLead(lead_id, {
       leadName: body?.leadName,
       email: body?.email,
       phone: body?.phone,
@@ -63,7 +65,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
-    const deleted = await softDeleteLead(params.lead_id)
+    const { lead_id } = await params
+    const deleted = await softDeleteLead(lead_id)
     if (!deleted) {
       return NextResponse.json({ message: 'Lead not found' }, { status: 404 })
     }

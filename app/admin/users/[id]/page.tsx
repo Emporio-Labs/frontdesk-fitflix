@@ -1,13 +1,18 @@
 'use client'
 
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { IconArrowLeft, IconEdit, IconMail, IconPhone } from '@tabler/icons-react'
 import { useUser } from '@/hooks/use-users'
 
-export default function UserDetailPage({ params }: { params: { id: string } }) {
-  const { data: user, isLoading, isError } = useUser(params.id)
+export default function UserDetailPage() {
+  const params = useParams<{ id?: string | string[] }>()
+  const idParam = params?.id
+  const userId = Array.isArray(idParam) ? idParam[0] : idParam || ''
+
+  const { data: user, isLoading, isError } = useUser(userId)
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
