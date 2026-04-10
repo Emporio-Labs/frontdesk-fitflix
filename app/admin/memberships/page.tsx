@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,6 +26,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { IconPlus, IconTrash, IconEye, IconRefresh, IconEdit } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { Membership, MembershipStatus } from '@/lib/services/membership.service'
+import { useMembershipPlans } from '@/hooks/use-membership-plans'
+import { useUsers } from '@/hooks/use-users'
 import {
   useMemberships,
   useCreateMembership,
@@ -33,27 +36,159 @@ import {
 } from '@/hooks/use-memberships'
 
 export default function MembershipsPage() {
+  const searchParams = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedMembership, setSelectedMembership] = useState<Membership | null>(null)
   const [editingMembership, setEditingMembership] = useState<Membership | null>(null)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [hasHandledAssignParam, setHasHandledAssignParam] = useState(false)
   const [formData, setFormData] = useState({
     userId: '',
-    planName: '',
-    price: 199.99,
-    currency: 'USD',
+    planId: '',
+    discountPercent: 0 as number | '',
     status: 'Active' as MembershipStatus,
     startDate: '',
     endDate: '',
-    features: '',
     notes: '',
   })
 
   const { data: memberships = [], isLoading, isError, refetch } = useMemberships()
+  const { data: users = [] } = useUsers()
+  const { data: membershipPlans = [] } = useMembershipPlans()
   const createMembership = useCreateMembership()
   const updateMembership = useUpdateMembership()
   const deleteMembership = useDeleteMembership()
+
+  const assignUserId = searchParams.get('assignUserId') || ''
+
+  const selectedPlan = useMemo(
+    () => membershipPlans.find((plan) => plan.id === formData.planId),
+    [membershipPlans, formData.planId]
+  )
+
+  const selectedPlanCredits = useMemo(
+    () => Number(selectedPlan?.benefits?.credits ?? 0),
+    [selectedPlan]
+  )
+
+  const selectedPlanBasePrice = useMemo(
+    () => Number(selectedPlan?.totalPrice ?? 0),
+    [selectedPlan]
+  )
+
+  const normalizedDiscountPercent = useMemo(() => {
+    const raw = Number(formData.discountPercent)
+    if (!Number.isFinite(raw)) {
+      return 0
+    }
+    return Math.min(100, Math.max(0, raw))
+  }, [formData.discountPercent])
+
+  const discountedPrice = useMemo(() => {
+    if (!selectedPlan) {
+      return 0
+    }
+    const discounted = selectedPlanBasePrice * (1 - normalizedDiscountPercent / 100)
+    return Number(Math.max(0, discounted).toFixed(2))
+  }, [selectedPlan, selectedPlanBasePrice, normalizedDiscountPercent])
+
+  const selectedUser = useMemo(
+    () =>
+      users.find(
+        (user) => user._id === formData.userId || user.username === formData.userId || user.email === formData.userId
+      ),
+    [users, formData.userId]
+  )
+
+  const getMembershipUsername = (membership: Membership) => {
+    const membershipUserId = membership.userId.toLowerCase()
+    const match = users.find(
+      (user) =>
+        user._id.toLowerCase() === membershipUserId ||
+        user.username.toLowerCase() === membershipUserId ||
+        user.email.toLowerCase() === membershipUserId
+    )
+    return match?.username || 'Unknown User'
+  }
+
+  const getMembershipUserEmail = (membership: Membership) => {
+    const membershipUserId = membership.userId.toLowerCase()
+    const match = users.find(
+      (user) =>
+        user._id.toLowerCase() === membershipUserId ||
+        user.username.toLowerCase() === membershipUserId ||
+        user.email.toLowerCase() === membershipUserId
+    )
+    return match?.email || '-'
+  }
+
+  const formatDateOnly = (value?: string) => {
+    if (!value) return '-'
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) {
+      return value.split('T')[0] || value
+    }
+    return parsed.toISOString().slice(0, 10)
+  }
+
+  useEffect(() => {
+    if (!assignUserId || hasHandledAssignParam || users.length === 0) {
+      return
+    }
+
+    const matchedUser = users.find(
+      (user) =>
+        user._id === assignUserId ||
+        user.username.toLowerCase() === assignUserId.toLowerCase() ||
+        user.email.toLowerCase() === assignUserId.toLowerCase()
+    )
+
+    if (!matchedUser) {
+      toast.error('Selected member was not found')
+      setHasHandledAssignParam(true)
+      return
+    }
+
+    const userKeys = [matchedUser._id, matchedUser.username, matchedUser.email]
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean)
+
+    const alreadyAssigned = memberships.some((membership) =>
+      userKeys.includes((membership.userId || '').trim().toLowerCase())
+    )
+
+    if (alreadyAssigned) {
+      toast.info(`${matchedUser.username} already has a membership assigned`)
+      setHasHandledAssignParam(true)
+      return
+    }
+
+    setEditingMembership(null)
+    resetForm()
+    setFormData((prev) => ({ ...prev, userId: matchedUser._id }))
+    setIsAddDialogOpen(true)
+    setHasHandledAssignParam(true)
+  }, [assignUserId, hasHandledAssignParam, users, memberships])
+
+  useEffect(() => {
+    if (!selectedPlan || !formData.startDate) {
+      return
+    }
+
+    const start = new Date(`${formData.startDate}T00:00:00`)
+    if (Number.isNaN(start.getTime())) {
+      return
+    }
+
+    const end = new Date(start)
+    end.setMonth(end.getMonth() + selectedPlan.durationMonths)
+    const endDate = end.toISOString().slice(0, 10)
+
+    if (formData.endDate !== endDate) {
+      setFormData((prev) => ({ ...prev, endDate }))
+    }
+  }, [selectedPlan, formData.startDate, formData.endDate])
 
   const filteredMemberships = memberships.filter(m =>
     m.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -65,27 +200,25 @@ export default function MembershipsPage() {
 
   const handleSaveMembership = async () => {
     if (!formData.userId.trim() || !formData.startDate || !formData.endDate) {
-      toast.error('Member ID, start date, and end date are required')
+      toast.error('Username/email must be auto-filled from Assign Membership, plus start and end date are required')
       return
     }
 
-    if (!Number.isFinite(formData.price) || formData.price <= 0) {
-      toast.error('Please enter a valid price greater than 0')
+    if (!selectedPlan) {
+      toast.error('Please select a membership plan')
       return
     }
 
     const payload = {
       userId: formData.userId.trim(),
-      planName: formData.planName.trim() || 'Standard Plan',
-      price: formData.price,
-      currency: formData.currency.trim() || 'USD',
+      planId: selectedPlan.id,
+      planName: selectedPlan.planName,
+      price: discountedPrice,
+      currency: selectedPlan.currency,
       status: formData.status,
       startDate: formData.startDate,
       endDate: formData.endDate,
-      features: formData.features
-        .split(',')
-        .map((token) => token.trim())
-        .filter(Boolean),
+      features: selectedPlan.features,
       notes: formData.notes,
     }
 
@@ -101,16 +234,38 @@ export default function MembershipsPage() {
   }
 
   const handleEditMembership = (membership: Membership) => {
+    const matchingUser = users.find((user) => {
+      const membershipUserId = membership.userId.toLowerCase()
+      return (
+        user._id.toLowerCase() === membershipUserId ||
+        user.username.toLowerCase() === membershipUserId ||
+        user.email.toLowerCase() === membershipUserId
+      )
+    })
+
+    const matchingPlan =
+      membershipPlans.find((plan) => plan.id === membership.planId) ||
+      membershipPlans.find((plan) => plan.planName === membership.planName)
+
+    const derivedDiscountPercent = (() => {
+      if (!matchingPlan || matchingPlan.totalPrice <= 0) {
+        return 0
+      }
+      const pct = ((matchingPlan.totalPrice - membership.price) / matchingPlan.totalPrice) * 100
+      if (!Number.isFinite(pct)) {
+        return 0
+      }
+      return Number(Math.min(100, Math.max(0, pct)).toFixed(2))
+    })()
+
     setEditingMembership(membership)
     setFormData({
-      userId: membership.userId,
-      planName: membership.planName,
-      price: membership.price,
-      currency: membership.currency,
+      userId: matchingUser?._id || membership.userId,
+      planId: matchingPlan?.id || '',
+      discountPercent: derivedDiscountPercent,
       status: membership.status,
       startDate: membership.startDate,
       endDate: membership.endDate,
-      features: membership.features.join(', '),
       notes: membership.notes,
     })
     setIsAddDialogOpen(true)
@@ -123,13 +278,11 @@ export default function MembershipsPage() {
   const resetForm = () => {
     setFormData({
       userId: '',
-      planName: '',
-      price: 199.99,
-      currency: 'USD',
+      planId: '',
+      discountPercent: 0,
       status: 'Active',
       startDate: '',
       endDate: '',
-      features: '',
       notes: '',
     })
   }
@@ -180,44 +333,101 @@ export default function MembershipsPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Member ID</label>
-                  <Input
-                    value={formData.userId}
-                    onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
-                    placeholder="member123"
-                  />
-                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">Plan Name</label>
+                    <label className="text-sm font-medium">Username</label>
                     <Input
-                      value={formData.planName}
-                      onChange={(e) => setFormData({ ...formData, planName: e.target.value })}
-                      placeholder="Gold Plan"
+                      value={selectedUser?.username || ''}
+                      readOnly
+                      placeholder="Auto-filled from Assign Membership"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Price</label>
+                    <label className="text-sm font-medium">Email</label>
+                    <Input
+                      value={selectedUser?.email || ''}
+                      readOnly
+                      placeholder="Auto-filled from Assign Membership"
+                    />
+                  </div>
+                </div>
+                {!selectedUser && (
+                  <p className="text-xs text-muted-foreground">
+                    Open this dialog from Users page using Assign Membership to auto-fill member details.
+                  </p>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Membership Plan</label>
+                    <select
+                      value={formData.planId}
+                      onChange={(e) => setFormData({ ...formData, planId: e.target.value })}
+                      className="w-full rounded-md border px-3 py-2"
+                    >
+                      <option value="">Select a plan</option>
+                      {membershipPlans.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.planName} - {plan.durationMonths} month{plan.durationMonths > 1 ? 's' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="rounded-md border p-3 text-sm">
+                    <p className="font-medium">Selected Plan Details</p>
+                    {selectedPlan ? (
+                      <div className="mt-1 space-y-1 text-muted-foreground">
+                        <p>Original Price: {selectedPlan.currency} {selectedPlanBasePrice.toFixed(2)}</p>
+                        <p>Credits: {selectedPlanCredits}</p>
+                        <p>Features: {selectedPlan.features.join(', ') || '-'}</p>
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-muted-foreground">Select a plan to auto-populate details</p>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Discount (%)</label>
                     <Input
                       type="number"
-                      value={formData.price}
-                      onChange={(e) =>
-                        setFormData({ ...formData, price: Number.parseFloat(e.target.value) || 0 })
-                      }
-                      placeholder="199.99"
+                      min={0}
+                      max={100}
+                      value={formData.discountPercent}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === '') {
+                          setFormData({ ...formData, discountPercent: '' })
+                          return
+                        }
+                        const parsed = Number.parseFloat(value)
+                        if (Number.isNaN(parsed)) {
+                          return
+                        }
+                        setFormData({
+                          ...formData,
+                          discountPercent: Number(Math.min(100, Math.max(0, parsed)).toFixed(2)),
+                        })
+                      }}
+                      onBlur={() => {
+                        if (formData.discountPercent === '') {
+                          setFormData({ ...formData, discountPercent: 0 })
+                        }
+                      }}
                     />
+                  </div>
+                  <div className="rounded-md border p-3 text-sm text-muted-foreground">
+                    {selectedPlan ? (
+                      <>
+                        <p>Final Price: {selectedPlan.currency} {discountedPrice.toFixed(2)}</p>
+                        <p>Applied Discount: {normalizedDiscountPercent}%</p>
+                        <p>Credits: {selectedPlanCredits}</p>
+                      </>
+                    ) : (
+                      <p>Select a plan to apply discount</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Currency</label>
-                    <Input
-                      value={formData.currency}
-                      onChange={(e) => setFormData({ ...formData, currency: e.target.value.toUpperCase() })}
-                      placeholder="USD"
-                    />
-                  </div>
                   <div>
                     <label className="text-sm font-medium">Status</label>
                     <select
@@ -230,6 +440,16 @@ export default function MembershipsPage() {
                       <option value="Cancelled">Cancelled</option>
                       <option value="Expired">Expired</option>
                     </select>
+                  </div>
+                  <div className="rounded-md border p-3 text-sm text-muted-foreground">
+                    {selectedPlan ? (
+                      <>
+                        <p>Plan ID: {selectedPlan.id}</p>
+                        <p>Duration: {selectedPlan.durationMonths} months</p>
+                      </>
+                    ) : (
+                      <p>Plan ID will be attached once selected</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -246,17 +466,9 @@ export default function MembershipsPage() {
                     <Input
                       type="date"
                       value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      readOnly
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Features (comma separated)</label>
-                  <Input
-                    value={formData.features}
-                    onChange={(e) => setFormData({ ...formData, features: e.target.value })}
-                    placeholder="unlimited-sessions, priority-support"
-                  />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Notes</label>
@@ -334,8 +546,7 @@ export default function MembershipsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Member ID</TableHead>
+                    <TableHead>Username</TableHead>
                     <TableHead>Plan Name</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Currency</TableHead>
@@ -348,20 +559,19 @@ export default function MembershipsPage() {
                 <TableBody>
                   {filteredMemberships.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         No memberships found
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredMemberships.map((membership) => (
                       <TableRow key={membership.id}>
-                        <TableCell className="font-medium">{membership.id}</TableCell>
-                        <TableCell>{membership.userId}</TableCell>
+                        <TableCell className="font-medium">{getMembershipUsername(membership)}</TableCell>
                         <TableCell>{membership.planName}</TableCell>
                         <TableCell>${membership.price.toFixed(2)}</TableCell>
                         <TableCell>{membership.currency}</TableCell>
-                        <TableCell>{membership.startDate}</TableCell>
-                        <TableCell>{membership.endDate}</TableCell>
+                        <TableCell>{formatDateOnly(membership.startDate)}</TableCell>
+                        <TableCell>{formatDateOnly(membership.endDate)}</TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(membership.status)}>{membership.status}</Badge>
                         </TableCell>
@@ -411,48 +621,44 @@ export default function MembershipsPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Membership Details</DialogTitle>
-              <DialogDescription>{selectedMembership.id}</DialogDescription>
+              <DialogDescription>
+                {getMembershipUsername(selectedMembership)} - {selectedMembership.planName}
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Member ID</label>
-                  <p className="text-sm">{selectedMembership.userId}</p>
+            <Card>
+              <CardHeader>
+                <CardTitle>Plan Card Preview</CardTitle>
+                <CardDescription>How this assigned membership appears</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-lg font-semibold">{selectedMembership.planName}</p>
+                  <Badge variant={selectedMembership.status === 'Active' ? 'default' : 'secondary'}>
+                    {selectedMembership.status}
+                  </Badge>
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Plan Name</label>
-                  <p className="text-sm">{selectedMembership.planName}</p>
+                <p className="text-2xl font-bold">
+                  {selectedMembership.currency.toUpperCase()} {Number(selectedMembership.price || 0).toFixed(2)}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {getMembershipUsername(selectedMembership)} ({getMembershipUserEmail(selectedMembership)})
+                </p>
+                <ul className="list-disc space-y-1 pl-4 text-sm">
+                  {selectedMembership.features.length === 0 && <li>No features added yet</li>}
+                  {selectedMembership.features.map((feature) => (
+                    <li key={feature}>{feature}</li>
+                  ))}
+                </ul>
+                <div className="grid grid-cols-2 gap-2 pt-1 text-xs text-muted-foreground">
+                  <p>Start date: {formatDateOnly(selectedMembership.startDate)}</p>
+                  <p>End date: {formatDateOnly(selectedMembership.endDate)}</p>
+                  <p>Plan ID: {selectedMembership.planId || '-'}</p>
+                  <p>Membership ID: {selectedMembership.id}</p>
+                  <p>Member ref: {selectedMembership.userId || '-'}</p>
+                  <p>Notes: {selectedMembership.notes || '-'}</p>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Start Date</label>
-                  <p className="text-sm">{selectedMembership.startDate}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">End Date</label>
-                  <p className="text-sm">{selectedMembership.endDate}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Price</label>
-                  <p className="text-sm">${selectedMembership.price.toFixed(2)} {selectedMembership.currency}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Status</label>
-                  <p className="text-sm">{selectedMembership.status}</p>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Features</label>
-                <p className="text-sm">{selectedMembership.features.join(', ') || '-'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Notes</label>
-                <p className="text-sm">{selectedMembership.notes}</p>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </DialogContent>
         </Dialog>
       )}

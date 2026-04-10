@@ -1,0 +1,24 @@
+[
+  {
+    "plan_id": "9e10a840-20fc-48e7-97d4-2d23c87a7d61",
+    "gym_id": "default-gym",
+    "plan_name": "Elite Club",
+    "duration_months": 6,
+    "total_price": 7888,
+    "currency": "INR",
+    "features": [
+      "Cardio",
+      "Strength Training"
+    ],
+    "benefits": {
+      "credits": 5000,
+      "pauseDays": 50,
+      "trainerSessions": 12,
+      "transferSessions": 5,
+      "transferWindowDays": 0
+    },
+    "status": "active",
+    "created_at": "2026-04-10T18:54:18.835Z",
+    "updated_at": "2026-04-10T18:54:18.835Z"
+  }
+]

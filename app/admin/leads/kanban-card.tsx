@@ -4,14 +4,19 @@ import { useDraggable } from '@dnd-kit/core'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Lead, LeadTemperature } from '@/lib/services/lead.service'
-import { IconCheck, IconEdit, IconGripVertical } from '@tabler/icons-react'
+import { IconBrandWhatsapp, IconCheck, IconEdit, IconGripVertical, IconMessage, IconPhone, IconUser } from '@tabler/icons-react'
 
 interface KanbanCardProps {
   lead: Lead
   onConvert: () => void
   onEdit: () => void
+  onCall: () => void
+  onWhatsApp: () => void
+  onAddNote: () => void
   isPending: boolean
   source: string
+  isFollowUpToday: boolean
+  leadAgeDays: number
   isDragDisabled?: boolean
 }
 
@@ -19,8 +24,13 @@ export default function KanbanCard({
   lead,
   onConvert,
   onEdit,
+  onCall,
+  onWhatsApp,
+  onAddNote,
   isPending,
   source,
+  isFollowUpToday,
+  leadAgeDays,
   isDragDisabled = false,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -74,12 +84,13 @@ export default function KanbanCard({
       ref={setNodeRef}
       className={`rounded-md border p-3 space-y-2 transition-all ${getSourceAccentColor(
         source
-      )} ${isDragging ? 'opacity-50 ring-2 ring-blue-400' : ''}`}
+      )} ${isFollowUpToday ? 'ring-2 ring-orange-300' : ''} ${isDragging ? 'opacity-50 ring-2 ring-blue-400' : ''}`}
     >
       <div className="flex justify-between items-start gap-2">
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm truncate">{lead.name}</div>
           <div className="text-xs text-muted-foreground truncate">{lead.email}</div>
+          <div className="text-xs text-muted-foreground truncate">{lead.phone || 'No phone'}</div>
         </div>
         {!isDragDisabled && (
           <button
@@ -100,6 +111,12 @@ export default function KanbanCard({
         <Badge className={getStatusColor(lead.status)} variant="secondary">
           {lead.status}
         </Badge>
+        <Badge variant="outline">{lead.source}</Badge>
+      </div>
+
+      <div className="text-xs text-muted-foreground flex items-center gap-1">
+        <IconUser className="w-3 h-3" />
+        {lead.assignedStaffName || 'Unassigned'}
       </div>
 
       {lead.followUpDate && (
@@ -108,7 +125,52 @@ export default function KanbanCard({
         </div>
       )}
 
+      <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+        <span>Aging: {leadAgeDays}d</span>
+        <span>Contacts: {lead.contactCount || 0}</span>
+      </div>
+
+      {lead.interactions.length > 0 && (
+        <div className="rounded border bg-white/60 p-2">
+          <div className="text-[11px] font-medium text-muted-foreground mb-1">Recent Notes</div>
+          <ul className="space-y-1">
+            {lead.interactions.slice(0, 2).map((item) => (
+              <li key={item.id} className="text-[11px] text-muted-foreground truncate">
+                {item.note}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="flex gap-1 pt-2">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+          disabled={isPending || !lead.phone}
+          onClick={onCall}
+        >
+          <IconPhone className="w-4 h-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100"
+          disabled={isPending || !lead.phone}
+          onClick={onWhatsApp}
+        >
+          <IconBrandWhatsapp className="w-4 h-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-violet-600 hover:text-violet-700 hover:bg-violet-100"
+          disabled={isPending}
+          onClick={onAddNote}
+        >
+          <IconMessage className="w-4 h-4" />
+        </Button>
         <Button
           size="sm"
           variant="ghost"

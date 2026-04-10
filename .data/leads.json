@@ -1,0 +1,169 @@
+{
+  "leads": [
+    {
+      "_id": "lead-sagun-20260327",
+      "leadName": "sagun",
+      "email": "sagunvarma25@gmail.com",
+      "phone": "8919726698",
+      "source": "direct",
+      "status": "qualified",
+      "heat": "hot",
+      "notes": "",
+      "interestedIn": "",
+      "tags": [
+        "hot",
+        "qualified"
+      ],
+      "ownerId": "",
+      "assignedStaffName": "",
+      "createdAt": "2026-03-27T09:30:00.000Z",
+      "updatedAt": "2026-03-27T09:30:00.000Z",
+      "followUpDate": "2026-03-28T00:00:00.000Z",
+      "contactCount": 0,
+      "lastContactedAt": "",
+      "isDeleted": false,
+      "deletedAt": "",
+      "revision": 1,
+      "fcmTokens": [],
+      "interactions": [],
+      "stageHistory": [
+        {
+          "stage": "qualified",
+          "enteredAt": "2026-03-27T09:30:00.000Z"
+        }
+      ]
+    },
+    {
+      "_id": "lead-rahul-raju-20260327",
+      "leadName": "rahul raju",
+      "email": "shaskakak@gmail.com",
+      "phone": "0e8737302972309",
+      "source": "direct",
+      "status": "contacted",
+      "heat": "warm",
+      "notes": "",
+      "interestedIn": "",
+      "tags": [
+        "warm",
+        "contacted"
+      ],
+      "ownerId": "",
+      "assignedStaffName": "",
+      "createdAt": "2026-03-27T09:32:00.000Z",
+      "updatedAt": "2026-03-27T09:32:00.000Z",
+      "followUpDate": "",
+      "contactCount": 0,
+      "lastContactedAt": "",
+      "isDeleted": false,
+      "deletedAt": "",
+      "revision": 1,
+      "fcmTokens": [],
+      "interactions": [],
+      "stageHistory": [
+        {
+          "stage": "contacted",
+          "enteredAt": "2026-03-27T09:32:00.000Z"
+        }
+      ]
+    },
+    {
+      "_id": "lead-sambar-20260327",
+      "leadName": "sambar",
+      "email": "22951a67a7@iare.ac.in",
+      "phone": "65679808765456785",
+      "source": "website",
+      "status": "new",
+      "heat": "cold",
+      "notes": "",
+      "interestedIn": "",
+      "tags": [
+        "cold",
+        "new"
+      ],
+      "ownerId": "",
+      "assignedStaffName": "",
+      "createdAt": "2026-03-27T09:35:00.000Z",
+      "updatedAt": "2026-03-27T09:35:00.000Z",
+      "followUpDate": "2026-03-31T00:00:00.000Z",
+      "contactCount": 0,
+      "lastContactedAt": "",
+      "isDeleted": false,
+      "deletedAt": "",
+      "revision": 1,
+      "fcmTokens": [],
+      "interactions": [],
+      "stageHistory": [
+        {
+          "stage": "new",
+          "enteredAt": "2026-03-27T09:35:00.000Z"
+        }
+      ]
+    },
+    {
+      "_id": "lead-arvind-20260327",
+      "leadName": "arvind",
+      "email": "sagunvarma25@gmail.com",
+      "phone": "8919726698",
+      "source": "direct",
+      "status": "new",
+      "heat": "warm",
+      "notes": "",
+      "interestedIn": "",
+      "tags": [
+        "warm",
+        "new"
+      ],
+      "ownerId": "",
+      "assignedStaffName": "",
+      "createdAt": "2026-03-27T09:40:00.000Z",
+      "updatedAt": "2026-03-27T09:40:00.000Z",
+      "followUpDate": "2026-03-30T00:00:00.000Z",
+      "contactCount": 0,
+      "lastContactedAt": "",
+      "isDeleted": false,
+      "deletedAt": "",
+      "revision": 1,
+      "fcmTokens": [],
+      "interactions": [],
+      "stageHistory": [
+        {
+          "stage": "new",
+          "enteredAt": "2026-03-27T09:40:00.000Z"
+        }
+      ]
+    },
+    {
+      "_id": "lead-yeshwanth-20260410",
+      "leadName": "YESHWANTH",
+      "email": "yesh@gmail.com",
+      "phone": "9876543210",
+      "source": "direct",
+      "status": "new",
+      "heat": "cold",
+      "notes": "",
+      "interestedIn": "",
+      "tags": [
+        "cold",
+        "new"
+      ],
+      "ownerId": "",
+      "assignedStaffName": "",
+      "createdAt": "2026-04-10T09:00:00.000Z",
+      "updatedAt": "2026-04-10T09:00:00.000Z",
+      "followUpDate": "2026-04-10T00:00:00.000Z",
+      "contactCount": 0,
+      "lastContactedAt": "",
+      "isDeleted": false,
+      "deletedAt": "",
+      "revision": 1,
+      "fcmTokens": [],
+      "interactions": [],
+      "stageHistory": [
+        {
+          "stage": "new",
+          "enteredAt": "2026-04-10T09:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}

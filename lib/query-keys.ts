@@ -37,6 +37,10 @@ export const queryKeys = {
     all: () => ['memberships'] as const,
     detail: (id: string) => ['memberships', id] as const,
   },
+  membershipPlans: {
+    all: () => ['membership-plans'] as const,
+    detail: (id: string) => ['membership-plans', id] as const,
+  },
   therapies: {
     all: () => ['therapies'] as const,
     detail: (id: string) => ['therapies', id] as const,

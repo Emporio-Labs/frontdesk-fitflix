@@ -5,6 +5,7 @@ export type MembershipStatus = 'Active' | 'Paused' | 'Cancelled' | 'Expired'
 export interface Membership {
   id: string
   userId: string
+  planId?: string
   planName: string
   price: number
   currency: string
@@ -17,6 +18,7 @@ export interface Membership {
 
 export interface CreateMembershipPayload {
   userId: string
+  planId?: string
   planName: string
   price: number
   currency: string
@@ -29,6 +31,7 @@ export interface CreateMembershipPayload {
 
 export interface UpdateMembershipPayload {
   userId?: string
+  planId?: string
   planName?: string
   price?: number
   currency?: string
@@ -46,6 +49,7 @@ function normalizeMembership(raw: any): Membership {
   return {
     id: raw?._id || raw?.id || '',
     userId: raw?.userId || raw?.user || '',
+    planId: raw?.planId || raw?.plan?._id || raw?.plan || undefined,
     planName: raw?.planName || legacyPlan,
     price: Number(raw?.price ?? 0),
     currency: raw?.currency || 'USD',

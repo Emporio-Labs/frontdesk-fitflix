@@ -7,7 +7,6 @@ import {
   DragOverlay,
   closestCorners,
 } from '@dnd-kit/core'
-import { arrayMove } from '@dnd-kit/sortable'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,12 +30,17 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { IconPlus, IconEdit, IconTrash, IconCheck, IconGripVertical } from '@tabler/icons-react'
+import { IconPlus, IconEdit, IconTrash, IconCheck } from '@tabler/icons-react'
 import {
+  useAddLeadInteraction,
   useConvertLead,
   useCreateLead,
   useDeleteLead,
+  useLeadAnalytics,
+  useLeadDigest,
+  useLeadReminders,
   useLeads,
+  useRecordLeadContactAttempt,
   useUpdateLead,
 } from '@/hooks/use-leads'
 import { Lead, LeadStatus, LeadTemperature } from '@/lib/services/lead.service'
@@ -58,10 +62,15 @@ export default function LeadsPage() {
     isError,
     refetch,
   } = useLeads()
+  const { data: reminderSummary } = useLeadReminders()
+  const { data: leadAnalytics } = useLeadAnalytics()
+  const { data: leadDigest } = useLeadDigest()
   const createLead = useCreateLead()
   const updateLead = useUpdateLead()
   const deleteLead = useDeleteLead()
   const convertLead = useConvertLead()
+  const addInteraction = useAddLeadInteraction()
+  const contactAttempt = useRecordLeadContactAttempt()
 
   const [formData, setFormData] = useState({
     name: '',
@@ -73,6 +82,7 @@ export default function LeadsPage() {
     notes: '',
     interestedIn: '',
     followUpDate: '',
+    assignedStaffName: '',
   })
   const [convertFormData, setConvertFormData] = useState({
     username: '',
@@ -87,46 +97,66 @@ export default function LeadsPage() {
     return leads.filter((l) => {
       const matchesSearch =
         l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        l.email.toLowerCase().includes(searchTerm.toLowerCase())
+        l.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        l.phone.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesStatus = !filterStatus || l.status === filterStatus
       return matchesSearch && matchesStatus
     })
   }, [leads, searchTerm, filterStatus])
 
-  const today = useMemo(() => new Date().toISOString().split('T')[0], [])
+  const statusToHeat: Record<LeadStatus, LeadTemperature> = {
+    new: 'cold',
+    contacted: 'warm',
+    qualified: 'hot',
+    converted: 'hot',
+    lost: 'cold',
+  }
 
-  const followUpsToday = useMemo(
-    () => filteredLeads.filter((lead) => lead.followUpDate === today),
-    [filteredLeads, today]
-  )
+  const todayFollowUps = reminderSummary?.today || []
+  const missedFollowUps = reminderSummary?.missed || []
 
   const scheduledCalls = useMemo(
-    () => filteredLeads.filter((lead) => lead.followUpDate && lead.followUpDate > today),
-    [filteredLeads, today]
+    () => filteredLeads.filter((lead) => lead.followUpDate && !todayFollowUps.some((item) => item.id === lead.id)),
+    [filteredLeads, todayFollowUps]
   )
 
   const analytics = useMemo(() => {
-    const total = filteredLeads.length || 1
-    const converted = filteredLeads.filter((l) => l.status === 'converted').length
-    const hot = filteredLeads.filter((l) => l.temperature === 'hot').length
-    const warm = filteredLeads.filter((l) => l.temperature === 'warm').length
-    const cold = filteredLeads.filter((l) => l.temperature === 'cold').length
-    const conversionRate = Math.round((converted / total) * 100)
-
     const sourceCounts: Record<string, number> = {}
     filteredLeads.forEach((lead) => {
       const key = (lead.source || 'other').toLowerCase()
       sourceCounts[key] = (sourceCounts[key] || 0) + 1
     })
 
-    return { converted, hot, warm, cold, conversionRate, sourceCounts }
-  }, [filteredLeads])
+    const converted = leadAnalytics?.stageCounts?.converted || 0
+    const total = filteredLeads.length || 1
+    const conversionRate = Math.round((converted / total) * 100)
+
+    return {
+      converted,
+      hot: leadAnalytics?.heatDistribution?.hot || 0,
+      warm: leadAnalytics?.heatDistribution?.warm || 0,
+      cold: leadAnalytics?.heatDistribution?.cold || 0,
+      conversionRate,
+      sourceCounts,
+    }
+  }, [filteredLeads, leadAnalytics])
 
   const handleAddLead = async () => {
     if (!formData.name.trim() || !formData.email.trim()) {
       toast.error('Name and email are required')
       return
     }
+
+    const normalizedPhone = formData.phone.replace(/\D/g, '')
+    if (!editingLead && normalizedPhone) {
+      const duplicate = leads.find((lead) => lead.phone.replace(/\D/g, '') === normalizedPhone)
+      if (duplicate) {
+        toast.error(`Duplicate phone detected: already used by ${duplicate.name}`)
+        return
+      }
+    }
+
+    const mappedHeat = statusToHeat[formData.status]
 
     if (editingLead) {
       await updateLead.mutateAsync({
@@ -137,11 +167,13 @@ export default function LeadsPage() {
           phone: formData.phone.trim(),
           source: formData.source.trim(),
           status: formData.status,
-          temperature: formData.temperature,
+          temperature: mappedHeat,
           tags: editingLead.tags,
           notes: formData.notes.trim(),
           interestedIn: formData.interestedIn.trim(),
+          assignedStaffName: formData.assignedStaffName.trim(),
           followUpDate: formData.followUpDate ? new Date(formData.followUpDate).toISOString() : undefined,
+          expectedRevision: editingLead.revision,
         },
       })
       setEditingLead(null)
@@ -151,9 +183,11 @@ export default function LeadsPage() {
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         source: formData.source.trim(),
-        temperature: formData.temperature,
+        status: formData.status,
+        temperature: mappedHeat,
         notes: formData.notes.trim(),
         interestedIn: formData.interestedIn.trim(),
+        assignedStaffName: formData.assignedStaffName.trim(),
         followUpDate: formData.followUpDate ? new Date(formData.followUpDate).toISOString() : undefined,
       })
     }
@@ -173,7 +207,8 @@ export default function LeadsPage() {
       temperature: lead.temperature,
       notes: lead.notes,
       interestedIn: lead.interestedIn,
-      followUpDate: lead.followUpDate || '',
+      followUpDate: lead.followUpDate ? String(lead.followUpDate).split('T')[0] : '',
+      assignedStaffName: lead.assignedStaffName || '',
     })
     setIsAddDialogOpen(true)
   }
@@ -219,28 +254,29 @@ export default function LeadsPage() {
 
   const handleStatusChange = async (leadId: string, newStatus: LeadStatus) => {
     const lead = leads.find((item) => item.id === leadId)
+    if (!lead) return
+
+    const isValidForwardMove = (() => {
+      const order: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted']
+      const from = order.indexOf(lead.status)
+      const to = order.indexOf(newStatus)
+      if (lead.status === 'lost' || newStatus === 'lost') return true
+      if (from < 0 || to < 0) return false
+      return to === from + 1 || to === from
+    })()
+
+    if (!isValidForwardMove) {
+      toast.error('You cannot skip stages. Follow new -> contacted -> qualified -> converted.')
+      return
+    }
+
     await updateLead.mutateAsync({
       id: leadId,
       payload: {
         status: newStatus,
-        ...(lead ? { tags: lead.tags } : {}),
-      },
-    })
-  }
-
-  const statusByTemperature: Record<LeadTemperature, LeadStatus> = {
-    cold: 'new',
-    warm: 'contacted',
-    hot: 'qualified',
-  }
-
-  const moveLeadToTemperature = async (lead: Lead, temperature: LeadTemperature) => {
-    await updateLead.mutateAsync({
-      id: lead.id,
-      payload: {
-        temperature,
-        status: statusByTemperature[temperature],
+        temperature: statusToHeat[newStatus],
         tags: lead.tags,
+        expectedRevision: lead.revision,
       },
     })
   }
@@ -257,21 +293,61 @@ export default function LeadsPage() {
 
     if (!lead) return
 
-    // Map target column to temperature
-    const temperatureMap: Record<string, LeadTemperature> = {
-      'column-cold': 'cold',
-      'column-warm': 'warm',
-      'column-hot': 'hot',
+    // Map target column to status and enforce no stage skipping.
+    const stageMap: Record<string, LeadStatus> = {
+      'column-new': 'new',
+      'column-contacted': 'contacted',
+      'column-qualified': 'qualified',
+      'column-converted': 'converted',
     }
 
-    const newTemperature = temperatureMap[targetColumn]
-    if (newTemperature && newTemperature !== lead.temperature) {
-      await moveLeadToTemperature(lead, newTemperature)
+    const nextStage = stageMap[targetColumn]
+    if (!nextStage || nextStage === lead.status) return
+
+    const order: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted']
+    const from = order.indexOf(lead.status)
+    const to = order.indexOf(nextStage)
+    if (from < 0 || to < 0 || to !== from + 1) {
+      toast.error('Cannot skip stages. Move one step at a time.')
+      return
     }
+
+    await handleStatusChange(lead.id, nextStage)
   }
 
   const handleDeleteLead = (id: string) => {
     deleteLead.mutate(id)
+  }
+
+  const handleQuickCall = async (lead: Lead) => {
+    if (!lead.phone) {
+      toast.error('Phone number is missing for this lead')
+      return
+    }
+
+    await contactAttempt.mutateAsync({ id: lead.id, channel: 'call' })
+    if (typeof window !== 'undefined') {
+      window.open(`tel:${lead.phone}`, '_self')
+    }
+  }
+
+  const handleQuickWhatsApp = async (lead: Lead) => {
+    if (!lead.phone) {
+      toast.error('Phone number is missing for this lead')
+      return
+    }
+
+    await contactAttempt.mutateAsync({ id: lead.id, channel: 'whatsapp' })
+    if (typeof window !== 'undefined') {
+      const digits = lead.phone.replace(/\D/g, '')
+      window.open(`https://wa.me/${digits}`, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  const handleQuickAddNote = async (lead: Lead) => {
+    const note = typeof window !== 'undefined' ? window.prompt(`Add a note for ${lead.name}`) : ''
+    if (!note || !note.trim()) return
+    await addInteraction.mutateAsync({ id: lead.id, note: note.trim(), type: 'note' })
   }
 
   const resetForm = () => {
@@ -285,6 +361,7 @@ export default function LeadsPage() {
       notes: '',
       interestedIn: '',
       followUpDate: '',
+      assignedStaffName: '',
     })
   }
 
@@ -292,7 +369,9 @@ export default function LeadsPage() {
     createLead.isPending ||
     updateLead.isPending ||
     deleteLead.isPending ||
-    convertLead.isPending
+    convertLead.isPending ||
+    addInteraction.isPending ||
+    contactAttempt.isPending
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -339,12 +418,31 @@ export default function LeadsPage() {
     return 'bg-red-100 text-red-800'
   }
 
+  const getLeadAgeDays = (createdAt: string) => {
+    const created = new Date(createdAt)
+    if (Number.isNaN(created.getTime())) return 0
+    const ms = Date.now() - created.getTime()
+    return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)))
+  }
+
+  const formatDateOnly = (value?: string) => {
+    if (!value) return '-'
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) {
+      return value.split('T')[0] || value
+    }
+    return d.toISOString().slice(0, 10)
+  }
+
+  const isFollowUpToday = (lead: Lead) => todayFollowUps.some((item) => item.id === lead.id)
+
   const kanbanData = useMemo(() => {
+    const active = filteredLeads.filter((lead) => lead.status !== 'lost')
     return {
-      cold: filteredLeads.filter((lead) => lead.status !== 'converted' && lead.temperature === 'cold'),
-      warm: filteredLeads.filter((lead) => lead.status !== 'converted' && lead.temperature === 'warm'),
-      hot: filteredLeads.filter((lead) => lead.status !== 'converted' && lead.temperature === 'hot'),
-      converted: filteredLeads.filter((lead) => lead.status === 'converted'),
+      new: active.filter((lead) => lead.status === 'new'),
+      contacted: active.filter((lead) => lead.status === 'contacted'),
+      qualified: active.filter((lead) => lead.status === 'qualified'),
+      converted: active.filter((lead) => lead.status === 'converted'),
     }
   }, [filteredLeads])
 
@@ -398,6 +496,10 @@ export default function LeadsPage() {
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="Phone number"
                   />
+                  {!!formData.phone.trim() &&
+                    leads.some((lead) => lead.phone.replace(/\D/g, '') === formData.phone.replace(/\D/g, '')) && (
+                      <p className="mt-1 text-xs text-red-600">Duplicate phone detected in existing leads</p>
+                    )}
                 </div>
                 <div>
                   <label className="text-sm font-medium">Interested In</label>
@@ -406,6 +508,31 @@ export default function LeadsPage() {
                     onChange={(e) => setFormData({ ...formData, interestedIn: e.target.value })}
                     placeholder="Premium Membership"
                   />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Assigned Staff</label>
+                  <Input
+                    value={formData.assignedStaffName}
+                    onChange={(e) => setFormData({ ...formData, assignedStaffName: e.target.value })}
+                    placeholder="Staff member name"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as LeadStatus })}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="qualified">Qualified</option>
+                    <option value="converted">Converted</option>
+                    <option value="lost">Lost</option>
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Heat is auto-mapped from status: new = cold, contacted = warm, qualified/converted = hot.
+                  </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Source</label>
@@ -421,50 +548,6 @@ export default function LeadsPage() {
                     <option value="Other">Other</option>
                   </select>
                 </div>
-                {editingLead && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-sm font-medium">Status</label>
-                      <select
-                        value={formData.status}
-                        onChange={(e) => setFormData({ ...formData, status: e.target.value as LeadStatus })}
-                        className="w-full px-3 py-2 border rounded-md"
-                      >
-                        <option value="new">New</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="qualified">Qualified</option>
-                        <option value="converted">Converted</option>
-                        <option value="lost">Lost</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Heat</label>
-                      <select
-                        value={formData.temperature}
-                        onChange={(e) => setFormData({ ...formData, temperature: e.target.value as LeadTemperature })}
-                        className="w-full px-3 py-2 border rounded-md"
-                      >
-                        <option value="cold">Cold</option>
-                        <option value="warm">Warm</option>
-                        <option value="hot">Hot</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-                {!editingLead && (
-                  <div>
-                    <label className="text-sm font-medium">Heat</label>
-                    <select
-                      value={formData.temperature}
-                      onChange={(e) => setFormData({ ...formData, temperature: e.target.value as LeadTemperature })}
-                      className="w-full px-3 py-2 border rounded-md"
-                    >
-                      <option value="cold">Cold</option>
-                      <option value="warm">Warm</option>
-                      <option value="hot">Hot</option>
-                    </select>
-                  </div>
-                )}
                 <div>
                   <label className="text-sm font-medium">Notes</label>
                   <textarea
@@ -591,58 +674,73 @@ export default function LeadsPage() {
           >
             <div className="grid gap-4 lg:grid-cols-4">
               <KanbanColumn
-                id="column-cold"
-                title="Cold"
-                count={kanbanData.cold.length}
+                id="column-new"
+                title="New"
+                count={kanbanData.new.length}
                 leadColor="bg-sky-50 border-sky-200"
                 headerColor="text-sky-700"
               >
-                {kanbanData.cold.map((lead) => (
+                {kanbanData.new.map((lead) => (
                   <KanbanCard
-                    key={`cold-${lead.id}`}
+                    key={`new-${lead.id}`}
                     lead={lead}
                     onConvert={() => handleConvertLead(lead)}
                     onEdit={() => handleEditLead(lead)}
+                    onCall={() => handleQuickCall(lead)}
+                    onWhatsApp={() => handleQuickWhatsApp(lead)}
+                    onAddNote={() => handleQuickAddNote(lead)}
                     isPending={isPending}
                     source={lead.source}
+                    isFollowUpToday={isFollowUpToday(lead)}
+                    leadAgeDays={getLeadAgeDays(lead.createdAt)}
                   />
                 ))}
               </KanbanColumn>
 
               <KanbanColumn
-                id="column-warm"
-                title="Warm"
-                count={kanbanData.warm.length}
+                id="column-contacted"
+                title="Contacted"
+                count={kanbanData.contacted.length}
                 leadColor="bg-amber-50 border-amber-200"
                 headerColor="text-amber-700"
               >
-                {kanbanData.warm.map((lead) => (
+                {kanbanData.contacted.map((lead) => (
                   <KanbanCard
-                    key={`warm-${lead.id}`}
+                    key={`contacted-${lead.id}`}
                     lead={lead}
                     onConvert={() => handleConvertLead(lead)}
                     onEdit={() => handleEditLead(lead)}
+                    onCall={() => handleQuickCall(lead)}
+                    onWhatsApp={() => handleQuickWhatsApp(lead)}
+                    onAddNote={() => handleQuickAddNote(lead)}
                     isPending={isPending}
                     source={lead.source}
+                    isFollowUpToday={isFollowUpToday(lead)}
+                    leadAgeDays={getLeadAgeDays(lead.createdAt)}
                   />
                 ))}
               </KanbanColumn>
 
               <KanbanColumn
-                id="column-hot"
-                title="Hot"
-                count={kanbanData.hot.length}
+                id="column-qualified"
+                title="Qualified"
+                count={kanbanData.qualified.length}
                 leadColor="bg-red-50 border-red-200"
                 headerColor="text-red-700"
               >
-                {kanbanData.hot.map((lead) => (
+                {kanbanData.qualified.map((lead) => (
                   <KanbanCard
-                    key={`hot-${lead.id}`}
+                    key={`qualified-${lead.id}`}
                     lead={lead}
                     onConvert={() => handleConvertLead(lead)}
                     onEdit={() => handleEditLead(lead)}
+                    onCall={() => handleQuickCall(lead)}
+                    onWhatsApp={() => handleQuickWhatsApp(lead)}
+                    onAddNote={() => handleQuickAddNote(lead)}
                     isPending={isPending}
                     source={lead.source}
+                    isFollowUpToday={isFollowUpToday(lead)}
+                    leadAgeDays={getLeadAgeDays(lead.createdAt)}
                   />
                 ))}
               </KanbanColumn>
@@ -661,8 +759,13 @@ export default function LeadsPage() {
                     lead={lead}
                     onConvert={() => handleConvertLead(lead)}
                     onEdit={() => handleEditLead(lead)}
+                    onCall={() => handleQuickCall(lead)}
+                    onWhatsApp={() => handleQuickWhatsApp(lead)}
+                    onAddNote={() => handleQuickAddNote(lead)}
                     isPending={isPending}
                     source={lead.source}
+                    isFollowUpToday={isFollowUpToday(lead)}
+                    leadAgeDays={getLeadAgeDays(lead.createdAt)}
                     isDragDisabled
                   />
                 ))}
@@ -711,9 +814,12 @@ export default function LeadsPage() {
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
+                      <TableHead>Assigned Staff</TableHead>
                       <TableHead>Source</TableHead>
                       <TableHead>Heat</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Contacts</TableHead>
+                      <TableHead>Aging</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead>Follow Up</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -725,6 +831,7 @@ export default function LeadsPage() {
                         <TableCell className="font-medium">{lead.name}</TableCell>
                         <TableCell>{lead.email}</TableCell>
                         <TableCell>{lead.phone}</TableCell>
+                        <TableCell>{lead.assignedStaffName || '-'}</TableCell>
                         <TableCell>
                           <Badge className={getSourceColor(lead.source)}>
                             {lead.source.replace('-', ' ')}
@@ -738,10 +845,28 @@ export default function LeadsPage() {
                             {lead.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{lead.createdAt}</TableCell>
-                        <TableCell>{lead.followUpDate || '-'}</TableCell>
+                        <TableCell>{lead.contactCount || 0}</TableCell>
+                        <TableCell>{getLeadAgeDays(lead.createdAt)}d</TableCell>
+                        <TableCell>{formatDateOnly(lead.createdAt)}</TableCell>
+                        <TableCell>{formatDateOnly(lead.followUpDate)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleQuickCall(lead)}
+                              disabled={isPending || !lead.phone}
+                            >
+                              Call
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleQuickWhatsApp(lead)}
+                              disabled={isPending || !lead.phone}
+                            >
+                              WA
+                            </Button>
                             {lead.status !== 'converted' && lead.status !== 'lost' && (
                               <Button
                                 size="sm"
@@ -806,14 +931,38 @@ export default function LeadsPage() {
         <TabsContent value="reminders" className="space-y-4">
           <Card>
             <CardHeader>
+              <CardTitle>Daily Digest</CardTitle>
+              <CardDescription>Auto-generated follow-up notification summary</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!leadDigest ? (
+                <p className="text-sm text-muted-foreground">No digest available yet.</p>
+              ) : (
+                <div className="space-y-2 text-sm">
+                  <p>
+                    <span className="font-medium">Date:</span> {leadDigest.date} ({leadDigest.timezone})
+                  </p>
+                  <p>
+                    <span className="font-medium">Today follow-ups:</span> {leadDigest.totals?.todayFollowUps || 0}
+                  </p>
+                  <p>
+                    <span className="font-medium">Missed follow-ups:</span> {leadDigest.totals?.missedFollowUps || 0}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Today's Follow Ups</CardTitle>
-              <CardDescription>{followUpsToday.length || 0} due today</CardDescription>
+              <CardDescription>{todayFollowUps.length || 0} due today</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {followUpsToday.length === 0 && (
+              {todayFollowUps.length === 0 && (
                 <p className="text-sm text-muted-foreground">No follow ups scheduled for today.</p>
               )}
-              {followUpsToday.map((lead) => (
+              {todayFollowUps.map((lead) => (
                 <div key={`today-${lead.id}`} className="rounded-md border p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div>
@@ -838,6 +987,38 @@ export default function LeadsPage() {
 
           <Card>
             <CardHeader>
+              <CardTitle>Missed Follow-ups</CardTitle>
+              <CardDescription>{missedFollowUps.length || 0} overdue</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {missedFollowUps.length === 0 && (
+                <p className="text-sm text-muted-foreground">No missed follow-ups. Great job.</p>
+              )}
+              {missedFollowUps.map((lead) => (
+                <div key={`missed-${lead.id}`} className="rounded-md border border-red-200 bg-red-50 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="font-medium">{lead.name}</div>
+                      <div className="text-xs text-muted-foreground">{lead.email}</div>
+                      <div className="text-xs text-red-700">Follow up was due: {formatDateOnly(lead.followUpDate)}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge className={getTemperatureColor(lead.temperature)}>{lead.temperature}</Badge>
+                      <Badge className={getStatusColor(lead.status)}>{lead.status}</Badge>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button size="sm" variant="outline" onClick={() => handleQuickCall(lead)}>Call</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleQuickWhatsApp(lead)}>WhatsApp</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleEditLead(lead)}>Edit</Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Scheduled Calls</CardTitle>
               <CardDescription>{scheduledCalls.length || 0} upcoming</CardDescription>
             </CardHeader>
@@ -851,7 +1032,7 @@ export default function LeadsPage() {
                     <div>
                       <div className="font-medium">{lead.name}</div>
                       <div className="text-xs text-muted-foreground">{lead.email}</div>
-                      <div className="text-xs text-muted-foreground">Follow up: {lead.followUpDate}</div>
+                      <div className="text-xs text-muted-foreground">Follow up: {formatDateOnly(lead.followUpDate)}</div>
                     </div>
                     <div className="flex gap-2">
                       <Badge className={getTemperatureColor(lead.temperature)}>{lead.temperature}</Badge>
@@ -909,6 +1090,87 @@ export default function LeadsPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Pipeline Health Summary</CardTitle>
+              <CardDescription>Cold / Warm / Hot distribution</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-3">
+              <div className="rounded border p-3">
+                <p className="text-xs text-muted-foreground">Cold</p>
+                <p className="text-xl font-semibold">{leadAnalytics?.heatDistribution?.cold || 0}</p>
+              </div>
+              <div className="rounded border p-3">
+                <p className="text-xs text-muted-foreground">Warm</p>
+                <p className="text-xl font-semibold">{leadAnalytics?.heatDistribution?.warm || 0}</p>
+              </div>
+              <div className="rounded border p-3">
+                <p className="text-xs text-muted-foreground">Hot</p>
+                <p className="text-xl font-semibold">{leadAnalytics?.heatDistribution?.hot || 0}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Stage Drop-off</CardTitle>
+                <CardDescription>Lead loss between stages</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between"><span>New -> Contacted</span><span>{leadAnalytics?.dropOff?.newToContacted || 0}</span></div>
+                <div className="flex justify-between"><span>Contacted -> Qualified</span><span>{leadAnalytics?.dropOff?.contactedToQualified || 0}</span></div>
+                <div className="flex justify-between"><span>Qualified -> Converted</span><span>{leadAnalytics?.dropOff?.qualifiedToConverted || 0}</span></div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Avg Time Per Stage (days)</CardTitle>
+                <CardDescription>Cycle time across pipeline</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between"><span>New</span><span>{leadAnalytics?.stageDurations?.new?.averageDays || 0}</span></div>
+                <div className="flex justify-between"><span>Contacted</span><span>{leadAnalytics?.stageDurations?.contacted?.averageDays || 0}</span></div>
+                <div className="flex justify-between"><span>Qualified</span><span>{leadAnalytics?.stageDurations?.qualified?.averageDays || 0}</span></div>
+                <div className="flex justify-between"><span>Converted</span><span>{leadAnalytics?.stageDurations?.converted?.averageDays || 0}</span></div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Conversion Timeline</CardTitle>
+              <CardDescription>Monthly converted leads</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(leadAnalytics?.conversionTimeline || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No conversion timeline data yet.</p>
+              ) : (
+                (leadAnalytics?.conversionTimeline || []).map((item) => (
+                  <div key={item.month} className="flex items-center justify-between text-sm">
+                    <span>{item.month}</span>
+                    <span className="font-medium">{item.converted}</span>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Lead Lifecycle Metrics</CardTitle>
+              <CardDescription>Operational metrics for dashboard tracking</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-5 text-sm">
+              <div className="rounded border p-3"><p className="text-muted-foreground">Active Leads</p><p className="font-semibold">{leadAnalytics?.lifecycleMetrics?.totalActiveLeads || 0}</p></div>
+              <div className="rounded border p-3"><p className="text-muted-foreground">Converted</p><p className="font-semibold">{leadAnalytics?.lifecycleMetrics?.convertedLeads || 0}</p></div>
+              <div className="rounded border p-3"><p className="text-muted-foreground">Lost</p><p className="font-semibold">{leadAnalytics?.lifecycleMetrics?.lostLeads || 0}</p></div>
+              <div className="rounded border p-3"><p className="text-muted-foreground">Avg Contacts</p><p className="font-semibold">{leadAnalytics?.lifecycleMetrics?.avgContactAttempts || 0}</p></div>
+              <div className="rounded border p-3"><p className="text-muted-foreground">Avg Lead Age</p><p className="font-semibold">{leadAnalytics?.lifecycleMetrics?.avgLeadAgeDays || 0}d</p></div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

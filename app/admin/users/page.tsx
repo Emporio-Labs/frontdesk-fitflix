@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import Link from 'next/link'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf } from '@tabler/icons-react'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
 import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '@/hooks/use-admins'
+import { useMemberships } from '@/hooks/use-memberships'
 import { User } from '@/lib/services/user.service'
 import { Admin } from '@/lib/services/admin.service'
 
@@ -44,11 +46,37 @@ export default function UsersPage() {
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const deleteUser = useDeleteUser()
+  const { data: memberships = [] } = useMemberships()
 
   const { data: admins = [], isLoading: adminsLoading, isError: adminsError, refetch: refetchAdmins } = useAdmins()
   const createAdmin = useCreateAdmin()
   const updateAdmin = useUpdateAdmin()
   const deleteAdmin = useDeleteAdmin()
+
+  const membershipsByUserKey = useMemo(() => {
+    const mapping = new Map<string, (typeof memberships)[number]>()
+    memberships.forEach((membership) => {
+      const key = (membership.userId || '').trim().toLowerCase()
+      if (key) {
+        mapping.set(key, membership)
+      }
+    })
+    return mapping
+  }, [memberships])
+
+  const getUserMembership = (user: User) => {
+    const keys = [user._id, user.username, user.email].map((value) => value.trim().toLowerCase())
+    return keys.map((key) => membershipsByUserKey.get(key)).find(Boolean)
+  }
+
+  const formatDateOnly = (value?: string) => {
+    if (!value) return '-'
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) {
+      return value.split('T')[0] || value
+    }
+    return parsed.toISOString().slice(0, 10)
+  }
 
   // --- Member helpers ---
   const filteredUsers = users.filter(
@@ -239,15 +267,22 @@ export default function UsersPage() {
                         <TableHead>Gender</TableHead>
                         <TableHead>Health Goals</TableHead>
                         <TableHead>Joined</TableHead>
+                        <TableHead>Membership</TableHead>
+                        <TableHead>Plan Start</TableHead>
+                        <TableHead>Plan Expiry</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredUsers.length === 0 ? (
-                        <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
                       ) : (
                         filteredUsers.map((user) => (
                           <TableRow key={user._id}>
+                            {(() => {
+                              const membership = getUserMembership(user)
+                              return (
+                                <>
                             <TableCell className="font-medium">{user.username}</TableCell>
                             <TableCell className="text-muted-foreground">{user.email}</TableCell>
                             <TableCell>{user.age}</TableCell>
@@ -265,12 +300,31 @@ export default function UsersPage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-muted-foreground">{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              {membership ? (
+                                <Badge variant="secondary">{membership.planName}</Badge>
+                              ) : (
+                                <Badge variant="outline">Not Assigned</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{formatDateOnly(membership?.startDate)}</TableCell>
+                            <TableCell className="text-muted-foreground">{formatDateOnly(membership?.endDate)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
+                                {!membership && (
+                                  <Button asChild size="sm">
+                                    <Link href={`/admin/memberships?assignUserId=${encodeURIComponent(user._id)}`}>
+                                      Assign Membership
+                                    </Link>
+                                  </Button>
+                                )}
                                 <Button size="sm" variant="outline" onClick={() => handleOpenEditUser(user)}><IconEdit className="w-4 h-4" /></Button>
                                 <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${user.username}?`)) deleteUser.mutate(user._id) }} disabled={deleteUser.isPending}><IconTrash className="w-4 h-4" /></Button>
                               </div>
                             </TableCell>
+                                </>
+                              )
+                            })()}
                           </TableRow>
                         ))
                       )}
