@@ -1,5 +1,4 @@
 import { apiClient } from '@/lib/api-client'
-import { mockTherapies } from '@/lib/mock-data'
 
 export interface ServiceCatalogItem {
   id: string
@@ -26,15 +25,6 @@ export interface UpdateServicePayload {
   slots?: string[]
 }
 
-let fallbackStore: ServiceCatalogItem[] = mockTherapies.map((item) => ({
-  id: item.id,
-  name: item.name,
-  time: item.duration,
-  description: item.description,
-  tags: item.category ? [item.category.toLowerCase().replace(/\s+/g, '-')] : [],
-  slots: [],
-}))
-
 function normalizeService(raw: any): ServiceCatalogItem {
   return {
     id: raw?._id || raw?.id || '',
@@ -48,31 +38,17 @@ function normalizeService(raw: any): ServiceCatalogItem {
   }
 }
 
-function nextFallbackId() {
-  return `sv${fallbackStore.length + 1}`
-}
-
 export const serviceService = {
   getAll: async (): Promise<{ services: ServiceCatalogItem[] }> => {
-    try {
-      const { data } = await apiClient.get('/services')
-      if (Array.isArray(data?.services)) return { services: data.services.map(normalizeService) }
-      if (Array.isArray(data)) return { services: data.map(normalizeService) }
-      return { services: [] }
-    } catch {
-      return { services: [...fallbackStore] }
-    }
+    const { data } = await apiClient.get('/services')
+    if (Array.isArray(data?.services)) return { services: data.services.map(normalizeService) }
+    if (Array.isArray(data)) return { services: data.map(normalizeService) }
+    return { services: [] }
   },
 
   getById: async (id: string): Promise<{ service: ServiceCatalogItem }> => {
-    try {
-      const { data } = await apiClient.get(`/services/${id}`)
-      return { service: normalizeService(data?.service || data) }
-    } catch {
-      const service = fallbackStore.find((item) => item.id === id)
-      if (!service) throw new Error('Service not found')
-      return { service }
-    }
+    const { data } = await apiClient.get(`/services/${id}`)
+    return { service: normalizeService(data?.service || data) }
   },
 
   create: async (payload: CreateServicePayload): Promise<{ message: string; service: ServiceCatalogItem }> => {
@@ -84,23 +60,10 @@ export const serviceService = {
       slots: payload.slots || [],
     }
 
-    try {
-      const { data } = await apiClient.post('/services', apiPayload)
-      return {
-        message: data?.message || 'Service created successfully',
-        service: normalizeService(data?.service || data),
-      }
-    } catch {
-      const service: ServiceCatalogItem = {
-        id: nextFallbackId(),
-        name: payload.name,
-        time: payload.time,
-        description: payload.description || '',
-        tags: payload.tags || [],
-        slots: payload.slots || [],
-      }
-      fallbackStore = [service, ...fallbackStore]
-      return { message: 'Service created locally', service }
+    const { data } = await apiClient.post('/services', apiPayload)
+    return {
+      message: data?.message || 'Service created successfully',
+      service: normalizeService(data?.service || data),
     }
   },
 
@@ -113,28 +76,15 @@ export const serviceService = {
       ...(payload.slots !== undefined ? { slots: payload.slots } : {}),
     }
 
-    try {
-      const { data } = await apiClient.patch(`/services/${id}`, apiPayload)
-      return {
-        message: data?.message || 'Service updated successfully',
-        service: normalizeService(data?.service || data),
-      }
-    } catch {
-      const current = fallbackStore.find((item) => item.id === id)
-      if (!current) throw new Error('Service not found')
-      const updated: ServiceCatalogItem = { ...current, ...payload }
-      fallbackStore = fallbackStore.map((item) => (item.id === id ? updated : item))
-      return { message: 'Service updated locally', service: updated }
+    const { data } = await apiClient.patch(`/services/${id}`, apiPayload)
+    return {
+      message: data?.message || 'Service updated successfully',
+      service: normalizeService(data?.service || data),
     }
   },
 
   delete: async (id: string): Promise<{ message: string }> => {
-    try {
-      const { data } = await apiClient.delete(`/services/${id}`)
-      return { message: data?.message || 'Service deleted successfully' }
-    } catch {
-      fallbackStore = fallbackStore.filter((item) => item.id !== id)
-      return { message: 'Service deleted locally' }
-    }
+    const { data } = await apiClient.delete(`/services/${id}`)
+    return { message: data?.message || 'Service deleted successfully' }
   },
 }

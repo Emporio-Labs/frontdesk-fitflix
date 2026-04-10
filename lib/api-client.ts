@@ -1,9 +1,17 @@
 import axios from 'axios'
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '')
+const AUTH_DEBUG = process.env.NEXT_PUBLIC_DEBUG_AUTH === '1'
+
+function logAuthDebug(message: string, meta?: unknown) {
+  if (AUTH_DEBUG && typeof window !== 'undefined') {
+    // Keep logs grouped and consistent for quick auth flow debugging.
+    console.debug(`[auth-debug] ${message}`, meta ?? '')
+  }
+}
 
 export const apiClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -11,14 +19,68 @@ export const apiClient = axios.create({
 
 // Inject Basic Auth from localStorage on every request
 apiClient.interceptors.request.use((config) => {
+  const requestPath = config.url ?? ''
+  const requestUrl = `${config.baseURL ?? API_BASE_URL}${requestPath}`
+
   if (typeof window !== 'undefined') {
-    const credentials = localStorage.getItem('hh_credentials')
-    if (credentials) {
-      config.headers['Authorization'] = `Basic ${credentials}`
+    // Do not attach Basic auth for public auth endpoints.
+    const isAuthEndpoint = requestPath.startsWith('/auth/') || requestPath === '/auth'
+    if (isAuthEndpoint) {
+      logAuthDebug('request', {
+        method: config.method,
+        url: requestUrl,
+        hasAuthHeader: false,
+        reason: 'auth endpoint',
+      })
+      return config
     }
+
+    const credentials = localStorage.getItem('hh_credentials')
+    let hasAuthHeader = false
+    if (credentials) {
+      if (config.headers && typeof (config.headers as any).set === 'function') {
+        ;(config.headers as any).set('Authorization', `Basic ${credentials}`)
+      } else {
+        config.headers = {
+          ...(config.headers ?? {}),
+          Authorization: `Basic ${credentials}`,
+        }
+      }
+      hasAuthHeader = true
+    }
+
+    logAuthDebug('request', {
+      method: config.method,
+      url: requestUrl,
+      hasAuthHeader,
+    })
   }
   return config
 })
+
+apiClient.interceptors.response.use(
+  (response) => {
+    const url = `${response.config.baseURL ?? API_BASE_URL}${response.config.url ?? ''}`
+    logAuthDebug('response', {
+      method: response.config.method,
+      url,
+      status: response.status,
+    })
+    return response
+  },
+  (error) => {
+    const config = error?.config ?? {}
+    const url = `${config.baseURL ?? API_BASE_URL}${config.url ?? ''}`
+    logAuthDebug('response-error', {
+      method: config.method,
+      url,
+      status: error?.response?.status,
+      message: error?.message,
+      serverMessage: error?.response?.data?.message,
+    })
+    return Promise.reject(error)
+  }
+)
 
 // Helper to build Basic Auth header value
 export function buildBasicAuth(email: string, password: string): string {

@@ -45,4 +45,8 @@ export const queryKeys = {
     all: () => ['services'] as const,
     detail: (id: string) => ['services', id] as const,
   },
+  leads: {
+    all: () => ['leads'] as const,
+    detail: (id: string) => ['leads', id] as const,
+  },
 }

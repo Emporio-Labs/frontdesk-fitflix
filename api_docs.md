@@ -2,7 +2,7 @@
 
 **Base URL:** `http://localhost:3000`  
 **API Version:** 1.0.0  
-**Last Updated:** March 26, 2026
+**Last Updated:** March 27, 2026
 
 ---
 
@@ -63,7 +63,7 @@ The system supports 4 role types:
 |-------|---------|------|-----------|
 | `/auth` | User authentication | ❌ No | 2 endpoints |
 | `/admins` | Admin management | ✅ Admin only | 5 endpoints |
-| `/users` | Member management | ✅ Admin + Doctor (read) | 5 endpoints |
+| `/users` | Member management | ✅ Admin + Doctor (read), Admin (write) | 5 endpoints |
 | `/doctors` | Doctor management | ✅ Admin + Role-based | 5 endpoints |
 | `/trainers` | Trainer management | ✅ Admin + Role-based | 5 endpoints |
 | `/slots` | Time slot management | ✅ Admin only | 5 endpoints |
@@ -195,7 +195,8 @@ POST /auth/login
 
 **Global Requirements:**
 - ✅ Basic Authentication required
-- ✅ Admin role required for all endpoints
+- ✅ Admin role required for create/update/delete
+- ✅ Admin or Doctor role allowed for read (list and get by id)
 
 #### 1. Create Admin
 ```
@@ -327,8 +328,7 @@ DELETE /admins/:id
 
 **Global Requirements:**
 - ✅ Basic Authentication required
-- ✅ Admin role required for create/update/delete endpoints
-- ✅ Doctor role can read users (`GET /users`, `GET /users/:id`)
+- ✅ Admin role required for all endpoints
 
 #### 1. Create User
 ```
@@ -373,7 +373,7 @@ POST /users
 GET /users
 ```
 
-**Authorization:** Admin, Doctor
+**Auth:** Admin or Doctor
 
 **Response (200 OK):**
 ```json
@@ -401,10 +401,10 @@ GET /users
 GET /users/:id
 ```
 
-**Authorization:** Admin, Doctor
-
 **URL Params:**
 - `id` (string, required) — User MongoDB ObjectId
+
+**Auth:** Admin or Doctor
 
 **Response (200 OK):**
 ```json
@@ -429,8 +429,6 @@ GET /users/:id
 ```
 PATCH /users/:id
 ```
-
-**Authorization:** Admin only
 
 **URL Params:**
 - `id` (string, required) — User MongoDB ObjectId
@@ -458,8 +456,6 @@ PATCH /users/:id
 ```
 DELETE /users/:id
 ```
-
-**Authorization:** Admin only
 
 **URL Params:**
 - `id` (string, required) — User MongoDB ObjectId
@@ -983,7 +979,7 @@ DELETE /therapies/:id
 **Global Requirements:**
 - ✅ Basic Authentication required
 - ✅ Admin can list/delete/convert; Admin/Doctor/Trainer can create/read/update
-- **Lead Status Values:** `New`, `Contacted`, `Qualified`, `Converted`, `Lost`
+- **Lead Status Values:** `New`, `Contacted`, `Qualified`, `Warm`, `Hot`, `Cold`, `Converted`, `Lost`
 
 #### 1. Create Lead
 ```
@@ -1002,6 +998,7 @@ POST /leads
   "interestedIn": "Premium Membership",
   "notes": "Prefers evening calls",
   "tags": ["premium", "warm"],
+  "followUpDate": "2026-04-05T00:00:00Z",
   "ownerId": "507f1f77bcf86cd799439099"
 }
 ```
@@ -1028,6 +1025,7 @@ PATCH /leads/:id
 **Authorization:** Admin, Doctor, Trainer
 
 **Notes:** Any subset of fields from create payload; at least one field required.
+**Field Notes:** `followUpDate` accepts ISO 8601 date-time strings.
 
 #### 5. Delete Lead
 ```
@@ -1507,6 +1505,9 @@ DELETE /schedules/:userId
   "New": "New",
   "Contacted": "Contacted",
   "Qualified": "Qualified",
+  "Warm": "Warm",
+  "Hot": "Hot",
+  "Cold": "Cold",
   "Converted": "Converted",
   "Lost": "Lost"
 }

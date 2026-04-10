@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const authDebug = process.env.NEXT_PUBLIC_DEBUG_AUTH === '1'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -17,10 +18,25 @@ export default function LoginPage() {
       toast.error('Please enter email and password')
       return
     }
+
+    if (authDebug) {
+      console.debug('[auth-debug] login submit', {
+        email,
+        hasPassword: Boolean(password),
+      })
+    }
+
     setIsLoading(true)
     try {
       const data = await authService.login({ email, password })
       const apiUser = data.user
+      if (authDebug) {
+        console.debug('[auth-debug] login success', {
+          userId: apiUser?.id,
+          email: apiUser?.email,
+          role: apiUser?.role,
+        })
+      }
       const roleMap: Record<string, any> = {
         admin: 'clinic_admin',
         doctor: 'clinician',
@@ -37,6 +53,13 @@ export default function LoginPage() {
       toast.success('Welcome back!')
       // Redirect is handled inside login() via window.location.href
     } catch (err: any) {
+      if (authDebug) {
+        console.debug('[auth-debug] login failed', {
+          message: err?.message,
+          status: err?.response?.status,
+          serverMessage: err?.response?.data?.message,
+        })
+      }
       toast.error(err?.response?.data?.message || 'Login failed. Check your credentials.')
     } finally {
       setIsLoading(false)

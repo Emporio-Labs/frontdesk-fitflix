@@ -75,7 +75,7 @@ const data = {
       icon: IconHeartHandshake,
     },
     {
-      title: "Therapies",
+      title: "Services",
       url: "/admin/therapies",
       icon: IconListDetails,
     },

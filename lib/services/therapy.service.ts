@@ -1,5 +1,4 @@
 import { apiClient } from '@/lib/api-client'
-import { mockTherapies } from '@/lib/mock-data'
 
 export interface TherapyCatalogItem {
   id: string
@@ -26,15 +25,6 @@ export interface UpdateTherapyPayload {
   slots?: string[]
 }
 
-let fallbackStore: TherapyCatalogItem[] = mockTherapies.map((item) => ({
-  id: item.id,
-  name: item.name,
-  time: item.duration,
-  description: item.description,
-  tags: item.category ? [item.category.toLowerCase().replace(/\s+/g, '-')] : [],
-  slots: [],
-}))
-
 function normalizeTherapy(raw: any): TherapyCatalogItem {
   return {
     id: raw?._id || raw?.id || '',
@@ -48,31 +38,17 @@ function normalizeTherapy(raw: any): TherapyCatalogItem {
   }
 }
 
-function nextFallbackId() {
-  return `th${fallbackStore.length + 1}`
-}
-
 export const therapyService = {
   getAll: async (): Promise<{ therapies: TherapyCatalogItem[] }> => {
-    try {
-      const { data } = await apiClient.get('/therapies')
-      if (Array.isArray(data?.therapies)) return { therapies: data.therapies.map(normalizeTherapy) }
-      if (Array.isArray(data)) return { therapies: data.map(normalizeTherapy) }
-      return { therapies: [] }
-    } catch {
-      return { therapies: [...fallbackStore] }
-    }
+    const { data } = await apiClient.get('/therapies')
+    if (Array.isArray(data?.therapies)) return { therapies: data.therapies.map(normalizeTherapy) }
+    if (Array.isArray(data)) return { therapies: data.map(normalizeTherapy) }
+    return { therapies: [] }
   },
 
   getById: async (id: string): Promise<{ therapy: TherapyCatalogItem }> => {
-    try {
-      const { data } = await apiClient.get(`/therapies/${id}`)
-      return { therapy: normalizeTherapy(data?.therapy || data) }
-    } catch {
-      const therapy = fallbackStore.find((item) => item.id === id)
-      if (!therapy) throw new Error('Therapy not found')
-      return { therapy }
-    }
+    const { data } = await apiClient.get(`/therapies/${id}`)
+    return { therapy: normalizeTherapy(data?.therapy || data) }
   },
 
   create: async (payload: CreateTherapyPayload): Promise<{ message: string; therapy: TherapyCatalogItem }> => {
@@ -84,23 +60,10 @@ export const therapyService = {
       slots: payload.slots || [],
     }
 
-    try {
-      const { data } = await apiClient.post('/therapies', apiPayload)
-      return {
-        message: data?.message || 'Therapy created successfully',
-        therapy: normalizeTherapy(data?.therapy || data),
-      }
-    } catch {
-      const therapy: TherapyCatalogItem = {
-        id: nextFallbackId(),
-        name: payload.name,
-        time: payload.time,
-        description: payload.description || '',
-        tags: payload.tags || [],
-        slots: payload.slots || [],
-      }
-      fallbackStore = [therapy, ...fallbackStore]
-      return { message: 'Therapy created locally', therapy }
+    const { data } = await apiClient.post('/therapies', apiPayload)
+    return {
+      message: data?.message || 'Therapy created successfully',
+      therapy: normalizeTherapy(data?.therapy || data),
     }
   },
 
@@ -113,28 +76,15 @@ export const therapyService = {
       ...(payload.slots !== undefined ? { slots: payload.slots } : {}),
     }
 
-    try {
-      const { data } = await apiClient.patch(`/therapies/${id}`, apiPayload)
-      return {
-        message: data?.message || 'Therapy updated successfully',
-        therapy: normalizeTherapy(data?.therapy || data),
-      }
-    } catch {
-      const current = fallbackStore.find((item) => item.id === id)
-      if (!current) throw new Error('Therapy not found')
-      const updated: TherapyCatalogItem = { ...current, ...payload }
-      fallbackStore = fallbackStore.map((item) => (item.id === id ? updated : item))
-      return { message: 'Therapy updated locally', therapy: updated }
+    const { data } = await apiClient.patch(`/therapies/${id}`, apiPayload)
+    return {
+      message: data?.message || 'Therapy updated successfully',
+      therapy: normalizeTherapy(data?.therapy || data),
     }
   },
 
   delete: async (id: string): Promise<{ message: string }> => {
-    try {
-      const { data } = await apiClient.delete(`/therapies/${id}`)
-      return { message: data?.message || 'Therapy deleted successfully' }
-    } catch {
-      fallbackStore = fallbackStore.filter((item) => item.id !== id)
-      return { message: 'Therapy deleted locally' }
-    }
+    const { data } = await apiClient.delete(`/therapies/${id}`)
+    return { message: data?.message || 'Therapy deleted successfully' }
   },
 }

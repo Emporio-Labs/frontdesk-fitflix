@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { mockAuditLogs, mockUsers, AuditLog } from '@/lib/mock-data'
 import {
   Table,
   TableBody,
@@ -23,8 +22,18 @@ import { Badge } from '@/components/ui/badge'
 import { IconEye } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
 
+type AuditLog = {
+  id: string
+  userId: string
+  action: string
+  entityType: string
+  entityId: string
+  changes: Record<string, { before: unknown; after: unknown }>
+  timestamp: string
+}
+
 export default function AuditLogsPage() {
-  const [logs, setLogs] = useState<AuditLog[]>(mockAuditLogs)
+  const [logs, setLogs] = useState<AuditLog[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterAction, setFilterAction] = useState<string>('')
   const [filterEntity, setFilterEntity] = useState<string>('')
@@ -41,10 +50,7 @@ export default function AuditLogsPage() {
     return matchesSearch && matchesAction && matchesEntity
   })
 
-  const getUserName = (userId: string) => {
-    const user = mockUsers.find(u => u.id === userId)
-    return user ? user.name : 'Unknown'
-  }
+  const getUserName = (userId: string) => userId
 
   const getActionColor = (action: string) => {
     switch (action) {

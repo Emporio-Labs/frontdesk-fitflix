@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { mockReports, Report } from '@/lib/mock-data'
 import {
   Table,
   TableBody,
@@ -24,8 +23,16 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { IconPlus, IconDownload, IconTrash } from '@tabler/icons-react'
 
+type Report = {
+  id: string
+  memberId: string
+  reportType: 'membership' | 'therapy-progress' | 'dna-analysis' | 'financial'
+  generatedDate: string
+  downloadUrl: string
+}
+
 export default function ReportsPage() {
-  const [reports, setReports] = useState<Report[]>(mockReports)
+  const [reports, setReports] = useState<Report[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<string>('')
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)

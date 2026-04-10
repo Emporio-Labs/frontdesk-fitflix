@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { mockDNATests, DNATest } from '@/lib/mock-data'
 import {
   Table,
   TableBody,
@@ -24,8 +23,16 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { IconPlus, IconEdit, IconTrash, IconArrowRight } from '@tabler/icons-react'
 
+type DNATest = {
+  id: string
+  memberId: string
+  testDate: string
+  status: 'not-started' | 'in-progress' | 'completed'
+  notes: string
+}
+
 export default function DNATestingPage() {
-  const [tests, setTests] = useState<DNATest[]>(mockDNATests)
+  const [tests, setTests] = useState<DNATest[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)

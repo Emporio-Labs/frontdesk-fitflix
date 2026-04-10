@@ -25,19 +25,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { IconPlus, IconEdit, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import {
-  useCreateTherapy,
-  useDeleteTherapy,
-  useTherapies,
-  useUpdateTherapy,
-} from '@/hooks/use-therapies'
-import {
   useCreateService,
   useDeleteService,
   useServices,
   useUpdateService,
 } from '@/hooks/use-services'
-
-type CatalogMode = 'services' | 'therapies'
 
 type CatalogItem = {
   id: string
@@ -48,8 +40,7 @@ type CatalogItem = {
   slots: string[]
 }
 
-export default function TherapiesPage() {
-  const [mode, setMode] = useState<CatalogMode>('services')
+export default function ServicesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null)
@@ -63,28 +54,16 @@ export default function TherapiesPage() {
 
   const {
     data: services = [],
-    isLoading: isLoadingServices,
-    isError: isServicesError,
+    isLoading,
+    isError,
     refetch: refetchServices,
   } = useServices()
-  const {
-    data: therapies = [],
-    isLoading: isLoadingTherapies,
-    isError: isTherapiesError,
-    refetch: refetchTherapies,
-  } = useTherapies()
 
   const createService = useCreateService()
   const updateService = useUpdateService()
   const deleteService = useDeleteService()
 
-  const createTherapy = useCreateTherapy()
-  const updateTherapy = useUpdateTherapy()
-  const deleteTherapy = useDeleteTherapy()
-
-  const items = mode === 'services' ? services : therapies
-  const isLoading = mode === 'services' ? isLoadingServices : isLoadingTherapies
-  const isError = mode === 'services' ? isServicesError : isTherapiesError
+  const items = services
 
   const filteredItems = useMemo(
     () =>
@@ -152,16 +131,10 @@ export default function TherapiesPage() {
       slots: parseCsvInput(formData.slots),
     }
 
-    if (mode === 'services') {
-      if (editingItem) {
-        await updateService.mutateAsync({ id: editingItem.id, payload })
-      } else {
-        await createService.mutateAsync(payload)
-      }
-    } else if (editingItem) {
-      await updateTherapy.mutateAsync({ id: editingItem.id, payload })
+    if (editingItem) {
+      await updateService.mutateAsync({ id: editingItem.id, payload })
     } else {
-      await createTherapy.mutateAsync(payload)
+      await createService.mutateAsync(payload)
     }
 
     setEditingItem(null)
@@ -170,35 +143,21 @@ export default function TherapiesPage() {
   }
 
   const handleDelete = (id: string) => {
-    if (mode === 'services') {
-      deleteService.mutate(id)
-    } else {
-      deleteTherapy.mutate(id)
-    }
+    deleteService.mutate(id)
   }
 
   const handleRefresh = () => {
-    if (mode === 'services') {
-      refetchServices()
-    } else {
-      refetchTherapies()
-    }
+    refetchServices()
   }
 
-  const isPending =
-    createService.isPending ||
-    updateService.isPending ||
-    deleteService.isPending ||
-    createTherapy.isPending ||
-    updateTherapy.isPending ||
-    deleteTherapy.isPending
+  const isPending = createService.isPending || updateService.isPending || deleteService.isPending
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Therapies & Services</h2>
-          <p className="text-muted-foreground">Manage both catalogs from one screen</p>
+          <h2 className="text-3xl font-bold tracking-tight">Services</h2>
+          <p className="text-muted-foreground">Manage all services from one screen</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleRefresh}>
@@ -208,15 +167,13 @@ export default function TherapiesPage() {
             <DialogTrigger asChild>
               <Button onClick={openCreateDialog}>
                 <IconPlus className="mr-2 h-4 w-4" />
-                Add {mode === 'services' ? 'Service' : 'Therapy'}
+                Add Service
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{editingItem ? 'Edit' : 'Create'} {mode === 'services' ? 'Service' : 'Therapy'}</DialogTitle>
-                <DialogDescription>
-                  Fill in the catalog details required by the updated API.
-                </DialogDescription>
+                <DialogTitle>{editingItem ? 'Edit Service' : 'Create Service'}</DialogTitle>
+                <DialogDescription>Fill in the catalog details required by the updated API.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -224,7 +181,7 @@ export default function TherapiesPage() {
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder={mode === 'services' ? 'Body Composition Analysis' : 'Deep Tissue Massage'}
+                    placeholder="Body Composition Analysis"
                   />
                 </div>
                 <div>
@@ -284,24 +241,8 @@ export default function TherapiesPage() {
 
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex gap-2">
-            <Button
-              variant={mode === 'services' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setMode('services')}
-            >
-              Services
-            </Button>
-            <Button
-              variant={mode === 'therapies' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setMode('therapies')}
-            >
-              Therapies
-            </Button>
-          </div>
           <Input
-            placeholder={`Search ${mode}...`}
+            placeholder="Search services..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-sm"
@@ -311,15 +252,13 @@ export default function TherapiesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{mode === 'services' ? 'Services' : 'Therapies'} Catalog</CardTitle>
-          <CardDescription>
-            {isLoading ? 'Loading...' : `${filteredItems.length} ${mode} found`}
-          </CardDescription>
+          <CardTitle>Services Catalog</CardTitle>
+          <CardDescription>{isLoading ? 'Loading...' : `${filteredItems.length} services found`}</CardDescription>
         </CardHeader>
         <CardContent>
           {isError && (
             <div className="py-8 text-center text-red-500">
-              Failed to load {mode}. Please check API connectivity.
+              Failed to load services. Please check API connectivity.
             </div>
           )}
           {isLoading ? (
@@ -345,7 +284,7 @@ export default function TherapiesPage() {
                   {filteredItems.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                        No {mode} found
+                        No services found
                       </TableCell>
                     </TableRow>
                   ) : (
