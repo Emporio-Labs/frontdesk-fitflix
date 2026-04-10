@@ -17,9 +17,16 @@ export interface Appointment {
   user: string
   slot: string
   doctor: string
+  service?: string
   report?: string
   createdAt: string
   updatedAt: string
+}
+
+export interface AppointmentCreditsMeta {
+  consumed?: number
+  refunded?: number
+  bypassed?: boolean
 }
 
 export interface CreateAppointmentPayload {
@@ -27,13 +34,16 @@ export interface CreateAppointmentPayload {
   userId: string
   slotId: string
   doctorId: string
+  serviceId?: string
   reportId?: string
+  bypassCredits?: boolean
 }
 
 export interface UpdateAppointmentPayload {
   appointmentDate?: string
   slotId?: string
   doctorId?: string
+  serviceId?: string
   reportId?: string
 }
 
@@ -50,7 +60,7 @@ export const appointmentService = {
     const { data } = await apiClient.get(`/appointments/${id}`)
     return data
   },
-  create: async (payload: CreateAppointmentPayload): Promise<{ message: string; appointment: Appointment }> => {
+  create: async (payload: CreateAppointmentPayload): Promise<{ message: string; appointment: Appointment; credits?: AppointmentCreditsMeta }> => {
     const { data } = await apiClient.post('/appointments', payload)
     return data
   },
@@ -62,7 +72,7 @@ export const appointmentService = {
     const { data } = await apiClient.delete(`/appointments/${id}`)
     return data
   },
-  changeStatus: async (id: string, status: AppointmentStatusValue): Promise<{ message: string; appointment: Appointment }> => {
+  changeStatus: async (id: string, status: AppointmentStatusValue): Promise<{ message: string; appointment: Appointment; credits?: AppointmentCreditsMeta }> => {
     const { data } = await apiClient.patch(`/appointments/${id}/status`, { status })
     return data
   },

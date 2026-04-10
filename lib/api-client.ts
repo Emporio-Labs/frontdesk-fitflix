@@ -1,6 +1,25 @@
 import axios from 'axios'
 
-export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '')
+const DEFAULT_API_BASE_URL = 'http://localhost:3000'
+
+function normalizeApiBaseUrl(rawValue?: string): string {
+  const value = String(rawValue ?? '').trim().replace(/\/$/, '')
+  if (!value) {
+    return DEFAULT_API_BASE_URL
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value
+  }
+
+  if (/^(localhost|127\.0\.0\.1)(:\d+)?(\/.*)?$/i.test(value)) {
+    return `http://${value}`
+  }
+
+  return `https://${value}`
+}
+
+export const API_BASE_URL = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_URL)
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_DEBUG_AUTH === '1'
 
 function logAuthDebug(message: string, meta?: unknown) {

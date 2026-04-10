@@ -7,6 +7,8 @@ export interface Membership {
   userId: string
   planId?: string
   planName: string
+  creditsIncluded: number
+  creditsRemaining: number
   price: number
   currency: string
   status: MembershipStatus
@@ -20,6 +22,7 @@ export interface CreateMembershipPayload {
   userId: string
   planId?: string
   planName: string
+  creditsIncluded?: number
   price: number
   currency: string
   status: MembershipStatus
@@ -33,6 +36,7 @@ export interface UpdateMembershipPayload {
   userId?: string
   planId?: string
   planName?: string
+  creditsIncluded?: number
   price?: number
   currency?: string
   status?: MembershipStatus
@@ -45,12 +49,18 @@ export interface UpdateMembershipPayload {
 function normalizeMembership(raw: any): Membership {
   const legacyPlan = raw?.planType || 'Standard Plan'
   const normalizedStatus = String(raw?.status || 'Active')
+  const userRef = raw?.userId || raw?.user
+  const userId = typeof userRef === 'object' ? String(userRef?._id || '') : String(userRef || '')
+  const creditsIncluded = Number(raw?.creditsIncluded ?? 0)
+  const creditsRemaining = Number(raw?.creditsRemaining ?? raw?.creditsIncluded ?? 0)
 
   return {
     id: raw?._id || raw?.id || '',
-    userId: raw?.userId || raw?.user || '',
+    userId,
     planId: raw?.planId || raw?.plan?._id || raw?.plan || undefined,
     planName: raw?.planName || legacyPlan,
+    creditsIncluded: Number.isFinite(creditsIncluded) ? creditsIncluded : 0,
+    creditsRemaining: Number.isFinite(creditsRemaining) ? creditsRemaining : 0,
     price: Number(raw?.price ?? 0),
     currency: raw?.currency || 'USD',
     status: (['Active', 'Paused', 'Cancelled', 'Expired'].includes(normalizedStatus)

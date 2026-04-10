@@ -23,12 +23,19 @@ export interface Booking {
   updatedAt: string
 }
 
+export interface BookingCreditsMeta {
+  consumed?: number
+  refunded?: number
+  bypassed?: boolean
+}
+
 export interface CreateBookingPayload {
   bookingDate: string
   userId?: string
   slotId: string
   serviceId: string
   reportId?: string
+  bypassCredits?: boolean
 }
 
 export interface UpdateBookingPayload {
@@ -51,7 +58,7 @@ export const bookingService = {
     const { data } = await apiClient.get(`/bookings/${id}`)
     return data
   },
-  create: async (payload: CreateBookingPayload): Promise<{ message: string; booking: Booking }> => {
+  create: async (payload: CreateBookingPayload): Promise<{ message: string; booking: Booking; credits?: BookingCreditsMeta }> => {
     const { data } = await apiClient.post('/bookings', payload)
     return data
   },
@@ -63,7 +70,7 @@ export const bookingService = {
     const { data } = await apiClient.delete(`/bookings/${id}`)
     return data
   },
-  changeStatus: async (id: string, status: BookingStatusValue): Promise<{ message: string; booking: Booking }> => {
+  changeStatus: async (id: string, status: BookingStatusValue): Promise<{ message: string; booking: Booking; credits?: BookingCreditsMeta }> => {
     const { data } = await apiClient.patch(`/bookings/${id}/status`, { status })
     return data
   },

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -18,6 +19,7 @@ import {
 import { IconPlus, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { useAppointments, useCreateAppointment, useDeleteAppointment, useChangeAppointmentStatus } from '@/hooks/use-appointments'
 import { useDoctors } from '@/hooks/use-doctors'
+import { useServices } from '@/hooks/use-services'
 import { useSlots } from '@/hooks/use-slots'
 import { APPOINTMENT_STATUS, AppointmentStatusValue } from '@/lib/services/appointment.service'
 
@@ -33,11 +35,12 @@ export default function AppointmentsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [formData, setFormData] = useState({
-    appointmentDate: '', userId: '', slotId: '', doctorId: '',
+    appointmentDate: '', userId: '', slotId: '', doctorId: '', serviceId: '', bypassCredits: false,
   })
 
   const { data: appointments = [], isLoading, isError, refetch } = useAppointments()
   const { data: doctors = [] } = useDoctors()
+  const { data: services = [] } = useServices()
   const { data: slots = [] } = useSlots()
   const createAppointment = useCreateAppointment()
   const deleteAppointment = useDeleteAppointment()
@@ -51,9 +54,17 @@ export default function AppointmentsPage() {
 
   const handleCreate = async () => {
     if (!formData.appointmentDate || !formData.userId || !formData.slotId || !formData.doctorId) return
-    await createAppointment.mutateAsync(formData)
+    const payload = {
+      appointmentDate: formData.appointmentDate,
+      userId: formData.userId.trim(),
+      slotId: formData.slotId,
+      doctorId: formData.doctorId,
+      bypassCredits: formData.bypassCredits,
+      ...(formData.serviceId ? { serviceId: formData.serviceId } : {}),
+    }
+    await createAppointment.mutateAsync(payload)
     setIsDialogOpen(false)
-    setFormData({ appointmentDate: '', userId: '', slotId: '', doctorId: '' })
+    setFormData({ appointmentDate: '', userId: '', slotId: '', doctorId: '', serviceId: '', bypassCredits: false })
   }
 
   return (
@@ -81,7 +92,12 @@ export default function AppointmentsPage() {
                   <Input
                     type="datetime-local"
                     value={formData.appointmentDate}
-                    onChange={(e) => setFormData({ ...formData, appointmentDate: new Date(e.target.value).toISOString() })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        appointmentDate: e.target.value ? new Date(e.target.value).toISOString() : '',
+                      })
+                    }
                   />
                 </div>
                 <div>
@@ -115,6 +131,33 @@ export default function AppointmentsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Service (optional)</label>
+                  <Select
+                    value={formData.serviceId || '__none__'}
+                    onValueChange={(v) => setFormData({ ...formData, serviceId: v === '__none__' ? '' : v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="No service (default 1 credit)" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">No service (default 1 credit)</SelectItem>
+                      {services.map((service) => (
+                        <SelectItem key={service.id} value={service.id}>
+                          {service.name} ({service.creditCost} credit{service.creditCost > 1 ? 's' : ''})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div>
+                    <p className="text-sm font-medium">Bypass Credits</p>
+                    <p className="text-xs text-muted-foreground">Admin-only override for special cases.</p>
+                  </div>
+                  <Switch
+                    checked={formData.bypassCredits}
+                    onCheckedChange={(checked) => setFormData({ ...formData, bypassCredits: checked })}
+                  />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>

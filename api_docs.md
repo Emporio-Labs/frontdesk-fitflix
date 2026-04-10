@@ -2,7 +2,7 @@
 
 **Base URL:** `http://localhost:3000`  
 **API Version:** 1.0.0  
-**Last Updated:** March 27, 2026
+**Last Updated:** April 11, 2026
 
 ---
 
@@ -22,9 +22,10 @@
 12. [Lead Routes](#lead-routes)
 13. [Booking Routes](#booking-routes)
 14. [Appointment Routes](#appointment-routes)
-15. [Schedule Routes](#schedule-routes)
-16. [Enums & Status Codes](#enums--status-codes)
-17. [Error Handling](#error-handling)
+15. [Credit Routes](#credit-routes)
+16. [Schedule Routes](#schedule-routes)
+17. [Enums & Status Codes](#enums--status-codes)
+18. [Error Handling](#error-handling)
 
 ---
 
@@ -63,7 +64,7 @@ The system supports 4 role types:
 |-------|---------|------|-----------|
 | `/auth` | User authentication | ❌ No | 2 endpoints |
 | `/admins` | Admin management | ✅ Admin only | 5 endpoints |
-| `/users` | Member management | ✅ Admin + Doctor (read), Admin (write) | 5 endpoints |
+| `/users` | Member management | ✅ Admin + Doctor (read), Admin/User self (updates), User self-service profile/report/password | 10 endpoints |
 | `/doctors` | Doctor management | ✅ Admin + Role-based | 5 endpoints |
 | `/trainers` | Trainer management | ✅ Admin + Role-based | 5 endpoints |
 | `/slots` | Time slot management | ✅ Admin only | 5 endpoints |
@@ -73,10 +74,11 @@ The system supports 4 role types:
 | `/leads` | Lead intake and conversion | ✅ Mixed roles | 6 endpoints |
 | `/bookings` | Service bookings | ✅ Mixed roles | 7 endpoints |
 | `/appointments` | Doctor appointments | ✅ Mixed roles | 7 endpoints |
+| `/credits` | Credit balance, history, top-up | ✅ Admin + User (self-service for user) | 5 endpoints |
 | `/schedules` | User schedules/todos | ✅ All authenticated | 6 endpoints |
 | `/health` | Health check | ❌ No | 1 endpoint |
 
-**Total Endpoints:** 70
+**Total Endpoints:** 80
 
 ---
 
@@ -101,15 +103,20 @@ POST /auth/signup
   "password": "securePassword123",
   "age": 28,
   "gender": 0,
-  "healthGoals": "Build muscle and lose weight"
+  "healthGoals": ["Build muscle", "Lose weight"]
 }
 ```
+
+**Validation Notes:**
+- `password` must be at least 8 characters and include at least one letter and one number.
+- `age` must be an integer in range `0` to `130`.
 
 **Response (201 Created):**
 ```json
 {
-  "message": "User registered successfully",
-  "userId": "507f1f77bcf86cd799439011"
+  "message": "User signup successful",
+  "userId": "507f1f77bcf86cd799439011",
+  "onboarded": false
 }
 ```
 
@@ -328,12 +335,16 @@ DELETE /admins/:id
 
 **Global Requirements:**
 - ✅ Basic Authentication required
-- ✅ Admin role required for all endpoints
+- ✅ Admin can create and delete users
+- ✅ Admin or user-self can update profile (`PATCH /users/:id`)
+- ✅ Users can access self-service endpoints (`/me`, `/me/reports`, `/me/password`)
 
 #### 1. Create User
 ```
 POST /users
 ```
+
+**Authorization:** Admin only
 
 **Request Body:**
 ```json
@@ -342,11 +353,18 @@ POST /users
   "email": "john@example.com",
   "phone": "+1234567890",
   "password": "securePassword123",
-  "age": "28",
+  "age": 28,
   "gender": "Male",
-  "healthGoals": ["Build muscle", "Improve stamina"]
+  "healthGoals": ["Build muscle", "Improve stamina"],
+  "dateOfBirth": "1998-09-12T00:00:00.000Z",
+  "emergencyContact": "+1987654321",
+  "address": "221B Baker Street"
 }
 ```
+
+**Validation Notes:**
+- `password` must be at least 8 characters and include at least one letter and one number.
+- `age` must be an integer in range `0` to `130`.
 
 **Response (201 Created):**
 ```json
@@ -357,9 +375,13 @@ POST /users
     "username": "john_doe",
     "email": "john@example.com",
     "phone": "+1234567890",
-    "age": "28",
+    "age": 28,
     "gender": "Male",
     "healthGoals": ["Build muscle", "Improve stamina"],
+    "dateOfBirth": "1998-09-12T00:00:00.000Z",
+    "emergencyContact": "+1987654321",
+    "address": "221B Baker Street",
+    "onboarded": false,
     "createdAt": "2026-03-21T10:00:00Z",
     "updatedAt": "2026-03-21T10:00:00Z"
   }
@@ -373,7 +395,7 @@ POST /users
 GET /users
 ```
 
-**Auth:** Admin or Doctor
+**Authorization:** Admin or Doctor
 
 **Response (200 OK):**
 ```json
@@ -384,7 +406,7 @@ GET /users
       "username": "john_doe",
       "email": "john@example.com",
       "phone": "+1234567890",
-      "age": "28",
+      "age": 28,
       "gender": "Male",
       "healthGoals": ["Build muscle", "Improve stamina"],
       "createdAt": "2026-03-21T10:00:00Z",
@@ -404,7 +426,7 @@ GET /users/:id
 **URL Params:**
 - `id` (string, required) — User MongoDB ObjectId
 
-**Auth:** Admin or Doctor
+**Authorization:** Admin or Doctor
 
 **Response (200 OK):**
 ```json
@@ -414,9 +436,10 @@ GET /users/:id
     "username": "john_doe",
     "email": "john@example.com",
     "phone": "+1234567890",
-    "age": "28",
+    "age": 28,
     "gender": "Male",
     "healthGoals": ["Build muscle", "Improve stamina"],
+    "onboarded": false,
     "createdAt": "2026-03-21T10:00:00Z",
     "updatedAt": "2026-03-21T10:00:00Z"
   }
@@ -425,10 +448,178 @@ GET /users/:id
 
 ---
 
-#### 4. Update User
+#### 4. Get My User
+```
+GET /users/me
+```
+
+**Authorization:** User only
+
+**Response (200 OK):**
+```json
+{
+  "user": {
+    "_id": "507f1f77bcf86cd799439011",
+    "username": "john_doe",
+    "email": "john@example.com",
+    "phone": "+1234567890",
+    "age": 28,
+    "gender": "Male",
+    "healthGoals": ["Build muscle", "Improve stamina"],
+    "dateOfBirth": "1998-09-12T00:00:00.000Z",
+    "emergencyContact": "+1987654321",
+    "address": "221B Baker Street",
+    "onboarded": true
+  }
+}
+```
+
+---
+
+#### 5. Get My Reports
+```
+GET /users/me/reports
+```
+
+**Authorization:** User only
+
+**Response (200 OK):**
+```json
+{
+  "reports": [
+    {
+      "id": "report-001",
+      "title": "April Personalized Optimization Report",
+      "summary": "Your recovery markers improved, but sleep consistency needs attention.",
+      "suggestions": [
+        "Maintain 7.5-8 hours sleep window for 14 days.",
+        "Shift caffeine cutoff to 2 PM."
+      ],
+      "recommendations": [
+        "Maintain 7.5-8 hours sleep window for 14 days.",
+        "Shift caffeine cutoff to 2 PM."
+      ],
+      "insights": [
+        "Maintain 7.5-8 hours sleep window for 14 days.",
+        "Shift caffeine cutoff to 2 PM."
+      ],
+      "generated_date": "2026-04-10T08:00:00.000Z",
+      "pdf_url": "http://localhost:3000/users/me/reports/report-001/pdf"
+    }
+  ]
+}
+```
+
+---
+
+#### 6. Get My Report PDF
+```
+GET /users/me/reports/:id/pdf
+```
+
+**Authorization:** User only
+
+**URL Params:**
+- `id` (string, required) — Report ObjectId
+
+**Current Behavior:**
+- Endpoint validates ownership and currently returns `501 Not Implemented` while PDF byte storage/streaming is being finalized.
+
+**Error Responses:**
+- `403` — Report does not belong to authenticated user
+- `404` — Report not found
+- `501` — PDF endpoint not available yet
+
+---
+
+#### 7. Update My Password
+```
+PATCH /users/me/password
+```
+
+**Authorization:** User only
+
+**Request Body:**
+```json
+{
+  "currentPassword": "old-password",
+  "newPassword": "newStrongPass123"
+}
+```
+
+**Validation Notes:**
+- `newPassword` must be at least 8 characters and include at least one letter and one number.
+- `newPassword` must be different from `currentPassword`.
+
+**Success Response (200 OK):**
+```json
+{
+  "message": "Password updated successfully"
+}
+```
+
+**Error Responses:**
+- `400` — Invalid payload or weak password
+- `401` — Current password is incorrect
+- `404` — Authenticated user not found
+
+---
+
+#### 8. Onboard User (self or admin)
+```
+PATCH /users/:id/onboard
+```
+
+**Authorization:** Admin (any user) or User (self)
+
+**Purpose:** Mark the user as onboarded and optionally update profile fields in one call.
+
+**URL Params:**
+- `id` (string, required) — User MongoDB ObjectId
+
+**Request Body (all fields optional; at least one required):**
+```json
+{
+  "username": "john_doe",
+  "phone": "+1234567890",
+  "age": 28,
+  "gender": "Male",
+  "healthGoals": ["Build muscle"],
+  "onboarded": true
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "User onboarded",
+  "user": {
+    "_id": "507f1f77bcf86cd799439011",
+    "username": "john_doe",
+    "email": "john@example.com",
+    "phone": "+1234567890",
+    "age": 28,
+    "gender": "Male",
+    "healthGoals": ["Build muscle"],
+    "onboarded": true,
+    "createdAt": "2026-03-21T10:00:00Z",
+    "updatedAt": "2026-03-21T10:05:00Z"
+  }
+}
+```
+
+**Notes:**
+- Users can only onboard themselves; admins can onboard any user.
+- The endpoint forces `onboarded` to `true` even if omitted.
+
+---
+
+#### 9. Update User
 ```
 PATCH /users/:id
 ```
+
+**Authorization:** Admin (any user) or User (self)
 
 **URL Params:**
 - `id` (string, required) — User MongoDB ObjectId
@@ -438,24 +629,33 @@ PATCH /users/:id
 {
   "username": "john_updated",
   "phone": "+1987654321",
-  "healthGoals": ["Weight loss", "Sleep improvement"]
+  "age": 29,
+  "gender": "Male",
+  "healthGoals": ["Weight loss", "Sleep improvement"],
+  "dateOfBirth": "1998-09-12T00:00:00.000Z",
+  "emergencyContact": "+1987654321",
+  "address": "221B Baker Street"
 }
 ```
+
+**Notes:**
+- For role `user`, password changes are not allowed in this endpoint. Use `PATCH /users/me/password`.
 
 **Response (200 OK):**
 ```json
 {
-  "message": "User updated",
   "user": { /* updated user object */ }
 }
 ```
 
 ---
 
-#### 5. Delete User
+#### 10. Delete User
 ```
 DELETE /users/:id
 ```
+
+**Authorization:** Admin only
 
 **URL Params:**
 - `id` (string, required) — User MongoDB ObjectId
@@ -779,6 +979,7 @@ POST /memberships
 {
   "userId": "507f1f77bcf86cd799439011",
   "planName": "Gold Plan",
+  "creditsIncluded": 12,
   "price": 49.99,
   "currency": "USD",
   "status": "Active",
@@ -789,10 +990,35 @@ POST /memberships
 }
 ```
 
+**Credit Notes:**
+- `creditsIncluded` defaults to `0` if omitted.
+- `creditsRemaining` is initialized to `creditsIncluded` on create.
+
 **Responses:**
 - `201` — Created; returns membership
 - `400` — Invalid payload, invalid dates, or missing `userId`
 - `401` — Unauthorized
+
+**Response (201 Created) Example:**
+```json
+{
+  "message": "Membership created",
+  "membership": {
+    "_id": "507f1f77bcf86cd799439101",
+    "user": "507f1f77bcf86cd799439011",
+    "planName": "Gold Plan",
+    "creditsIncluded": 12,
+    "creditsRemaining": 12,
+    "status": "Active",
+    "price": 49.99,
+    "currency": "USD",
+    "startDate": "2026-04-01T00:00:00.000Z",
+    "endDate": "2026-07-01T00:00:00.000Z",
+    "features": ["unlimited-sessions", "priority-support"],
+    "notes": "Spring promo"
+  }
+}
+```
 
 #### 2. Get All Memberships (Admin)
 ```
@@ -837,6 +1063,10 @@ PATCH /memberships/:id
 
 **Request Body:** Any subset of fields from create payload; at least one field required.
 
+**Credit Notes:**
+- If `creditsIncluded` changes, backend adjusts `creditsRemaining` by the same delta.
+- `creditsRemaining` never drops below `0`.
+
 **Responses:**
 - `200` — Updated membership
 - `400` — Invalid payload/ids/dates
@@ -876,11 +1106,16 @@ POST /services
 {
   "serviceName": "Body Composition Analysis",
   "serviceTime": 45,
+  "creditCost": 2,
   "description": "Includes BMI, body fat %, muscle mass",
   "tags": ["assessment", "baseline"],
   "slots": ["507f1f77bcf86cd799439020"]
 }
 ```
+
+**Credit Notes:**
+- `creditCost` is required by schema and defaults to `1` when omitted.
+- Booking and appointment credit deduction uses this value.
 
 #### 2. Get All Services
 ```
@@ -904,6 +1139,9 @@ PATCH /services/:id
 **Authorization:** Admin only
 
 **Notes:** Any subset of fields from create payload; at least one field required.
+
+**Credit Notes:**
+- `creditCost` can be updated to change future deduction behavior.
 
 #### 5. Delete Service
 ```
@@ -1080,13 +1318,16 @@ POST /bookings
   "userId": "507f1f77bcf86cd799439011",
   "slotId": "507f1f77bcf86cd799439020",
   "serviceId": "507f1f77bcf86cd799439030",
-  "reportId": "507f1f77bcf86cd799439040"
+  "reportId": "507f1f77bcf86cd799439040",
+  "bypassCredits": false
 }
 ```
 
 **Notes:**
 - `userId` — Required for admin. Optional for users (uses their ID).
-- `reportId` — Optional field
+- `reportId` — Optional field.
+- `bypassCredits` — Optional; only admins can set `true`.
+- Credit consumption amount is read from `service.creditCost`.
 
 **Response (201 Created):**
 ```json
@@ -1102,9 +1343,18 @@ POST /bookings
     "report": "507f1f77bcf86cd799439040",
     "createdAt": "2026-03-20T10:00:00Z",
     "updatedAt": "2026-03-20T10:00:00Z"
+  },
+  "credits": {
+    "consumed": 2,
+    "bypassed": false
   }
 }
 ```
+
+**Error Responses:**
+- `402` — Insufficient credits.
+- `403` — No active membership with available credits, or non-admin bypass attempt.
+- `404` — Service not found.
 
 ---
 
@@ -1184,6 +1434,23 @@ PATCH /bookings/:id/status
 }
 ```
 
+**Behavior:**
+- When status transitions to `Cancelled`, credits previously consumed for that booking are refunded once.
+
+**Response (200 OK) Example:**
+```json
+{
+  "message": "Booking status changed",
+  "booking": {
+    "_id": "507f1f77bcf86cd799439050",
+    "status": 2
+  },
+  "credits": {
+    "refunded": 2
+  }
+}
+```
+
 **Status Values:**
 - `0` — Booked
 - `1` — Confirmed
@@ -1214,11 +1481,42 @@ POST /appointments
   "userId": "507f1f77bcf86cd799439011",
   "slotId": "507f1f77bcf86cd799439020",
   "doctorId": "507f1f77bcf86cd799439012",
-  "reportId": "507f1f77bcf86cd799439040"
+  "serviceId": "507f1f77bcf86cd799439030",
+  "reportId": "507f1f77bcf86cd799439040",
+  "bypassCredits": false
 }
 ```
 
-**Response (201 Created):** Similar to booking creation
+**Notes:**
+- `serviceId` is optional. If provided, credits consumed use `service.creditCost`.
+- If `serviceId` is not provided, default deduction is `1` credit.
+- `bypassCredits` is optional and admin-only.
+
+**Response (201 Created) Example:**
+```json
+{
+  "message": "Appointment created",
+  "appointment": {
+    "_id": "507f1f77bcf86cd799439150",
+    "appointmentDate": "2026-03-25T10:00:00Z",
+    "status": 0,
+    "user": "507f1f77bcf86cd799439011",
+    "slot": "507f1f77bcf86cd799439020",
+    "doctor": "507f1f77bcf86cd799439012",
+    "service": "507f1f77bcf86cd799439030",
+    "report": "507f1f77bcf86cd799439040"
+  },
+  "credits": {
+    "consumed": 2,
+    "bypassed": false
+  }
+}
+```
+
+**Error Responses:**
+- `402` — Insufficient credits.
+- `403` — No active membership with available credits, or non-admin bypass attempt.
+- `404` — Service not found (when `serviceId` is provided).
 
 ---
 
@@ -1269,6 +1567,7 @@ PATCH /appointments/:id
   "appointmentDate": "2026-03-26T10:00:00Z",
   "slotId": "507f1f77bcf86cd799439021",
   "doctorId": "507f1f77bcf86cd799439013",
+  "serviceId": "507f1f77bcf86cd799439031",
   "reportId": "507f1f77bcf86cd799439041"
 }
 ```
@@ -1298,7 +1597,159 @@ PATCH /appointments/:id/status
 }
 ```
 
+**Behavior:**
+- When status transitions to `Cancelled`, credits previously consumed for that appointment are refunded once.
+
+**Response (200 OK) Example:**
+```json
+{
+  "message": "Appointment status changed",
+  "appointment": {
+    "_id": "507f1f77bcf86cd799439150",
+    "status": 2
+  },
+  "credits": {
+    "refunded": 2
+  }
+}
+```
+
 **Status Values:** (See Booking status values)
+
+---
+
+## Credit Routes
+
+### Base Path: `/credits`
+
+**Global Requirements:**
+- ✅ Basic Authentication required
+- ✅ Users can access only their own credit endpoints (`/me/*`)
+- ✅ Admin can access any user credit endpoints (`/users/:userId/*`)
+
+#### 1. Get My Credit Balance
+```
+GET /credits/me/balance
+```
+
+**Authorization:** User only
+
+**Response (200 OK) Example:**
+```json
+{
+  "userId": "507f1f77bcf86cd799439011",
+  "totalIncluded": 12,
+  "totalRemaining": 9,
+  "memberships": [
+    {
+      "id": "507f1f77bcf86cd799439101",
+      "planName": "Gold Plan",
+      "creditsIncluded": 12,
+      "creditsRemaining": 9,
+      "endDate": "2026-07-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+#### 2. Get My Credit History
+```
+GET /credits/me/history?limit=50&sourceType=Booking
+```
+
+**Authorization:** User only
+
+**Query Params:**
+- `limit` (optional, number, min `1`, max `200`, default `50`)
+- `sourceType` (optional): `Booking` | `Appointment` | `Admin`
+
+**Response (200 OK) Example:**
+```json
+{
+  "userId": "507f1f77bcf86cd799439011",
+  "count": 2,
+  "transactions": [
+    {
+      "id": "507f1f77bcf86cd799439501",
+      "membershipId": "507f1f77bcf86cd799439101",
+      "amount": -2,
+      "type": "Consume",
+      "sourceType": "Booking",
+      "sourceId": "507f1f77bcf86cd799439050",
+      "reason": "Booking 507f1f77bcf86cd799439050",
+      "actorId": "507f1f77bcf86cd799439011",
+      "actorRole": "user",
+      "createdAt": "2026-04-11T09:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+#### 3. Get User Credit Balance (Admin)
+```
+GET /credits/users/:userId/balance
+```
+
+**Authorization:** Admin only
+
+**Responses:**
+- `200` — Balance details for the target user
+- `400` — Invalid `userId`
+
+---
+
+#### 4. Get User Credit History (Admin)
+```
+GET /credits/users/:userId/history?limit=100&sourceType=Appointment
+```
+
+**Authorization:** Admin only
+
+**Query Params:** same as `/credits/me/history`
+
+**Responses:**
+- `200` — Credit transaction history for the target user
+- `400` — Invalid `userId` or query params
+
+---
+
+#### 5. Top Up User Credits (Admin)
+```
+POST /credits/users/:userId/topup
+```
+
+**Authorization:** Admin only
+
+**Request Body:**
+```json
+{
+  "membershipId": "507f1f77bcf86cd799439101",
+  "amount": 5,
+  "reason": "Manual goodwill top-up"
+}
+```
+
+**Notes:**
+- `membershipId` is optional; when omitted, backend tops up the earliest-expiring eligible active membership.
+- `amount` must be positive.
+
+**Response (200 OK) Example:**
+```json
+{
+  "message": "Credits topped up",
+  "membershipId": "507f1f77bcf86cd799439101",
+  "toppedUp": 5,
+  "creditsRemaining": 14
+}
+```
+
+**Error Responses:**
+- `400` — Invalid payload or IDs
+- `404` — No eligible membership found for top-up
 
 ---
 
@@ -1513,6 +1964,25 @@ DELETE /schedules/:userId
 }
 ```
 
+### Credit Transaction Type
+```javascript
+{
+  "Consume": "Consume",
+  "Refund": "Refund",
+  "AdminTopUp": "AdminTopUp",
+  "Void": "Void"
+}
+```
+
+### Credit Transaction Source
+```javascript
+{
+  "Booking": "Booking",
+  "Appointment": "Appointment",
+  "Admin": "Admin"
+}
+```
+
 ---
 
 ## Error Handling
@@ -1525,54 +1995,67 @@ DELETE /schedules/:userId
 | `201` | Created | Successful POST |
 | `400` | Bad Request | Invalid input, validation failed |
 | `401` | Unauthorized | Missing/invalid credentials |
+| `402` | Payment Required | Insufficient credits |
 | `403` | Forbidden | Insufficient permissions |
 | `404` | Not Found | Resource doesn't exist |
 | `409` | Conflict | Email/resource already exists |
+| `501` | Not Implemented | Feature is intentionally pending (for example report PDF streaming) |
 | `500` | Server Error | Unexpected server error |
 
 ### Error Response Format
 ```json
 {
-  "message": "Error description",
-  "errors": [
-    {
-      "code": "validation_error",
-      "path": ["fieldName"],
-      "message": "Field validation failed"
-    }
-  ]
+  "error": "Error description",
+  "code": "VALIDATION_ERROR",
+  "details": {
+    "fieldName": "Field validation failed"
+  }
 }
 ```
+
+**Notes:**
+- Error responses are normalized to the envelope above.
+- `details` is optional and may contain field-level validation details.
+- Common `code` values include: `VALIDATION_ERROR`, `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `NOT_IMPLEMENTED`, `INTERNAL_ERROR`, `API_ERROR`.
 
 ### Example Error Responses
 
 **401 Unauthorized:**
 ```json
 {
-  "message": "Unauthorized"
+  "error": "Unauthorized",
+  "code": "UNAUTHORIZED"
 }
 ```
 
 **403 Forbidden:**
 ```json
 {
-  "message": "Forbidden"
+  "error": "Forbidden",
+  "code": "FORBIDDEN"
 }
 ```
 
 **400 Bad Request (Validation):**
 ```json
 {
-  "message": "Invalid booking payload",
-  "errors": [
-    {
-      "code": "invalid_type",
-      "expected": "string",
-      "received": "undefined",
-      "path": ["userId"],
-      "message": "Required"
-    }
-  ]
+  "error": "Validation failed",
+  "code": "VALIDATION_ERROR",
+  "details": {
+    "userId": "Required"
+  }
+}
+```
+
+**501 Not Implemented:**
+```json
+{
+  "error": "Report PDF endpoint is not available yet",
+  "code": "NOT_IMPLEMENTED",
+  "details": {
+    "id": "507f1f77bcf86cd799439011",
+    "hasPdf": true
+  }
 }
 ```
 
@@ -1602,9 +2085,10 @@ GET /health
 
 1. **Patient signs up:** `POST /auth/signup`
 2. **Patient logs in:** `POST /auth/login` → Get credentials
-3. **Patient views slots:** `GET /slots` (needs admin credentials)
-4. **Patient creates booking:** `POST /bookings` with their userId
-5. **Patient checks booking:** `GET /bookings/me`
+3. **Admin creates membership with credits:** `POST /memberships` (for the patient)
+4. **Patient checks available credits:** `GET /credits/me/balance`
+5. **Patient creates booking:** `POST /bookings` (credits are consumed based on service `creditCost`)
+6. **Patient checks booking + history:** `GET /bookings/me` and `GET /credits/me/history`
 
 ### Workflow 2: Admin Creates Doctor Schedule
 
@@ -1620,13 +2104,20 @@ GET /health
 3. **Update schedule status:** `PATCH /schedules/:userId` (change status from Todo → Doing → Done)
 4. **Reschedule if needed:** `PATCH /schedules/:userId/reschedule` (within 7 days only)
 
+### Workflow 4: Admin Manual Credit Top-Up
+
+1. **Admin logs in:** `POST /auth/login`
+2. **Admin checks user credit position:** `GET /credits/users/:userId/balance`
+3. **Admin adds credits:** `POST /credits/users/:userId/topup`
+4. **Admin verifies ledger entry:** `GET /credits/users/:userId/history`
+
 ---
 
 ## Notes for Development
 
 - All timestamps are in **ISO 8601** format (UTC)
 - All IDs are MongoDB **ObjectId** strings
-- Passwords are currently stored as **plain text** (⚠️ Security issue for production)
+- Passwords are stored as **bcrypt hashes** and never returned in API responses
 - Date fields accept various formats that coerce to Date objects
 - Array fields (like `specialities`, `todoIds`) default to empty arrays if not provided
 - At least one field is required for PATCH operations
@@ -1642,4 +2133,4 @@ For questions or issues with the API:
 3. Verify Basic Auth headers are properly formatted
 4. Check that resource IDs are valid MongoDB ObjectIds
 
-**Last Updated:** March 21, 2026
+**Last Updated:** April 11, 2026

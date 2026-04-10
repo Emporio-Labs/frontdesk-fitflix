@@ -4,6 +4,7 @@ export interface ServiceCatalogItem {
   id: string
   name: string
   time: number
+  creditCost: number
   description: string
   tags: string[]
   slots: string[]
@@ -12,6 +13,7 @@ export interface ServiceCatalogItem {
 export interface CreateServicePayload {
   name: string
   time: number
+  creditCost?: number
   description?: string
   tags?: string[]
   slots?: string[]
@@ -20,16 +22,20 @@ export interface CreateServicePayload {
 export interface UpdateServicePayload {
   name?: string
   time?: number
+  creditCost?: number
   description?: string
   tags?: string[]
   slots?: string[]
 }
 
 function normalizeService(raw: any): ServiceCatalogItem {
+  const creditCost = Number(raw?.creditCost ?? 1)
+
   return {
     id: raw?._id || raw?.id || '',
     name: raw?.serviceName || raw?.name || '',
     time: Number(raw?.serviceTime ?? raw?.time ?? 0),
+    creditCost: Number.isFinite(creditCost) ? creditCost : 1,
     description: raw?.description || '',
     tags: Array.isArray(raw?.tags) ? raw.tags : [],
     slots: Array.isArray(raw?.slots)
@@ -55,6 +61,7 @@ export const serviceService = {
     const apiPayload = {
       serviceName: payload.name,
       serviceTime: payload.time,
+      creditCost: payload.creditCost ?? 1,
       description: payload.description || '',
       tags: payload.tags || [],
       slots: payload.slots || [],
@@ -71,6 +78,7 @@ export const serviceService = {
     const apiPayload = {
       ...(payload.name !== undefined ? { serviceName: payload.name } : {}),
       ...(payload.time !== undefined ? { serviceTime: payload.time } : {}),
+      ...(payload.creditCost !== undefined ? { creditCost: payload.creditCost } : {}),
       ...(payload.description !== undefined ? { description: payload.description } : {}),
       ...(payload.tags !== undefined ? { tags: payload.tags } : {}),
       ...(payload.slots !== undefined ? { slots: payload.slots } : {}),

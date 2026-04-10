@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { IconPlus, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { useBookings, useCreateBooking, useDeleteBooking, useChangeBookingStatus } from '@/hooks/use-bookings'
 import { useSlots } from '@/hooks/use-slots'
@@ -50,6 +51,7 @@ export default function BookingsPage() {
     userId: '',
     slotId: '',
     serviceId: '',
+    bypassCredits: false,
   })
 
   const { data: bookings = [], isLoading, isError, refetch } = useBookings()
@@ -66,10 +68,10 @@ export default function BookingsPage() {
   )
 
   const handleCreate = async () => {
-    if (!formData.bookingDate || !formData.slotId || !formData.serviceId) return
+    if (!formData.bookingDate || !formData.userId || !formData.slotId || !formData.serviceId) return
     await createBooking.mutateAsync(formData)
     setIsDialogOpen(false)
-    setFormData({ bookingDate: '', userId: '', slotId: '', serviceId: '' })
+    setFormData({ bookingDate: '', userId: '', slotId: '', serviceId: '', bypassCredits: false })
   }
 
   const handleStatusChange = (id: string, status: string) => {
@@ -103,7 +105,12 @@ export default function BookingsPage() {
                   <Input
                     type="datetime-local"
                     value={formData.bookingDate}
-                    onChange={(e) => setFormData({ ...formData, bookingDate: new Date(e.target.value).toISOString() })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        bookingDate: e.target.value ? new Date(e.target.value).toISOString() : '',
+                      })
+                    }
                   />
                 </div>
                 <div>
@@ -139,7 +146,7 @@ export default function BookingsPage() {
                       <SelectContent>
                         {services.map((service) => (
                           <SelectItem key={service.id} value={service.id}>
-                            {service.name} ({service.time} mins)
+                            {service.name} ({service.time} mins, {service.creditCost} credit{service.creditCost > 1 ? 's' : ''})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -151,6 +158,16 @@ export default function BookingsPage() {
                       onChange={(e) => setFormData({ ...formData, serviceId: e.target.value })}
                     />
                   )}
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div>
+                    <p className="text-sm font-medium">Bypass Credits</p>
+                    <p className="text-xs text-muted-foreground">Admin-only override. Use only when approved.</p>
+                  </div>
+                  <Switch
+                    checked={formData.bypassCredits}
+                    onCheckedChange={(checked) => setFormData({ ...formData, bypassCredits: checked })}
+                  />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>

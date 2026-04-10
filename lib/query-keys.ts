@@ -53,4 +53,11 @@ export const queryKeys = {
     all: () => ['leads'] as const,
     detail: (id: string) => ['leads', id] as const,
   },
+  credits: {
+    myBalance: () => ['credits', 'me', 'balance'] as const,
+    myHistory: (limit = 50, sourceType?: string) => ['credits', 'me', 'history', limit, sourceType || 'all'] as const,
+    userBalance: (userId: string) => ['credits', 'users', userId, 'balance'] as const,
+    userHistory: (userId: string, limit = 50, sourceType?: string) =>
+      ['credits', 'users', userId, 'history', limit, sourceType || 'all'] as const,
+  },
 }

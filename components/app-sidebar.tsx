@@ -27,6 +27,7 @@ import {
   IconStethoscope,
   IconRun,
   IconCards,
+  IconCreditCard,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from '@/components/nav-documents'
@@ -79,6 +80,11 @@ const data = {
       title: "Membership Plans",
       url: "/admin/membership-plans",
       icon: IconCards,
+    },
+    {
+      title: "Credits",
+      url: "/admin/credits",
+      icon: IconCreditCard,
     },
     {
       title: "Services",

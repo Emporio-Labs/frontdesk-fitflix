@@ -35,6 +35,7 @@ type CatalogItem = {
   id: string
   name: string
   time: number
+  creditCost: number
   description: string
   tags: string[]
   slots: string[]
@@ -47,6 +48,7 @@ export default function ServicesPage() {
   const [formData, setFormData] = useState({
     name: '',
     time: 60,
+    creditCost: 1,
     description: '',
     tags: '',
     slots: '',
@@ -88,6 +90,7 @@ export default function ServicesPage() {
     setFormData({
       name: '',
       time: 60,
+      creditCost: 1,
       description: '',
       tags: '',
       slots: '',
@@ -105,6 +108,7 @@ export default function ServicesPage() {
     setFormData({
       name: item.name,
       time: item.time,
+      creditCost: item.creditCost,
       description: item.description,
       tags: item.tags.join(', '),
       slots: item.slots.join(', '),
@@ -123,9 +127,15 @@ export default function ServicesPage() {
       return
     }
 
+    if (!Number.isFinite(formData.creditCost) || formData.creditCost <= 0) {
+      toast.error('Please enter a valid credit cost greater than 0')
+      return
+    }
+
     const payload = {
       name: formData.name.trim(),
       time: formData.time,
+      creditCost: formData.creditCost,
       description: formData.description.trim(),
       tags: parseCsvInput(formData.tags),
       slots: parseCsvInput(formData.slots),
@@ -191,6 +201,16 @@ export default function ServicesPage() {
                     value={formData.time}
                     onChange={(e) => setFormData({ ...formData, time: Number.parseInt(e.target.value, 10) || 0 })}
                     placeholder="60"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Credit Cost</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={formData.creditCost}
+                    onChange={(e) => setFormData({ ...formData, creditCost: Number.parseInt(e.target.value, 10) || 0 })}
+                    placeholder="1"
                   />
                 </div>
                 <div>
@@ -274,6 +294,7 @@ export default function ServicesPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Time</TableHead>
+                    <TableHead>Credit Cost</TableHead>
                     <TableHead>Tags</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Slots</TableHead>
@@ -283,7 +304,7 @@ export default function ServicesPage() {
                 <TableBody>
                   {filteredItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                         No services found
                       </TableCell>
                     </TableRow>
@@ -292,6 +313,7 @@ export default function ServicesPage() {
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell>{item.time} mins</TableCell>
+                        <TableCell>{item.creditCost}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {item.tags.length ? (

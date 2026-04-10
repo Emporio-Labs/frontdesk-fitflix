@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,7 @@ import {
   useDeleteMembership,
 } from '@/hooks/use-memberships'
 
-export default function MembershipsPage() {
+function MembershipsPageContent() {
   const searchParams = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedMembership, setSelectedMembership] = useState<Membership | null>(null)
@@ -213,6 +213,7 @@ export default function MembershipsPage() {
       userId: formData.userId.trim(),
       planId: selectedPlan.id,
       planName: selectedPlan.planName,
+      creditsIncluded: selectedPlanCredits,
       price: discountedPrice,
       currency: selectedPlan.currency,
       status: formData.status,
@@ -548,6 +549,8 @@ export default function MembershipsPage() {
                   <TableRow>
                     <TableHead>Username</TableHead>
                     <TableHead>Plan Name</TableHead>
+                    <TableHead>Credits Included</TableHead>
+                    <TableHead>Credits Remaining</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Currency</TableHead>
                     <TableHead>Start Date</TableHead>
@@ -559,7 +562,7 @@ export default function MembershipsPage() {
                 <TableBody>
                   {filteredMemberships.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                         No memberships found
                       </TableCell>
                     </TableRow>
@@ -568,6 +571,8 @@ export default function MembershipsPage() {
                       <TableRow key={membership.id}>
                         <TableCell className="font-medium">{getMembershipUsername(membership)}</TableCell>
                         <TableCell>{membership.planName}</TableCell>
+                        <TableCell>{membership.creditsIncluded}</TableCell>
+                        <TableCell>{membership.creditsRemaining}</TableCell>
                         <TableCell>${membership.price.toFixed(2)}</TableCell>
                         <TableCell>{membership.currency}</TableCell>
                         <TableCell>{formatDateOnly(membership.startDate)}</TableCell>
@@ -652,6 +657,8 @@ export default function MembershipsPage() {
                 <div className="grid grid-cols-2 gap-2 pt-1 text-xs text-muted-foreground">
                   <p>Start date: {formatDateOnly(selectedMembership.startDate)}</p>
                   <p>End date: {formatDateOnly(selectedMembership.endDate)}</p>
+                  <p>Credits included: {selectedMembership.creditsIncluded}</p>
+                  <p>Credits remaining: {selectedMembership.creditsRemaining}</p>
                   <p>Plan ID: {selectedMembership.planId || '-'}</p>
                   <p>Membership ID: {selectedMembership.id}</p>
                   <p>Member ref: {selectedMembership.userId || '-'}</p>
@@ -663,5 +670,23 @@ export default function MembershipsPage() {
         </Dialog>
       )}
     </div>
+  )
+}
+
+function MembershipsPageFallback() {
+  return (
+    <div className="flex-1 space-y-4 p-8 pt-6">
+      <Skeleton className="h-10 w-64" />
+      <Skeleton className="h-24 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  )
+}
+
+export default function MembershipsPage() {
+  return (
+    <Suspense fallback={<MembershipsPageFallback />}>
+      <MembershipsPageContent />
+    </Suspense>
   )
 }
