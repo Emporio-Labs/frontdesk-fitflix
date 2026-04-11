@@ -18,6 +18,8 @@ export interface Appointment {
   slot: string
   doctor: string
   service?: string
+  creditCostSnapshot?: number
+  creditsBypassed?: boolean
   report?: string
   createdAt: string
   updatedAt: string

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,7 +33,11 @@ import { IconPlus, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { useBookings, useCreateBooking, useDeleteBooking, useChangeBookingStatus } from '@/hooks/use-bookings'
 import { useSlots } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
+import { useTherapies } from '@/hooks/use-therapies'
+import { useUsers } from '@/hooks/use-users'
 import { BOOKING_STATUS, BookingStatusValue } from '@/lib/services/booking.service'
+import { toUtcDateKey } from '@/lib/utils'
+import { toast } from 'sonner'
 
 const STATUS_COLORS: Record<number, string> = {
   0: 'bg-blue-100 text-blue-800',
@@ -41,6 +45,25 @@ const STATUS_COLORS: Record<number, string> = {
   2: 'bg-red-100 text-red-800',
   3: 'bg-emerald-100 text-emerald-800',
   4: 'bg-gray-100 text-gray-800',
+}
+
+function formatSlotWindowLabel(slot: {
+  date?: string
+  isDaily?: boolean
+  startTime: string
+  endTime: string
+  remainingCapacity: number
+  capacity: number
+}) {
+  const scheduleLabel =
+    slot.isDaily || !slot.date
+      ? 'Daily'
+      : (() => {
+          const parsed = new Date(slot.date)
+          return Number.isNaN(parsed.getTime()) ? 'Daily' : parsed.toLocaleDateString()
+        })()
+
+  return `${scheduleLabel} - ${slot.startTime} to ${slot.endTime} (${slot.remainingCapacity}/${slot.capacity})`
 }
 
 export default function BookingsPage() {
@@ -57,9 +80,48 @@ export default function BookingsPage() {
   const { data: bookings = [], isLoading, isError, refetch } = useBookings()
   const { data: slots = [] } = useSlots()
   const { data: services = [] } = useServices()
+  const { data: therapies = [] } = useTherapies()
+  const { data: users = [] } = useUsers()
   const createBooking = useCreateBooking()
   const deleteBooking = useDeleteBooking()
   const changeStatus = useChangeBookingStatus()
+
+  const selectedDateKey = useMemo(
+    () => toUtcDateKey(formData.bookingDate),
+    [formData.bookingDate]
+  )
+
+  const selectedBookableSlotRefs = useMemo(() => {
+    if (!formData.serviceId) return [] as string[]
+
+    const fromService = services.find((service) => service.id === formData.serviceId)
+    if (fromService) return fromService.slots
+
+    const fromTherapy = therapies.find((therapy) => therapy.id === formData.serviceId)
+    if (fromTherapy) return fromTherapy.slots
+
+    return [] as string[]
+  }, [formData.serviceId, services, therapies])
+
+  const filteredSlotOptions = useMemo(() => {
+    if (!selectedDateKey || !formData.serviceId || selectedBookableSlotRefs.length === 0) {
+      return [] as typeof slots
+    }
+
+    return slots
+      .filter((slot) => {
+        const slotDateKey = toUtcDateKey(slot.date)
+        const matchesDay = slot.isDaily || slotDateKey === selectedDateKey
+        if (!matchesDay) return false
+
+        const matchesBookableSlots =
+          selectedBookableSlotRefs.includes(slot._id) ||
+          (slot.parentTemplate ? selectedBookableSlotRefs.includes(slot.parentTemplate) : false)
+
+        return matchesBookableSlots
+      })
+      .filter((slot) => slot.remainingCapacity > 0)
+  }, [selectedDateKey, formData.serviceId, selectedBookableSlotRefs, slots])
 
   const filtered = bookings.filter(
     (b) =>
@@ -69,9 +131,20 @@ export default function BookingsPage() {
 
   const handleCreate = async () => {
     if (!formData.bookingDate || !formData.userId || !formData.slotId || !formData.serviceId) return
-    await createBooking.mutateAsync(formData)
-    setIsDialogOpen(false)
-    setFormData({ bookingDate: '', userId: '', slotId: '', serviceId: '', bypassCredits: false })
+
+    const selectedSlot = slots.find((slot) => slot._id === formData.slotId)
+    if (selectedSlot && selectedSlot.remainingCapacity <= 0) {
+      toast.error('Selected slot is already full. Please choose another slot.')
+      return
+    }
+
+    try {
+      await createBooking.mutateAsync(formData)
+      setIsDialogOpen(false)
+      setFormData({ bookingDate: '', userId: '', slotId: '', serviceId: '', bypassCredits: false })
+    } catch {
+      // Error states are handled by mutation hooks.
+    }
   }
 
   const handleStatusChange = (id: string, status: string) => {
@@ -83,7 +156,7 @@ export default function BookingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Bookings</h2>
-          <p className="text-muted-foreground">Manage all service bookings</p>
+          <p className="text-muted-foreground">Manage all service and therapy bookings</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -109,51 +182,95 @@ export default function BookingsPage() {
                       setFormData({
                         ...formData,
                         bookingDate: e.target.value ? new Date(e.target.value).toISOString() : '',
+                        slotId: '',
                       })
                     }
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium">User ID</label>
-                  <Input
-                    placeholder="MongoDB ObjectId of the user"
-                    value={formData.userId}
-                    onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Slot</label>
-                  <Select onValueChange={(v) => setFormData({ ...formData, slotId: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a slot" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {slots.filter(s => !s.isBooked).map((slot) => (
-                        <SelectItem key={slot._id} value={slot._id}>
-                          {new Date(slot.date).toLocaleDateString()} — {slot.startTime} to {slot.endTime}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Service</label>
-                  {services.length > 0 ? (
-                    <Select onValueChange={(v) => setFormData({ ...formData, serviceId: v })}>
+                  {users.length > 0 ? (
+                    <Select onValueChange={(v) => setFormData({ ...formData, userId: v })}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a service" />
+                        <SelectValue placeholder="Select a member" />
                       </SelectTrigger>
                       <SelectContent>
-                        {services.map((service) => (
-                          <SelectItem key={service.id} value={service.id}>
-                            {service.name} ({service.time} mins, {service.creditCost} credit{service.creditCost > 1 ? 's' : ''})
+                        {users.map((user) => (
+                          <SelectItem key={user._id} value={user._id}>
+                            {user.username} ({user.email})
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   ) : (
                     <Input
-                      placeholder="MongoDB ObjectId of the service"
+                      placeholder="MongoDB ObjectId of the user"
+                      value={formData.userId}
+                      onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
+                    />
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Slot</label>
+                  <Select
+                    value={formData.slotId || undefined}
+                    onValueChange={(v) => setFormData({ ...formData, slotId: v })}
+                    disabled={!selectedDateKey || !formData.serviceId || filteredSlotOptions.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          !formData.serviceId
+                            ? 'Select a service or therapy first'
+                            : !selectedDateKey
+                              ? 'Select booking date first'
+                              : filteredSlotOptions.length === 0
+                                ? 'No available slots for this selection'
+                                : 'Select a slot'
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredSlotOptions.map((slot) => (
+                        <SelectItem key={slot._id} value={slot._id}>
+                          {formatSlotWindowLabel(slot)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Service / Therapy</label>
+                  {services.length > 0 || therapies.length > 0 ? (
+                    <Select
+                      value={formData.serviceId || undefined}
+                      onValueChange={(v) => setFormData({ ...formData, serviceId: v, slotId: '' })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a service or therapy" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {services.length > 0 && (
+                          <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Services</div>
+                        )}
+                        {services.map((service) => (
+                          <SelectItem key={service.id} value={service.id}>
+                            {service.name} ({service.time} mins, {service.creditCost} credit{service.creditCost > 1 ? 's' : ''})
+                          </SelectItem>
+                        ))}
+                        {therapies.length > 0 && (
+                          <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Therapies</div>
+                        )}
+                        {therapies.map((therapy) => (
+                          <SelectItem key={therapy.id} value={therapy.id}>
+                            {therapy.name} ({therapy.time} mins, {therapy.creditCost} credit{therapy.creditCost > 1 ? 's' : ''})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      placeholder="MongoDB ObjectId of a service or therapy"
                       value={formData.serviceId}
                       onChange={(e) => setFormData({ ...formData, serviceId: e.target.value })}
                     />
@@ -215,6 +332,7 @@ export default function BookingsPage() {
                     <TableHead>Booking ID</TableHead>
                     <TableHead>User</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead>Credits</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Change Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -223,7 +341,7 @@ export default function BookingsPage() {
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No bookings found
                       </TableCell>
                     </TableRow>
@@ -233,6 +351,20 @@ export default function BookingsPage() {
                         <TableCell className="font-mono text-xs">{booking._id.slice(-8)}</TableCell>
                         <TableCell className="font-mono text-xs">{booking.user.slice(-8)}</TableCell>
                         <TableCell>{new Date(booking.bookingDate).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs">
+                              {typeof booking.creditCostSnapshot === 'number'
+                                ? `${booking.creditCostSnapshot} cr`
+                                : '-'}
+                            </span>
+                            {booking.creditsBypassed ? (
+                              <Badge variant="outline" className="text-[10px]">
+                                Bypassed
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <Badge className={STATUS_COLORS[booking.status as number] || 'bg-gray-100 text-gray-800'}>
                             {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS] ?? booking.status}

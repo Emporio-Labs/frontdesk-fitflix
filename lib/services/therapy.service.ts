@@ -4,6 +4,7 @@ export interface TherapyCatalogItem {
   id: string
   name: string
   time: number
+  creditCost: number
   description: string
   tags: string[]
   slots: string[]
@@ -12,6 +13,7 @@ export interface TherapyCatalogItem {
 export interface CreateTherapyPayload {
   name: string
   time: number
+  creditCost?: number
   description?: string
   tags?: string[]
   slots?: string[]
@@ -20,9 +22,15 @@ export interface CreateTherapyPayload {
 export interface UpdateTherapyPayload {
   name?: string
   time?: number
+  creditCost?: number
   description?: string
   tags?: string[]
   slots?: string[]
+}
+
+function parseCreditCost(value: unknown): number {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
 }
 
 function normalizeTherapy(raw: any): TherapyCatalogItem {
@@ -30,6 +38,7 @@ function normalizeTherapy(raw: any): TherapyCatalogItem {
     id: raw?._id || raw?.id || '',
     name: raw?.therapyName || raw?.name || '',
     time: Number(raw?.therapyTime ?? raw?.time ?? 0),
+    creditCost: parseCreditCost(raw?.creditCost ?? raw?.therapyCreditCost),
     description: raw?.description || '',
     tags: Array.isArray(raw?.tags) ? raw.tags : [],
     slots: Array.isArray(raw?.slots)
@@ -55,6 +64,7 @@ export const therapyService = {
     const apiPayload = {
       therapyName: payload.name,
       therapyTime: payload.time,
+      creditCost: payload.creditCost ?? 1,
       description: payload.description || '',
       tags: payload.tags || [],
       slots: payload.slots || [],
@@ -71,6 +81,7 @@ export const therapyService = {
     const apiPayload = {
       ...(payload.name !== undefined ? { therapyName: payload.name } : {}),
       ...(payload.time !== undefined ? { therapyTime: payload.time } : {}),
+      ...(payload.creditCost !== undefined ? { creditCost: payload.creditCost } : {}),
       ...(payload.description !== undefined ? { description: payload.description } : {}),
       ...(payload.tags !== undefined ? { tags: payload.tags } : {}),
       ...(payload.slots !== undefined ? { slots: payload.slots } : {}),

@@ -48,7 +48,7 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime())
     .slice(0, 5)
 
-  const availableSlots = slots.filter((s) => !s.isBooked).length
+  const availableSlots = slots.reduce((sum, slot) => sum + Math.max(slot.remainingCapacity, 0), 0)
 
   const handleRefreshAll = () => {
     refetchUsers()
@@ -121,7 +121,7 @@ export default function DashboardPage() {
           title="Open Slots"
           icon={<IconClock className="w-4 h-4 text-teal-500" />}
           value={availableSlots}
-          sub={`of ${slots.length} slots available`}
+          sub={`across ${slots.length} slot windows`}
           loading={false}
           href="/admin/slots"
           color="teal"

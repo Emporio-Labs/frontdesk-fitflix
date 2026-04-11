@@ -887,12 +887,20 @@ POST /slots
 **Request Body:**
 ```json
 {
-  "date": "2026-03-25T00:00:00Z",
+  "isDaily": true,
   "startTime": "09:00",
   "endTime": "10:00",
+  "capacity": 3,
   "isBooked": false
 }
 ```
+
+**Notes:**
+- `isDaily` defaults to `true` when `date` is omitted.
+- `date` is optional and only needed for one-off (non-recurring) slots.
+- `capacity` is optional and defaults to `1`.
+- `remainingCapacity` is initialized from `capacity`.
+- `isBooked` is derived from `remainingCapacity <= 0`.
 
 **Response (201 Created):**
 ```json
@@ -900,9 +908,11 @@ POST /slots
   "message": "Slot created successfully",
   "slot": {
     "_id": "507f1f77bcf86cd799439020",
-    "date": "2026-03-25T00:00:00Z",
+    "isDaily": true,
     "startTime": "09:00",
     "endTime": "10:00",
+    "capacity": 3,
+    "remainingCapacity": 3,
     "isBooked": false,
     "createdAt": "2026-03-20T10:00:00Z",
     "updatedAt": "2026-03-20T10:00:00Z"
@@ -941,12 +951,18 @@ PATCH /slots/:id
 **Request Body (all fields optional):**
 ```json
 {
-  "date": "2026-03-26T00:00:00Z",
+  "isDaily": true,
   "startTime": "10:00",
   "endTime": "11:00",
+  "capacity": 4,
+  "remainingCapacity": 2,
   "isBooked": true
 }
 ```
+
+**Notes:**
+- `remainingCapacity` cannot exceed `capacity`.
+- `isBooked` should be treated as derived state (`remainingCapacity <= 0`).
 
 ---
 
@@ -1094,6 +1110,10 @@ DELETE /memberships/:id
 - ✅ Basic Authentication required
 - ✅ Admin creates/updates/deletes; all roles can read
 
+**Implementation Notes:**
+- Therapies are persisted in the same underlying collection as services with `serviceType = "Therapy"`.
+- The therapy `_id` returned by `/therapies` is a valid `serviceId` for `/bookings` and `/appointments`.
+
 #### 1. Create Service
 ```
 POST /services
@@ -1172,11 +1192,16 @@ POST /therapies
 {
   "therapyName": "Deep Tissue Massage",
   "therapyTime": 60,
+  "creditCost": 2,
   "description": "Focus on muscle recovery",
   "tags": ["recovery", "massage"],
   "slots": ["507f1f77bcf86cd799439020"]
 }
 ```
+
+**Credit Notes:**
+- `creditCost` is optional and defaults to `1` when omitted.
+- Booking and appointment deduction uses this value when the therapy `_id` is used as `serviceId`.
 
 #### 2. Get All Therapies
 ```
@@ -1200,6 +1225,9 @@ PATCH /therapies/:id
 **Authorization:** Admin only
 
 **Notes:** Any subset of fields from create payload; at least one field required.
+
+**Credit Notes:**
+- `creditCost` can be updated to change future deduction behavior.
 
 #### 5. Delete Therapy
 ```
@@ -1327,7 +1355,12 @@ POST /bookings
 - `userId` — Required for admin. Optional for users (uses their ID).
 - `reportId` — Optional field.
 - `bypassCredits` — Optional; only admins can set `true`.
+- `serviceId` can be either a regular service ID (from `/services`) or a therapy ID (from `/therapies`) because both are stored under the same bookable service identity.
+- `slotId` can be a one-off slot instance or a daily slot template ID.
+- When `slotId` references a daily template, backend resolves/creates a dated slot inventory record for `bookingDate` and books against that concrete record.
 - Credit consumption amount is read from `service.creditCost`.
+- Booking creation atomically decrements slot `remainingCapacity` by `1`.
+- If slot `remainingCapacity` is `0`, booking creation must fail.
 
 **Response (201 Created):**
 ```json
@@ -1355,6 +1388,7 @@ POST /bookings
 - `402` — Insufficient credits.
 - `403` — No active membership with available credits, or non-admin bypass attempt.
 - `404` — Service not found.
+- `409` — Slot is full or no longer available.
 
 ---
 
@@ -1418,6 +1452,10 @@ DELETE /bookings/:id
 
 **Authorization:** Admin only
 
+**Behavior:**
+- If the booking is not already cancelled, delete first applies cancellation compensation: refund consumed credits once and release one slot capacity for the dated inventory slot.
+- If the booking is already cancelled, delete does not apply additional compensation.
+
 ---
 
 #### 7. Change Booking Status
@@ -1436,6 +1474,8 @@ PATCH /bookings/:id/status
 
 **Behavior:**
 - When status transitions to `Cancelled`, credits previously consumed for that booking are refunded once.
+- When status transitions to `Cancelled`, one slot capacity is released back to the same dated slot inventory record.
+- Cancellation compensation is idempotent for repeated cancel requests. Subsequent cancel requests return `refunded: 0`.
 
 **Response (200 OK) Example:**
 ```json
@@ -1491,6 +1531,11 @@ POST /appointments
 - `serviceId` is optional. If provided, credits consumed use `service.creditCost`.
 - If `serviceId` is not provided, default deduction is `1` credit.
 - `bypassCredits` is optional and admin-only.
+- `serviceId` may point to a regular service (`/services`) or therapy (`/therapies`) ID.
+- `slotId` can be a one-off slot instance or a daily slot template ID.
+- When `slotId` references a daily template, backend resolves/creates a dated slot inventory record for `appointmentDate` and books against that concrete record.
+- Appointment creation uses the same slot-capacity pool as bookings and atomically decrements `remainingCapacity` by `1`.
+- If slot capacity is unavailable, appointment creation fails.
 
 **Response (201 Created) Example:**
 ```json
@@ -1517,6 +1562,7 @@ POST /appointments
 - `402` — Insufficient credits.
 - `403` — No active membership with available credits, or non-admin bypass attempt.
 - `404` — Service not found (when `serviceId` is provided).
+- `409` — Slot is full or no longer available.
 
 ---
 
@@ -1581,6 +1627,10 @@ DELETE /appointments/:id
 
 **Authorization:** Admin only
 
+**Behavior:**
+- If the appointment is not already cancelled, delete first applies cancellation compensation: refund consumed credits once and release one slot capacity for the dated inventory slot.
+- If the appointment is already cancelled, delete does not apply additional compensation.
+
 ---
 
 #### 7. Change Appointment Status
@@ -1599,6 +1649,8 @@ PATCH /appointments/:id/status
 
 **Behavior:**
 - When status transitions to `Cancelled`, credits previously consumed for that appointment are refunded once.
+- When status transitions to `Cancelled`, one slot capacity is released back to the same dated slot inventory record.
+- Cancellation compensation is idempotent for repeated cancel requests. Subsequent cancel requests return `refunded: 0`.
 
 **Response (200 OK) Example:**
 ```json
