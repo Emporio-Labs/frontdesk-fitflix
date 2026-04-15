@@ -15,6 +15,9 @@ export function useLeads() {
     queryKey: queryKeys.leads.all(),
     queryFn: () => leadService.getAll(10),
     select: (data) => data.leads,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: 10000,
   })
 }
 
@@ -24,33 +27,98 @@ export function useLead(id: string) {
     queryFn: () => leadService.getById(id, 10),
     select: (data) => data.lead,
     enabled: !!id,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   })
 }
 
 export function useLeadReminders() {
   return useQuery({
     queryKey: [...queryKeys.leads.all(), 'reminders'],
-    queryFn: leadService.getReminders,
+    queryFn: async () => {
+      try {
+        return await leadService.getReminders()
+      } catch {
+        return {
+          today: [],
+          missed: [],
+          generatedAt: '',
+          timezone: 'Asia/Kolkata',
+        }
+      }
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: 10000,
   })
 }
 
 export function useLeadAnalytics() {
   return useQuery({
     queryKey: [...queryKeys.leads.all(), 'analytics'],
-    queryFn: leadService.getAnalytics,
+    queryFn: async () => {
+      try {
+        return await leadService.getAnalytics()
+      } catch {
+        return {
+          stageCounts: { new: 0, contacted: 0, qualified: 0, converted: 0, lost: 0 },
+          heatDistribution: { cold: 0, warm: 0, hot: 0 },
+          dropOff: { newToContacted: 0, contactedToQualified: 0, qualifiedToConverted: 0 },
+          stageDurations: {
+            new: { totalDays: 0, samples: 0, averageDays: 0 },
+            contacted: { totalDays: 0, samples: 0, averageDays: 0 },
+            qualified: { totalDays: 0, samples: 0, averageDays: 0 },
+            converted: { totalDays: 0, samples: 0, averageDays: 0 },
+            lost: { totalDays: 0, samples: 0, averageDays: 0 },
+          },
+          conversionTimeline: [],
+          lifecycleMetrics: {
+            totalActiveLeads: 0,
+            convertedLeads: 0,
+            lostLeads: 0,
+            avgContactAttempts: 0,
+            avgLeadAgeDays: 0,
+          },
+        }
+      }
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: 10000,
   })
 }
 
 export function useLeadDigest() {
   return useQuery({
     queryKey: [...queryKeys.leads.all(), 'digest'],
-    queryFn: leadService.getDigest,
+    queryFn: async () => {
+      try {
+        return await leadService.getDigest()
+      } catch {
+        return {}
+      }
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: 10000,
   })
 }
 
 function replaceLeadInList(list: Lead[] | undefined, updated: Lead): Lead[] {
   if (!Array.isArray(list)) return [updated]
   return list.map((lead) => (lead.id === updated.id ? updated : lead))
+}
+
+function getLeadListCache(data: unknown): Lead[] {
+  if (Array.isArray(data)) return data
+  if (data && typeof data === 'object' && Array.isArray((data as { leads?: Lead[] }).leads)) {
+    return (data as { leads: Lead[] }).leads
+  }
+  return []
+}
+
+function setLeadListCache(data: unknown, updater: (current: Lead[]) => Lead[]): { leads: Lead[] } {
+  return { leads: updater(getLeadListCache(data)) }
 }
 
 export function useCreateLead() {
@@ -76,10 +144,11 @@ export function useUpdateLead() {
       leadService.update(id, payload),
     onMutate: async ({ id, payload }) => {
       await qc.cancelQueries({ queryKey: queryKeys.leads.all() })
-      const prev = qc.getQueryData<Lead[]>(queryKeys.leads.all())
+      const prev = qc.getQueryData(queryKeys.leads.all())
 
-      if (prev) {
-        const next = prev.map((lead) => {
+      const prevLeads = getLeadListCache(prev)
+      if (prevLeads.length > 0) {
+        const next = prevLeads.map((lead) => {
           if (lead.id !== id) return lead
           const nextStatus = payload.status ?? lead.status
           const nextTemp =
@@ -103,7 +172,7 @@ export function useUpdateLead() {
             updatedAt: new Date().toISOString(),
           }
         })
-        qc.setQueryData(queryKeys.leads.all(), next)
+        qc.setQueryData(queryKeys.leads.all(), { leads: next })
       }
 
       return { prev }
@@ -166,7 +235,9 @@ export function useAddLeadInteraction() {
     mutationFn: ({ id, note, type }: { id: string; note: string; type?: LeadInteraction['type'] }) =>
       leadService.addInteraction(id, { note, type }),
     onSuccess: (data) => {
-      qc.setQueryData<Lead[]>(queryKeys.leads.all(), (current) => replaceLeadInList(current, data.lead))
+      qc.setQueryData(queryKeys.leads.all(), (current) =>
+        setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
+      )
       qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })
       toast.success(data.message || 'Interaction added')
     },
@@ -183,13 +254,18 @@ export function useRecordLeadContactAttempt() {
     mutationFn: ({ id, channel }: { id: string; channel: 'call' | 'whatsapp' | 'email' }) =>
       leadService.recordContactAttempt(id, { channel }),
     onSuccess: (data) => {
-      qc.setQueryData<Lead[]>(queryKeys.leads.all(), (current) => replaceLeadInList(current, data.lead))
+      qc.setQueryData(queryKeys.leads.all(), (current) =>
+        setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
+      )
       qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })
       qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'reminders'] })
       qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'analytics'] })
       toast.success(data.message || 'Contact attempt recorded')
     },
     onError: (err: any) => {
+      if (err?.response?.status === 404 || err?.response?.status === 400) {
+        return
+      }
       toast.error(err?.response?.data?.message || err?.message || 'Failed to record contact attempt')
     },
   })

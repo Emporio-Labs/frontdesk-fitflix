@@ -53,6 +53,13 @@ const STATUS_COLORS: Record<number, string> = {
   4: 'bg-gray-100 text-gray-800',
 }
 
+const UTC_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
+
 function getTodayDateKey() {
   const now = new Date()
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
@@ -66,11 +73,17 @@ function toUtcStartOfDayIso(dateKey: string) {
   return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString()
 }
 
+function formatDateForDisplay(value?: string) {
+  if (!value) return '-'
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : UTC_DATE_FORMATTER.format(parsed)
+}
+
 function formatDateKey(value: string) {
   if (!value) return '-'
 
-  const parsed = new Date(`${value}T00:00:00.000Z`)
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString()
+  return formatDateForDisplay(`${value}T00:00:00.000Z`)
 }
 
 function formatSlotWindowLabel(slot: {
@@ -86,7 +99,7 @@ function formatSlotWindowLabel(slot: {
       ? 'Daily'
       : (() => {
           const parsed = new Date(slot.date)
-          return Number.isNaN(parsed.getTime()) ? 'Daily' : parsed.toLocaleDateString()
+          return Number.isNaN(parsed.getTime()) ? 'Daily' : UTC_DATE_FORMATTER.format(parsed)
         })()
 
   return `${scheduleLabel} - ${slot.startTime} to ${slot.endTime} (${slot.remainingCapacity}/${slot.capacity})`
@@ -100,7 +113,7 @@ export default function BookingsPage() {
   const [topUpAmount, setTopUpAmount] = useState(1)
   const [topUpMembershipId, setTopUpMembershipId] = useState('')
   const [formData, setFormData] = useState(() => ({
-    bookingDate: getTodayDateKey(),
+    bookingDate: '',
     userId: '',
     slotId: '',
     serviceId: '',
@@ -122,6 +135,13 @@ export default function BookingsPage() {
   const deleteBooking = useDeleteBooking()
   const changeStatus = useChangeBookingStatus()
   const topUpCredits = useTopUpUserCredits()
+
+  useEffect(() => {
+    setFormData((prev) => {
+      if (prev.bookingDate) return prev
+      return { ...prev, bookingDate: getTodayDateKey() }
+    })
+  }, [])
 
   const selectedUser = useMemo(
     () => users.find((user) => user._id === formData.userId),
@@ -510,7 +530,7 @@ export default function BookingsPage() {
                           <p className="text-xs text-muted-foreground mt-1">
                             {slot.isDaily || !slot.date
                               ? 'Daily template window'
-                              : `Dated window: ${new Date(slot.date).toLocaleDateString()}`}
+                                : `Dated window: ${formatDateForDisplay(slot.date)}`}
                           </p>
                         </div>
                         <Badge variant={isFull ? 'secondary' : 'default'}>
@@ -727,7 +747,7 @@ export default function BookingsPage() {
                       <TableRow key={booking._id}>
                         <TableCell className="font-mono text-xs">{booking._id.slice(-8)}</TableCell>
                         <TableCell className="font-mono text-xs">{booking.user.slice(-8)}</TableCell>
-                        <TableCell>{new Date(booking.bookingDate).toLocaleDateString()}</TableCell>
+                        <TableCell>{formatDateForDisplay(booking.bookingDate)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <span className="text-xs">

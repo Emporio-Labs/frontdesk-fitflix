@@ -1,23 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { convertLead } from '@/lib/server/leads-store'
+import { NextRequest } from 'next/server'
+import { proxyLeadsRequest } from '../../proxy'
 
 type Params = { params: Promise<{ lead_id: string }> }
 
-export async function POST(_req: NextRequest, { params }: Params) {
-  try {
-    const { lead_id } = await params
-    const updated = await convertLead(lead_id)
-    if (!updated) {
-      return NextResponse.json({ message: 'Lead not found' }, { status: 404 })
-    }
-    return NextResponse.json({ message: 'Lead converted successfully', lead: updated })
-  } catch (error: any) {
-    if (error?.code === 'INVALID_TRANSITION') {
-      return NextResponse.json(
-        { message: 'Invalid stage transition. Follow new -> contacted -> qualified -> converted.' },
-        { status: 400 }
-      )
-    }
-    return NextResponse.json({ message: 'Failed to convert lead', error: String(error) }, { status: 500 })
-  }
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export async function POST(req: NextRequest, { params }: Params) {
+  const { lead_id } = await params
+  return proxyLeadsRequest(req, `/leads/${lead_id}/convert`)
 }

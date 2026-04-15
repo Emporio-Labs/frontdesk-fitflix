@@ -325,9 +325,13 @@ export default function LeadsPage() {
       return
     }
 
-    await contactAttempt.mutateAsync({ id: lead.id, channel: 'call' })
+    try {
+      await contactAttempt.mutateAsync({ id: lead.id, channel: 'call' })
+    } catch {
+      // Ignore telemetry failures; the direct call action should still proceed.
+    }
     if (typeof window !== 'undefined') {
-      window.open(`tel:${lead.phone}`, '_self')
+      window.location.href = `tel:${lead.phone.replace(/\D/g, '')}`
     }
   }
 
@@ -337,10 +341,15 @@ export default function LeadsPage() {
       return
     }
 
-    await contactAttempt.mutateAsync({ id: lead.id, channel: 'whatsapp' })
+    try {
+      await contactAttempt.mutateAsync({ id: lead.id, channel: 'whatsapp' })
+    } catch {
+      // Ignore telemetry failures; the WhatsApp action should still proceed.
+    }
     if (typeof window !== 'undefined') {
       const digits = lead.phone.replace(/\D/g, '')
-      window.open(`https://wa.me/${digits}`, '_blank', 'noopener,noreferrer')
+      const message = encodeURIComponent(`Hi ${lead.name}, following up on your inquiry from Fitflix.`)
+      window.open(`https://wa.me/${digits}?text=${message}`, '_blank', 'noopener,noreferrer')
     }
   }
 

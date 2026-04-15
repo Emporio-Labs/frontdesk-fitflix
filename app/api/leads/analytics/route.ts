@@ -1,11 +1,9 @@
-import { NextResponse } from 'next/server'
-import { getLeadAnalytics } from '@/lib/server/leads-store'
+import { NextRequest } from 'next/server'
+import { proxyLeadsRequest } from '../proxy'
 
-export async function GET() {
-  try {
-    const analytics = await getLeadAnalytics()
-    return NextResponse.json({ analytics })
-  } catch (error) {
-    return NextResponse.json({ message: 'Failed to fetch lead analytics', error: String(error) }, { status: 500 })
-  }
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export async function GET(req: NextRequest) {
+  return proxyLeadsRequest(req, '/leads/analytics')
 }

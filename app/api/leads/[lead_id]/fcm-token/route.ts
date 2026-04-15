@@ -1,44 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { removeFcmToken, upsertFcmToken } from '@/lib/server/leads-store'
+import { NextRequest } from 'next/server'
+import { proxyLeadsRequest } from '../../proxy'
 
 type Params = { params: Promise<{ lead_id: string }> }
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function POST(req: NextRequest, { params }: Params) {
-  try {
-    const { lead_id } = await params
-    const body = await req.json()
-    const token = String(body?.token || '').trim()
-    if (!token) {
-      return NextResponse.json({ message: 'token is required' }, { status: 400 })
-    }
-
-    const updated = await upsertFcmToken(lead_id, token)
-    if (!updated) {
-      return NextResponse.json({ message: 'Lead not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ message: 'FCM token saved', lead: updated })
-  } catch (error) {
-    return NextResponse.json({ message: 'Failed to save FCM token', error: String(error) }, { status: 500 })
-  }
+  const { lead_id } = await params
+  return proxyLeadsRequest(req, `/leads/${lead_id}/fcm-token`)
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  try {
-    const { lead_id } = await params
-    const body = await req.json()
-    const token = String(body?.token || '').trim()
-    if (!token) {
-      return NextResponse.json({ message: 'token is required' }, { status: 400 })
-    }
-
-    const updated = await removeFcmToken(lead_id, token)
-    if (!updated) {
-      return NextResponse.json({ message: 'Lead not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ message: 'FCM token removed', lead: updated })
-  } catch (error) {
-    return NextResponse.json({ message: 'Failed to remove FCM token', error: String(error) }, { status: 500 })
-  }
+  const { lead_id } = await params
+  return proxyLeadsRequest(req, `/leads/${lead_id}/fcm-token`)
 }

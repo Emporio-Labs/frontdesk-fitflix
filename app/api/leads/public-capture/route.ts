@@ -4,6 +4,6 @@ import { proxyLeadsRequest } from '../proxy'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function GET(req: NextRequest) {
-  return proxyLeadsRequest(req, '/leads/reminders')
+export async function POST(req: NextRequest) {
+  return proxyLeadsRequest(req, '/leads/public-capture')
 }

@@ -1,11 +1,9 @@
-import { NextResponse } from 'next/server'
-import { getDailyDigest } from '@/lib/server/leads-store'
+import { NextRequest } from 'next/server'
+import { proxyLeadsRequest } from '../../proxy'
 
-export async function GET() {
-  try {
-    const digest = await getDailyDigest()
-    return NextResponse.json(digest)
-  } catch (error) {
-    return NextResponse.json({ message: 'Failed to fetch daily digest', error: String(error) }, { status: 500 })
-  }
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export async function GET(req: NextRequest) {
+  return proxyLeadsRequest(req, '/leads/reminders/digest')
 }

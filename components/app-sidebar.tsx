@@ -48,7 +48,7 @@ const data = {
   user: {
     name: "Admin User",
     email: "admin@hybridhuman.com",
-    avatar: "/avatars/shadcn.jpg",
+    avatar: "/placeholder-user.jpg",
   },
   navMain: [
     {
