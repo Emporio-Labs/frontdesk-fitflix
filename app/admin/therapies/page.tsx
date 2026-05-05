@@ -130,11 +130,14 @@ export default function TherapiesPage() {
     [items, searchTerm]
   )
 
-  const parseCsvInput = (value: string) =>
-    value
+  const parseCsvInput = (value: string) => {
+    const tags = value
       .split(',')
       .map((token) => token.trim())
       .filter(Boolean)
+    // Deduplicate tags
+    return [...new Set(tags)]
+  }
 
   const resetForm = () => {
     setFormData({
@@ -703,7 +706,7 @@ export default function TherapiesPage() {
                     <CardContent className="space-y-4 p-4">
                       <div className="flex flex-wrap gap-1.5">
                         {item.tags.length ? (
-                          item.tags.map((tag) => (
+                          [...new Set(item.tags)].map((tag) => (
                             <Badge key={tag} variant="secondary" className="rounded-full">
                               {tag}
                             </Badge>

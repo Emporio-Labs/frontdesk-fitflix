@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
 import { authService } from '@/lib/services/auth.service'
 import { toast } from 'sonner'
@@ -80,21 +81,20 @@ export default function LoginPage() {
         {/* Logo area */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{
-            width: '56px', height: '56px',
-            borderRadius: '16px',
+            width: '72px', height: '72px',
+            borderRadius: '20px',
             background: 'linear-gradient(135deg, #10b981 0%, #0d9488 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 16px',
-            boxShadow: '0 10px 25px rgba(16,185,129,0.3)',
+            boxShadow: '0 10px 25px rgba(16,185,129,0.35)',
+            overflow: 'hidden',
           }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
+            <Image src="/fitflix_logo.png" alt="Fitflix Logo" width={56} height={56} style={{ objectFit: 'contain' }} />
           </div>
-          <h1 style={{ color: '#f8fafc', fontSize: '24px', fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.5px' }}>
-            Hybrid Human
+          <h1 style={{ color: '#f8fafc', fontSize: '26px', fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.5px' }}>
+            Fitflix
           </h1>
-          <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>IHO Ops Dashboard</p>
+          <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>Admin Panel</p>
         </div>
 
         {/* Card */}
@@ -122,7 +122,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@hybridhuman.com"
+                placeholder="admin@fitflix.com"
                 required
                 autoComplete="email"
                 style={{
@@ -189,7 +189,7 @@ export default function LoginPage() {
         </div>
 
         <p style={{ textAlign: 'center', color: '#334155', fontSize: '12px', marginTop: '24px' }}>
-          © {new Date().getFullYear()} Hybrid Human. Internal use only.
+          © {new Date().getFullYear()} Fitflix. Internal use only.
         </p>
       </div>
     </div>

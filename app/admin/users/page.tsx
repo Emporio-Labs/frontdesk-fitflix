@@ -366,7 +366,7 @@ export default function UsersPage() {
                     </div>
                     <div>
                       <label className="text-sm font-medium">Email</label>
-                      <Input type="email" value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} placeholder="alice@hybridhuman.com" />
+                      <Input type="email" value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} placeholder="alice@fitflix.com" />
                     </div>
                     <div>
                       <label className="text-sm font-medium">Phone</label>

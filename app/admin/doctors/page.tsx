@@ -101,7 +101,7 @@ export default function DoctorsPage() {
                   <>
                     <div>
                       <label className="text-sm font-medium">Email</label>
-                      <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="smith@hybridhuman.com" />
+                      <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="smith@fitflix.com" />
                     </div>
                     <div>
                       <label className="text-sm font-medium">Phone</label>

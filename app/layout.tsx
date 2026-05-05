@@ -10,9 +10,9 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Hybrid Human — Admin Panel',
-  description: 'IHO Ops Dashboard — Internal Admin Control Panel',
-  generator: 'hybridhuman',
+  title: 'Fitflix — Admin Panel',
+  description: 'Fitflix Operations Dashboard — Internal Admin Control Panel',
+  generator: 'fitflix',
   icons: {
     icon: [
       {
@@ -24,11 +24,11 @@ export const metadata: Metadata = {
         media: '(prefers-color-scheme: dark)',
       },
       {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        url: '/fitflix_logo.png',
+        type: 'image/png',
       },
     ],
-    apple: '/apple-icon.png',
+    apple: '/fitflix_logo.png',
   },
 }
 

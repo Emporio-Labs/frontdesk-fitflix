@@ -45,6 +45,22 @@ interface BookableItemOption {
   kind: BookableKind
 }
 
+interface BookingWithNames {
+  _id: string
+  bookingDate: string
+  status: BookingStatusValue
+  user: string
+  slot: string
+  service: string
+  creditCostSnapshot?: number
+  creditsBypassed?: boolean
+  report?: string
+  createdAt: string
+  updatedAt: string
+  userName: string
+  serviceName: string
+}
+
 const STATUS_COLORS: Record<number, string> = {
   0: 'bg-blue-100 text-blue-800',
   1: 'bg-green-100 text-green-800',
@@ -259,10 +275,64 @@ export default function BookingsPage() {
 
   const memberships = userBalance?.memberships || []
 
-  const filtered = bookings.filter(
-    (b) =>
-      b._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.user.toLowerCase().includes(searchTerm.toLowerCase())
+  const userNameById = useMemo(
+    () => new Map(users.map((user) => [user._id, user.name || user.username || user.email || 'Unknown User'])),
+    [users]
+  )
+
+  const itemNameById = useMemo(
+    () =>
+      new Map([
+        ...services.map((service) => [service.id, service.name] as const),
+        ...therapies.map((therapy) => [therapy.id, therapy.name] as const),
+      ]),
+    [services, therapies]
+  )
+
+  const slotById = useMemo(() => new Map(slots.map((slot) => [slot._id, slot] as const)), [slots])
+
+  const enrichedBookings = useMemo<BookingWithNames[]>(
+    () =>
+      bookings
+        .map((booking) => ({
+          ...booking,
+          userName: userNameById.get(booking.user) || 'Unknown User',
+          serviceName: itemNameById.get(booking.service) || 'Unknown Service',
+        }))
+        .sort((a, b) => {
+          const aTime = new Date(a.bookingDate || a.createdAt).getTime()
+          const bTime = new Date(b.bookingDate || b.createdAt).getTime()
+          return bTime - aTime
+        }),
+    [bookings, userNameById, itemNameById]
+  )
+
+  const filtered = useMemo(
+    () =>
+      enrichedBookings.filter((booking) => {
+        const query = searchTerm.toLowerCase()
+        return (
+          booking._id.toLowerCase().includes(query) ||
+          booking.userName.toLowerCase().includes(query) ||
+          booking.serviceName.toLowerCase().includes(query)
+        )
+      }),
+    [enrichedBookings, searchTerm]
+  )
+
+  const todayDateKey = getTodayDateKey()
+
+  const todaysUpcomingBookings = useMemo(
+    () =>
+      enrichedBookings
+        .filter((booking) => toUtcDateKey(booking.bookingDate) === todayDateKey)
+        .filter((booking) => booking.status === 0 || booking.status === 1)
+        .sort((a, b) => {
+          const aStart = slotById.get(a.slot)?.startTime || '99:99'
+          const bStart = slotById.get(b.slot)?.startTime || '99:99'
+          return aStart.localeCompare(bStart)
+        }),
+    [enrichedBookings, todayDateKey, slotById]
   )
 
   const canCreateBooking =
@@ -698,7 +768,7 @@ export default function BookingsPage() {
       <Card>
         <CardHeader>
           <Input
-            placeholder="Search by booking ID or user ID..."
+            placeholder="Search by booking ID, user name, or service..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-sm"
@@ -708,8 +778,58 @@ export default function BookingsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Today's Upcoming Bookings</CardTitle>
+          <CardDescription>
+            {isLoading ? 'Loading...' : `${todaysUpcomingBookings.length} upcoming for ${formatDateKey(todayDateKey)}`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : todaysUpcomingBookings.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-2">No upcoming bookings for today.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Member</TableHead>
+                    <TableHead>Service</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todaysUpcomingBookings.map((booking) => {
+                    const slot = slotById.get(booking.slot)
+                    const timeLabel = slot ? `${slot.startTime} to ${slot.endTime}` : 'Time TBD'
+
+                    return (
+                      <TableRow key={`today-${booking._id}`}>
+                        <TableCell>{timeLabel}</TableCell>
+                        <TableCell className="font-medium text-sm">{booking.userName}</TableCell>
+                        <TableCell className="text-sm">{booking.serviceName}</TableCell>
+                        <TableCell>
+                          <Badge className={STATUS_COLORS[booking.status as number] || 'bg-gray-100 text-gray-800'}>
+                            {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS] ?? booking.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>All Bookings</CardTitle>
-          <CardDescription>{isLoading ? 'Loading...' : `${filtered.length} bookings`}</CardDescription>
+          <CardDescription>{isLoading ? 'Loading...' : `${filtered.length} bookings (newest first)`}</CardDescription>
         </CardHeader>
         <CardContent>
           {isError && (
@@ -727,7 +847,8 @@ export default function BookingsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Booking ID</TableHead>
-                    <TableHead>User</TableHead>
+                    <TableHead>Member</TableHead>
+                    <TableHead>Service</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Credits</TableHead>
                     <TableHead>Status</TableHead>
@@ -738,15 +859,16 @@ export default function BookingsPage() {
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         No bookings found
                       </TableCell>
                     </TableRow>
                   ) : (
                     filtered.map((booking) => (
                       <TableRow key={booking._id}>
-                        <TableCell className="font-mono text-xs">{booking._id.slice(-8)}</TableCell>
-                        <TableCell className="font-mono text-xs">{booking.user.slice(-8)}</TableCell>
+                        <TableCell className="font-mono text-xs">{booking._id.slice(-6)}</TableCell>
+                        <TableCell className="font-medium text-sm">{booking.userName}</TableCell>
+                        <TableCell className="text-sm">{booking.serviceName}</TableCell>
                         <TableCell>{formatDateForDisplay(booking.bookingDate)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
