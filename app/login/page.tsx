@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
 import { authService } from '@/lib/services/auth.service'
 import { toast } from 'sonner'
+import { storeToken } from '@/lib/api-client'
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -30,6 +31,9 @@ export default function LoginPage() {
     setIsLoading(true)
     try {
       const data = await authService.login({ email, password })
+      if (data?.token) {
+        storeToken(data.token)
+      }
       const apiUser = data.user
       if (authDebug) {
         console.debug('[auth-debug] login success', {

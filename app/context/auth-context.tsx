@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, ReactNode, useEffect } from 'react'
 import { UserRole } from '@/lib/rbac'
-import { storeCredentials, clearCredentials, getStoredCredentials } from '@/lib/api-client'
+import { storeCredentials, clearCredentials, getStoredCredentials, getStoredToken } from '@/lib/api-client'
 
 // Helpers for auth cookie (read by Next.js middleware)
 function setAuthCookie() {
@@ -40,8 +40,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Restore session from localStorage on mount
   useEffect(() => {
     const stored = getStoredCredentials()
+    const token = getStoredToken()
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem('hh_user') : null
-    if (stored && storedUser) {
+    if ((stored || token) && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser)
         setUser(parsedUser)

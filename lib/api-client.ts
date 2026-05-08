@@ -24,7 +24,6 @@ const AUTH_DEBUG = process.env.NEXT_PUBLIC_DEBUG_AUTH === '1'
 
 function logAuthDebug(message: string, meta?: unknown) {
   if (AUTH_DEBUG && typeof window !== 'undefined') {
-    // Keep logs grouped and consistent for quick auth flow debugging.
     console.debug(`[auth-debug] ${message}`, meta ?? '')
   }
 }
@@ -36,13 +35,25 @@ export const apiClient = axios.create({
   },
 })
 
-// Inject Basic Auth from localStorage on every request
+// Token helpers (hh_token)
+export function storeToken(token: string) {
+  if (typeof window !== 'undefined') localStorage.setItem('hh_token', token)
+}
+export function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem('hh_token')
+}
+export function clearToken() {
+  if (typeof window !== 'undefined') localStorage.removeItem('hh_token')
+}
+
+// Inject Authorization (prefer Bearer, fall back to Basic)
 apiClient.interceptors.request.use((config) => {
   const requestPath = config.url ?? ''
   const requestUrl = `${config.baseURL ?? API_BASE_URL}${requestPath}`
 
   if (typeof window !== 'undefined') {
-    // Do not attach Basic auth for public auth endpoints.
+    // Do not attach auth for public auth endpoints.
     const isAuthEndpoint = requestPath.startsWith('/auth/') || requestPath === '/auth'
     if (isAuthEndpoint) {
       logAuthDebug('request', {
@@ -54,8 +65,26 @@ apiClient.interceptors.request.use((config) => {
       return config
     }
 
-    const credentials = localStorage.getItem('hh_credentials')
     let hasAuthHeader = false
+
+    // Prefer Bearer token
+    const token = getStoredToken()
+    if (token) {
+      const headers = AxiosHeaders.from(config.headers)
+      headers.set('Authorization', `Bearer ${token}`)
+      config.headers = headers
+      hasAuthHeader = true
+      logAuthDebug('request', {
+        method: config.method,
+        url: requestUrl,
+        hasAuthHeader: true,
+        headerType: 'bearer',
+      })
+      return config
+    }
+
+    // Fallback: existing Basic behaviour
+    const credentials = localStorage.getItem('hh_credentials')
     if (credentials) {
       const headers = AxiosHeaders.from(config.headers)
       headers.set('Authorization', `Basic ${credentials}`)
@@ -67,8 +96,10 @@ apiClient.interceptors.request.use((config) => {
       method: config.method,
       url: requestUrl,
       hasAuthHeader,
+      headerType: hasAuthHeader ? (token ? 'bearer' : 'basic') : undefined,
     })
   }
+
   return config
 })
 
