@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { IconRefresh } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { useUsers } from '@/hooks/use-users'
+import { useMemberships } from '@/hooks/use-memberships'
 import {
   CreditTransactionSource,
   useTopUpUserCredits,
@@ -53,10 +54,19 @@ export default function CreditsPage() {
   const [topUpReason, setTopUpReason] = useState('')
 
   const { data: users = [] } = useUsers()
+  const { data: allMemberships = [] } = useMemberships()
 
   const selectedUser = useMemo(
     () => users.find((user) => user._id === selectedUserId),
     [users, selectedUserId]
+  )
+
+  // All memberships for the selected user — includes future and non-active ones.
+  // Used in the top-up target dropdown so an admin can credit any bucket, not just
+  // the ones currently "active" (startDate <= today) returned by the balance API.
+  const allUserMemberships = useMemo(
+    () => allMemberships.filter((m) => m.userId === selectedUserId),
+    [allMemberships, selectedUserId]
   )
 
   const sourceType = historySource === 'all' ? undefined : historySource
@@ -240,7 +250,16 @@ export default function CreditsPage() {
               ))}
             </div>
           ) : memberships.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">No active memberships available for this user</div>
+            <div className="py-8 text-center text-muted-foreground">
+              No currently active memberships.
+              {allUserMemberships.length > 0 && (
+                <span className="block mt-1 text-xs">
+                  {allUserMemberships.length} membership{allUserMemberships.length > 1 ? 's' : ''} exist but
+                  {allUserMemberships.length > 1 ? ' are' : ' is'} not yet active — use the top-up form below to
+                  explicitly target one.
+                </span>
+              )}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -312,14 +331,29 @@ export default function CreditsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__auto__">Auto (earliest eligible)</SelectItem>
-                {memberships.map((membership) => (
-                  <SelectItem key={membership.id} value={membership.id}>
-                    {membership.planName} ({membership.creditsRemaining} remaining)
-                  </SelectItem>
-                ))}
+                <SelectItem value="__auto__">Auto (earliest eligible active)</SelectItem>
+                {allUserMemberships.map((membership) => {
+                  const now = new Date()
+                  const start = membership.startDate ? new Date(membership.startDate) : null
+                  const isFuture = start && start > now
+                  const statusLabel = isFuture
+                    ? `Future – starts ${start.toLocaleDateString()}`
+                    : membership.status !== 'Active'
+                      ? membership.status
+                      : null
+                  return (
+                    <SelectItem key={membership.id} value={membership.id}>
+                      {membership.planName}
+                      {statusLabel ? ` [${statusLabel}]` : ''}
+                      {' '}({membership.creditsRemaining} credits)
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
+            {allUserMemberships.length === 0 && selectedUserId && (
+              <p className="text-xs text-muted-foreground">No memberships found for this user.</p>
+            )}
           </div>
 
           <div className="space-y-2 md:col-span-2">

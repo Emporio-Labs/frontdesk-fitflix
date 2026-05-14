@@ -28,6 +28,7 @@ import { useSlots } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
 import { useUsers } from '@/hooks/use-users'
+import { useMemberships } from '@/hooks/use-memberships'
 import { useTopUpUserCredits, useUserCreditBalance } from '@/hooks/use-credits'
 import { BOOKING_STATUS, BookingStatusValue } from '@/lib/services/booking.service'
 import { cn, toUtcDateKey } from '@/lib/utils'
@@ -141,6 +142,7 @@ export default function BookingsPage() {
   const { data: services = [] } = useServices()
   const { data: therapies = [] } = useTherapies()
   const { data: users = [] } = useUsers()
+  const { data: allMemberships = [] } = useMemberships()
   const {
     data: userBalance,
     isLoading: isUserBalanceLoading,
@@ -273,7 +275,15 @@ export default function BookingsPage() {
       (isUserBalanceLoading || isUserBalanceFetching)
   )
 
+  // Active memberships from the credit ledger (accurate remaining counts for the balance panel).
   const memberships = userBalance?.memberships || []
+
+  // ALL memberships for the selected user (including future ones), used in the top-up
+  // target dropdown so admins can explicitly credit a not-yet-active bucket.
+  const allUserMemberships = useMemo(
+    () => allMemberships.filter((m) => m.userId === formData.userId),
+    [allMemberships, formData.userId]
+  )
 
   const userNameById = useMemo(
     () => new Map(users.map((user) => [user._id, user.name || user.username || user.email || 'Unknown User'])),
@@ -718,12 +728,24 @@ export default function BookingsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__auto__">Auto (earliest eligible)</SelectItem>
-                      {memberships.map((membership) => (
-                        <SelectItem key={membership.id} value={membership.id}>
-                          {membership.planName} ({membership.creditsRemaining} remaining)
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="__auto__">Auto (earliest eligible active)</SelectItem>
+                      {allUserMemberships.map((membership) => {
+                        const now = new Date()
+                        const start = membership.startDate ? new Date(membership.startDate) : null
+                        const isFuture = start && start > now
+                        const statusLabel = isFuture
+                          ? `Future – starts ${start.toLocaleDateString()}`
+                          : membership.status !== 'Active'
+                            ? membership.status
+                            : null
+                        return (
+                          <SelectItem key={membership.id} value={membership.id}>
+                            {membership.planName}
+                            {statusLabel ? ` [${statusLabel}]` : ''}
+                            {' '}({membership.creditsRemaining} credits)
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
                 </div>

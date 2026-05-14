@@ -278,6 +278,11 @@ export default function TherapiesPage() {
       return
     }
 
+    if (!formData.description.trim()) {
+      toast.error('Description is required')
+      return
+    }
+
     if (!Number.isFinite(formData.time) || formData.time <= 0) {
       toast.error('Please enter a valid duration greater than 0')
       return
@@ -289,6 +294,11 @@ export default function TherapiesPage() {
     }
 
     const mergedSlotIds = Array.from(new Set([...selectedSlotIds, ...parseCsvInput(manualSlotIds)]))
+
+    if (mergedSlotIds.length === 0) {
+      toast.error('At least one booking slot is required. Use "Generate Slots" or select from the list.')
+      return
+    }
 
     const payload = {
       name: formData.name.trim(),
@@ -469,7 +479,7 @@ export default function TherapiesPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Description</label>
+                  <label className="text-sm font-medium">Description <span className="text-red-500">*</span></label>
                   <Textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -540,14 +550,18 @@ export default function TherapiesPage() {
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Booking Windows For This Therapy (Optional)</label>
-                    <Badge variant="secondary" className="rounded-full">
+                    <label className="text-sm font-medium">
+                      Booking Windows For This Therapy
+                      {!editingItem && <span className="ml-1 text-red-500">*</span>}
+                    </label>
+                    <Badge variant={selectedSlotIds.length === 0 ? 'destructive' : 'secondary'} className="rounded-full">
                       {selectedSlotIds.length} linked
                     </Badge>
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    Select which time windows this therapy can be booked in. Only linked windows appear during booking.
+                    Select which time windows this therapy can be booked in. At least one slot is required.
+                    Only linked windows appear during booking.
                   </p>
 
                   <Input

@@ -59,7 +59,7 @@ export default function TrainersPage() {
         payload: { trainerName: formData.trainerName, description: formData.description, specialities },
       })
     } else {
-      if (!formData.password) return
+      if (!formData.trainerName || !formData.email || !formData.phone || !formData.password) return
       await createTrainer.mutateAsync({
         trainerName: formData.trainerName, email: formData.email, phone: formData.phone,
         password: formData.password, description: formData.description, specialities,
@@ -94,21 +94,21 @@ export default function TrainersPage() {
               </DialogHeader>
               <div className="space-y-4 pt-2">
                 <div>
-                  <label className="text-sm font-medium">Name</label>
+                  <label className="text-sm font-medium">Name *</label>
                   <Input value={formData.trainerName} onChange={(e) => setFormData({ ...formData, trainerName: e.target.value })} placeholder="Coach John" />
                 </div>
                 {!editingTrainer && (
                   <>
                     <div>
-                      <label className="text-sm font-medium">Email</label>
+                      <label className="text-sm font-medium">Email *</label>
                       <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Phone</label>
+                      <label className="text-sm font-medium">Phone *</label>
                       <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Password</label>
+                      <label className="text-sm font-medium">Password *</label>
                       <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
                     </div>
                   </>

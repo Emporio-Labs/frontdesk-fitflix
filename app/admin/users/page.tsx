@@ -108,7 +108,7 @@ export default function UsersPage() {
         payload: { username: memberForm.username, phone: memberForm.phone, age: memberForm.age, gender: memberForm.gender, healthGoals },
       })
     } else {
-      if (!memberForm.username || !memberForm.email || !memberForm.password || !memberForm.age) return
+      if (!memberForm.username || !memberForm.email || !memberForm.phone || !memberForm.password || !memberForm.age) return
       await createUser.mutateAsync({
         username: memberForm.username, email: memberForm.email, phone: memberForm.phone,
         password: memberForm.password, age: memberForm.age, gender: memberForm.gender, healthGoals,
@@ -137,7 +137,7 @@ export default function UsersPage() {
   }
 
   const handleAdminSubmit = async () => {
-    if (!adminForm.adminName || !adminForm.email) return
+    if (!adminForm.adminName || !adminForm.email || !adminForm.phone) return
     if (editingAdmin) {
       await updateAdmin.mutateAsync({
         id: editingAdmin._id,
@@ -213,7 +213,7 @@ export default function UsersPage() {
                       </div>
                     )}
                     <div>
-                      <label className="text-sm font-medium">Phone</label>
+                      <label className="text-sm font-medium">Phone *</label>
                       <Input value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} placeholder="+1234567890" />
                     </div>
                     {!editingUser && (
@@ -361,20 +361,20 @@ export default function UsersPage() {
                   </DialogHeader>
                   <div className="space-y-3 pt-2">
                     <div>
-                      <label className="text-sm font-medium">Full Name</label>
+                      <label className="text-sm font-medium">Full Name *</label>
                       <Input value={adminForm.adminName} onChange={(e) => setAdminForm({ ...adminForm, adminName: e.target.value })} placeholder="Alice Manager" />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Email</label>
+                      <label className="text-sm font-medium">Email *</label>
                       <Input type="email" value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} placeholder="alice@fitflix.com" />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Phone</label>
+                      <label className="text-sm font-medium">Phone *</label>
                       <Input value={adminForm.phone} onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })} placeholder="+1234567890" />
                     </div>
                     {!editingAdmin && (
                       <div>
-                        <label className="text-sm font-medium">Password</label>
+                        <label className="text-sm font-medium">Password *</label>
                         <Input type="password" value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} />
                       </div>
                     )}
