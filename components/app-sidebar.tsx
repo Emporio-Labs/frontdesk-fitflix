@@ -18,6 +18,7 @@ import {
   IconRun,
   IconCards,
   IconCreditCard,
+  IconBarbell,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -54,6 +55,11 @@ const navMain = [
       title: "Trainers",
       url: "/admin/trainers",
       icon: IconRun,
+    },
+    {
+      title: "Workouts",
+      url: "/dashboard/workouts",
+      icon: IconBarbell,
     },
     {
       title: "Memberships",

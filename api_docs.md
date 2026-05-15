@@ -2,7 +2,7 @@
 
 **Base URL:** `http://localhost:3000`  
 **API Version:** 1.0.0  
-**Last Updated:** April 11, 2026
+**Last Updated:** May 15, 2026
 
 ---
 
@@ -24,8 +24,10 @@
 14. [Appointment Routes](#appointment-routes)
 15. [Credit Routes](#credit-routes)
 16. [Schedule Routes](#schedule-routes)
-17. [Enums & Status Codes](#enums--status-codes)
-18. [Error Handling](#error-handling)
+17. [Exercise Routes](#exercise-routes)
+18. [Workout Routes](#workout-routes)
+19. [Enums & Status Codes](#enums--status-codes)
+20. [Error Handling](#error-handling)
 
 ---
 
@@ -76,9 +78,11 @@ The system supports 4 role types:
 | `/appointments` | Doctor appointments | ✅ Mixed roles | 7 endpoints |
 | `/credits` | Credit balance, history, top-up | ✅ Admin + User (self-service for user) | 5 endpoints |
 | `/schedules` | User schedules/todos | ✅ All authenticated | 6 endpoints |
+| `/exercises` | Exercise library | ✅ Admin + User | 5 endpoints |
+| `/workouts` | Workout sessions, exercises, set logging, stats | ✅ User | 15 endpoints |
 | `/health` | Health check | ❌ No | 1 endpoint |
 
-**Total Endpoints:** 81
+**Total Endpoints:** 102
 
 ---
 
@@ -512,7 +516,69 @@ GET /users/me/reports
 
 ---
 
-#### 6. Get My Report PDF
+#### 6. Get My HPOD Metrics History
+```
+GET /users/me/hpod-metrics
+```
+
+**Authorization:** User only
+
+**Response (200 OK):**
+```json
+{
+  "history": [
+    {
+      "_id": "507f1f77bcf86cd799439120",
+      "reportId": "507f1f77bcf86cd799439111",
+      "reportDate": "2026-04-10",
+      "recordedAt": "2026-04-10T08:00:00.000Z",
+      "receivedAt": "2026-04-10T08:05:00.000Z",
+      "patientName": "John Doe",
+      "patientEmail": "john@example.com",
+      "patientPhone": "+1234567890",
+      "age": "28",
+      "gender": "Male",
+      "vitals": {
+        "weight_kg": 76.2,
+        "height_cm": 178.0,
+        "bmi": 24.1,
+        "bmi_category": "Normal",
+        "spo2_percent": 98,
+        "body_temperature_f": 98.6,
+        "pulse": 72,
+        "blood_pressure": "118/76"
+      },
+      "bodyComposition": {
+        "body_fat_mass_kg": 14.5,
+        "body_fat_percent": 19.0,
+        "total_body_water_L": 41.2,
+        "protein_kg": 10.6,
+        "minerals_kg": 3.6,
+        "skeletal_muscle_mass_kg": 31.8,
+        "visceral_fat_cm2": 82,
+        "basal_metabolic_rate_cal": 1650,
+        "intracellular_water_L": 24.8,
+        "extracellular_water_L": 16.4
+      },
+      "ecg": {
+        "pr_interval": "160 ms",
+        "qrs_interval": "90 ms",
+        "qtc_interval": "420 ms",
+        "heart_rate": "72 bpm"
+      },
+      "idealBodyWeight_kg": 72.5,
+      "weightToLose_kg": 4.0,
+      "testsNotTaken": [],
+      "healthInsight": "Overall metrics are within normal range with a slight opportunity to improve body composition.",
+      "concerns": []
+    }
+  ]
+}
+```
+
+---
+
+#### 7. Get My Report PDF
 ```
 GET /users/me/reports/:id/pdf
 ```
@@ -532,7 +598,7 @@ GET /users/me/reports/:id/pdf
 
 ---
 
-#### 7. Update My Password
+#### 8. Update My Password
 ```
 PATCH /users/me/password
 ```
@@ -565,7 +631,7 @@ PATCH /users/me/password
 
 ---
 
-#### 8. Onboard User (self or admin)
+#### 9. Onboard User (self or admin)
 ```
 PATCH /users/:id/onboard
 ```
@@ -1474,11 +1540,15 @@ POST /bookings
   "booking": {
     "_id": "507f1f77bcf86cd799439050",
     "bookingDate": "2026-03-25T10:00:00Z",
+    "startTime": "10:00",
+    "endTime": "11:00",
     "status": 0,
     "user": "507f1f77bcf86cd799439011",
     "slot": "507f1f77bcf86cd799439020",
     "service": "507f1f77bcf86cd799439030",
     "report": "507f1f77bcf86cd799439040",
+    "creditCostSnapshot": 2,
+    "creditsBypassed": false,
     "createdAt": "2026-03-20T10:00:00Z",
     "updatedAt": "2026-03-20T10:00:00Z"
   },
@@ -1531,14 +1601,14 @@ GET /bookings/:id
 
 ---
 
-#### 5. Update Booking
+#### 5. Update Booking (Reschedule)
 ```
 PATCH /bookings/:id
 ```
 
-**Authorization:** Admin only
+**Authorization:** Admin (any user) or User (self only)
 
-**Request Body (all fields optional):**
+**Request Body (all fields optional; at least one required):**
 ```json
 {
   "bookingDate": "2026-03-26T10:00:00Z",
@@ -1547,6 +1617,42 @@ PATCH /bookings/:id
   "reportId": "507f1f77bcf86cd799439041"
 }
 ```
+
+**Reschedule Logic (when `slotId` or `bookingDate` changes):**
+- New slot is validated against the service slot list
+- New slot capacity is reserved (decremented by 1)
+- Old slot capacity is released (incremented by 1)
+- If slot is a daily template, a dated concrete slot inventory record is resolved/created for the new `bookingDate`
+- If the booking was previously cancelled, reschedule rebooks it: status is set to `Booked` and credits are consumed again (unless credits were bypassed)
+- If any validation fails (slot full, slot not linked to service), old slot remains unchanged
+- On error, any newly reserved slot capacity is automatically released (rollback)
+
+**Response (200 OK):**
+```json
+{
+  "message": "Booking updated",
+  "booking": {
+    "_id": "507f1f77bcf86cd799439050",
+    "bookingDate": "2026-03-26T10:00:00Z",
+    "startTime": "10:00",
+    "endTime": "11:00",
+    "status": 0,
+    "user": "507f1f77bcf86cd799439011",
+    "slot": "507f1f77bcf86cd799439021",
+    "service": "507f1f77bcf86cd799439031",
+    "report": "507f1f77bcf86cd799439041",
+    "creditCostSnapshot": 2,
+    "creditsBypassed": false,
+    "createdAt": "2026-03-20T10:00:00Z",
+    "updatedAt": "2026-03-21T11:00:00Z"
+  }
+}
+```
+
+**Error Responses:**
+- `403` — Forbidden (user trying to update another user's booking)
+- `404` — Booking or service not found
+- `409` — Slot is full or no longer available, or slot not linked to service
 
 ---
 
@@ -1581,6 +1687,7 @@ PATCH /bookings/:id/status
 - When status transitions to `Cancelled`, credits previously consumed for that booking are refunded once.
 - When status transitions to `Cancelled`, one slot capacity is released back to the same dated slot inventory record.
 - Cancellation compensation is idempotent for repeated cancel requests. Subsequent cancel requests return `refunded: 0`.
+- Cancelled bookings cannot be reactivated via this endpoint. Use reschedule to rebook (returns `409`).
 
 **Response (200 OK) Example:**
 ```json
@@ -1649,12 +1756,16 @@ POST /appointments
   "appointment": {
     "_id": "507f1f77bcf86cd799439150",
     "appointmentDate": "2026-03-25T10:00:00Z",
+    "startTime": "10:00",
+    "endTime": "11:00",
     "status": 0,
     "user": "507f1f77bcf86cd799439011",
     "slot": "507f1f77bcf86cd799439020",
     "doctor": "507f1f77bcf86cd799439012",
     "service": "507f1f77bcf86cd799439030",
-    "report": "507f1f77bcf86cd799439040"
+    "report": "507f1f77bcf86cd799439040",
+    "creditCostSnapshot": 2,
+    "creditsBypassed": false
   },
   "credits": {
     "consumed": 2,
@@ -1705,14 +1816,14 @@ GET /appointments/:id
 
 ---
 
-#### 5. Update Appointment
+#### 5. Update Appointment (Reschedule)
 ```
 PATCH /appointments/:id
 ```
 
-**Authorization:** Admin only
+**Authorization:** Admin (any appointment) or User (self only)
 
-**Request Body (all fields optional):**
+**Request Body (all fields optional; at least one required):**
 ```json
 {
   "appointmentDate": "2026-03-26T10:00:00Z",
@@ -1722,6 +1833,43 @@ PATCH /appointments/:id
   "reportId": "507f1f77bcf86cd799439041"
 }
 ```
+
+**Reschedule Logic (when `slotId` or `appointmentDate` changes):**
+- New slot is validated against the service slot list (if a service is linked)
+- New slot capacity is reserved (decremented by 1)
+- Old slot capacity is released (incremented by 1)
+- If slot is a daily template, a dated concrete slot inventory record is resolved/created for the new `appointmentDate`
+- If the appointment was previously cancelled, reschedule rebooks it: status is set to `Booked` and credits are consumed again (unless credits were bypassed)
+- If any validation fails (slot full, slot not linked to service), old slot remains unchanged
+- On error, any newly reserved slot capacity is automatically released (rollback)
+
+**Response (200 OK):**
+```json
+{
+  "message": "Appointment updated",
+  "appointment": {
+    "_id": "507f1f77bcf86cd799439150",
+    "appointmentDate": "2026-03-26T10:00:00Z",
+    "startTime": "10:00",
+    "endTime": "11:00",
+    "status": 0,
+    "user": "507f1f77bcf86cd799439011",
+    "slot": "507f1f77bcf86cd799439021",
+    "doctor": "507f1f77bcf86cd799439013",
+    "service": "507f1f77bcf86cd799439031",
+    "report": "507f1f77bcf86cd799439041",
+    "creditCostSnapshot": 2,
+    "creditsBypassed": false,
+    "createdAt": "2026-03-20T10:00:00Z",
+    "updatedAt": "2026-03-21T11:00:00Z"
+  }
+}
+```
+
+**Error Responses:**
+- `403` — Forbidden (user trying to update another user's appointment)
+- `404` — Appointment, service, or doctor not found
+- `409` — Slot is full or no longer available, or slot not linked to service
 
 ---
 
@@ -1756,6 +1904,7 @@ PATCH /appointments/:id/status
 - When status transitions to `Cancelled`, credits previously consumed for that appointment are refunded once.
 - When status transitions to `Cancelled`, one slot capacity is released back to the same dated slot inventory record.
 - Cancellation compensation is idempotent for repeated cancel requests. Subsequent cancel requests return `refunded: 0`.
+- Cancelled appointments cannot be reactivated via this endpoint. Use reschedule to rebook (returns `409`).
 
 **Response (200 OK) Example:**
 ```json
@@ -2076,6 +2225,762 @@ DELETE /schedules/:userId
 
 ---
 
+## Exercise Routes
+
+### Base Path: `/exercises`
+
+**Global Requirements:**
+- ✅ JWT Authentication required for all endpoints
+- ✅ Admin and User roles can access all endpoints
+- System exercises are visible to all users and cannot be modified or deleted
+- User-created exercises are private to the creator
+
+#### 1. List Exercises
+```
+GET /exercises
+```
+
+**Authorization:** Admin, User
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `muscleGroup` | string | - | Filter by muscle group: `Chest`, `Back`, `Legs`, `Shoulders`, `Arms`, `Core` |
+| `difficulty` | string | - | Filter by difficulty: `Beginner`, `Intermediate`, `Advanced` |
+| `equipment` | string | - | Partial match (case-insensitive) on equipment field |
+| `search` | string | - | Case-insensitive search on exercise name |
+| `isSystem` | boolean | - | `true` = system only, `false` = user's own only, omit = both |
+| `page` | number | 1 | Page number |
+| `limit` | number | 50 | Items per page (max 100) |
+
+**Response (200 OK):**
+```json
+{
+  "exercises": [
+    {
+      "_id": "664a...",
+      "name": "Bench Press",
+      "muscleGroup": "Chest",
+      "targetedMuscles": ["Pectoralis Major", "Anterior Deltoids", "Triceps"],
+      "difficulty": "Intermediate",
+      "equipment": "Barbell & Bench",
+      "instructions": "Lie flat on a bench...",
+      "commonMistakes": ["Bouncing the bar off the chest"],
+      "tips": ["Keep your wrists straight..."],
+      "caloriesPerSet": 12,
+      "imageUrl": null,
+      "isSystem": true,
+      "createdBy": null,
+      "createdAt": "2026-05-01T00:00:00Z",
+      "updatedAt": "2026-05-01T00:00:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 87,
+    "totalPages": 2
+  }
+}
+```
+
+---
+
+#### 2. Get Exercise by ID
+```
+GET /exercises/:id
+```
+
+**Authorization:** Admin, User
+
+**URL Params:**
+- `id` (string, required) — Exercise MongoDB ObjectId
+
+**Notes:**
+- Returns the exercise if it is a system exercise or was created by the authenticated user.
+- Returns `404` if the exercise is user-created and belongs to another user.
+
+**Response (200 OK):**
+```json
+{
+  "_id": "664a...",
+  "name": "Bench Press",
+  "muscleGroup": "Chest",
+  "targetedMuscles": ["Pectoralis Major", "Anterior Deltoids", "Triceps"],
+  "difficulty": "Intermediate",
+  "equipment": "Barbell & Bench",
+  "instructions": "Lie flat on a bench...",
+  "commonMistakes": ["Bouncing the bar off the chest"],
+  "tips": ["Keep your wrists straight..."],
+  "caloriesPerSet": 12,
+  "imageUrl": null,
+  "isSystem": true,
+  "createdBy": null,
+  "createdAt": "2026-05-01T00:00:00Z",
+  "updatedAt": "2026-05-01T00:00:00Z"
+}
+```
+
+---
+
+#### 3. Create Exercise
+```
+POST /exercises
+```
+
+**Authorization:** Admin, User
+
+**Request Body:**
+```json
+{
+  "name": "Lat Pulldown",
+  "muscleGroup": "Back",
+  "targetedMuscles": ["Latissimus Dorsi", "Biceps"],
+  "difficulty": "Beginner",
+  "equipment": "Cable Machine",
+  "instructions": "Sit at the lat pulldown...",
+  "commonMistakes": ["Leaning too far back"],
+  "tips": ["Focus on pulling with your elbows"],
+  "caloriesPerSet": 10,
+  "imageUrl": "https://example.com/lat-pulldown.jpg"
+}
+```
+
+**Validation Rules:**
+
+| Field | Rule |
+|-------|------|
+| `name` | 1-100 chars, required |
+| `muscleGroup` | Must be valid enum, required |
+| `difficulty` | Must be valid enum, required |
+| `equipment` | 1-200 chars, optional |
+| `instructions` | Max 5000 chars, optional |
+| `commonMistakes` | Array of max 20 strings, each max 500 chars |
+| `tips` | Array of max 20 strings, each max 500 chars |
+| `targetedMuscles` | Array of 1-10 strings, each max 100 chars |
+| `caloriesPerSet` | 1-1000, integer, optional |
+| `imageUrl` | Valid URL, optional |
+
+**Notes:**
+- `isSystem` is forced to `false` — users cannot create system exercises.
+- `createdBy` is set to the authenticated user's ID automatically.
+
+**Response (201 Created):**
+```json
+{
+  "_id": "664f...",
+  "name": "Lat Pulldown",
+  "muscleGroup": "Back",
+  "isSystem": false,
+  "createdBy": "663a...",
+  ...
+}
+```
+
+---
+
+#### 4. Update Exercise
+```
+PUT /exercises/:id
+```
+
+**Authorization:** Admin, User (owner only)
+
+**URL Params:**
+- `id` (string, required) — Exercise MongoDB ObjectId
+
+**Request Body (all fields optional; at least one required):**
+```json
+{
+  "name": "Wide-Grip Lat Pulldown",
+  "caloriesPerSet": 12
+}
+```
+
+**Error Responses:**
+- `403` — Cannot modify a system exercise
+- `403` — Not authorized to modify this exercise (not the creator)
+- `404` — Exercise not found
+
+---
+
+#### 5. Delete Exercise
+```
+DELETE /exercises/:id
+```
+
+**Authorization:** Admin, User (owner only)
+
+**URL Params:**
+- `id` (string, required) — Exercise MongoDB ObjectId
+
+**Error Responses:**
+- `403` — Cannot delete a system exercise
+- `403` — Not authorized to delete this exercise (not the creator)
+- `404` — Exercise not found
+
+**Response (200 OK):**
+```json
+{
+  "message": "Exercise deleted"
+}
+```
+
+---
+
+## Workout Routes
+
+### Base Path: `/workouts`
+
+**Global Requirements:**
+- ✅ JWT Authentication required for all endpoints
+- ✅ User role required for all endpoints
+- All workout data is scoped to the authenticated user
+- A user can have at most one `Active` session per calendar day (enforced by database index)
+
+### Session Endpoints
+
+#### 1. Get Today's Session
+```
+GET /workouts/today
+```
+
+**Authorization:** User only
+
+**Behavior:**
+- Returns the active session for today (UTC date) with full exercise and set data.
+- If no active session exists for today, one is automatically created.
+
+**Response (200 OK):**
+```json
+{
+  "_id": "664b...",
+  "userId": "663a...",
+  "date": "2026-05-15T00:00:00Z",
+  "status": "Active",
+  "startedAt": "2026-05-15T07:30:00Z",
+  "completedAt": null,
+  "notes": null,
+  "exercises": [
+    {
+      "_id": "664c...",
+      "sessionId": "664b...",
+      "exerciseId": "664a...",
+      "exercise": {
+        "name": "Bench Press",
+        "muscleGroup": "Chest",
+        "difficulty": "Intermediate",
+        "equipment": "Barbell & Bench",
+        "caloriesPerSet": 12
+      },
+      "orderIndex": 0,
+      "targetSets": 4,
+      "targetReps": 10,
+      "targetWeightKg": 60.0,
+      "restSeconds": 90,
+      "isCompleted": false,
+      "sets": [
+        {
+          "_id": "664d...",
+          "setNumber": 1,
+          "actualReps": 10,
+          "actualWeightKg": 60.0,
+          "rpe": 7.0,
+          "isWarmup": false,
+          "completedAt": "2026-05-15T07:35:22Z",
+          "notes": null
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-05-15T07:30:00Z",
+  "updatedAt": "2026-05-15T07:30:00Z"
+}
+```
+
+---
+
+#### 2. List My Sessions
+```
+GET /workouts/me
+```
+
+**Authorization:** User only
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `page` | number | 1 | Page number |
+| `limit` | number | 20 | Items per page (max 100) |
+| `status` | string | - | Filter by status: `Active`, `Completed`, `Abandoned` |
+
+**Response (200 OK):**
+```json
+{
+  "sessions": [
+    {
+      "_id": "664b...",
+      "userId": "663a...",
+      "date": "2026-05-15T00:00:00Z",
+      "status": "Active",
+      "startedAt": "2026-05-15T07:30:00Z",
+      "completedAt": null,
+      "notes": null,
+      "createdAt": "2026-05-15T07:30:00Z",
+      "updatedAt": "2026-05-15T07:30:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 45,
+    "totalPages": 3
+  }
+}
+```
+
+---
+
+#### 3. Get Session by ID
+```
+GET /workouts/:id
+```
+
+**Authorization:** User only (own sessions)
+
+**URL Params:**
+- `id` (string, required) — WorkoutSession MongoDB ObjectId
+
+**Notes:**
+- Returns full session detail including exercises and set logs (same structure as `GET /workouts/today`).
+- Returns `403` if the session belongs to a different user.
+
+---
+
+#### 4. Create Session
+```
+POST /workouts
+```
+
+**Authorization:** User only
+
+**Request Body:**
+```json
+{
+  "date": "2026-05-15",
+  "notes": "Chest and arms day",
+  "exercises": [
+    {
+      "exerciseId": "664a...",
+      "targetSets": 4,
+      "targetReps": 10,
+      "targetWeightKg": 60.0,
+      "restSeconds": 90
+    },
+    {
+      "exerciseId": "664a02...",
+      "targetSets": 3,
+      "targetReps": 12,
+      "targetWeightKg": 15.0,
+      "restSeconds": 60
+    }
+  ]
+}
+```
+
+**Notes:**
+- `date` is optional; defaults to today (UTC).
+- `exercises` is optional; can create an empty session and add exercises later.
+- If an active session already exists for the given date, the existing session is returned instead of creating a duplicate.
+- Only exercises visible to the user (system + user's own) are added; invalid exercise IDs are silently skipped.
+
+**Response (201 Created):** Full session object with exercises (same structure as `GET /workouts/today`).
+**Response (200 OK):** If active session already exists for that date, returns existing session.
+
+---
+
+#### 5. Update Session
+```
+PATCH /workouts/:id
+```
+
+**Authorization:** User only (own sessions)
+
+**Request Body (at least one field required):**
+```json
+{
+  "status": "Completed",
+  "notes": "Great session, felt strong"
+}
+```
+
+**Notes:**
+- When `status` transitions to `Completed`, `completedAt` is set automatically.
+- Cannot reactivate a completed session (returns `409`).
+
+**Error Responses:**
+- `403` — Not authorized (not the session owner)
+- `404` — Session not found
+- `409` — Cannot reactivate a completed session
+
+---
+
+#### 6. Delete Session
+```
+DELETE /workouts/:id
+```
+
+**Authorization:** User only (own sessions)
+
+**Notes:**
+- Can only delete sessions with status `Active`.
+- Cannot delete a session that has logged sets (returns `409`).
+- Deleting a session also removes all its WorkoutExercise records.
+
+**Error Responses:**
+- `403` — Not authorized
+- `404` — Session not found
+- `409` — Can only delete active sessions / Cannot delete a session with logged sets
+
+**Response (200 OK):**
+```json
+{
+  "message": "Workout session deleted"
+}
+```
+
+---
+
+### Exercise-in-Session Endpoints
+
+#### 7. Add Exercise to Session
+```
+POST /workouts/:sessionId/exercises
+```
+
+**Authorization:** User only
+
+**URL Params:**
+- `sessionId` (string, required) — WorkoutSession MongoDB ObjectId
+
+**Request Body:**
+```json
+{
+  "exerciseId": "664a...",
+  "targetSets": 3,
+  "targetReps": 12,
+  "targetWeightKg": 40.0,
+  "restSeconds": 60
+}
+```
+
+**Validation:**
+
+| Field | Rule |
+|-------|------|
+| `exerciseId` | Valid ObjectId, required |
+| `targetSets` | 1-50, integer, required |
+| `targetReps` | 1-100, integer, required |
+| `targetWeightKg` | 0-999.99, optional |
+| `restSeconds` | 0-600, integer, default 60 |
+
+**Notes:**
+- Session must be `Active`.
+- `orderIndex` is auto-assigned (appended to end).
+- The exercise must be visible to the user (system or user-created).
+
+**Response (201 Created):**
+```json
+{
+  "_id": "664c...",
+  "sessionId": "664b...",
+  "exerciseId": "664a...",
+  "orderIndex": 2,
+  "targetSets": 3,
+  "targetReps": 12,
+  "targetWeightKg": 40.0,
+  "restSeconds": 60,
+  "isCompleted": false,
+  "createdAt": "2026-05-15T07:45:00Z"
+}
+```
+
+---
+
+#### 8. Update Workout Exercise
+```
+PATCH /workouts/:sessionId/exercises/:id
+```
+
+**Authorization:** User only
+
+**URL Params:**
+- `sessionId` (string, required) — WorkoutSession ObjectId
+- `id` (string, required) — WorkoutExercise ObjectId
+
+**Request Body (at least one field required):**
+```json
+{
+  "targetSets": 4,
+  "targetReps": 8,
+  "targetWeightKg": 65.0,
+  "restSeconds": 120
+}
+```
+
+---
+
+#### 9. Delete Workout Exercise
+```
+DELETE /workouts/:sessionId/exercises/:id
+```
+
+**Authorization:** User only
+
+**Notes:**
+- Also deletes all associated SetLog records for this exercise.
+
+**Response (200 OK):**
+```json
+{
+  "message": "Exercise removed from session"
+}
+```
+
+---
+
+#### 10. Reorder Exercises
+```
+PATCH /workouts/:sessionId/exercises/reorder
+```
+
+**Authorization:** User only
+
+**Request Body:**
+```json
+{
+  "order": ["664c01...", "664c02...", "664c03..."]
+}
+```
+
+**Notes:**
+- `order` is an array of WorkoutExercise IDs in the desired display order.
+- All IDs must belong to the specified session.
+
+**Response (200 OK):** Array of updated WorkoutExercise objects sorted by new order.
+
+---
+
+### Set Logging Endpoints
+
+#### 11. Log a Set
+```
+POST /workouts/:sessionId/exercises/:exerciseId/sets
+```
+
+**Authorization:** User only
+
+**URL Params:**
+- `sessionId` (string, required) — WorkoutSession ObjectId
+- `exerciseId` (string, required) — WorkoutExercise ObjectId
+
+**Request Body:**
+```json
+{
+  "actualReps": 10,
+  "actualWeightKg": 62.5,
+  "rpe": 8.0,
+  "isWarmup": false,
+  "notes": "Felt strong"
+}
+```
+
+**Validation:**
+
+| Field | Rule |
+|-------|------|
+| `actualReps` | 1-999, integer, required |
+| `actualWeightKg` | 0-999.99, float (0 = bodyweight), required |
+| `rpe` | 1.0-10.0, float, optional |
+| `isWarmup` | boolean, default false |
+| `notes` | Max 500 chars, optional |
+
+**Notes:**
+- `setNumber` is auto-incremented.
+- `completedAt` is set automatically.
+- Session must be `Active`.
+- Weight is always stored in kg.
+- When the number of non-warmup sets reaches `targetSets`, the exercise is automatically marked as completed.
+
+**Response (201 Created):**
+```json
+{
+  "_id": "664d...",
+  "workoutExerciseId": "664c...",
+  "setNumber": 2,
+  "actualReps": 10,
+  "actualWeightKg": 62.5,
+  "rpe": 8.0,
+  "isWarmup": false,
+  "completedAt": "2026-05-15T07:38:45Z",
+  "notes": "Felt strong",
+  "exerciseCompleted": false,
+  "setsRemaining": 2
+}
+```
+
+**Extra Fields:**
+- `exerciseCompleted` — Whether non-warmup set count has reached `targetSets`
+- `setsRemaining` — Number of non-warmup sets still needed
+
+---
+
+#### 12. Update a Set
+```
+PATCH /workouts/:sessionId/exercises/:exerciseId/sets/:setId
+```
+
+**Authorization:** User only
+
+**URL Params:**
+- `sessionId`, `exerciseId`, `setId` (all string, required)
+
+**Request Body (at least one field required):**
+```json
+{
+  "actualReps": 12,
+  "actualWeightKg": 65.0,
+  "rpe": 9.0
+}
+```
+
+---
+
+#### 13. Delete a Set
+```
+DELETE /workouts/:sessionId/exercises/:exerciseId/sets/:setId
+```
+
+**Authorization:** User only
+
+**Notes:**
+- Remaining sets are automatically renumbered after deletion.
+- The exercise's `isCompleted` status is recalculated.
+
+**Response (200 OK):**
+```json
+{
+  "message": "Set deleted"
+}
+```
+
+---
+
+### Stats & History Endpoints
+
+#### 14. Get My Workout Stats
+```
+GET /workouts/me/stats
+```
+
+**Authorization:** User only
+
+**Response (200 OK):**
+```json
+{
+  "weeklyWorkouts": 4,
+  "totalSetsThisWeek": 47,
+  "caloriesBurnedWeek": 1248,
+  "consistencyScore": 0.85,
+  "currentStreak": 7,
+  "totalVolumeKg": 28500.0,
+  "personalRecords": {
+    "benchPress": {
+      "maxWeightKg": 80.0,
+      "maxReps": 12,
+      "achievedAt": "2026-05-10T08:00:00Z"
+    },
+    "barbellSquats": {
+      "maxWeightKg": 100.0,
+      "maxReps": 8,
+      "achievedAt": "2026-05-12T07:00:00Z"
+    }
+  }
+}
+```
+
+**Field Descriptions:**
+
+| Field | Description |
+|-------|-------------|
+| `weeklyWorkouts` | Completed sessions this week (Mon-Sun) |
+| `totalSetsThisWeek` | Total non-warmup sets this week |
+| `caloriesBurnedWeek` | Sum of (exercise.caloriesPerSet * sets completed) this week |
+| `consistencyScore` | Completed sessions / 28 days over last 4 weeks (0.0-1.0) |
+| `currentStreak` | Consecutive days with a completed session (from today backward) |
+| `totalVolumeKg` | Sum of (actualWeightKg * actualReps) this week |
+| `personalRecords` | Max weight and max reps per exercise across all completed sessions |
+
+---
+
+#### 15. Get My Workout History
+```
+GET /workouts/me/history
+```
+
+**Authorization:** User only
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `from` | date | 30 days ago | Start date |
+| `to` | date | today | End date |
+| `page` | number | 1 | Page number |
+| `limit` | number | 20 | Items per page (max 100) |
+
+**Response (200 OK):**
+```json
+{
+  "workouts": [
+    {
+      "id": "664b...",
+      "date": "2026-05-14T00:00:00Z",
+      "status": "Completed",
+      "duration": 3420,
+      "exerciseCount": 5,
+      "totalSets": 18,
+      "totalReps": 186,
+      "totalVolumeKg": 5240.0,
+      "caloriesBurned": 216,
+      "muscleGroups": ["Chest", "Arms"]
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 45,
+    "totalPages": 3
+  }
+}
+```
+
+**Field Descriptions:**
+
+| Field | Description |
+|-------|-------------|
+| `duration` | Session duration in seconds (completedAt - startedAt) |
+| `exerciseCount` | Number of exercises in the session |
+| `totalSets` | Total non-warmup sets logged |
+| `totalReps` | Sum of all reps in non-warmup sets |
+| `totalVolumeKg` | Sum of (weight * reps) for all non-warmup sets |
+| `caloriesBurned` | Sum of exercise.caloriesPerSet for each non-warmup set |
+| `muscleGroups` | Distinct muscle groups targeted in the session |
+
+---
+
 ## Enums & Status Codes
 
 ### Booking/Appointment Status
@@ -2137,6 +3042,36 @@ DELETE /schedules/:userId
   "Booking": "Booking",
   "Appointment": "Appointment",
   "Admin": "Admin"
+}
+```
+
+### Muscle Group
+```javascript
+{
+  "Chest": "Chest",
+  "Back": "Back",
+  "Legs": "Legs",
+  "Shoulders": "Shoulders",
+  "Arms": "Arms",
+  "Core": "Core"
+}
+```
+
+### Exercise Difficulty
+```javascript
+{
+  "Beginner": "Beginner",
+  "Intermediate": "Intermediate",
+  "Advanced": "Advanced"
+}
+```
+
+### Workout Session Status
+```javascript
+{
+  "Active": "Active",
+  "Completed": "Completed",
+  "Abandoned": "Abandoned"
 }
 ```
 
@@ -2261,7 +3196,18 @@ GET /health
 3. **Update schedule status:** `PATCH /schedules/:userId` (change status from Todo → Doing → Done)
 4. **Reschedule if needed:** `PATCH /schedules/:userId/reschedule` (within 7 days only)
 
-### Workflow 4: Admin Manual Credit Top-Up
+### Workflow 4: User Logs a Workout
+
+1. **User logs in:** `POST /auth/login`
+2. **Browse exercise library:** `GET /exercises?muscleGroup=Chest`
+3. **Get today's session:** `GET /workouts/today` (auto-creates if none)
+4. **Add exercises:** `POST /workouts/:sessionId/exercises` (repeat for each exercise)
+5. **Log sets:** `POST /workouts/:sessionId/exercises/:exerciseId/sets` (repeat for each set; response includes `exerciseCompleted` and `setsRemaining`)
+6. **Complete session:** `PATCH /workouts/:sessionId` with `{ "status": "Completed" }`
+7. **Check stats:** `GET /workouts/me/stats`
+8. **View history:** `GET /workouts/me/history`
+
+### Workflow 5: Admin Manual Credit Top-Up
 
 1. **Admin logs in:** `POST /auth/login`
 2. **Admin checks user credit position:** `GET /credits/users/:userId/balance`
@@ -2290,4 +3236,4 @@ For questions or issues with the API:
 3. Verify Basic Auth headers are properly formatted
 4. Check that resource IDs are valid MongoDB ObjectIds
 
-**Last Updated:** April 11, 2026
+**Last Updated:** May 15, 2026
