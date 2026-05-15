@@ -36,9 +36,11 @@ export function useWorkoutSession(id: string) {
 }
 
 export function useWorkoutStats() {
+  // /workouts/me/stats is user-scoped only — disabled in admin panel
   return useQuery({
     queryKey: queryKeys.workoutSessions.stats(),
     queryFn: workoutService.getStats,
+    enabled: false,
   })
 }
 

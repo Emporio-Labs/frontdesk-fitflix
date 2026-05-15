@@ -13,15 +13,16 @@ import {
   IconFlame,
   IconBarbell,
 } from '@tabler/icons-react'
-import { useWorkoutStore } from '@/stores/workout-store'
+import { useWorkoutPlans } from '@/hooks/use-workout-plans'
 import { useWorkoutStats } from '@/hooks/use-workouts'
 
 export function WorkoutStatsCards() {
-  const plans = useWorkoutStore((s) => s.plans)
+  const { data: plansData, isLoading: plansLoading } = useWorkoutPlans()
   const { data: backendStats, isLoading: statsLoading } = useWorkoutStats()
 
-  const activePlans = plans.filter((p) => p.status === 'active').length
-  const draftPlans = plans.filter((p) => p.status === 'draft').length
+  const plans = plansData?.plans ?? []
+  const activePlans = plans.filter((p) => p.status === 'Active').length
+  const draftPlans = plans.filter((p) => p.status === 'Draft').length
   const templates = plans.filter((p) => p.isTemplate).length
   const assignedUsers = new Set(plans.flatMap((p) => p.assignedUsers)).size
   const totalExercises = plans.reduce(
@@ -36,7 +37,7 @@ export function WorkoutStatsCards() {
       sub: 'workout plans created',
       icon: <IconClipboardList className="w-4 h-4 text-blue-500" />,
       href: '/dashboard/workouts',
-      loading: false,
+      loading: plansLoading,
     },
     {
       title: 'Active Plans',
@@ -44,7 +45,7 @@ export function WorkoutStatsCards() {
       sub: 'currently assigned',
       icon: <IconPlayerPlay className="w-4 h-4 text-emerald-500" />,
       href: '/dashboard/workouts',
-      loading: false,
+      loading: plansLoading,
     },
     {
       title: 'Weekly Workouts',
@@ -68,7 +69,7 @@ export function WorkoutStatsCards() {
       sub: 'unique members',
       icon: <IconUsers className="w-4 h-4 text-violet-500" />,
       href: '/dashboard/workouts',
-      loading: false,
+      loading: plansLoading,
     },
     {
       title: 'Drafts',
@@ -76,7 +77,7 @@ export function WorkoutStatsCards() {
       sub: 'in progress',
       icon: <IconEdit className="w-4 h-4 text-amber-500" />,
       href: '/dashboard/workouts',
-      loading: false,
+      loading: plansLoading,
     },
     {
       title: 'Exercises Used',
@@ -84,7 +85,7 @@ export function WorkoutStatsCards() {
       sub: 'across all plans',
       icon: <IconChartBar className="w-4 h-4 text-rose-500" />,
       href: '/dashboard/workouts',
-      loading: false,
+      loading: plansLoading,
     },
     {
       title: 'Templates',
@@ -92,7 +93,7 @@ export function WorkoutStatsCards() {
       sub: 'reusable plans',
       icon: <IconTemplate className="w-4 h-4 text-teal-500" />,
       href: '/dashboard/workouts/templates',
-      loading: false,
+      loading: plansLoading,
     },
   ]
 

@@ -17,6 +17,7 @@ export interface WorkoutHistoryParams {
 export interface CreateSessionPayload {
   date?: string
   notes?: string
+  planId?: string
   exercises?: {
     exerciseId: string
     targetSets: number

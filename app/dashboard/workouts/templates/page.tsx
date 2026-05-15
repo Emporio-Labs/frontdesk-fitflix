@@ -3,14 +3,18 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useWorkoutStore } from '@/stores/workout-store'
+import { useWorkoutPlans } from '@/hooks/use-workout-plans'
 import { PlanCard } from '@/components/workouts/plan-card'
 import { TemplateCategoryFilter } from '@/components/workouts/template-category-filter'
 import { toast } from 'sonner'
+import type { WorkoutPlan } from '@/types/workout'
 
 export default function TemplatesPage() {
   const router = useRouter()
   const [category, setCategory] = useState('All')
-  const { plans, loadPlan } = useWorkoutStore()
+  const { loadPlan } = useWorkoutStore()
+  const { data: plansData } = useWorkoutPlans()
+  const plans = plansData?.plans ?? []
 
   const templates = plans.filter((p) => p.isTemplate)
   const filtered =
@@ -19,15 +23,15 @@ export default function TemplatesPage() {
       : templates.filter(
           (t) =>
             t.templateCategory?.toLowerCase() === category.toLowerCase() ||
-            t.goal?.replace('_', ' ').toLowerCase().includes(category.toLowerCase())
+            t.goal?.replace(/([A-Z])/g, ' $1').trim().toLowerCase().includes(category.toLowerCase())
         )
 
-  const handleUseTemplate = (plan: typeof plans[0]) => {
+  const handleUseTemplate = (plan: WorkoutPlan) => {
     loadPlan({
       ...plan,
-      id: '',
+      _id: '',
       name: `${plan.name} (Copy)`,
-      status: 'draft',
+      status: 'Draft',
       isTemplate: false,
       assignedUsers: [],
       createdAt: new Date().toISOString(),
@@ -60,7 +64,7 @@ export default function TemplatesPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((plan) => (
             <PlanCard
-              key={plan.id}
+              key={plan._id}
               plan={plan}
               showUseTemplate
               onUseTemplate={() => handleUseTemplate(plan)}

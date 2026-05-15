@@ -67,6 +67,11 @@ export const queryKeys = {
     stats: () => ['workout-sessions', 'stats'] as const,
     history: (params?: Record<string, any>) => ['workout-sessions', 'history', params] as const,
   },
+  workoutPlans: {
+    all: () => ['workout-plans'] as const,
+    list: (filters?: Record<string, any>) => ['workout-plans', 'list', filters] as const,
+    detail: (id: string) => ['workout-plans', id] as const,
+  },
   credits: {
     myBalance: () => ['credits', 'me', 'balance'] as const,
     myHistory: (limit = 50, sourceType?: string) => ['credits', 'me', 'history', limit, sourceType || 'all'] as const,

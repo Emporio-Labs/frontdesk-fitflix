@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -9,14 +9,16 @@ import {
   ResizableHandle,
 } from '@/components/ui/resizable'
 import { Button } from '@/components/ui/button'
-import { IconArrowLeft, IconDeviceFloppy, IconPlayerPlay } from '@tabler/icons-react'
+import { IconArrowLeft, IconDeviceFloppy, IconPlayerPlay, IconLoader2 } from '@tabler/icons-react'
 import { useWorkoutStore } from '@/stores/workout-store'
 import { PlanConfigPanel } from '@/components/workouts/plan-config-panel'
 import { DayBuilderPanel } from '@/components/workouts/day-builder-panel'
 import { MobilePreviewPanel } from '@/components/workouts/mobile-preview-panel'
 import { AssignUsersDialog } from '@/components/workouts/assign-users-dialog'
+import { useCreateWorkoutPlan, useUpdateWorkoutPlan } from '@/hooks/use-workout-plans'
 import { toast } from 'sonner'
 import type { WorkoutPlan } from '@/types/workout'
+import { useState } from 'react'
 
 export function PlanBuilderLayout({
   mode,
@@ -26,8 +28,13 @@ export function PlanBuilderLayout({
   plan?: WorkoutPlan
 }) {
   const router = useRouter()
-  const { loadPlan, resetPlan, savePlan, currentPlan, setPlanField } = useWorkoutStore()
+  const { loadPlan, resetPlan, currentPlan, setPlanField, getPlanPayload, getUpdatePayload } =
+    useWorkoutStore()
   const [assignOpen, setAssignOpen] = useState(false)
+
+  const createMutation = useCreateWorkoutPlan()
+  const updateMutation = useUpdateWorkoutPlan()
+  const isSaving = createMutation.isPending || updateMutation.isPending
 
   useEffect(() => {
     if (mode === 'edit' && plan) {
@@ -35,29 +42,39 @@ export function PlanBuilderLayout({
     } else if (mode === 'create') {
       resetPlan()
     }
-  }, [mode, plan?.id])
+  }, [mode, plan?._id])
 
   const handleSave = () => {
     if (!currentPlan.name?.trim()) {
       toast.error('Please enter a plan name')
       return
     }
-    const saved = savePlan()
-    toast.success(mode === 'create' ? 'Plan created!' : 'Plan updated!')
+
     if (mode === 'create') {
-      router.push(`/dashboard/workouts/${saved.id}`)
+      createMutation.mutate(getPlanPayload(), {
+        onSuccess: (saved) => {
+          router.push(`/dashboard/workouts/${saved._id}`)
+        },
+      })
+    } else if (plan?._id) {
+      updateMutation.mutate({ id: plan._id, payload: getUpdatePayload() })
     }
   }
 
   const handlePublish = () => {
-    setPlanField('status', 'active')
-    setTimeout(() => {
-      const saved = savePlan()
-      toast.success('Plan published!')
-      if (mode === 'create') {
-        router.push(`/dashboard/workouts/${saved.id}`)
-      }
-    }, 0)
+    setPlanField('status', 'Active')
+
+    if (mode === 'create') {
+      const payload = { ...getPlanPayload(), status: 'Active' as const }
+      createMutation.mutate(payload, {
+        onSuccess: (saved) => {
+          router.push(`/dashboard/workouts/${saved._id}`)
+        },
+      })
+    } else if (plan?._id) {
+      const payload = { ...getUpdatePayload(), status: 'Active' as const }
+      updateMutation.mutate({ id: plan._id, payload })
+    }
   }
 
   return (
@@ -80,12 +97,31 @@ export function PlanBuilderLayout({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleSave}>
-            <IconDeviceFloppy className="w-3.5 h-3.5 mr-1" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <IconLoader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <IconDeviceFloppy className="w-3.5 h-3.5 mr-1" />
+            )}
             Save Draft
           </Button>
-          <Button size="sm" className="h-8 text-xs" onClick={handlePublish}>
-            <IconPlayerPlay className="w-3.5 h-3.5 mr-1" />
+          <Button
+            size="sm"
+            className="h-8 text-xs"
+            onClick={handlePublish}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <IconLoader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <IconPlayerPlay className="w-3.5 h-3.5 mr-1" />
+            )}
             Publish
           </Button>
         </div>

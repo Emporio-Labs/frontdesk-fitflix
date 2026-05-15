@@ -1,26 +1,18 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import type {
   WorkoutPlan,
   WorkoutDay,
   WorkoutExercise,
   Exercise,
-  Difficulty,
-  PlanGoal,
-  SplitType,
-  PlanStatus,
+  CreateWorkoutPlanPayload,
+  UpdateWorkoutPlanPayload,
 } from '@/types/workout'
 
 interface WorkoutStore {
-  // Persisted plan list (localStorage — no backend plan model yet)
-  plans: WorkoutPlan[]
-
-  // Builder draft state
   currentPlan: Partial<WorkoutPlan>
   selectedDayIndex: number
   assignedUserIds: string[]
 
-  // Plan CRUD
   setPlanField: <K extends keyof WorkoutPlan>(field: K, value: WorkoutPlan[K]) => void
   setSelectedDay: (index: number) => void
   addDay: () => void
@@ -36,8 +28,8 @@ interface WorkoutStore {
   reorderExercisesInDay: (dayIndex: number, oldIndex: number, newIndex: number) => void
   loadPlan: (plan: WorkoutPlan) => void
   resetPlan: () => void
-  savePlan: () => WorkoutPlan
-  deletePlan: (planId: string) => void
+  getPlanPayload: () => CreateWorkoutPlanPayload
+  getUpdatePayload: () => UpdateWorkoutPlanPayload
   toggleUserAssignment: (userId: string) => void
   setAssignedUsers: (userIds: string[]) => void
 }
@@ -47,185 +39,171 @@ const DEFAULT_PLAN: Partial<WorkoutPlan> = {
   description: '',
   difficulty: 'Intermediate',
   duration: 4,
-  goal: 'general_fitness',
-  splitType: 'custom',
+  goal: 'GeneralFitness',
+  splitType: 'Custom',
   days: [],
-  status: 'draft',
+  status: 'Draft',
   assignedUsers: [],
   isTemplate: false,
 }
 
-export const useWorkoutStore = create<WorkoutStore>()(
-  persist(
-    (set, get) => ({
-      plans: [],
-      currentPlan: { ...DEFAULT_PLAN },
+export const useWorkoutStore = create<WorkoutStore>()((set, get) => ({
+  currentPlan: { ...DEFAULT_PLAN },
+  selectedDayIndex: 0,
+  assignedUserIds: [],
+
+  setPlanField: (field, value) =>
+    set((s) => ({ currentPlan: { ...s.currentPlan, [field]: value } })),
+
+  setSelectedDay: (index) => set({ selectedDayIndex: index }),
+
+  addDay: () =>
+    set((s) => {
+      const days = [...(s.currentPlan.days || [])]
+      const dayNumber = days.length + 1
+      days.push({ dayNumber, name: `Day ${dayNumber}`, isRestDay: false, exercises: [] })
+      return { currentPlan: { ...s.currentPlan, days }, selectedDayIndex: days.length - 1 }
+    }),
+
+  removeDay: (index) =>
+    set((s) => {
+      const days = [...(s.currentPlan.days || [])]
+      days.splice(index, 1)
+      const renumbered = days.map((d, i) => ({ ...d, dayNumber: i + 1 }))
+      return {
+        currentPlan: { ...s.currentPlan, days: renumbered },
+        selectedDayIndex: Math.min(s.selectedDayIndex, Math.max(renumbered.length - 1, 0)),
+      }
+    }),
+
+  updateDay: (index, updates) =>
+    set((s) => {
+      const days = [...(s.currentPlan.days || [])]
+      if (days[index]) days[index] = { ...days[index], ...updates }
+      return { currentPlan: { ...s.currentPlan, days } }
+    }),
+
+  addExerciseToDay: (dayIndex, exercise) =>
+    set((s) => {
+      const days = [...(s.currentPlan.days || [])]
+      if (!days[dayIndex]) return s
+      const exercises = [...days[dayIndex].exercises]
+      exercises.push({
+        exerciseId: exercise._id,
+        exercise: {
+          name: exercise.name,
+          muscleGroup: exercise.muscleGroup,
+          difficulty: exercise.difficulty,
+          equipment: exercise.equipment,
+          caloriesPerSet: exercise.caloriesPerSet,
+        },
+        targetSets: 3,
+        targetReps: 12,
+        targetWeightKg: 20,
+        restSeconds: 60,
+        orderIndex: exercises.length,
+      })
+      days[dayIndex] = { ...days[dayIndex], exercises }
+      return { currentPlan: { ...s.currentPlan, days } }
+    }),
+
+  removeExerciseFromDay: (dayIndex, exerciseIndex) =>
+    set((s) => {
+      const days = [...(s.currentPlan.days || [])]
+      if (!days[dayIndex]) return s
+      const exercises = [...days[dayIndex].exercises]
+      exercises.splice(exerciseIndex, 1)
+      days[dayIndex] = {
+        ...days[dayIndex],
+        exercises: exercises.map((e, i) => ({ ...e, orderIndex: i })),
+      }
+      return { currentPlan: { ...s.currentPlan, days } }
+    }),
+
+  updateExerciseInDay: (dayIndex, exerciseIndex, updates) =>
+    set((s) => {
+      const days = [...(s.currentPlan.days || [])]
+      if (!days[dayIndex]) return s
+      const exercises = [...days[dayIndex].exercises]
+      if (exercises[exerciseIndex]) {
+        exercises[exerciseIndex] = { ...exercises[exerciseIndex], ...updates }
+      }
+      days[dayIndex] = { ...days[dayIndex], exercises }
+      return { currentPlan: { ...s.currentPlan, days } }
+    }),
+
+  reorderExercisesInDay: (dayIndex, oldIndex, newIndex) =>
+    set((s) => {
+      const days = [...(s.currentPlan.days || [])]
+      if (!days[dayIndex]) return s
+      const exercises = [...days[dayIndex].exercises]
+      const [moved] = exercises.splice(oldIndex, 1)
+      exercises.splice(newIndex, 0, moved)
+      days[dayIndex] = {
+        ...days[dayIndex],
+        exercises: exercises.map((e, i) => ({ ...e, orderIndex: i })),
+      }
+      return { currentPlan: { ...s.currentPlan, days } }
+    }),
+
+  loadPlan: (plan) =>
+    set({
+      currentPlan: { ...plan },
+      selectedDayIndex: 0,
+      assignedUserIds: (plan.assignedUsers || []).map((u: any) =>
+        typeof u === 'string' ? u : u._id
+      ),
+    }),
+
+  resetPlan: () =>
+    set({
+      currentPlan: { ...DEFAULT_PLAN, days: [] },
       selectedDayIndex: 0,
       assignedUserIds: [],
-
-      setPlanField: (field, value) =>
-        set((s) => ({ currentPlan: { ...s.currentPlan, [field]: value } })),
-
-      setSelectedDay: (index) => set({ selectedDayIndex: index }),
-
-      addDay: () =>
-        set((s) => {
-          const days = [...(s.currentPlan.days || [])]
-          const dayNumber = days.length + 1
-          days.push({ dayNumber, name: `Day ${dayNumber}`, isRestDay: false, exercises: [] })
-          return { currentPlan: { ...s.currentPlan, days }, selectedDayIndex: days.length - 1 }
-        }),
-
-      removeDay: (index) =>
-        set((s) => {
-          const days = [...(s.currentPlan.days || [])]
-          days.splice(index, 1)
-          const renumbered = days.map((d, i) => ({ ...d, dayNumber: i + 1 }))
-          return {
-            currentPlan: { ...s.currentPlan, days: renumbered },
-            selectedDayIndex: Math.min(s.selectedDayIndex, Math.max(renumbered.length - 1, 0)),
-          }
-        }),
-
-      updateDay: (index, updates) =>
-        set((s) => {
-          const days = [...(s.currentPlan.days || [])]
-          if (days[index]) days[index] = { ...days[index], ...updates }
-          return { currentPlan: { ...s.currentPlan, days } }
-        }),
-
-      addExerciseToDay: (dayIndex, exercise) =>
-        set((s) => {
-          const days = [...(s.currentPlan.days || [])]
-          if (!days[dayIndex]) return s
-          const exercises = [...days[dayIndex].exercises]
-          exercises.push({
-            exerciseId: exercise._id,
-            exercise: {
-              name: exercise.name,
-              muscleGroup: exercise.muscleGroup,
-              difficulty: exercise.difficulty,
-              equipment: exercise.equipment,
-              caloriesPerSet: exercise.caloriesPerSet,
-            },
-            targetSets: 3,
-            targetReps: 12,
-            targetWeightKg: 20,
-            restSeconds: 60,
-            orderIndex: exercises.length,
-          })
-          days[dayIndex] = { ...days[dayIndex], exercises }
-          return { currentPlan: { ...s.currentPlan, days } }
-        }),
-
-      removeExerciseFromDay: (dayIndex, exerciseIndex) =>
-        set((s) => {
-          const days = [...(s.currentPlan.days || [])]
-          if (!days[dayIndex]) return s
-          const exercises = [...days[dayIndex].exercises]
-          exercises.splice(exerciseIndex, 1)
-          days[dayIndex] = {
-            ...days[dayIndex],
-            exercises: exercises.map((e, i) => ({ ...e, orderIndex: i })),
-          }
-          return { currentPlan: { ...s.currentPlan, days } }
-        }),
-
-      updateExerciseInDay: (dayIndex, exerciseIndex, updates) =>
-        set((s) => {
-          const days = [...(s.currentPlan.days || [])]
-          if (!days[dayIndex]) return s
-          const exercises = [...days[dayIndex].exercises]
-          if (exercises[exerciseIndex]) {
-            exercises[exerciseIndex] = { ...exercises[exerciseIndex], ...updates }
-          }
-          days[dayIndex] = { ...days[dayIndex], exercises }
-          return { currentPlan: { ...s.currentPlan, days } }
-        }),
-
-      reorderExercisesInDay: (dayIndex, oldIndex, newIndex) =>
-        set((s) => {
-          const days = [...(s.currentPlan.days || [])]
-          if (!days[dayIndex]) return s
-          const exercises = [...days[dayIndex].exercises]
-          const [moved] = exercises.splice(oldIndex, 1)
-          exercises.splice(newIndex, 0, moved)
-          days[dayIndex] = {
-            ...days[dayIndex],
-            exercises: exercises.map((e, i) => ({ ...e, orderIndex: i })),
-          }
-          return { currentPlan: { ...s.currentPlan, days } }
-        }),
-
-      loadPlan: (plan) =>
-        set({
-          currentPlan: { ...plan },
-          selectedDayIndex: 0,
-          assignedUserIds: [...plan.assignedUsers],
-        }),
-
-      resetPlan: () =>
-        set({
-          currentPlan: { ...DEFAULT_PLAN, days: [] },
-          selectedDayIndex: 0,
-          assignedUserIds: [],
-        }),
-
-      savePlan: () => {
-        const s = get()
-        const now = new Date().toISOString()
-        const isNew = !s.currentPlan.id
-
-        const plan: WorkoutPlan = {
-          id: s.currentPlan.id || `plan_${Date.now()}`,
-          name: s.currentPlan.name || 'Untitled Plan',
-          description: s.currentPlan.description || '',
-          difficulty: s.currentPlan.difficulty || 'Intermediate',
-          duration: s.currentPlan.duration || 4,
-          goal: s.currentPlan.goal || 'general_fitness',
-          splitType: s.currentPlan.splitType || 'custom',
-          days: s.currentPlan.days || [],
-          status: s.currentPlan.status || 'draft',
-          assignedUsers: s.assignedUserIds,
-          isTemplate: s.currentPlan.isTemplate || false,
-          templateCategory: s.currentPlan.templateCategory,
-          createdBy: s.currentPlan.createdBy || 'frontdesk',
-          createdAt: s.currentPlan.createdAt || now,
-          updatedAt: now,
-        }
-
-        set((prev) => {
-          const plans = [...prev.plans]
-          if (isNew) {
-            plans.unshift(plan)
-          } else {
-            const idx = plans.findIndex((p) => p.id === plan.id)
-            if (idx >= 0) plans[idx] = plan
-            else plans.unshift(plan)
-          }
-          return { plans, currentPlan: plan }
-        })
-
-        return plan
-      },
-
-      deletePlan: (planId) =>
-        set((s) => ({ plans: s.plans.filter((p) => p.id !== planId) })),
-
-      toggleUserAssignment: (userId) =>
-        set((s) => {
-          const ids = [...s.assignedUserIds]
-          const idx = ids.indexOf(userId)
-          if (idx >= 0) ids.splice(idx, 1)
-          else ids.push(userId)
-          return { assignedUserIds: ids }
-        }),
-
-      setAssignedUsers: (userIds) => set({ assignedUserIds: userIds }),
     }),
-    {
-      name: 'fitflix-workout-plans',
-      partialize: (state) => ({ plans: state.plans }),
+
+  getPlanPayload: () => {
+    const s = get()
+    return {
+      name: s.currentPlan.name || 'Untitled Plan',
+      description: s.currentPlan.description || '',
+      difficulty: s.currentPlan.difficulty || 'Intermediate',
+      duration: s.currentPlan.duration || 4,
+      goal: s.currentPlan.goal || 'GeneralFitness',
+      splitType: s.currentPlan.splitType || 'Custom',
+      status: s.currentPlan.status || 'Draft',
+      isTemplate: s.currentPlan.isTemplate || false,
+      templateCategory: s.currentPlan.templateCategory,
+      assignedUsers: s.assignedUserIds,
+      days: s.currentPlan.days || [],
     }
-  )
-)
+  },
+
+  getUpdatePayload: () => {
+    const s = get()
+    return {
+      name: s.currentPlan.name,
+      description: s.currentPlan.description,
+      difficulty: s.currentPlan.difficulty,
+      duration: s.currentPlan.duration,
+      goal: s.currentPlan.goal,
+      splitType: s.currentPlan.splitType,
+      status: s.currentPlan.status,
+      isTemplate: s.currentPlan.isTemplate,
+      templateCategory: s.currentPlan.templateCategory,
+      assignedUsers: s.assignedUserIds,
+      days: s.currentPlan.days,
+    }
+  },
+
+  toggleUserAssignment: (userId) =>
+    set((s) => {
+      const ids = [...s.assignedUserIds]
+      const idx = ids.indexOf(userId)
+      if (idx >= 0) ids.splice(idx, 1)
+      else ids.push(userId)
+      return { assignedUserIds: ids }
+    }),
+
+  setAssignedUsers: (userIds) => set({ assignedUserIds: userIds }),
+}))

@@ -103,6 +103,9 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+// Guard: prevent multiple 401 logouts firing at the same time
+let _isLoggingOut = false
+
 apiClient.interceptors.response.use(
   (response) => {
     const url = `${response.config.baseURL ?? API_BASE_URL}${response.config.url ?? ''}`
@@ -123,6 +126,34 @@ apiClient.interceptors.response.use(
       message: error?.message,
       serverMessage: error?.response?.data?.message,
     })
+
+    if (error?.response?.status === 401 && typeof window !== 'undefined') {
+      const requestPath = config.url ?? ''
+      const isAuthEndpoint = requestPath.startsWith('/auth/') || requestPath === '/auth'
+
+      // Only auto-logout if:
+      // 1. It's NOT an auth endpoint (login/signup)
+      // 2. We're not already logging out (debounce parallel 401s)
+      // 3. We're not already on the login page
+      if (!isAuthEndpoint && !_isLoggingOut && window.location.pathname !== '/login') {
+        _isLoggingOut = true
+        logAuthDebug('401 auto-logout triggered', { url, path: window.location.pathname })
+        clearCredentials()
+        clearToken()
+        if (typeof document !== 'undefined') {
+          document.cookie = 'hh_authed=; path=/; max-age=0; SameSite=Lax'
+        }
+        localStorage.removeItem('hh_user')
+        // Small delay to let any parallel requests settle before redirect
+        setTimeout(() => {
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login'
+          }
+          _isLoggingOut = false
+        }, 100)
+      }
+    }
+
     return Promise.reject(error)
   }
 )
