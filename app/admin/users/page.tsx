@@ -94,7 +94,7 @@ export default function UsersPage() {
     setEditingUser(user)
     setMemberForm({
       username: user.username, email: user.email, phone: user.phone,
-      password: '', age: user.age, gender: user.gender,
+      password: '', age: String(user.age ?? ''), gender: user.gender,
       healthGoalsInput: user.healthGoals.join(', '),
     })
     setIsMemberDialogOpen(true)
@@ -105,13 +105,13 @@ export default function UsersPage() {
     if (editingUser) {
       await updateUser.mutateAsync({
         id: editingUser._id,
-        payload: { username: memberForm.username, phone: memberForm.phone, age: memberForm.age, gender: memberForm.gender, healthGoals },
+        payload: { username: memberForm.username, phone: memberForm.phone, age: Number(memberForm.age), gender: memberForm.gender, healthGoals },
       })
     } else {
       if (!memberForm.username || !memberForm.email || !memberForm.phone || !memberForm.password || !memberForm.age) return
       await createUser.mutateAsync({
         username: memberForm.username, email: memberForm.email, phone: memberForm.phone,
-        password: memberForm.password, age: memberForm.age, gender: memberForm.gender, healthGoals,
+        password: memberForm.password, age: Number(memberForm.age), gender: memberForm.gender, healthGoals,
       })
     }
     setIsMemberDialogOpen(false)

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   IconClipboardList,
   IconPlayerPlay,
@@ -9,11 +10,15 @@ import {
   IconUsers,
   IconChartBar,
   IconTemplate,
+  IconFlame,
+  IconBarbell,
 } from '@tabler/icons-react'
 import { useWorkoutStore } from '@/stores/workout-store'
+import { useWorkoutStats } from '@/hooks/use-workouts'
 
 export function WorkoutStatsCards() {
   const plans = useWorkoutStore((s) => s.plans)
+  const { data: backendStats, isLoading: statsLoading } = useWorkoutStats()
 
   const activePlans = plans.filter((p) => p.status === 'active').length
   const draftPlans = plans.filter((p) => p.status === 'draft').length
@@ -31,6 +36,7 @@ export function WorkoutStatsCards() {
       sub: 'workout plans created',
       icon: <IconClipboardList className="w-4 h-4 text-blue-500" />,
       href: '/dashboard/workouts',
+      loading: false,
     },
     {
       title: 'Active Plans',
@@ -38,13 +44,23 @@ export function WorkoutStatsCards() {
       sub: 'currently assigned',
       icon: <IconPlayerPlay className="w-4 h-4 text-emerald-500" />,
       href: '/dashboard/workouts',
+      loading: false,
     },
     {
-      title: 'Drafts',
-      value: draftPlans,
-      sub: 'in progress',
-      icon: <IconEdit className="w-4 h-4 text-amber-500" />,
+      title: 'Weekly Workouts',
+      value: backendStats?.weeklyWorkouts ?? 0,
+      sub: 'sessions this week',
+      icon: <IconFlame className="w-4 h-4 text-orange-500" />,
       href: '/dashboard/workouts',
+      loading: statsLoading,
+    },
+    {
+      title: 'Current Streak',
+      value: backendStats?.currentStreak ?? 0,
+      sub: 'consecutive days',
+      icon: <IconBarbell className="w-4 h-4 text-violet-500" />,
+      href: '/dashboard/workouts',
+      loading: statsLoading,
     },
     {
       title: 'Assigned Users',
@@ -52,6 +68,15 @@ export function WorkoutStatsCards() {
       sub: 'unique members',
       icon: <IconUsers className="w-4 h-4 text-violet-500" />,
       href: '/dashboard/workouts',
+      loading: false,
+    },
+    {
+      title: 'Drafts',
+      value: draftPlans,
+      sub: 'in progress',
+      icon: <IconEdit className="w-4 h-4 text-amber-500" />,
+      href: '/dashboard/workouts',
+      loading: false,
     },
     {
       title: 'Exercises Used',
@@ -59,6 +84,7 @@ export function WorkoutStatsCards() {
       sub: 'across all plans',
       icon: <IconChartBar className="w-4 h-4 text-rose-500" />,
       href: '/dashboard/workouts',
+      loading: false,
     },
     {
       title: 'Templates',
@@ -66,11 +92,12 @@ export function WorkoutStatsCards() {
       sub: 'reusable plans',
       icon: <IconTemplate className="w-4 h-4 text-teal-500" />,
       href: '/dashboard/workouts/templates',
+      loading: false,
     },
   ]
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
       {stats.map((s) => (
         <Link key={s.title} href={s.href} className="block">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
@@ -79,7 +106,11 @@ export function WorkoutStatsCards() {
               {s.icon}
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{s.value}</div>
+              {s.loading ? (
+                <Skeleton className="h-8 w-16 mb-1" />
+              ) : (
+                <div className="text-2xl font-bold">{s.value}</div>
+              )}
               <p className="text-xs text-muted-foreground">{s.sub}</p>
             </CardContent>
           </Card>

@@ -35,6 +35,7 @@ export const queryKeys = {
   },
   memberships: {
     all: () => ['memberships'] as const,
+    mine: () => ['memberships', 'me'] as const,
     detail: (id: string) => ['memberships', id] as const,
   },
   membershipPlans: {
@@ -60,7 +61,11 @@ export const queryKeys = {
   },
   workoutSessions: {
     all: () => ['workout-sessions'] as const,
+    today: () => ['workout-sessions', 'today'] as const,
+    mine: (params?: Record<string, any>) => ['workout-sessions', 'me', params] as const,
     detail: (id: string) => ['workout-sessions', id] as const,
+    stats: () => ['workout-sessions', 'stats'] as const,
+    history: (params?: Record<string, any>) => ['workout-sessions', 'history', params] as const,
   },
   credits: {
     myBalance: () => ['credits', 'me', 'balance'] as const,
