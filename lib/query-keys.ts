@@ -69,4 +69,8 @@ export const queryKeys = {
     userHistory: (userId: string, limit = 50, sourceType?: string) =>
       ['credits', 'users', userId, 'history', limit, sourceType || 'all'] as const,
   },
+  onboarding: {
+    all: () => ['onboarding'] as const,
+    mine: () => ['onboarding', 'me'] as const,
+  },
 }
