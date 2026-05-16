@@ -1,5 +1,26 @@
 import { apiClient } from '@/lib/api-client'
 
+export type OnboardingStep =
+  | 'HEALTH_MARKERS'
+  | 'HEALTH_GOALS'
+  | 'CONSENT'
+  | 'REPORT_UPLOAD'
+  | 'SPORTS_SCIENTIST_BOOKING'
+  | 'NUTRITIONIST_BOOKING'
+  | 'COMPLETED'
+
+export interface UserOnboardingSummary {
+  currentStep: OnboardingStep
+  completedSteps: OnboardingStep[]
+  healthMarkersCompleted: boolean
+  healthGoalsCompleted: boolean
+  consentCompleted: boolean
+  reportsUploaded: boolean
+  sportsScientistBooked: boolean
+  nutritionistBooked: boolean
+  onboardingCompleted: boolean
+}
+
 export interface User {
   _id: string
   username: string
@@ -14,6 +35,8 @@ export interface User {
   onboarded?: boolean
   createdAt: string
   updatedAt: string
+  onboarded?: boolean
+  onboardingStatus?: UserOnboardingSummary
 }
 
 export interface CreateUserPayload {

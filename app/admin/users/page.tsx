@@ -23,8 +23,29 @@ import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '@/hoo
 import { useMemberships } from '@/hooks/use-memberships'
 import { User } from '@/lib/services/user.service'
 import { Admin } from '@/lib/services/admin.service'
+import { StatusBadge } from '@/components/status-badge'
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other']
+
+type OnboardingState = 'completed' | 'in_progress' | 'not_started'
+
+function deriveOnboardingState(user: User): OnboardingState {
+  const status = user.onboardingStatus
+  if (status?.onboardingCompleted || user.onboarded) return 'completed'
+  if (status?.currentStep && status.currentStep !== 'HEALTH_MARKERS') return 'in_progress'
+  if (status?.completedSteps && status.completedSteps.length > 0) return 'in_progress'
+  if (
+    status?.healthMarkersCompleted ||
+    status?.healthGoalsCompleted ||
+    status?.consentCompleted ||
+    status?.reportsUploaded ||
+    status?.sportsScientistBooked ||
+    status?.nutritionistBooked
+  ) {
+    return 'in_progress'
+  }
+  return 'not_started'
+}
 
 export default function UsersPage() {
   // Member state
@@ -267,6 +288,7 @@ export default function UsersPage() {
                         <TableHead>Gender</TableHead>
                         <TableHead>Health Goals</TableHead>
                         <TableHead>Joined</TableHead>
+                        <TableHead>Onboarding</TableHead>
                         <TableHead>Membership</TableHead>
                         <TableHead>Plan Start</TableHead>
                         <TableHead>Plan Expiry</TableHead>
@@ -275,7 +297,7 @@ export default function UsersPage() {
                     </TableHeader>
                     <TableBody>
                       {filteredUsers.length === 0 ? (
-                        <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
                       ) : (
                         filteredUsers.map((user) => (
                           <TableRow key={user._id}>
@@ -300,6 +322,9 @@ export default function UsersPage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-muted-foreground">{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              <StatusBadge status={deriveOnboardingState(user)} size="sm" />
+                            </TableCell>
                             <TableCell>
                               {membership ? (
                                 <Badge variant="secondary">{membership.planName}</Badge>

@@ -20,6 +20,7 @@ const statusStyles: Record<string, string> = {
   confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
   completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
   cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+  booked: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
 
   // DNA statuses
   not_started: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
