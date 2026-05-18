@@ -1,7 +1,8 @@
 import { apiClient } from '@/lib/api-client'
-import type { OnboardingStep, UserOnboardingSummary } from './user.service'
+import type { PopulatedUserRef } from '@/lib/populated'
+import type { HealthMarkers, OnboardingStep, UserOnboardingSummary } from './user.service'
 
-export type { OnboardingStep, UserOnboardingSummary }
+export type { HealthMarkers, OnboardingStep, UserOnboardingSummary }
 
 // ── /onboarding/status (User only) ────────────────────────────────────────────
 // Returns the authenticated user's onboarding pointer. The endpoint does not
@@ -33,7 +34,7 @@ export type ExpertAppointmentStatus = 'Pending' | 'Confirmed' | 'Cancelled'
 
 export interface ExpertAppointment {
   _id: string
-  userId: string
+  userId: PopulatedUserRef
   expertType: ExpertType
   bookingStatus: ExpertAppointmentStatus
   appointmentDate?: string | null
@@ -80,12 +81,69 @@ export interface OnboardingAppointmentPayload {
   calComBookingId?: string
 }
 
+// ── Aggregated onboarding profile (GET /users/:id/onboarding-profile) ─────────
+// Wide types — backend schema not yet locked. Defensive readers in
+// `lib/onboarding-normalize.ts` walk known shape variants.
+export interface HealthGoalsData {
+  goals?: string[] | string
+  primaryGoals?: string[] | string
+  targetWeight?: number | string
+  targetWeightKg?: number | string
+  currentWeight?: number | string
+  timeline?: string
+  targetDate?: string
+  workoutExperience?: string
+  workoutGoals?: string[] | string
+  foodPreferences?: string[] | string
+  dietPreferences?: string[] | string
+  transformationTargets?: string[] | string | Record<string, unknown>
+  notes?: string
+  userNotes?: string
+  [key: string]: unknown
+}
+
+export interface ConsentData {
+  accepted?: boolean
+  consentGiven?: boolean
+  consentDate?: string
+  signedAt?: string
+  acceptedAt?: string
+  version?: string | number
+  consentVersion?: string | number
+  signature?: string
+  signatureUrl?: string
+  ipAddress?: string
+  ip?: string
+  userAgent?: string
+  [key: string]: unknown
+}
+
+export interface OnboardingProfileResponse {
+  healthMarkers?: HealthMarkers
+  healthGoals?: HealthGoalsData
+  consent?: ConsentData
+  consentForm?: ConsentData
+  reports?: MedicalReport[]
+  medicalReports?: MedicalReport[]
+  expertAppointments?: ExpertAppointment[]
+  appointments?: ExpertAppointment[]
+  onboardingStatus?: UserOnboardingSummary
+  profile?: Partial<OnboardingProfileResponse>
+  data?: Partial<OnboardingProfileResponse>
+  [key: string]: unknown
+}
+
 export const onboardingService = {
   // Authenticated user's own onboarding status. Admin dashboards should NOT
   // call this — use `user.onboardingStatus` from `GET /users/:id` instead.
   getStatus: async () => {
     const { data } = await apiClient.get('/onboarding/status')
     return data as OnboardingStatusResponse
+  },
+
+  getOnboardingProfile: async (userId: string) => {
+    const { data } = await apiClient.get(`/users/${userId}/onboarding-profile`)
+    return data as OnboardingProfileResponse
   },
 
   submitHealthMarkers: async (payload: HealthMarkersPayload) => {
@@ -116,5 +174,13 @@ export const onboardingService = {
   complete: async () => {
     const { data } = await apiClient.post('/onboarding/complete')
     return data as { message: string; completedAt: string }
+  },
+
+  cancelNutritionistAppointment: async (userId: string) => {
+    // TODO(backend): confirm endpoint shape — see BACKEND_REQUIREMENTS.txt §6.
+    const { data } = await apiClient.delete(
+      `/onboarding/appointments/nutritionist/${userId}`
+    )
+    return data as { message: string }
   },
 }

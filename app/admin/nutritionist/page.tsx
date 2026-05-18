@@ -10,10 +10,21 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconRefresh, IconSalad } from '@tabler/icons-react'
+import { IconRefresh, IconSalad, IconTrash } from '@tabler/icons-react'
 import { useUsers } from '@/hooks/use-users'
+import { useCancelNutritionistBooking } from '@/hooks/use-onboarding'
 import { User } from '@/lib/services/user.service'
 import { StatusBadge } from '@/components/status-badge'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 type Segment = 'pending' | 'booked' | 'all'
 
@@ -21,6 +32,8 @@ export default function NutritionistPage() {
   const [search, setSearch] = useState('')
   const [segment, setSegment] = useState<Segment>('pending')
   const { data: users = [], isLoading, isError, refetch } = useUsers()
+  const cancelBooking = useCancelNutritionistBooking()
+  const [confirmUser, setConfirmUser] = useState<User | null>(null)
 
   const counts = useMemo(() => {
     const booked = users.filter((u) => !!u.onboardingStatus?.nutritionistBooked).length
@@ -159,9 +172,24 @@ export default function NutritionistPage() {
                                 <StatusBadge status={booked ? 'booked' : 'pending'} size="sm" />
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button asChild size="sm" variant="outline">
-                                  <Link href={`/admin/users/${user._id}`}>View User</Link>
-                                </Button>
+                                <div className="flex justify-end gap-2">
+                                  <Button asChild size="sm" variant="outline">
+                                    <Link href={`/admin/users/${user._id}`}>View User</Link>
+                                  </Button>
+                                  {booked && (
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => setConfirmUser(user)}
+                                      disabled={
+                                        cancelBooking.isPending && confirmUser?._id === user._id
+                                      }
+                                    >
+                                      <IconTrash className="h-4 w-4 mr-1" />
+                                      Delete
+                                    </Button>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           )
@@ -175,6 +203,40 @@ export default function NutritionistPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog
+        open={!!confirmUser}
+        onOpenChange={(open) => {
+          if (!open && !cancelBooking.isPending) setConfirmUser(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete nutritionist booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this booking? This will cancel{' '}
+              <span className="font-medium">{confirmUser?.username}</span>'s nutritionist
+              appointment. The member record will not be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelBooking.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={cancelBooking.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                if (!confirmUser) return
+                cancelBooking.mutate(confirmUser._id, {
+                  onSettled: () => setConfirmUser(null),
+                })
+              }}
+            >
+              {cancelBooking.isPending ? 'Deleting…' : 'Confirm Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

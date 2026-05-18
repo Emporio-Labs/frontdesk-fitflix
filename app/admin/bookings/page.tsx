@@ -30,7 +30,7 @@ import { useTherapies } from '@/hooks/use-therapies'
 import { useUsers } from '@/hooks/use-users'
 import { useMemberships } from '@/hooks/use-memberships'
 import { useTopUpUserCredits, useUserCreditBalance } from '@/hooks/use-credits'
-import { BOOKING_STATUS, BookingStatusValue } from '@/lib/services/booking.service'
+import { BOOKING_STATUS, BookingStatusValue, Booking } from '@/lib/services/booking.service'
 import { cn, toUtcDateKey } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -46,18 +46,7 @@ interface BookableItemOption {
   kind: BookableKind
 }
 
-interface BookingWithNames {
-  _id: string
-  bookingDate: string
-  status: BookingStatusValue
-  user: string
-  slot: string
-  service: string
-  creditCostSnapshot?: number
-  creditsBypassed?: boolean
-  report?: string
-  createdAt: string
-  updatedAt: string
+interface BookingWithNames extends Booking {
   userName: string
   serviceName: string
 }
@@ -306,8 +295,14 @@ export default function BookingsPage() {
       bookings
         .map((booking) => ({
           ...booking,
-          userName: userNameById.get(booking.user) || 'Unknown User',
-          serviceName: itemNameById.get(booking.service) || 'Unknown Service',
+          userName:
+            booking.user?.username ||
+            userNameById.get(booking.user?._id ?? '') ||
+            'Unknown User',
+          serviceName:
+            booking.service?.serviceName ||
+            itemNameById.get(booking.service?._id ?? '') ||
+            'Unknown Service',
         }))
         .sort((a, b) => {
           const aTime = new Date(a.bookingDate || a.createdAt).getTime()
@@ -338,8 +333,10 @@ export default function BookingsPage() {
         .filter((booking) => toUtcDateKey(booking.bookingDate) === todayDateKey)
         .filter((booking) => booking.status === 0 || booking.status === 1)
         .sort((a, b) => {
-          const aStart = slotById.get(a.slot)?.startTime || '99:99'
-          const bStart = slotById.get(b.slot)?.startTime || '99:99'
+          const aStart =
+            a.slot?.startTime ?? slotById.get(a.slot?._id ?? '')?.startTime ?? '99:99'
+          const bStart =
+            b.slot?.startTime ?? slotById.get(b.slot?._id ?? '')?.startTime ?? '99:99'
           return aStart.localeCompare(bStart)
         }),
     [enrichedBookings, todayDateKey, slotById]
@@ -825,8 +822,14 @@ export default function BookingsPage() {
                 </TableHeader>
                 <TableBody>
                   {todaysUpcomingBookings.map((booking) => {
-                    const slot = slotById.get(booking.slot)
-                    const timeLabel = slot ? `${slot.startTime} to ${slot.endTime}` : 'Time TBD'
+                    const slot =
+                      booking.slot?.startTime && booking.slot?.endTime
+                        ? booking.slot
+                        : slotById.get(booking.slot?._id ?? '')
+                    const timeLabel =
+                      slot?.startTime && slot?.endTime
+                        ? `${slot.startTime} to ${slot.endTime}`
+                        : 'Time TBD'
 
                     return (
                       <TableRow key={`today-${booking._id}`}>

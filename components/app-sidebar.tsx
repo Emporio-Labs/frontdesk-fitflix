@@ -69,6 +69,11 @@ const navMain = [
       icon: IconSalad,
     },
     {
+      title: "Nutritionist Appointments",
+      url: "/admin/nutritionist-appointments",
+      icon: IconCalendarEvent,
+    },
+    {
       title: "Workouts",
       url: "/dashboard/workouts",
       icon: IconBarbell,
