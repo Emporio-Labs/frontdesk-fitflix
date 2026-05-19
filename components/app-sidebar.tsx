@@ -69,9 +69,19 @@ const navMain = [
       icon: IconSalad,
     },
     {
+      title: "Nutrition",
+      url: "/admin/nutrition",
+      icon: IconSalad,
+    },
+    {
       title: "Workouts",
       url: "/dashboard/workouts",
       icon: IconBarbell,
+    },
+    {
+      title: "My Nutrition",
+      url: "/dashboard/nutrition",
+      icon: IconSalad,
     },
     {
       title: "Memberships",

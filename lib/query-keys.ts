@@ -73,4 +73,24 @@ export const queryKeys = {
     all: () => ['onboarding'] as const,
     mine: () => ['onboarding', 'me'] as const,
   },
+  nutrition: {
+    all: () => ['nutrition'] as const,
+    foods: (search?: string) => ['nutrition', 'foods', search ?? ''] as const,
+    templates: {
+      all: () => ['nutrition', 'templates'] as const,
+      detail: (id: string) => ['nutrition', 'templates', id] as const,
+    },
+    plans: {
+      all: (userId?: string) => ['nutrition', 'plans', userId ?? 'all'] as const,
+      detail: (id: string) => ['nutrition', 'plans', id] as const,
+      mine: () => ['nutrition', 'plans', 'me'] as const,
+    },
+    mealLogs: (planId: string, date?: string) =>
+      ['nutrition', 'meal-logs', planId, date ?? ''] as const,
+    hydration: (userId: string, date?: string) =>
+      ['nutrition', 'hydration', userId, date ?? ''] as const,
+    adherence: (userId: string, from?: string, to?: string) =>
+      ['nutrition', 'adherence', userId, from ?? '', to ?? ''] as const,
+    progress: (userId: string) => ['nutrition', 'progress', userId] as const,
+  },
 }
