@@ -16,10 +16,10 @@ export default function TemplateDetailPage() {
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
-      <Link href="/admin/nutrition/templates">
+      <Link href="/admin/nutrition">
         <Button variant="ghost" size="sm">
           <IconArrowLeft className="w-4 h-4 mr-2" />
-          Back to Templates
+          Back
         </Button>
       </Link>
 
@@ -39,7 +39,7 @@ export default function TemplateDetailPage() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">{template.name}</h2>
             <p className="text-muted-foreground">
-              {template.goal.replace(/_/g, ' ')} · {template.totalCalories} kcal
+              {template.goal.replace(/([a-z])([A-Z])/g, '$1 $2')} · {template.targetCaloriesKcal ?? '—'} kcal
             </p>
           </div>
           <TemplateForm template={template} />

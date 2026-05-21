@@ -75,6 +75,7 @@ export const queryKeys = {
   },
   nutrition: {
     all: () => ['nutrition'] as const,
+    members: () => ['nutrition', 'members'] as const,
     foods: (search?: string) => ['nutrition', 'foods', search ?? ''] as const,
     templates: {
       all: () => ['nutrition', 'templates'] as const,
@@ -92,5 +93,7 @@ export const queryKeys = {
     adherence: (userId: string, from?: string, to?: string) =>
       ['nutrition', 'adherence', userId, from ?? '', to ?? ''] as const,
     progress: (userId: string) => ['nutrition', 'progress', userId] as const,
+    assessment: (userId: string) =>
+      ['nutrition', 'assessment', userId] as const,
   },
 }

@@ -15,9 +15,19 @@ import type {
   LogMealPayload,
   LogProgressPayload,
   MealLog,
+  SaveAssessmentPayload,
   UpdateFoodPayload,
   UpdateTemplatePayload,
 } from '@/lib/types/nutrition'
+
+// ── Dashboard members ────────────────────────────────────────────────────────
+export function useNutritionMembers() {
+  return useQuery({
+    queryKey: queryKeys.nutrition.members(),
+    queryFn: nutritionService.getNutritionMembers,
+    select: (data) => data.members,
+  })
+}
 
 function invalidateNutrition(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: queryKeys.nutrition.all() })
@@ -77,7 +87,7 @@ export function useNutritionTemplates() {
   return useQuery({
     queryKey: queryKeys.nutrition.templates.all(),
     queryFn: nutritionService.getTemplates,
-    select: (data) => data.items,
+    select: (data) => data.templates,
   })
 }
 
@@ -136,7 +146,7 @@ export function useNutritionPlans(userId?: string) {
   return useQuery({
     queryKey: queryKeys.nutrition.plans.all(userId),
     queryFn: () => nutritionService.getPlans(userId),
-    select: (data) => data.items,
+    select: (data) => data.plans,
   })
 }
 
@@ -149,11 +159,11 @@ export function useNutritionPlan(id: string) {
   })
 }
 
-export function useMyNutritionPlan() {
+export function useMyNutritionPlans() {
   return useQuery({
     queryKey: queryKeys.nutrition.plans.mine(),
     queryFn: nutritionService.getMyPlan,
-    select: (data) => data.plan,
+    select: (data) => data.plans,
   })
 }
 
@@ -167,6 +177,20 @@ export function useAssignPlan() {
     },
     onError: (err: any) =>
       toast.error(err?.response?.data?.message || 'Failed to assign plan'),
+  })
+}
+
+export function useUpdatePlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateTemplatePayload }) =>
+      nutritionService.updatePlan(id, payload),
+    onSuccess: (data, variables) => {
+      invalidateNutrition(qc)
+      toast.success(data.message || 'Plan updated')
+    },
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.message || 'Failed to update plan'),
   })
 }
 
@@ -276,5 +300,29 @@ export function useLogProgress() {
     },
     onError: (err: any) =>
       toast.error(err?.response?.data?.message || 'Failed to log progress'),
+  })
+}
+
+// ── Assessment (advisory; enriches onboarding, never gates plans) ────────────
+export function useNutritionAssessment(userId: string) {
+  return useQuery({
+    queryKey: queryKeys.nutrition.assessment(userId),
+    queryFn: () => nutritionService.getAssessment(userId),
+    select: (data) => data.assessment,
+    enabled: !!userId,
+  })
+}
+
+export function useSaveAssessment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: SaveAssessmentPayload) =>
+      nutritionService.saveAssessment(payload),
+    onSuccess: (data) => {
+      invalidateNutrition(qc)
+      toast.success(data.message || 'Assessment saved')
+    },
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.message || 'Failed to save assessment'),
   })
 }

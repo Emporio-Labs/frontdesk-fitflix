@@ -31,8 +31,10 @@ import {
 } from '@/components/ui/select'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
 import {
-  MEAL_SLOTS,
+  MEAL_TYPES,
+  MEAL_TYPE_LABELS,
   NUTRITION_GOALS,
+  NUTRITION_GOAL_LABELS,
   templateSchema,
   type FoodItem,
   type NutritionTemplate,
@@ -40,32 +42,23 @@ import {
 } from '@/lib/types/nutrition'
 import { useFoods, useCreateTemplate, useUpdateTemplate } from '@/hooks/use-nutrition'
 
-const EMPTY: TemplateFormValues = {
-  name: '',
-  description: '',
-  goal: 'maintenance',
-  meals: [{ slot: 'Breakfast', items: [] }],
-}
-
 function round(n: number) {
   return Math.round(n * 10) / 10
 }
 
-function scaleItem(food: FoodItem, quantity: number) {
-  const factor = food.servingSize > 0 ? quantity / food.servingSize : 0
+function scaleMacros(food: FoodItem, quantityG: number) {
+  const base = food.basePer > 0 ? food.basePer : 100
+  const factor = quantityG / base
   return {
-    foodId: food._id,
-    foodName: food.name,
-    unit: food.unit,
-    quantity,
-    calories: round(food.calories * factor),
-    protein: round(food.protein * factor),
-    carbs: round(food.carbs * factor),
-    fat: round(food.fat * factor),
+    caloriesKcal: round(food.caloriesKcal * factor),
+    proteinG: round(food.proteinG * factor),
+    carbsG: round(food.carbsG * factor),
+    fatG: round(food.fatG * factor),
   }
 }
 
 interface MealCardProps {
+  dayIndex: number
   mealIndex: number
   control: Control<TemplateFormValues>
   setValue: UseFormSetValue<TemplateFormValues>
@@ -73,40 +66,65 @@ interface MealCardProps {
   onRemove: () => void
 }
 
-function MealCard({ mealIndex, control, setValue, foods, onRemove }: MealCardProps) {
-  const { getValues } = useFormContext<TemplateFormValues>()
+function MealCard({ dayIndex, mealIndex, control, setValue, foods, onRemove }: MealCardProps) {
+  const { getValues, watch } = useFormContext<TemplateFormValues>()
   const { fields, append, remove } = useFieldArray({
     control,
-    name: `meals.${mealIndex}.items`,
+    name: `days.${dayIndex}.meals.${mealIndex}.items`,
   })
+
+  const watchedItems = watch(`days.${dayIndex}.meals.${mealIndex}.items`)
+
+  const mealMacros = useMemo(() => {
+    let caloriesKcal = 0, proteinG = 0, carbsG = 0, fatG = 0
+    for (const item of watchedItems ?? []) {
+      const food = foods.find((f) => f._id === item.foodId)
+      if (food && item.quantityG > 0) {
+        const scaled = scaleMacros(food, item.quantityG)
+        caloriesKcal += scaled.caloriesKcal
+        proteinG += scaled.proteinG
+        carbsG += scaled.carbsG
+        fatG += scaled.fatG
+      }
+    }
+    return { caloriesKcal: round(caloriesKcal), proteinG: round(proteinG), carbsG: round(carbsG), fatG: round(fatG) }
+  }, [watchedItems, foods])
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <div className="w-48">
-          <FormField
-            control={control}
-            name={`meals.${mealIndex}.slot`}
-            render={({ field }) => (
-              <FormItem>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Meal slot" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {MEAL_SLOTS.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <div className="flex items-center gap-3">
+          <div className="w-48">
+            <FormField
+              control={control}
+              name={`days.${dayIndex}.meals.${mealIndex}.mealType`}
+              render={({ field }) => (
+                <FormItem>
+                  <Select value={field.value} onValueChange={(v) => {
+                    field.onChange(v)
+                    setValue(`days.${dayIndex}.meals.${mealIndex}.name`, MEAL_TYPE_LABELS[v as keyof typeof MEAL_TYPE_LABELS] ?? v)
+                  }}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Meal type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {MEAL_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {MEAL_TYPE_LABELS[t]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {mealMacros.caloriesKcal} kcal | P:{mealMacros.proteinG}g C:{mealMacros.carbsG}g F:{mealMacros.fatG}g
+          </span>
         </div>
         <Button
           type="button"
@@ -122,108 +140,165 @@ function MealCard({ mealIndex, control, setValue, foods, onRemove }: MealCardPro
         {fields.length === 0 && (
           <p className="text-sm text-muted-foreground">No foods added to this meal.</p>
         )}
-        {fields.map((f, itemIndex) => (
-          <div
-            key={f.id}
-            className="grid grid-cols-1 md:grid-cols-[1fr_120px_auto] gap-2 items-end"
-          >
-            <FormField
-              control={control}
-              name={`meals.${mealIndex}.items.${itemIndex}.foodId`}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Food</FormLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={(foodId) => {
-                      const food = foods.find((x) => x._id === foodId)
-                      if (food) {
-                        setValue(
-                          `meals.${mealIndex}.items.${itemIndex}`,
-                          scaleItem(food, food.servingSize),
-                          { shouldValidate: true }
-                        )
-                      }
-                    }}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select food" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {foods.map((food) => (
-                        <SelectItem key={food._id} value={food._id}>
-                          {food.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={control}
-              name={`meals.${mealIndex}.items.${itemIndex}.quantity`}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Quantity</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="any"
-                      {...field}
-                      onChange={(e) => {
-                        const qty = Number(e.target.value)
-                        field.onChange(e)
-                        const foodId = getValues(
-                          `meals.${mealIndex}.items.${itemIndex}.foodId`
-                        )
-                        const food = foods.find((x) => x._id === foodId)
-                        if (food && !Number.isNaN(qty)) {
-                          setValue(
-                            `meals.${mealIndex}.items.${itemIndex}`,
-                            scaleItem(food, qty),
-                            { shouldValidate: true }
-                          )
-                        }
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-red-500"
-              onClick={() => remove(itemIndex)}
+        {fields.map((f, itemIndex) => {
+          const foodId = getValues(`days.${dayIndex}.meals.${mealIndex}.items.${itemIndex}.foodId`)
+          const qty = getValues(`days.${dayIndex}.meals.${mealIndex}.items.${itemIndex}.quantityG`)
+          const food = foods.find((x) => x._id === foodId)
+          const itemMacros = food && qty > 0 ? scaleMacros(food, qty) : null
+
+          return (
+            <div
+              key={f.id}
+              className="grid grid-cols-1 md:grid-cols-[1fr_120px_auto_auto] gap-2 items-end"
             >
-              <IconTrash className="w-4 h-4" />
-            </Button>
-          </div>
+              <FormField
+                control={control}
+                name={`days.${dayIndex}.meals.${mealIndex}.items.${itemIndex}.foodId`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Food</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select food" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {foods.map((food) => (
+                          <SelectItem key={food._id} value={food._id}>
+                            {food.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={control}
+                name={`days.${dayIndex}.meals.${mealIndex}.items.${itemIndex}.quantityG`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Quantity (g)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="any"
+                        min={0}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {itemMacros && (
+                <span className="text-xs text-muted-foreground whitespace-nowrap pb-2">
+                  {itemMacros.caloriesKcal} kcal
+                </span>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-red-500"
+                onClick={() => remove(itemIndex)}
+              >
+                <IconTrash className="w-4 h-4" />
+              </Button>
+            </div>
+          )
+        })}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            append({ foodId: '', quantityG: 100 })
+          }
+        >
+          <IconPlus className="w-4 h-4 mr-1" /> Add food
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+interface DayCardProps {
+  dayIndex: number
+  control: Control<TemplateFormValues>
+  setValue: UseFormSetValue<TemplateFormValues>
+  foods: FoodItem[]
+  onRemoveDay: () => void
+}
+
+function DayCard({ dayIndex, control, setValue, foods, onRemoveDay }: DayCardProps) {
+  const { fields: mealFields, append: appendMeal, remove: removeMeal } = useFieldArray({
+    control,
+    name: `days.${dayIndex}.meals`,
+  })
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-base">
+          <FormField
+            control={control}
+            name={`days.${dayIndex}.dayNumber`}
+            render={({ field }) => (
+              <span className="flex items-center gap-2">
+                Day
+                <Input
+                  type="number"
+                  className="w-16 h-7 text-sm"
+                  min={1}
+                  max={366}
+                  {...field}
+                />
+              </span>
+            )}
+          />
+        </CardTitle>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="text-red-500"
+          onClick={onRemoveDay}
+        >
+          <IconTrash className="w-4 h-4 mr-1" /> Remove day
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {mealFields.map((mf, mi) => (
+          <MealCard
+            key={mf.id}
+            dayIndex={dayIndex}
+            mealIndex={mi}
+            control={control}
+            setValue={setValue}
+            foods={foods}
+            onRemove={() => removeMeal(mi)}
+          />
         ))}
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() =>
-            append({
-              foodId: '',
-              foodName: '',
-              quantity: 0,
-              unit: '',
-              calories: 0,
-              protein: 0,
-              carbs: 0,
-              fat: 0,
+            appendMeal({
+              mealType: 'Snack',
+              name: 'Snack',
+              items: [],
+              options: [],
             })
           }
         >
-          <IconPlus className="w-4 h-4 mr-1" /> Add food
+          <IconPlus className="w-4 h-4 mr-1" /> Add meal
         </Button>
       </CardContent>
     </Card>
@@ -241,51 +316,102 @@ export function TemplateForm({ template }: TemplateFormProps) {
   const updateTemplate = useUpdateTemplate()
   const isEdit = !!template
 
+  const defaultValues: TemplateFormValues = template
+    ? {
+        name: template.name,
+        description: template.description ?? '',
+        goal: template.goal,
+        targetCaloriesKcal: template.targetCaloriesKcal ?? undefined,
+        targetMacros: template.targetMacros ?? undefined,
+        durationDays: template.durationDays ?? 7,
+        days: template.days.map((d) => ({
+          dayNumber: d.dayNumber,
+          meals: d.meals.map((m) => ({
+            mealType: m.mealType,
+            name: m.name,
+            timeOfDay: m.timeOfDay ?? undefined,
+            notes: m.notes ?? undefined,
+            items: m.items.map((item) => ({
+              foodId: item.foodId,
+              quantityG: item.quantityG,
+            })),
+            options: [],
+          })),
+        })),
+        lifestyle: [],
+      }
+    : {
+        name: '',
+        description: '',
+        goal: 'Maintenance' as const,
+        durationDays: 7,
+        lifestyle: [],
+        days: [
+          {
+            dayNumber: 1,
+            meals: [{ mealType: 'Breakfast' as const, name: 'Breakfast', items: [], options: [] }],
+          },
+        ],
+      }
+
   const form = useForm<TemplateFormValues>({
     resolver: zodResolver(templateSchema),
-    defaultValues: template
-      ? {
-          name: template.name,
-          description: template.description ?? '',
-          goal: template.goal,
-          meals: template.meals,
-        }
-      : EMPTY,
+    defaultValues,
   })
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields: dayFields, append: appendDay, remove: removeDay } = useFieldArray({
     control: form.control,
-    name: 'meals',
+    name: 'days',
   })
 
-  const watchedMeals = form.watch('meals')
+  const watchedDays = form.watch('days')
+
   const totals = useMemo(() => {
-    let calories = 0
-    let protein = 0
-    let carbs = 0
-    let fat = 0
-    for (const meal of watchedMeals ?? []) {
-      for (const item of meal.items ?? []) {
-        calories += Number(item.calories) || 0
-        protein += Number(item.protein) || 0
-        carbs += Number(item.carbs) || 0
-        fat += Number(item.fat) || 0
+    let caloriesKcal = 0, proteinG = 0, carbsG = 0, fatG = 0
+    for (const day of watchedDays ?? []) {
+      for (const meal of day.meals ?? []) {
+        for (const item of meal.items ?? []) {
+          const food = foods.find((f) => f._id === item.foodId)
+          if (food && item.quantityG > 0) {
+            const scaled = scaleMacros(food, item.quantityG)
+            caloriesKcal += scaled.caloriesKcal
+            proteinG += scaled.proteinG
+            carbsG += scaled.carbsG
+            fatG += scaled.fatG
+          }
+        }
       }
     }
+    const numDays = (watchedDays?.length || 1)
     return {
-      calories: round(calories),
-      protein: round(protein),
-      carbs: round(carbs),
-      fat: round(fat),
+      caloriesKcal: round(caloriesKcal / numDays),
+      proteinG: round(proteinG / numDays),
+      carbsG: round(carbsG / numDays),
+      fatG: round(fatG / numDays),
     }
-  }, [watchedMeals])
+  }, [watchedDays, foods])
 
   const onSubmit = async (values: TemplateFormValues) => {
     const payload = {
       name: values.name,
-      description: values.description,
+      description: values.description || undefined,
       goal: values.goal,
-      meals: values.meals,
+      targetCaloriesKcal: values.targetCaloriesKcal ?? undefined,
+      targetMacros: values.targetMacros,
+      durationDays: values.durationDays,
+      days: values.days.map((d) => ({
+        dayNumber: d.dayNumber,
+        meals: d.meals.map((m) => ({
+          mealType: m.mealType,
+          name: m.name,
+          timeOfDay: m.timeOfDay || undefined,
+          notes: m.notes || undefined,
+          items: m.items.map((item) => ({
+            foodId: item.foodId,
+            quantityG: item.quantityG,
+          })),
+        })),
+      })),
     }
     if (isEdit && template) {
       await updateTemplate.mutateAsync({ id: template._id, payload })
@@ -334,7 +460,7 @@ export function TemplateForm({ template }: TemplateFormProps) {
                       <SelectContent>
                         {NUTRITION_GOALS.map((g) => (
                           <SelectItem key={g} value={g}>
-                            {g.replace(/_/g, ' ')}
+                            {NUTRITION_GOAL_LABELS[g]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -358,30 +484,31 @@ export function TemplateForm({ template }: TemplateFormProps) {
               )}
             />
             <div className="flex flex-wrap gap-4 rounded-lg border p-3 text-sm">
+              <span>Avg/day:</span>
               <span>
-                <strong>{totals.calories}</strong> kcal
+                <strong>{totals.caloriesKcal}</strong> kcal
               </span>
-              <span>P: <strong>{totals.protein}g</strong></span>
-              <span>C: <strong>{totals.carbs}g</strong></span>
-              <span>F: <strong>{totals.fat}g</strong></span>
+              <span>P: <strong>{totals.proteinG}g</strong></span>
+              <span>C: <strong>{totals.carbsG}g</strong></span>
+              <span>F: <strong>{totals.fatG}g</strong></span>
             </div>
           </CardContent>
         </Card>
 
-        {fields.map((f, i) => (
-          <MealCard
-            key={f.id}
-            mealIndex={i}
+        {dayFields.map((df, di) => (
+          <DayCard
+            key={df.id}
+            dayIndex={di}
             control={form.control}
             setValue={form.setValue}
             foods={foods}
-            onRemove={() => remove(i)}
+            onRemoveDay={() => removeDay(di)}
           />
         ))}
 
-        {typeof form.formState.errors.meals?.message === 'string' && (
+        {typeof form.formState.errors.days?.message === 'string' && (
           <p className="text-sm font-medium text-destructive">
-            {form.formState.errors.meals.message}
+            {form.formState.errors.days.message}
           </p>
         )}
 
@@ -389,9 +516,14 @@ export function TemplateForm({ template }: TemplateFormProps) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => append({ slot: 'Snack', items: [] })}
+            onClick={() =>
+              appendDay({
+                dayNumber: (watchedDays?.length ?? 0) + 1,
+                meals: [{ mealType: 'Breakfast', name: 'Breakfast', items: [], options: [] }],
+              })
+            }
           >
-            <IconPlus className="w-4 h-4 mr-1" /> Add meal
+            <IconPlus className="w-4 h-4 mr-1" /> Add day
           </Button>
           <Button type="submit" disabled={isPending}>
             {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Template'}

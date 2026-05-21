@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
-export default function NutritionTemplatesRedirect() {
+export default function AssessmentsRedirect() {
   redirect('/admin/nutrition')
 }

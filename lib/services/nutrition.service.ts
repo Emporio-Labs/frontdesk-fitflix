@@ -10,8 +10,11 @@ import type {
   LogMealPayload,
   LogProgressPayload,
   MealLog,
+  NutritionDashboardMember,
+  NutritionAssessment,
   NutritionProgress,
   NutritionTemplate,
+  SaveAssessmentPayload,
   UpdateFoodPayload,
   UpdateTemplatePayload,
   UserNutritionPlan,
@@ -28,12 +31,21 @@ import type {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const nutritionService = {
+  // ── Dashboard members (nutritionist booking pipeline) ─────────────────────
+  // ASSUMPTION: GET /nutrition/members returns members in the nutritionist
+  // booking / plan pipeline with populated member details, nutrition status,
+  // onboarding step, and booking status. Verify path and response shape.
+  getNutritionMembers: async () => {
+    const { data } = await apiClient.get('/nutrition/members')
+    return data as { members: NutritionDashboardMember[] }
+  },
+
   // ── Food catalog ────────────────────────────────────────────────────────────
   getFoods: async (search?: string) => {
     const { data } = await apiClient.get('/nutrition/foods', {
-      params: search ? { search } : undefined,
+      params: search ? { query: search } : undefined,
     })
-    return data as { items: FoodItem[] }
+    return data as { items: FoodItem[]; total: number; page: number; limit: number }
   },
   createFood: async (payload: CreateFoodPayload) => {
     const { data } = await apiClient.post('/nutrition/foods', payload)
@@ -51,7 +63,7 @@ export const nutritionService = {
   // ── Templates (nutritionist-owned reusable plans) ───────────────────────────
   getTemplates: async () => {
     const { data } = await apiClient.get('/nutrition/templates')
-    return data as { items: NutritionTemplate[] }
+    return data as { templates: NutritionTemplate[] }
   },
   getTemplate: async (id: string) => {
     const { data } = await apiClient.get(`/nutrition/templates/${id}`)
@@ -75,19 +87,23 @@ export const nutritionService = {
     const { data } = await apiClient.get('/nutrition/plans', {
       params: userId ? { userId } : undefined,
     })
-    return data as { items: UserNutritionPlan[] }
+    return data as { plans: UserNutritionPlan[] }
   },
   getPlan: async (id: string) => {
     const { data } = await apiClient.get(`/nutrition/plans/${id}`)
     return data as { plan: UserNutritionPlan }
   },
-  // Active plan for the authenticated member (user dashboard).
   getMyPlan: async () => {
-    const { data } = await apiClient.get('/nutrition/me/plan')
-    return data as { plan: UserNutritionPlan | null }
+    const { data } = await apiClient.get('/nutrition/my/plans')
+    return data as { plans: UserNutritionPlan[] }
   },
   assignPlan: async (payload: AssignPlanPayload) => {
-    const { data } = await apiClient.post('/nutrition/plans', payload)
+    const { templateId, ...body } = payload
+    const { data } = await apiClient.post(`/nutrition/templates/${templateId}/assign`, body)
+    return data as { message: string; plan: UserNutritionPlan }
+  },
+  updatePlan: async (id: string, payload: UpdateTemplatePayload) => {
+    const { data } = await apiClient.patch(`/nutrition/plans/${id}`, payload)
     return data as { message: string; plan: UserNutritionPlan }
   },
   deletePlan: async (id: string) => {
@@ -97,46 +113,65 @@ export const nutritionService = {
 
   // ── Meal logs ───────────────────────────────────────────────────────────────
   getMealLogs: async (planId: string, date?: string) => {
-    const { data } = await apiClient.get(`/nutrition/plans/${planId}/meal-logs`, {
-      params: date ? { date } : undefined,
+    const { data } = await apiClient.get(`/nutrition/my/meal-logs`, {
+      params: { planId, ...(date ? { date } : {}) },
     })
     return data as { items: MealLog[] }
   },
   logMeal: async (payload: LogMealPayload) => {
-    const { data } = await apiClient.post('/nutrition/meal-logs', payload)
+    const { data } = await apiClient.post('/nutrition/my/meal-logs', payload)
     return data as { message: string; mealLog: MealLog }
   },
 
   // ── Hydration ───────────────────────────────────────────────────────────────
   getHydration: async (userId: string, date?: string) => {
-    const { data } = await apiClient.get('/nutrition/hydration', {
-      params: { userId, ...(date ? { date } : {}) },
+    const { data } = await apiClient.get('/nutrition/my/hydration', {
+      params: { ...(date ? { date } : {}) },
     })
     return data as { items: HydrationLog[] }
   },
   logHydration: async (payload: LogHydrationPayload) => {
-    const { data } = await apiClient.post('/nutrition/hydration', payload)
+    const { data } = await apiClient.post('/nutrition/my/hydration', payload)
     return data as { message: string; hydration: HydrationLog }
   },
 
   // ── Adherence (read-only materialized daily rollup) ─────────────────────────
   getAdherence: async (userId: string, from?: string, to?: string) => {
-    const { data } = await apiClient.get('/nutrition/adherence', {
-      params: { userId, ...(from ? { from } : {}), ...(to ? { to } : {}) },
+    const { data } = await apiClient.get('/nutrition/my/adherence', {
+      params: { ...(from ? { from } : {}), ...(to ? { to } : {}) },
     })
     return data as { items: AdherenceDaily[] }
   },
 
   // ── Progress tracking ───────────────────────────────────────────────────────
   getProgress: async (userId: string) => {
-    const { data } = await apiClient.get('/nutrition/progress', {
-      params: { userId },
-    })
+    const { data } = await apiClient.get('/nutrition/my/progress', { params: { userId } })
     return data as { items: NutritionProgress[] }
   },
   logProgress: async (payload: LogProgressPayload) => {
-    const { data } = await apiClient.post('/nutrition/progress', payload)
+    const { data } = await apiClient.post('/nutrition/my/progress', payload)
     return data as { message: string; progress: NutritionProgress }
+  },
+
+  // ── Nutrition assessment (enriches onboarding — never duplicates it) ────────
+  // ASSUMPTION: GET/PUT /nutrition/assessment?userId= is UNVERIFIED. The
+  // assessment is advisory and never gates plan creation. A 404 (endpoint not
+  // implemented yet) resolves to { assessment: null } so the UI shows an empty
+  // state instead of erroring.
+  getAssessment: async (userId: string) => {
+    try {
+      const { data } = await apiClient.get('/nutrition/assessment', {
+        params: { userId },
+      })
+      return data as { assessment: NutritionAssessment | null }
+    } catch (e: any) {
+      if (e?.response?.status === 404) return { assessment: null }
+      throw e
+    }
+  },
+  saveAssessment: async (payload: SaveAssessmentPayload) => {
+    const { data } = await apiClient.put('/nutrition/assessment', payload)
+    return data as { message: string; assessment: NutritionAssessment }
   },
 
   // ── PDF (deferred backend seam — UI renders a disabled button) ──────────────

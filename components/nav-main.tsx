@@ -23,7 +23,7 @@ export function NavMain({
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupContent className="flex flex-col gap-2">
+      <SidebarGroupContent className="flex flex-col gap-3">
         <SidebarMenu>
           <SidebarMenuItem className="flex items-center gap-2">
             <SidebarMenuButton
@@ -46,7 +46,7 @@ export function NavMain({
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild tooltip={item.title}>
+              <SidebarMenuButton asChild tooltip={item.title} className="h-10 gap-3 font-medium [&>svg]:size-5">
                 <Link href={item.url}>
                   {item.icon && <item.icon />}
                   <span>{item.title}</span>

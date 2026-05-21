@@ -21,6 +21,25 @@ export interface UserOnboardingSummary {
   onboardingCompleted: boolean
 }
 
+export type ActivityLevel = 'Sedentary' | 'Light' | 'Moderate' | 'Active' | 'VeryActive'
+
+// Optional snapshot of the user's onboarding health markers (weight/height/activity).
+// Backend may populate this on GET /users/:id later — the UI degrades gracefully
+// when the field is absent.
+export interface HealthMarkersSnapshot {
+  weight?: number          // kg
+  height?: number          // cm
+  activityLevel?: ActivityLevel
+  sleepHours?: number
+  allergies?: string[]
+}
+
+export interface HealthGoalsSnapshot {
+  targetWeight?: number
+  workoutExperience?: 'None' | 'Beginner' | 'Intermediate' | 'Advanced'
+  foodPreferences?: string[]
+}
+
 export interface User {
   _id: string
   username: string
@@ -33,6 +52,8 @@ export interface User {
   updatedAt: string
   onboarded?: boolean
   onboardingStatus?: UserOnboardingSummary
+  healthMarkers?: HealthMarkersSnapshot
+  healthGoalsSnapshot?: HealthGoalsSnapshot
 }
 
 export interface CreateUserPayload {
