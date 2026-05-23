@@ -1,4 +1,11 @@
 import { apiClient } from '@/lib/api-client'
+import type {
+  PopulatedDoctorRef,
+  PopulatedReportRef,
+  PopulatedServiceRef,
+  PopulatedSlotRef,
+  PopulatedUserRef,
+} from '@/lib/populated'
 
 export const APPOINTMENT_STATUS = {
   0: 'Booked',
@@ -14,13 +21,13 @@ export interface Appointment {
   _id: string
   appointmentDate: string
   status: AppointmentStatusValue
-  user: string
-  slot: string
-  doctor: string
-  service?: string
+  user: PopulatedUserRef
+  slot: PopulatedSlotRef
+  doctor: PopulatedDoctorRef
+  service?: PopulatedServiceRef
   creditCostSnapshot?: number
   creditsBypassed?: boolean
-  report?: string
+  report?: PopulatedReportRef
   createdAt: string
   updatedAt: string
 }

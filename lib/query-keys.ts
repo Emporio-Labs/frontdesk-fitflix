@@ -72,6 +72,11 @@ export const queryKeys = {
   onboarding: {
     all: () => ['onboarding'] as const,
     mine: () => ['onboarding', 'me'] as const,
+    byUser: (userId: string) => ['onboarding', 'user', userId] as const,
+  },
+  nutritionistBookings: {
+    all: () => ['nutritionist-bookings'] as const,
+    detail: (id: string) => ['nutritionist-bookings', id] as const,
   },
   nutrition: {
     all: () => ['nutrition'] as const,
