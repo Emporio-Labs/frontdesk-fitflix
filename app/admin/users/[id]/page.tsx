@@ -15,6 +15,8 @@ import {
   IconSalad,
 } from '@tabler/icons-react'
 import { useUser } from '@/hooks/use-users'
+import { useMemberships } from '@/hooks/use-memberships'
+import { useBookings } from '@/hooks/use-bookings'
 import { StatusBadge } from '@/components/status-badge'
 import { OnboardingTimeline } from '@/components/onboarding-timeline'
 
@@ -41,6 +43,16 @@ export default function UserDetailPage() {
   const userId = Array.isArray(idParam) ? idParam[0] : idParam || ''
 
   const { data: user, isLoading, isError } = useUser(userId)
+  const { data: memberships = [], isLoading: membershipsLoading } = useMemberships()
+  const { data: bookings = [], isLoading: bookingsLoading } = useBookings()
+
+  // Debug: temporary logs to inspect API data shapes
+  if (typeof window !== 'undefined') {
+    console.debug('UserDetail: userId', userId)
+    console.debug('UserDetail: user', user)
+    console.debug('UserDetail: memberships (raw)', memberships)
+    console.debug('UserDetail: bookings (raw)', bookings)
+  }
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
@@ -148,20 +160,74 @@ export default function UserDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle>Memberships</CardTitle>
-              <CardDescription>Connect to memberships API to display data.</CardDescription>
+              <CardDescription>Memberships associated with this user</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-500">No membership data available.</p>
+              {membershipsLoading ? (
+                <p className="text-sm text-gray-500">Loading memberships…</p>
+              ) : (
+                (() => {
+                  const userMemberships = (memberships || []).filter((m: any) => String(m.userId || m.user || m.user?._id || '') === String(userId))
+                  console.debug('UserDetail: userMemberships', userMemberships)
+                  return userMemberships.length ? (
+                    <div className="space-y-3">
+                      {userMemberships.map((m: any) => (
+                        <div key={m.id || m._id || m.planId} className="rounded-md border px-4 py-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium">{m.planName || m.plan?.name || 'Membership'}</div>
+                              <div className="text-sm text-muted-foreground">{m.status}</div>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {m.startDate ? new Date(m.startDate).toLocaleDateString() : '—'}
+                              {' '}–{' '}
+                              {m.endDate ? new Date(m.endDate).toLocaleDateString() : '—'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No membership data available.</p>
+                  )
+                })()
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <CardTitle>Bookings</CardTitle>
-              <CardDescription>Connect to bookings API to display data.</CardDescription>
+              <CardDescription>Booking history and sessions</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-500">No booking data available.</p>
+              {bookingsLoading ? (
+                <p className="text-sm text-gray-500">Loading bookings…</p>
+              ) : (
+                (() => {
+                  const userBookings = (bookings || []).filter((b: any) => String(b.user || b.userId || b.user?._id || '') === String(userId))
+                  console.debug('UserDetail: userBookings', userBookings)
+                  return userBookings.length ? (
+                    <div className="space-y-3">
+                      {userBookings.map((b: any) => (
+                        <div key={b._id || b.id || `${b.service}-${b._id}`} className="rounded-md border px-4 py-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium">{b.service || b.serviceName || 'Booking'}</div>
+                              <div className="text-sm text-muted-foreground">Status: {String(b.status)}</div>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {b.bookingDate ? new Date(b.bookingDate).toLocaleString() : (b.createdAt ? new Date(b.createdAt).toLocaleString() : '—')}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No booking data available.</p>
+                  )
+                })()
+              )}
             </CardContent>
           </Card>
 

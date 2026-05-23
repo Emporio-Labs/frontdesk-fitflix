@@ -527,7 +527,7 @@ export type TemplateFormValues = z.infer<typeof templateSchema>
 
 export const assignPlanSchema = z.object({
   userId: z.string().min(1, 'Select a member'),
-  templateId: z.string().min(1, 'Select a template'),
+  planId: z.string().min(1, 'Select a plan'),
   startDate: z.string().min(1, 'Start date is required'),
   endDate: z.string().optional(),
 })
@@ -559,7 +559,7 @@ export interface CreateTemplatePayload {
 export type UpdateTemplatePayload = Partial<CreateTemplatePayload>
 
 export interface AssignPlanPayload {
-  templateId: string
+  planId: string
   userId: string
   startDate: string
   endDate?: string

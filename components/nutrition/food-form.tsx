@@ -128,12 +128,14 @@ export function FoodForm({ open, onOpenChange, food }: FoodFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Food' : 'Add Food'}</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden p-0">
+        <div className="flex max-h-[90vh] flex-col">
+          <DialogHeader className="shrink-0 px-6 pt-6">
+            <DialogTitle>{isEdit ? 'Edit Food' : 'Add Food'}</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pt-2 pb-4">
             <FormField
               control={form.control}
               name="name"
@@ -441,20 +443,22 @@ export function FoodForm({ open, onOpenChange, food }: FoodFormProps) {
                 )}
               />
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Food'}
-              </Button>
-            </div>
-          </form>
-        </Form>
+              </div>
+              <div className="shrink-0 flex gap-2 border-t px-6 py-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Food'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -82,21 +82,12 @@ export function useDeleteFood() {
   })
 }
 
-// ── Templates ─────────────────────────────────────────────────────────────────
+// ── Diet plans (templates backing the Diet Plans tab) ────────────────────────
 export function useNutritionTemplates() {
   return useQuery({
     queryKey: queryKeys.nutrition.templates.all(),
     queryFn: nutritionService.getTemplates,
     select: (data) => data.templates,
-  })
-}
-
-export function useNutritionTemplate(id: string) {
-  return useQuery({
-    queryKey: queryKeys.nutrition.templates.detail(id),
-    queryFn: () => nutritionService.getTemplate(id),
-    select: (data) => data.template,
-    enabled: !!id,
   })
 }
 
@@ -107,10 +98,10 @@ export function useCreateTemplate() {
       nutritionService.createTemplate(payload),
     onSuccess: (data) => {
       invalidateNutrition(qc)
-      toast.success(data.message || 'Template created')
+      toast.success(data.message || 'Diet plan created')
     },
     onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Failed to create template'),
+      toast.error(err?.response?.data?.message || 'Failed to create diet plan'),
   })
 }
 
@@ -121,23 +112,10 @@ export function useUpdateTemplate() {
       nutritionService.updateTemplate(id, payload),
     onSuccess: (data) => {
       invalidateNutrition(qc)
-      toast.success(data.message || 'Template updated')
+      toast.success(data.message || 'Diet plan updated')
     },
     onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Failed to update template'),
-  })
-}
-
-export function useDeleteTemplate() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => nutritionService.deleteTemplate(id),
-    onSuccess: (data) => {
-      invalidateNutrition(qc)
-      toast.success(data.message || 'Template deleted')
-    },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Failed to delete template'),
+      toast.error(err?.response?.data?.message || 'Failed to update diet plan'),
   })
 }
 

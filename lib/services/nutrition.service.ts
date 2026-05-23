@@ -32,11 +32,11 @@ import type {
 
 export const nutritionService = {
   // ── Dashboard members (nutritionist booking pipeline) ─────────────────────
-  // ASSUMPTION: GET /nutrition/members returns members in the nutritionist
+  // GET /nutrition/dashboard/members returns members in the nutritionist
   // booking / plan pipeline with populated member details, nutrition status,
-  // onboarding step, and booking status. Verify path and response shape.
+  // onboarding step (flat camelCase `onboardingStep`), and booking status.
   getNutritionMembers: async () => {
-    const { data } = await apiClient.get('/nutrition/members')
+    const { data } = await apiClient.get('/nutrition/dashboard/members')
     return data as { members: NutritionDashboardMember[] }
   },
 
@@ -60,14 +60,10 @@ export const nutritionService = {
     return data as { message: string }
   },
 
-  // ── Templates (nutritionist-owned reusable plans) ───────────────────────────
+  // ── Diet plans (reusable templates backing the Diet Plans tab) ──────────────
   getTemplates: async () => {
     const { data } = await apiClient.get('/nutrition/templates')
     return data as { templates: NutritionTemplate[] }
-  },
-  getTemplate: async (id: string) => {
-    const { data } = await apiClient.get(`/nutrition/templates/${id}`)
-    return data as { template: NutritionTemplate }
   },
   createTemplate: async (payload: CreateTemplatePayload) => {
     const { data } = await apiClient.post('/nutrition/templates', payload)
@@ -76,10 +72,6 @@ export const nutritionService = {
   updateTemplate: async (id: string, payload: UpdateTemplatePayload) => {
     const { data } = await apiClient.patch(`/nutrition/templates/${id}`, payload)
     return data as { message: string; template: NutritionTemplate }
-  },
-  deleteTemplate: async (id: string) => {
-    const { data } = await apiClient.delete(`/nutrition/templates/${id}`)
-    return data as { message: string }
   },
 
   // ── Assigned user plans (deep snapshot of a template) ───────────────────────
@@ -98,8 +90,8 @@ export const nutritionService = {
     return data as { plans: UserNutritionPlan[] }
   },
   assignPlan: async (payload: AssignPlanPayload) => {
-    const { templateId, ...body } = payload
-    const { data } = await apiClient.post(`/nutrition/templates/${templateId}/assign`, body)
+    const { planId, ...body } = payload
+    const { data } = await apiClient.post(`/nutrition/templates/${planId}/assign`, body)
     return data as { message: string; plan: UserNutritionPlan }
   },
   updatePlan: async (id: string, payload: UpdateTemplatePayload) => {

@@ -68,7 +68,7 @@ import {
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// ── Pure helpers (same as template-form.tsx — inlined to keep both independent) ──
+// ── Pure helpers ─────────────────────────────────────────────────────────────
 
 function round(n: number) {
   return Math.round(n * 10) / 10
@@ -150,12 +150,31 @@ function OptionCard({
           render={({ field }) => (
             <FormItem className="flex-1">
               <FormControl>
-                <Input
-                  placeholder={`Option ${optionIndex + 1}`}
-                  className="h-7 text-sm"
+                <Select
                   value={field.value ?? ''}
-                  onChange={field.onChange}
-                />
+                  onValueChange={field.onChange}
+                >
+                  <FormControl>
+                    <SelectTrigger className="h-7 text-sm">
+                      <SelectValue placeholder={`Option ${optionIndex + 1}`} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {Array.from({ length: 6 }).map((_, i) => {
+                      const label = `Option ${i + 1}`
+                      return (
+                        <SelectItem key={label} value={label}>
+                          {label}
+                        </SelectItem>
+                      )
+                    })}
+                    {field.value && !field.value.startsWith('Option') && (
+                      <SelectItem key={field.value} value={field.value}>
+                        {field.value}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               </FormControl>
             </FormItem>
           )}
@@ -981,10 +1000,10 @@ export function ClinicalTemplateForm({
       router.push('/admin/nutrition')
     } else if (isEdit && template) {
       await updateTemplate.mutateAsync({ id: template._id, payload })
-      router.push('/admin/nutrition/templates')
+      router.push('/admin/nutrition?tab=diet-plans')
     } else {
       await createTemplate.mutateAsync(payload)
-      router.push('/admin/nutrition/templates')
+      router.push('/admin/nutrition?tab=diet-plans')
     }
   }
 
@@ -1229,7 +1248,7 @@ export function ClinicalTemplateForm({
           <Button
             type="button"
             variant="ghost"
-            onClick={() => router.push(mode === 'plan' ? '/admin/nutrition' : '/admin/nutrition/templates')}
+            onClick={() => router.push(mode === 'plan' ? '/admin/nutrition' : '/admin/nutrition?tab=diet-plans')}
           >
             Cancel
           </Button>

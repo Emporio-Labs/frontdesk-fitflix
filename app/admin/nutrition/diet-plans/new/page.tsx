@@ -9,7 +9,11 @@ export default function NewClinicalTemplatePage() {
   const router = useRouter()
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
-      <Button variant="ghost" size="sm" onClick={() => router.back()}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => router.push('/admin/nutrition?tab=diet-plans')}
+      >
         <IconArrowLeft className="mr-2 h-4 w-4" />
         Back
       </Button>

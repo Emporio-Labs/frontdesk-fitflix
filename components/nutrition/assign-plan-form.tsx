@@ -39,14 +39,14 @@ interface AssignPlanFormProps {
 
 export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormProps) {
   const { data: users = [] } = useUsers()
-  const { data: templates = [] } = useNutritionTemplates()
+  const { data: dietPlans = [] } = useNutritionTemplates()
   const assignPlan = useAssignPlan()
 
   const form = useForm<AssignPlanFormValues>({
     resolver: zodResolver(assignPlanSchema),
     defaultValues: {
       userId: userId ?? '',
-      templateId: '',
+      planId: '',
       startDate: new Date().toISOString().slice(0, 10),
       endDate: '',
     },
@@ -56,7 +56,7 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
     if (open) {
       form.reset({
         userId: userId ?? '',
-        templateId: '',
+        planId: '',
         startDate: new Date().toISOString().slice(0, 10),
         endDate: '',
       })
@@ -66,7 +66,7 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
   const onSubmit = async (values: AssignPlanFormValues) => {
     await assignPlan.mutateAsync({
       userId: values.userId,
-      templateId: values.templateId,
+      planId: values.planId,
       startDate: values.startDate,
       endDate: values.endDate || undefined,
     })
@@ -111,20 +111,20 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
             />
             <FormField
               control={form.control}
-              name="templateId"
+              name="planId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Template *</FormLabel>
+                  <FormLabel>Diet Plan *</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select template" />
+                        <SelectValue placeholder="Select diet plan" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {templates.map((t) => (
-                        <SelectItem key={t._id} value={t._id}>
-                          {t.name}
+                      {dietPlans.map((p) => (
+                        <SelectItem key={p._id} value={p._id}>
+                          {p.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

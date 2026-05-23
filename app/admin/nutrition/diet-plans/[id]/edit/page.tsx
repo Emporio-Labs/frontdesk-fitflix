@@ -25,7 +25,11 @@ export default function EditAssignedPlanPage() {
   if (isError || !plan) {
     return (
       <div className="flex-1 space-y-4 p-8 pt-6">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push('/admin/nutrition?tab=diet-plans')}
+        >
           <IconArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
@@ -39,7 +43,11 @@ export default function EditAssignedPlanPage() {
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push('/admin/nutrition?tab=diet-plans')}
+        >
           <IconArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>

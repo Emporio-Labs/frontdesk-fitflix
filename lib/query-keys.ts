@@ -79,7 +79,6 @@ export const queryKeys = {
     foods: (search?: string) => ['nutrition', 'foods', search ?? ''] as const,
     templates: {
       all: () => ['nutrition', 'templates'] as const,
-      detail: (id: string) => ['nutrition', 'templates', id] as const,
     },
     plans: {
       all: (userId?: string) => ['nutrition', 'plans', userId ?? 'all'] as const,

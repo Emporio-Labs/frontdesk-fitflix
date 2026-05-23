@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default function DietPlansRedirect() {
-  redirect('/admin/nutrition')
+  redirect('/admin/nutrition?tab=diet-plans')
 }
