@@ -58,6 +58,18 @@ export const queryKeys = {
     list: (filters?: Record<string, any>) => ['exercises', 'list', filters] as const,
     detail: (id: string) => ['exercises', id] as const,
   },
+  workoutPlans: {
+    all: () => ['workout-plans'] as const,
+    list: (filters?: Record<string, any>) => ['workout-plans', 'list', filters] as const,
+    detail: (id: string) => ['workout-plans', id] as const,
+    assignments: {
+      all: () => ['workout-plans', 'assignments'] as const,
+      mine: () => ['workout-plans', 'assignments', 'me'] as const,
+      today: () => ['workout-plans', 'assignments', 'me', 'today'] as const,
+      schedule: (from?: string, to?: string) =>
+        ['workout-plans', 'assignments', 'me', 'schedule', from ?? '', to ?? ''] as const,
+    },
+  },
   workoutSessions: {
     all: () => ['workout-sessions'] as const,
     detail: (id: string) => ['workout-sessions', id] as const,

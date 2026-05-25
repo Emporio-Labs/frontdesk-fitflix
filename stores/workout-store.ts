@@ -9,6 +9,7 @@ import type {
   PlanGoal,
   SplitType,
   PlanStatus,
+  WorkoutSection,
 } from '@/types/workout'
 
 interface WorkoutStore {
@@ -26,7 +27,7 @@ interface WorkoutStore {
   addDay: () => void
   removeDay: (index: number) => void
   updateDay: (index: number, updates: Partial<WorkoutDay>) => void
-  addExerciseToDay: (dayIndex: number, exercise: Exercise) => void
+  addExerciseToDay: (dayIndex: number, exercise: Exercise, section?: WorkoutSection) => void
   removeExerciseFromDay: (dayIndex: number, exerciseIndex: number) => void
   updateExerciseInDay: (
     dayIndex: number,
@@ -47,10 +48,10 @@ const DEFAULT_PLAN: Partial<WorkoutPlan> = {
   description: '',
   difficulty: 'Intermediate',
   duration: 4,
-  goal: 'general_fitness',
-  splitType: 'custom',
+  goal: 'Custom',
+  splitType: 'Custom',
   days: [],
-  status: 'draft',
+  status: 'Draft',
   assignedUsers: [],
   isTemplate: false,
 }
@@ -94,7 +95,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
           return { currentPlan: { ...s.currentPlan, days } }
         }),
 
-      addExerciseToDay: (dayIndex, exercise) =>
+      addExerciseToDay: (dayIndex, exercise, section = 'workout') =>
         set((s) => {
           const days = [...(s.currentPlan.days || [])]
           if (!days[dayIndex]) return s
@@ -107,7 +108,10 @@ export const useWorkoutStore = create<WorkoutStore>()(
               difficulty: exercise.difficulty,
               equipment: exercise.equipment,
               caloriesPerSet: exercise.caloriesPerSet,
+              exerciseType: exercise.exerciseType,
+              sectionTypes: exercise.sectionTypes,
             },
+            section,
             targetSets: 3,
             targetReps: 12,
             targetWeightKg: 20,
@@ -182,10 +186,10 @@ export const useWorkoutStore = create<WorkoutStore>()(
           description: s.currentPlan.description || '',
           difficulty: s.currentPlan.difficulty || 'Intermediate',
           duration: s.currentPlan.duration || 4,
-          goal: s.currentPlan.goal || 'general_fitness',
-          splitType: s.currentPlan.splitType || 'custom',
+          goal: s.currentPlan.goal || 'Custom',
+          splitType: s.currentPlan.splitType || 'Custom',
           days: s.currentPlan.days || [],
-          status: s.currentPlan.status || 'draft',
+          status: s.currentPlan.status || 'Draft',
           assignedUsers: s.assignedUserIds,
           isTemplate: s.currentPlan.isTemplate || false,
           templateCategory: s.currentPlan.templateCategory,
@@ -225,6 +229,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
     }),
     {
       name: 'fitflix-workout-plans',
+      version: 2,
       partialize: (state) => ({ plans: state.plans }),
     }
   )
