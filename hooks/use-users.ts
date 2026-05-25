@@ -59,7 +59,16 @@ export function useCreateUser() {
       toast.success(data.message || 'User created successfully')
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to create user')
+      const data = err?.response?.data
+      const details = data?.details
+      if (details && typeof details === 'object') {
+        const messages = Object.entries(details)
+          .map(([field, msg]) => `${field}: ${msg}`)
+          .join(', ')
+        toast.error(messages || data?.error || 'Failed to create user')
+      } else {
+        toast.error(data?.error || data?.message || 'Failed to create user')
+      }
     },
   })
 }

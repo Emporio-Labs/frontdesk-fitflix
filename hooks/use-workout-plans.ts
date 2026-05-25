@@ -35,7 +35,13 @@ export function useCreateWorkoutPlan() {
       toast.success('Workout plan created')
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.error || 'Failed to create plan')
+      console.error('Create Plan Error:', err?.response?.data || err)
+      const details = err?.response?.data?.details
+      const detailsMsg = Array.isArray(details)
+        ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
+        : ''
+      const errorMsg = err?.response?.data?.error || 'Failed to create plan'
+      toast.error(detailsMsg ? `${errorMsg} (${detailsMsg})` : errorMsg)
     },
   })
 }
@@ -58,7 +64,13 @@ export function useUpdateWorkoutPlan() {
       toast.success('Plan updated')
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.error || 'Failed to update plan')
+      console.error('Update Plan Error:', err?.response?.data || err)
+      const details = err?.response?.data?.details
+      const detailsMsg = Array.isArray(details)
+        ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
+        : ''
+      const errorMsg = err?.response?.data?.error || 'Failed to update plan'
+      toast.error(detailsMsg ? `${errorMsg} (${detailsMsg})` : errorMsg)
     },
   })
 }
@@ -80,16 +92,50 @@ export function useDeleteWorkoutPlan() {
 export function useAssignPlanUsers() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, userIds }: { id: string; userIds: string[] }) =>
-      workoutPlanService.assignUsers(id, userIds),
-    onSuccess: (_data, variables) => {
+    mutationFn: ({
+      id,
+      userIds,
+      startDate,
+    }: {
+      id: string
+      userIds: string[]
+      startDate?: string
+    }) => workoutPlanService.assignUsers(id, { userIds, startDate }),
+    onSuccess: (data, variables) => {
       qc.invalidateQueries({
         queryKey: queryKeys.workoutPlans.detail(variables.id),
       })
-      toast.success('Users assigned')
+      qc.invalidateQueries({ queryKey: queryKeys.workoutPlans.all() })
+
+      const createdCount = data.created.length
+      const skippedCount = data.skipped.length
+      const failedCount = data.failed.length
+      const startDateStr = data.startDate
+        ? new Date(data.startDate).toLocaleDateString()
+        : ''
+
+      const parts: string[] = []
+      if (createdCount > 0)
+        parts.push(`Assigned to ${createdCount} member${createdCount === 1 ? '' : 's'}`)
+      if (skippedCount > 0)
+        parts.push(`${skippedCount} already had this plan`)
+      if (failedCount > 0)
+        parts.push(`${failedCount} failed`)
+
+      const msg = parts.length > 0 ? parts.join(' · ') : 'No changes'
+      const fullMsg = startDateStr ? `${msg} (starting ${startDateStr})` : msg
+
+      if (failedCount > 0) toast.warning(fullMsg)
+      else toast.success(fullMsg)
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.error || 'Failed to assign users')
+      console.error('Assign Users Error:', err?.response?.data || err)
+      const details = err?.response?.data?.details
+      const detailsMsg = Array.isArray(details)
+        ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
+        : ''
+      const errorMsg = err?.response?.data?.error || 'Failed to assign users'
+      toast.error(detailsMsg ? `${errorMsg} (${detailsMsg})` : errorMsg)
     },
   })
 }

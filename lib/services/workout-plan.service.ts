@@ -8,6 +8,19 @@ import type {
   Difficulty,
 } from '@/types/workout'
 
+export interface AssignUsersPayload {
+  userIds: string[]
+  startDate?: string // ISO date
+}
+
+export interface AssignUsersResponse {
+  planId: string
+  startDate: string
+  created: string[]
+  skipped: string[]
+  failed: { userId: string; error: string }[]
+}
+
 export interface WorkoutPlanListParams {
   page?: number
   limit?: number
@@ -56,11 +69,9 @@ export const workoutPlanService = {
 
   assignUsers: async (
     id: string,
-    userIds: string[]
-  ): Promise<WorkoutPlan> => {
-    const { data } = await apiClient.post(`/workout-plans/${id}/assign`, {
-      userIds,
-    })
+    payload: AssignUsersPayload
+  ): Promise<AssignUsersResponse> => {
+    const { data } = await apiClient.post(`/workout-plans/${id}/assign`, payload)
     return data
   },
 }

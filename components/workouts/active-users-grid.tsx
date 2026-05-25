@@ -17,7 +17,7 @@ export function ActiveUsersGrid() {
   const assignedUsers = users.filter((u: any) => assignedUserIds.has(u._id))
 
   const getUserPlan = (userId: string) =>
-    plans.find((p) => p.assignedUsers.includes(userId) && p.status === 'Active')
+    plans.find((p) => p.assignedUsers.includes(userId) && p.status === 'Published')
 
   return (
     <Card>

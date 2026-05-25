@@ -3,14 +3,14 @@ export type MuscleGroup = 'Chest' | 'Back' | 'Legs' | 'Shoulders' | 'Arms' | 'Co
 export type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced'
 export type SessionStatus = 'Active' | 'Completed' | 'Abandoned'
 
-export type PlanStatus = 'Draft' | 'Active' | 'Archived'
+export type PlanStatus = 'Draft' | 'Published' | 'Archived'
 export type SplitType = 'FullBody' | 'UpperLower' | 'PushPullLegs' | 'BroSplit' | 'Custom'
 export type PlanGoal =
   | 'MuscleGain'
-  | 'FatLoss'
+  | 'WeightLoss'
   | 'Strength'
   | 'Endurance'
-  | 'Flexibility'
+  | 'Mobility'
   | 'GeneralFitness'
 
 // Backend exercise model (matches GET /exercises response)
@@ -177,10 +177,10 @@ export const MUSCLE_GROUPS: MuscleGroup[] = ['Chest', 'Back', 'Legs', 'Shoulders
 export const DIFFICULTIES: Difficulty[] = ['Beginner', 'Intermediate', 'Advanced']
 export const PLAN_GOALS: { value: PlanGoal; label: string }[] = [
   { value: 'MuscleGain', label: 'Muscle Gain' },
-  { value: 'FatLoss', label: 'Fat Loss' },
+  { value: 'WeightLoss', label: 'Weight Loss' },
   { value: 'Strength', label: 'Strength' },
   { value: 'Endurance', label: 'Endurance' },
-  { value: 'Flexibility', label: 'Flexibility' },
+  { value: 'Mobility', label: 'Mobility' },
   { value: 'GeneralFitness', label: 'General Fitness' },
 ]
 export const SPLIT_TYPES: { value: SplitType; label: string }[] = [

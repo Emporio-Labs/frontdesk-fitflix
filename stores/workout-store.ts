@@ -12,6 +12,7 @@ interface WorkoutStore {
   currentPlan: Partial<WorkoutPlan>
   selectedDayIndex: number
   assignedUserIds: string[]
+  assignmentStartDate: string // ISO date (YYYY-MM-DD)
 
   setPlanField: <K extends keyof WorkoutPlan>(field: K, value: WorkoutPlan[K]) => void
   setSelectedDay: (index: number) => void
@@ -32,6 +33,15 @@ interface WorkoutStore {
   getUpdatePayload: () => UpdateWorkoutPlanPayload
   toggleUserAssignment: (userId: string) => void
   setAssignedUsers: (userIds: string[]) => void
+  setAssignmentStartDate: (date: string) => void
+}
+
+const todayIsoDate = (): string => {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 const DEFAULT_PLAN: Partial<WorkoutPlan> = {
@@ -51,6 +61,7 @@ export const useWorkoutStore = create<WorkoutStore>()((set, get) => ({
   currentPlan: { ...DEFAULT_PLAN },
   selectedDayIndex: 0,
   assignedUserIds: [],
+  assignmentStartDate: todayIsoDate(),
 
   setPlanField: (field, value) =>
     set((s) => ({ currentPlan: { ...s.currentPlan, [field]: value } })),
@@ -153,6 +164,7 @@ export const useWorkoutStore = create<WorkoutStore>()((set, get) => ({
       assignedUserIds: (plan.assignedUsers || []).map((u: any) =>
         typeof u === 'string' ? u : u._id
       ),
+      assignmentStartDate: todayIsoDate(),
     }),
 
   resetPlan: () =>
@@ -160,6 +172,7 @@ export const useWorkoutStore = create<WorkoutStore>()((set, get) => ({
       currentPlan: { ...DEFAULT_PLAN, days: [] },
       selectedDayIndex: 0,
       assignedUserIds: [],
+      assignmentStartDate: todayIsoDate(),
     }),
 
   getPlanPayload: () => {
@@ -173,26 +186,50 @@ export const useWorkoutStore = create<WorkoutStore>()((set, get) => ({
       splitType: s.currentPlan.splitType || 'Custom',
       status: s.currentPlan.status || 'Draft',
       isTemplate: s.currentPlan.isTemplate || false,
-      templateCategory: s.currentPlan.templateCategory,
+      templateCategory: s.currentPlan.templateCategory || undefined,
       assignedUsers: s.assignedUserIds,
-      days: s.currentPlan.days || [],
+      days: (s.currentPlan.days || []).map((day) => ({
+        dayNumber: day.dayNumber,
+        name: day.name,
+        isRestDay: day.isRestDay,
+        exercises: day.exercises.map((ex) => ({
+          exerciseId: ex.exerciseId,
+          orderIndex: ex.orderIndex,
+          targetSets: ex.targetSets,
+          targetReps: ex.targetReps,
+          targetWeightKg: ex.targetWeightKg ?? 0,
+          restSeconds: ex.restSeconds ?? 60,
+        })),
+      })),
     }
   },
-
+ 
   getUpdatePayload: () => {
     const s = get()
     return {
-      name: s.currentPlan.name,
-      description: s.currentPlan.description,
-      difficulty: s.currentPlan.difficulty,
-      duration: s.currentPlan.duration,
-      goal: s.currentPlan.goal,
-      splitType: s.currentPlan.splitType,
-      status: s.currentPlan.status,
-      isTemplate: s.currentPlan.isTemplate,
-      templateCategory: s.currentPlan.templateCategory,
+      name: s.currentPlan.name || 'Untitled Plan',
+      description: s.currentPlan.description || '',
+      difficulty: s.currentPlan.difficulty || 'Intermediate',
+      duration: s.currentPlan.duration || 4,
+      goal: s.currentPlan.goal || 'GeneralFitness',
+      splitType: s.currentPlan.splitType || 'Custom',
+      status: s.currentPlan.status || 'Draft',
+      isTemplate: s.currentPlan.isTemplate || false,
+      templateCategory: s.currentPlan.templateCategory || undefined,
       assignedUsers: s.assignedUserIds,
-      days: s.currentPlan.days,
+      days: s.currentPlan.days?.map((day) => ({
+        dayNumber: day.dayNumber,
+        name: day.name,
+        isRestDay: day.isRestDay,
+        exercises: day.exercises.map((ex) => ({
+          exerciseId: ex.exerciseId,
+          orderIndex: ex.orderIndex,
+          targetSets: ex.targetSets,
+          targetReps: ex.targetReps,
+          targetWeightKg: ex.targetWeightKg ?? 0,
+          restSeconds: ex.restSeconds ?? 60,
+        })),
+      })),
     }
   },
 
@@ -206,4 +243,6 @@ export const useWorkoutStore = create<WorkoutStore>()((set, get) => ({
     }),
 
   setAssignedUsers: (userIds) => set({ assignedUserIds: userIds }),
+
+  setAssignmentStartDate: (date) => set({ assignmentStartDate: date }),
 }))

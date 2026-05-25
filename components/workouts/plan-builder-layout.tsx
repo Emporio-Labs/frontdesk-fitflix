@@ -15,7 +15,11 @@ import { PlanConfigPanel } from '@/components/workouts/plan-config-panel'
 import { DayBuilderPanel } from '@/components/workouts/day-builder-panel'
 import { MobilePreviewPanel } from '@/components/workouts/mobile-preview-panel'
 import { AssignUsersDialog } from '@/components/workouts/assign-users-dialog'
-import { useCreateWorkoutPlan, useUpdateWorkoutPlan } from '@/hooks/use-workout-plans'
+import {
+  useCreateWorkoutPlan,
+  useUpdateWorkoutPlan,
+  useAssignPlanUsers,
+} from '@/hooks/use-workout-plans'
 import { toast } from 'sonner'
 import type { WorkoutPlan } from '@/types/workout'
 import { useState } from 'react'
@@ -28,12 +32,21 @@ export function PlanBuilderLayout({
   plan?: WorkoutPlan
 }) {
   const router = useRouter()
-  const { loadPlan, resetPlan, currentPlan, setPlanField, getPlanPayload, getUpdatePayload } =
-    useWorkoutStore()
+  const {
+    loadPlan,
+    resetPlan,
+    currentPlan,
+    setPlanField,
+    getPlanPayload,
+    getUpdatePayload,
+    assignedUserIds,
+    assignmentStartDate,
+  } = useWorkoutStore()
   const [assignOpen, setAssignOpen] = useState(false)
 
   const createMutation = useCreateWorkoutPlan()
   const updateMutation = useUpdateWorkoutPlan()
+  const assignMutation = useAssignPlanUsers()
   const isSaving = createMutation.isPending || updateMutation.isPending
 
   useEffect(() => {
@@ -44,6 +57,15 @@ export function PlanBuilderLayout({
     }
   }, [mode, plan?._id])
 
+  const assignAfterCreate = (savedId: string) => {
+    if (assignedUserIds.length === 0) return
+    assignMutation.mutate({
+      id: savedId,
+      userIds: assignedUserIds,
+      startDate: new Date(assignmentStartDate).toISOString(),
+    })
+  }
+
   const handleSave = () => {
     if (!currentPlan.name?.trim()) {
       toast.error('Please enter a plan name')
@@ -53,6 +75,7 @@ export function PlanBuilderLayout({
     if (mode === 'create') {
       createMutation.mutate(getPlanPayload(), {
         onSuccess: (saved) => {
+          assignAfterCreate(saved._id)
           router.push(`/dashboard/workouts/${saved._id}`)
         },
       })
@@ -62,17 +85,18 @@ export function PlanBuilderLayout({
   }
 
   const handlePublish = () => {
-    setPlanField('status', 'Active')
+    setPlanField('status', 'Published')
 
     if (mode === 'create') {
-      const payload = { ...getPlanPayload(), status: 'Active' as const }
+      const payload = { ...getPlanPayload(), status: 'Published' as const }
       createMutation.mutate(payload, {
         onSuccess: (saved) => {
+          assignAfterCreate(saved._id)
           router.push(`/dashboard/workouts/${saved._id}`)
         },
       })
     } else if (plan?._id) {
-      const payload = { ...getUpdatePayload(), status: 'Active' as const }
+      const payload = { ...getUpdatePayload(), status: 'Published' as const }
       updateMutation.mutate({ id: plan._id, payload })
     }
   }
@@ -142,7 +166,11 @@ export function PlanBuilderLayout({
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      <AssignUsersDialog open={assignOpen} onOpenChange={setAssignOpen} />
+      <AssignUsersDialog
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        planId={mode === 'edit' ? plan?._id : undefined}
+      />
     </div>
   )
 }
