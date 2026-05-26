@@ -83,13 +83,17 @@ apiClient.interceptors.request.use((config) => {
       return config
     }
 
-    // Fallback: existing Basic behaviour
-    const credentials = localStorage.getItem('hh_credentials')
-    if (credentials) {
-      const headers = AxiosHeaders.from(config.headers)
-      headers.set('Authorization', `Basic ${credentials}`)
-      config.headers = headers
-      hasAuthHeader = true
+    // Unsafe Basic Auth fallback should NOT be applied on JWT-only paths
+    const requiresJwt = !isAuthEndpoint && requestPath !== '/health'
+    if (!requiresJwt) {
+      // Fallback: existing Basic behaviour
+      const credentials = localStorage.getItem('hh_credentials')
+      if (credentials) {
+        const headers = AxiosHeaders.from(config.headers)
+        headers.set('Authorization', `Basic ${credentials}`)
+        config.headers = headers
+        hasAuthHeader = true
+      }
     }
 
     logAuthDebug('request', {
