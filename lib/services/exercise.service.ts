@@ -12,6 +12,7 @@ export const exerciseService = {
     const params: Record<string, string | number | boolean> = {}
     if (filters?.muscleGroup) params.muscleGroup = filters.muscleGroup
     if (filters?.difficulty) params.difficulty = filters.difficulty
+    if (filters?.exerciseType) params.exerciseType = filters.exerciseType
     if (filters?.equipment) params.equipment = filters.equipment
     if (filters?.search) params.search = filters.search
     if (filters?.isSystem !== undefined) params.isSystem = filters.isSystem

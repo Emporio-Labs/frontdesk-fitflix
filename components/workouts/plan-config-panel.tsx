@@ -124,12 +124,12 @@ export function PlanConfigPanel({
             <Label className="text-xs">Status</Label>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
-                {currentPlan.status === 'active' ? 'Active' : 'Draft'}
+                {currentPlan.status === 'Active' ? 'Active' : 'Draft'}
               </span>
               <Switch
-                checked={currentPlan.status === 'active'}
+                checked={currentPlan.status === 'Active'}
                 onCheckedChange={(checked) =>
-                  setPlanField('status', (checked ? 'active' : 'draft') as PlanStatus)
+                  setPlanField('status', (checked ? 'Active' : 'Draft') as PlanStatus)
                 }
                 className="scale-90"
               />

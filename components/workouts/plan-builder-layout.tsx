@@ -17,6 +17,40 @@ import { MobilePreviewPanel } from '@/components/workouts/mobile-preview-panel'
 import { AssignUsersDialog } from '@/components/workouts/assign-users-dialog'
 import { toast } from 'sonner'
 import type { WorkoutPlan } from '@/types/workout'
+import { useCreateWorkoutPlan, useUpdateWorkoutPlan } from '@/hooks/use-workout-plans'
+import type { CreateWorkoutPlanPayload } from '@/lib/services/workout-plan.service'
+
+const isMongoId = (id?: string): boolean => !!id && /^[0-9a-f]{24}$/i.test(id)
+
+function buildApiPayload(plan: Partial<WorkoutPlan>, statusOverride?: string): CreateWorkoutPlanPayload {
+  return {
+    name: plan.name || 'Untitled Plan',
+    description: plan.description ?? undefined,
+    difficulty: plan.difficulty || 'Intermediate',
+    duration: plan.duration || 4,
+    goal: plan.goal || 'Custom',
+    splitType: plan.splitType,
+    status: statusOverride ?? plan.status,
+    isTemplate: plan.isTemplate,
+    templateCategory: plan.templateCategory ?? undefined,
+    days: (plan.days || []).map((day) => ({
+      dayNumber: day.dayNumber,
+      name: day.name,
+      isRestDay: day.isRestDay,
+      exercises: day.exercises.map((ex) => ({
+        exerciseId: ex.exerciseId,
+        orderIndex: ex.orderIndex,
+        targetSets: ex.targetSets,
+        targetReps: ex.targetReps,
+        targetWeightKg: ex.targetWeightKg,
+        restSeconds: ex.restSeconds,
+        section: ex.section,
+        durationSeconds: ex.durationSeconds,
+        notes: ex.notes,
+      })),
+    })),
+  }
+}
 
 export function PlanBuilderLayout({
   mode,
@@ -28,6 +62,8 @@ export function PlanBuilderLayout({
   const router = useRouter()
   const { loadPlan, resetPlan, savePlan, currentPlan, setPlanField } = useWorkoutStore()
   const [assignOpen, setAssignOpen] = useState(false)
+  const createPlanMutation = useCreateWorkoutPlan()
+  const updatePlanMutation = useUpdateWorkoutPlan()
 
   useEffect(() => {
     if (mode === 'edit' && plan) {
@@ -37,27 +73,50 @@ export function PlanBuilderLayout({
     }
   }, [mode, plan?.id])
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!currentPlan.name?.trim()) {
       toast.error('Please enter a plan name')
       return
     }
-    const saved = savePlan()
-    toast.success(mode === 'create' ? 'Plan created!' : 'Plan updated!')
-    if (mode === 'create') {
-      router.push(`/dashboard/workouts/${saved.id}`)
+    const payload = buildApiPayload(currentPlan)
+    try {
+      if (isMongoId(currentPlan.id)) {
+        await updatePlanMutation.mutateAsync({ id: currentPlan.id!, payload })
+        savePlan()
+      } else {
+        const result = await createPlanMutation.mutateAsync(payload)
+        // Store the real MongoDB _id so subsequent saves and assigns use it
+        setPlanField('id', (result as any)._id ?? result.id)
+        savePlan()
+        router.push(`/dashboard/workouts/${(result as any)._id ?? result.id}`)
+      }
+    } catch {
+      // errors surfaced via mutation's onError toast
     }
   }
 
-  const handlePublish = () => {
-    setPlanField('status', 'active')
-    setTimeout(() => {
-      const saved = savePlan()
-      toast.success('Plan published!')
-      if (mode === 'create') {
-        router.push(`/dashboard/workouts/${saved.id}`)
+  const handlePublish = async () => {
+    if (!currentPlan.name?.trim()) {
+      toast.error('Please enter a plan name')
+      return
+    }
+    const payload = buildApiPayload(currentPlan, 'Active')
+    try {
+      if (isMongoId(currentPlan.id)) {
+        await updatePlanMutation.mutateAsync({ id: currentPlan.id!, payload })
+        setPlanField('status', 'Active')
+        savePlan()
+      } else {
+        const result = await createPlanMutation.mutateAsync(payload)
+        const mongoId = (result as any)._id ?? result.id
+        setPlanField('id', mongoId)
+        setPlanField('status', 'Active')
+        savePlan()
+        router.push(`/dashboard/workouts/${mongoId}`)
       }
-    }, 0)
+    } catch {
+      // errors surfaced via mutation's onError toast
+    }
   }
 
   return (

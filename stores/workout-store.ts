@@ -230,6 +230,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
     {
       name: 'fitflix-workout-plans',
       version: 2,
+      migrate: (persistedState) => persistedState,
       partialize: (state) => ({ plans: state.plans }),
     }
   )

@@ -15,8 +15,8 @@ import { useWorkoutStore } from '@/stores/workout-store'
 export function WorkoutStatsCards() {
   const plans = useWorkoutStore((s) => s.plans)
 
-  const activePlans = plans.filter((p) => p.status === 'active').length
-  const draftPlans = plans.filter((p) => p.status === 'draft').length
+  const activePlans = plans.filter((p) => p.status === 'Active').length
+  const draftPlans = plans.filter((p) => p.status === 'Draft').length
   const templates = plans.filter((p) => p.isTemplate).length
   const assignedUsers = new Set(plans.flatMap((p) => p.assignedUsers)).size
   const totalExercises = plans.reduce(

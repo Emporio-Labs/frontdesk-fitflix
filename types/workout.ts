@@ -40,6 +40,7 @@ export interface Exercise {
 export interface ExerciseFilters {
   muscleGroup?: MuscleGroup
   difficulty?: Difficulty
+  exerciseType?: ExerciseType
   equipment?: string
   search?: string
   isSystem?: boolean

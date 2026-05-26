@@ -27,7 +27,7 @@ export default function TemplatesPage() {
       ...plan,
       id: '',
       name: `${plan.name} (Copy)`,
-      status: 'draft',
+      status: 'Draft',
       isTemplate: false,
       assignedUsers: [],
       createdAt: new Date().toISOString(),

@@ -103,6 +103,34 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+function getStoredRefreshToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem('hh_refresh_token')
+}
+
+let _refreshing: Promise<string | null> | null = null
+
+async function tryRefreshToken(): Promise<string | null> {
+  if (_refreshing) return _refreshing
+  _refreshing = (async () => {
+    const refreshToken = getStoredRefreshToken()
+    if (!refreshToken) return null
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken })
+      if (data?.accessToken) {
+        storeToken(data.accessToken)
+        return data.accessToken as string
+      }
+      return null
+    } catch {
+      return null
+    } finally {
+      _refreshing = null
+    }
+  })()
+  return _refreshing
+}
+
 apiClient.interceptors.response.use(
   (response) => {
     const url = `${response.config.baseURL ?? API_BASE_URL}${response.config.url ?? ''}`
@@ -113,7 +141,7 @@ apiClient.interceptors.response.use(
     })
     return response
   },
-  (error) => {
+  async (error) => {
     const config = error?.config ?? {}
     const url = `${config.baseURL ?? API_BASE_URL}${config.url ?? ''}`
     logAuthDebug('response-error', {
@@ -123,6 +151,27 @@ apiClient.interceptors.response.use(
       message: error?.message,
       serverMessage: error?.response?.data?.message,
     })
+
+    // Auto-refresh on 401 (but not for auth endpoints or retried requests)
+    const isAuthEndpoint = (config.url ?? '').startsWith('/auth/')
+    const alreadyRetried = (config as any).__retried
+    if (error?.response?.status === 401 && !isAuthEndpoint && !alreadyRetried) {
+      const newToken = await tryRefreshToken()
+      if (newToken) {
+        ;(config as any).__retried = true
+        config.headers = { ...config.headers, Authorization: `Bearer ${newToken}` }
+        return apiClient.request(config)
+      }
+      // Refresh failed — clear session and redirect to login
+      if (typeof window !== 'undefined') {
+        clearToken()
+        localStorage.removeItem('hh_refresh_token')
+        localStorage.removeItem('hh_user')
+        document.cookie = 'hh_authed=; path=/; max-age=0; SameSite=Lax'
+        window.location.href = '/login'
+      }
+    }
+
     return Promise.reject(error)
   }
 )

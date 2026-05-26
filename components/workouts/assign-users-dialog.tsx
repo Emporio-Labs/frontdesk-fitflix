@@ -18,6 +18,10 @@ import { Badge } from '@/components/ui/badge'
 import { IconSearch } from '@tabler/icons-react'
 import { useUsers } from '@/hooks/use-users'
 import { useWorkoutStore } from '@/stores/workout-store'
+import { useAssignWorkoutPlan } from '@/hooks/use-workout-plans'
+import { toast } from 'sonner'
+
+const isMongoId = (id?: string): boolean => !!id && /^[0-9a-f]{24}$/i.test(id)
 
 export function AssignUsersDialog({
   open,
@@ -28,7 +32,8 @@ export function AssignUsersDialog({
 }) {
   const [search, setSearch] = useState('')
   const { data: users = [], isLoading } = useUsers()
-  const { assignedUserIds, toggleUserAssignment } = useWorkoutStore()
+  const { assignedUserIds, toggleUserAssignment, currentPlan } = useWorkoutStore()
+  const assignMutation = useAssignWorkoutPlan()
 
   const filtered = users.filter((u: any) => {
     const term = search.toLowerCase()
@@ -101,8 +106,28 @@ export function AssignUsersDialog({
           <span className="text-xs text-muted-foreground">
             {assignedUserIds.length} user{assignedUserIds.length !== 1 ? 's' : ''} selected
           </span>
-          <Button size="sm" onClick={() => onOpenChange(false)}>
-            Done
+          <Button
+            size="sm"
+            disabled={assignMutation.isPending}
+            onClick={async () => {
+              const planId = currentPlan?.id
+              if (!isMongoId(planId)) {
+                toast.error('Save the plan to the server first before assigning users')
+                return
+              }
+              if (assignedUserIds.length === 0) {
+                onOpenChange(false)
+                return
+              }
+              try {
+                await assignMutation.mutateAsync({ id: planId!, payload: { userIds: assignedUserIds } })
+                onOpenChange(false)
+              } catch {
+                // errors surfaced via mutation's onError toast
+              }
+            }}
+          >
+            {assignMutation.isPending ? 'Assigning…' : 'Done'}
           </Button>
         </DialogFooter>
       </DialogContent>

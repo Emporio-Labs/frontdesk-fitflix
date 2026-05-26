@@ -31,8 +31,11 @@ export default function LoginPage() {
     setIsLoading(true)
     try {
       const data = await authService.login({ email, password })
-      if (data?.token) {
-        storeToken(data.token)
+      if (data?.accessToken) {
+        storeToken(data.accessToken)
+      }
+      if (data?.refreshToken && typeof window !== 'undefined') {
+        localStorage.setItem('hh_refresh_token', data.refreshToken)
       }
       const apiUser = data.user
       if (authDebug) {
