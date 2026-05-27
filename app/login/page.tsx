@@ -34,6 +34,9 @@ export default function LoginPage() {
       if (data?.accessToken) {
         storeToken(data.accessToken)
       }
+      if (data?.refreshToken && typeof window !== 'undefined') {
+        localStorage.setItem('hh_refresh_token', data.refreshToken)
+      }
       const apiUser = data.user
       if (authDebug) {
         console.debug('[auth-debug] login success', {

@@ -75,6 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAuthCookie()
     if (typeof window !== 'undefined') {
       localStorage.removeItem('hh_user')
+      localStorage.removeItem('hh_token')
+      localStorage.removeItem('hh_refresh_token')
       window.location.href = '/login'
     }
     setUser(null)
