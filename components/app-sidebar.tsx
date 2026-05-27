@@ -64,8 +64,8 @@ const navMain = [
       icon: IconActivity,
     },
     {
-      title: "Nutritionist",
-      url: "/admin/nutritionist",
+      title: "Nutrition",
+      url: "/admin/nutrition",
       icon: IconSalad,
     },
     {

@@ -2,16 +2,21 @@
 export type MuscleGroup = 'Chest' | 'Back' | 'Legs' | 'Shoulders' | 'Arms' | 'Core'
 export type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced'
 export type SessionStatus = 'Active' | 'Completed' | 'Abandoned'
+export type ExerciseType = 'Warmup' | 'Main' | 'Mobility' | 'Stretching' | 'Cooldown' | 'Cardio'
+export type WorkoutSection = 'warmup' | 'workout' | 'stretching'
 
-export type PlanStatus = 'Draft' | 'Published' | 'Archived'
-export type SplitType = 'FullBody' | 'UpperLower' | 'PushPullLegs' | 'BroSplit' | 'Custom'
+export type PlanStatus = 'Draft' | 'Published' | 'Active' | 'Paused' | 'Completed' | 'Archived'
+export type SplitType = 'FullBody' | 'UpperLower' | 'PushPull' | 'PushPullLegs' | 'BroSplit' | 'Custom'
 export type PlanGoal =
   | 'MuscleGain'
+  | 'Hypertrophy'
   | 'WeightLoss'
   | 'Strength'
   | 'Endurance'
   | 'Mobility'
   | 'GeneralFitness'
+  | 'Maintenance'
+  | 'Custom'
 
 // Backend exercise model (matches GET /exercises response)
 export interface Exercise {
@@ -25,6 +30,8 @@ export interface Exercise {
   commonMistakes: string[]
   tips: string[]
   caloriesPerSet: number
+  exerciseType?: ExerciseType
+  sectionTypes?: WorkoutSection[]
   imageUrl: string | null
   isSystem: boolean
   createdBy: string | null
@@ -35,6 +42,7 @@ export interface Exercise {
 export interface ExerciseFilters {
   muscleGroup?: MuscleGroup
   difficulty?: Difficulty
+  exerciseType?: ExerciseType
   equipment?: string
   search?: string
   isSystem?: boolean
@@ -84,12 +92,15 @@ export interface UpdateExercisePayload {
 export interface WorkoutExercise {
   _id?: string
   exerciseId: string
-  exercise?: Pick<Exercise, 'name' | 'muscleGroup' | 'difficulty' | 'equipment' | 'caloriesPerSet'>
+  exercise?: Pick<Exercise, 'name' | 'muscleGroup' | 'difficulty' | 'equipment' | 'caloriesPerSet' | 'exerciseType' | 'sectionTypes'>
   orderIndex: number
   targetSets: number
   targetReps: number
   targetWeightKg: number
   restSeconds: number
+  section: WorkoutSection
+  durationSeconds?: number | null
+  notes?: string | null
   isCompleted?: boolean
   sets?: SetLog[]
 }
@@ -129,6 +140,7 @@ export interface WorkoutDay {
 
 export interface WorkoutPlan {
   _id: string
+  id?: string
   name: string
   description: string
   difficulty: Difficulty
@@ -175,18 +187,32 @@ export interface UpdateWorkoutPlanPayload {
 
 export const MUSCLE_GROUPS: MuscleGroup[] = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core']
 export const DIFFICULTIES: Difficulty[] = ['Beginner', 'Intermediate', 'Advanced']
+export const EXERCISE_TYPES: ExerciseType[] = ['Warmup', 'Main', 'Mobility', 'Stretching', 'Cooldown', 'Cardio']
+export const WORKOUT_SECTIONS: WorkoutSection[] = ['warmup', 'workout', 'stretching']
 export const PLAN_GOALS: { value: PlanGoal; label: string }[] = [
   { value: 'MuscleGain', label: 'Muscle Gain' },
+  { value: 'Hypertrophy', label: 'Hypertrophy' },
   { value: 'WeightLoss', label: 'Weight Loss' },
   { value: 'Strength', label: 'Strength' },
   { value: 'Endurance', label: 'Endurance' },
   { value: 'Mobility', label: 'Mobility' },
   { value: 'GeneralFitness', label: 'General Fitness' },
+  { value: 'Maintenance', label: 'Maintenance' },
+  { value: 'Custom', label: 'Custom' },
 ]
 export const SPLIT_TYPES: { value: SplitType; label: string }[] = [
   { value: 'FullBody', label: 'Full Body' },
   { value: 'UpperLower', label: 'Upper / Lower' },
+  { value: 'PushPull', label: 'Push / Pull' },
   { value: 'PushPullLegs', label: 'Push / Pull / Legs' },
   { value: 'BroSplit', label: 'Bro Split' },
   { value: 'Custom', label: 'Custom' },
+]
+export const PLAN_STATUSES: { value: PlanStatus; label: string }[] = [
+  { value: 'Draft', label: 'Draft' },
+  { value: 'Published', label: 'Published' },
+  { value: 'Active', label: 'Active' },
+  { value: 'Paused', label: 'Paused' },
+  { value: 'Completed', label: 'Completed' },
+  { value: 'Archived', label: 'Archived' },
 ]

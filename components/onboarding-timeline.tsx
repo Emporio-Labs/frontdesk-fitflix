@@ -12,6 +12,17 @@ export const ONBOARDING_STEP_ORDER: { key: OnboardingStep; label: string }[] = [
   { key: 'COMPLETED', label: 'Completed' },
 ]
 
+export function onboardingStepLabel(step?: string | null): string {
+  if (!step) return '—'
+  const found = ONBOARDING_STEP_ORDER.find((s) => s.key === step)
+  if (found) return found.label
+  return step
+    .toLowerCase()
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
+
 interface OnboardingTimelineProps {
   currentStep?: OnboardingStep
   completedSteps?: OnboardingStep[]

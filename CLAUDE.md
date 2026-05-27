@@ -170,3 +170,31 @@ The backend onboarding workflow engine is integrated into the admin dashboard as
 - Reports list and Appointments list: `GET /onboarding/status?userId=<id>` (via `useOnboardingStatus`).
 
 > **Assumption to verify:** `GET /onboarding/status` accepts `userId` as a query param. If the backend uses a path segment (`/onboarding/status/:userId`), update `onboardingService.getStatus` in `lib/services/onboarding.service.ts`. Similarly, `MedicalReport` and `ExpertAppointment` field names should be confirmed against live API responses.
+
+---
+
+## Nutrition module (added)
+
+Full nutrition feature: admin/nutritionist management + member self-service. Uses the
+standard service → hook → page conventions. **Forms use react-hook-form + zod** (via
+`components/ui/form.tsx` + `@hookform/resolvers/zod`) — the first RHF usage in app code;
+the manual-useState dialogs elsewhere are unchanged.
+
+**Files added:**
+- `lib/types/nutrition.ts` — all interfaces, enums (`MEAL_SLOTS`, `NUTRITION_GOALS`), and zod form schemas (`foodSchema`, `templateSchema`, `assignPlanSchema`, `progressSchema`).
+- `lib/services/nutrition.service.ts` — single `nutritionService` object covering foods, templates, plans, meal logs, hydration, adherence, progress, PDF-url seam.
+- `hooks/use-nutrition.ts` — all RQ query/mutation hooks. `invalidateNutrition(qc)` invalidates `queryKeys.nutrition.all()`. `useLogMeal(planId, date)` does an **optimistic** meal-completion toggle (`onMutate`/`setQueryData`/`ctx.prev` rollback, pattern from `hooks/use-leads.ts`).
+- `components/nutrition/*` — `food-form`, `template-form` (nested `useFieldArray` meals→items, auto-scales macros from the food catalog), `assign-plan-form`, `progress-form` (RHF dialogs); `macro-summary`, `adherence-bar`, `adherence-chart` (recharts), `hydration-widget`, `meal-log-row`, `nutrition-status-cell` (presentational).
+- `app/admin/nutrition/{page,foods,templates,templates/create,templates/[id],plans,plans/[id],adherence}` — admin/nutritionist pages.
+- `app/dashboard/nutrition/page.tsx` — member view: assigned plan, optimistic meal completion, hydration logging, progress, adherence read-out, disabled PDF button.
+
+**Files extended:**
+- `lib/query-keys.ts` — `nutrition` namespace (foods/templates/plans/mealLogs/hydration/adherence/progress).
+- `lib/rbac.ts` — single `nutrition` resource. `super_admin`/`clinic_admin` = CRUD, `clinician` = read/update, `staff` = read, `sales` = none. **No `nutritionist` role added to the `UserRole` union** — UI gates via `useCanAccess('nutrition', action)`.
+- `components/status-badge.tsx` — added `assigned`, `on_track`, `behind`, `off_track`.
+- `components/app-sidebar.tsx` — "Nutrition" (`/admin/nutrition`) and "My Nutrition" (`/dashboard/nutrition`) nav entries (reuse `IconSalad`).
+
+**Collision note:** `app/admin/nutritionist/` (pre-existing read-only member-segmentation
+view) is unrelated and untouched. This module is `app/admin/nutrition/`.
+
+> **Assumptions to verify (correct `nutrition.service.ts` + `lib/types/nutrition.ts` only — hooks/pages stay stable):** All `/nutrition/*` paths and response/field shapes are inferred from the backend domain models (the module is not yet in `api_docs.md`). Each block in `nutrition.service.ts` carries an `ASSUMPTION` comment. List endpoints assumed to return `{ items: [...] }`; mutations `{ message, <entity> }`. `GET /nutrition/me/plan` assumed for the member's active plan; `userId` passed as a query param for plans/hydration/adherence/progress. PDF (`GET /nutrition/plans/:id/pdf`) is a **deferred** seam — UI renders a disabled "Export PDF" button.

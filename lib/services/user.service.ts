@@ -47,6 +47,22 @@ export interface HealthMarkers {
   [key: string]: unknown
 }
 
+export type ActivityLevel = 'Sedentary' | 'Light' | 'Moderate' | 'Active' | 'VeryActive'
+
+export interface HealthMarkersSnapshot {
+  weight?: number          // kg
+  height?: number          // cm
+  activityLevel?: ActivityLevel
+  sleepHours?: number
+  allergies?: string[]
+}
+
+export interface HealthGoalsSnapshot {
+  targetWeight?: number
+  workoutExperience?: 'None' | 'Beginner' | 'Intermediate' | 'Advanced'
+  foodPreferences?: string[]
+}
+
 export interface User {
   _id: string
   username: string
@@ -61,9 +77,9 @@ export interface User {
   onboarded?: boolean
   createdAt: string
   updatedAt: string
-  onboarded?: boolean
   onboardingStatus?: UserOnboardingSummary
   healthMarkers?: HealthMarkers
+  healthGoalsSnapshot?: HealthGoalsSnapshot
   reports?: MedicalReport[]
   expertAppointments?: ExpertAppointment[]
 }

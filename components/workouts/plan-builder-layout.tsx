@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -18,11 +18,43 @@ import { AssignUsersDialog } from '@/components/workouts/assign-users-dialog'
 import {
   useCreateWorkoutPlan,
   useUpdateWorkoutPlan,
-  useAssignPlanUsers,
+  useAssignWorkoutPlan,
 } from '@/hooks/use-workout-plans'
 import { toast } from 'sonner'
 import type { WorkoutPlan } from '@/types/workout'
-import { useState } from 'react'
+import type { CreateWorkoutPlanPayload } from '@/lib/services/workout-plan.service'
+
+const isMongoId = (id?: string): boolean => !!id && /^[0-9a-f]{24}$/i.test(id)
+
+function buildApiPayload(plan: Partial<WorkoutPlan>, statusOverride?: string): CreateWorkoutPlanPayload {
+  return {
+    name: plan.name || 'Untitled Plan',
+    description: plan.description ?? undefined,
+    difficulty: plan.difficulty || 'Intermediate',
+    duration: plan.duration || 4,
+    goal: plan.goal || 'Custom',
+    splitType: plan.splitType,
+    status: statusOverride ?? plan.status,
+    isTemplate: plan.isTemplate,
+    templateCategory: plan.templateCategory ?? undefined,
+    days: (plan.days || []).map((day) => ({
+      dayNumber: day.dayNumber,
+      name: day.name,
+      isRestDay: day.isRestDay,
+      exercises: day.exercises.map((ex) => ({
+        exerciseId: ex.exerciseId,
+        orderIndex: ex.orderIndex,
+        targetSets: ex.targetSets,
+        targetReps: ex.targetReps,
+        targetWeightKg: ex.targetWeightKg,
+        restSeconds: ex.restSeconds,
+        section: ex.section,
+        durationSeconds: ex.durationSeconds,
+        notes: ex.notes,
+      })),
+    })),
+  }
+}
 
 export function PlanBuilderLayout({
   mode,
@@ -37,16 +69,14 @@ export function PlanBuilderLayout({
     resetPlan,
     currentPlan,
     setPlanField,
-    getPlanPayload,
-    getUpdatePayload,
+    savePlan,
     assignedUserIds,
     assignmentStartDate,
   } = useWorkoutStore()
   const [assignOpen, setAssignOpen] = useState(false)
-
   const createMutation = useCreateWorkoutPlan()
   const updateMutation = useUpdateWorkoutPlan()
-  const assignMutation = useAssignPlanUsers()
+  const assignMutation = useAssignWorkoutPlan()
   const isSaving = createMutation.isPending || updateMutation.isPending
 
   useEffect(() => {
@@ -61,43 +91,65 @@ export function PlanBuilderLayout({
     if (assignedUserIds.length === 0) return
     assignMutation.mutate({
       id: savedId,
-      userIds: assignedUserIds,
-      startDate: new Date(assignmentStartDate).toISOString(),
+      payload: {
+        userIds: assignedUserIds,
+        startDate: new Date(assignmentStartDate).toISOString(),
+      },
     })
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!currentPlan.name?.trim()) {
       toast.error('Please enter a plan name')
       return
     }
 
-    if (mode === 'create') {
-      createMutation.mutate(getPlanPayload(), {
-        onSuccess: (saved) => {
-          assignAfterCreate(saved._id)
-          router.push(`/dashboard/workouts/${saved._id}`)
-        },
-      })
-    } else if (plan?._id) {
-      updateMutation.mutate({ id: plan._id, payload: getUpdatePayload() })
+    const payload = buildApiPayload(currentPlan)
+    const id = currentPlan._id || currentPlan.id
+    try {
+      if (isMongoId(id)) {
+        await updateMutation.mutateAsync({ id: id!, payload })
+        savePlan()
+        toast.success('Draft saved successfully')
+      } else {
+        const result = await createMutation.mutateAsync(payload)
+        const savedId = (result as any)._id ?? result.id
+        setPlanField('_id', savedId)
+        setPlanField('id', savedId)
+        savePlan()
+        assignAfterCreate(savedId)
+        router.push(`/dashboard/workouts/${savedId}`)
+      }
+    } catch {
+      // errors surfaced via mutation's onError toast
     }
   }
 
-  const handlePublish = () => {
-    setPlanField('status', 'Published')
-
-    if (mode === 'create') {
-      const payload = { ...getPlanPayload(), status: 'Published' as const }
-      createMutation.mutate(payload, {
-        onSuccess: (saved) => {
-          assignAfterCreate(saved._id)
-          router.push(`/dashboard/workouts/${saved._id}`)
-        },
-      })
-    } else if (plan?._id) {
-      const payload = { ...getUpdatePayload(), status: 'Published' as const }
-      updateMutation.mutate({ id: plan._id, payload })
+  const handlePublish = async () => {
+    if (!currentPlan.name?.trim()) {
+      toast.error('Please enter a plan name')
+      return
+    }
+    const payload = buildApiPayload(currentPlan, 'Active')
+    const id = currentPlan._id || currentPlan.id
+    try {
+      if (isMongoId(id)) {
+        await updateMutation.mutateAsync({ id: id!, payload })
+        setPlanField('status', 'Active')
+        savePlan()
+        toast.success('Plan published successfully')
+      } else {
+        const result = await createMutation.mutateAsync(payload)
+        const savedId = (result as any)._id ?? result.id
+        setPlanField('_id', savedId)
+        setPlanField('id', savedId)
+        setPlanField('status', 'Active')
+        savePlan()
+        assignAfterCreate(savedId)
+        router.push(`/dashboard/workouts/${savedId}`)
+      }
+    } catch {
+      // errors surfaced via mutation's onError toast
     }
   }
 

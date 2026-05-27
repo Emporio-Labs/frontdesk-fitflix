@@ -107,6 +107,34 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+function getStoredRefreshToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem('hh_refresh_token')
+}
+
+let _refreshing: Promise<string | null> | null = null
+
+async function tryRefreshToken(): Promise<string | null> {
+  if (_refreshing) return _refreshing
+  _refreshing = (async () => {
+    const refreshToken = getStoredRefreshToken()
+    if (!refreshToken) return null
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken })
+      if (data?.accessToken) {
+        storeToken(data.accessToken)
+        return data.accessToken as string
+      }
+      return null
+    } catch {
+      return null
+    } finally {
+      _refreshing = null
+    }
+  })()
+  return _refreshing
+}
+
 // Guard: prevent multiple 401 logouts firing at the same time
 let _isLoggingOut = false
 
@@ -120,7 +148,7 @@ apiClient.interceptors.response.use(
     })
     return response
   },
-  (error) => {
+  async (error) => {
     const config = error?.config ?? {}
     const url = `${config.baseURL ?? API_BASE_URL}${config.url ?? ''}`
     logAuthDebug('response-error', {
@@ -131,24 +159,28 @@ apiClient.interceptors.response.use(
       serverMessage: error?.response?.data?.message,
     })
 
-    if (error?.response?.status === 401 && typeof window !== 'undefined') {
-      const requestPath = config.url ?? ''
-      const isAuthEndpoint = requestPath.startsWith('/auth/') || requestPath === '/auth'
+    const requestPath = config.url ?? ''
+    const isAuthEndpoint = requestPath.startsWith('/auth/') || requestPath === '/auth'
+    const alreadyRetried = (config as any).__retried
 
-      // Only auto-logout if:
-      // 1. It's NOT an auth endpoint (login/signup)
-      // 2. We're not already logging out (debounce parallel 401s)
-      // 3. We're not already on the login page
-      if (!isAuthEndpoint && !_isLoggingOut && window.location.pathname !== '/login') {
+    if (error?.response?.status === 401 && !isAuthEndpoint && !alreadyRetried) {
+      const newToken = await tryRefreshToken()
+      if (newToken) {
+        ;(config as any).__retried = true
+        config.headers = { ...config.headers, Authorization: `Bearer ${newToken}` }
+        return apiClient.request(config)
+      }
+      // Refresh failed — clear session and redirect to login
+      if (typeof window !== 'undefined' && !_isLoggingOut && window.location.pathname !== '/login') {
         _isLoggingOut = true
         logAuthDebug('401 auto-logout triggered', { url, path: window.location.pathname })
         clearCredentials()
         clearToken()
+        localStorage.removeItem('hh_refresh_token')
+        localStorage.removeItem('hh_user')
         if (typeof document !== 'undefined') {
           document.cookie = 'hh_authed=; path=/; max-age=0; SameSite=Lax'
         }
-        localStorage.removeItem('hh_user')
-        // Small delay to let any parallel requests settle before redirect
         setTimeout(() => {
           if (window.location.pathname !== '/login') {
             window.location.href = '/login'

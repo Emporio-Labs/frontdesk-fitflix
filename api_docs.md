@@ -3998,3 +3998,497 @@ For questions or issues with the API:
 4. Check that resource IDs are valid MongoDB ObjectIds
 
 **Last Updated:** May 16, 2026
+
+# Nutrition Frontend Routes
+
+## Base Frontend Areas
+
+### Admin / Nutritionist Dashboard
+
+```
+/admin/nutrition/*
+```
+
+### User Nutrition Dashboard
+
+```
+/dashboard/nutrition/*
+```
+
+---
+
+# Nutrition Frontend Architecture
+
+## Frontend Stack
+
+* Next.js 15
+* React 19
+* TypeScript strict mode
+* React Query
+* Axios shared api-client.ts
+* TailwindCSS
+* Radix UI
+* Framer Motion
+* shadcn/ui patterns
+* Tabler Icons
+
+---
+
+## Frontend Architecture Rules
+
+### State Management
+
+* React Query is the primary server-state layer.
+* Forms remain local using react-hook-form.
+* Zustand is not used for Nutrition Module state.
+
+### API Integration
+
+* All Nutrition API requests go through:
+
+```ts
+lib/services/nutrition.service.ts
+```
+
+* Shared Axios instance:
+
+```ts
+lib/api-client.ts
+```
+
+### Query Management
+
+* Nutrition query keys are centralized in:
+
+```ts
+lib/query-keys.ts
+```
+
+### Hooks
+
+* Nutrition hooks follow:
+
+```ts
+hooks/use-nutrition-*.ts
+```
+
+### UI Components
+
+Reusable UI components live in:
+
+```ts
+components/nutrition/*
+```
+
+---
+
+# Nutrition Frontend Routes
+
+## Admin / Nutritionist Routes
+
+| Route                             | Purpose                        | Role                |
+| --------------------------------- | ------------------------------ | ------------------- |
+| `/admin/nutrition`                | Nutrition dashboard overview   | nutritionist, admin |
+| `/admin/nutrition/foods`          | Food catalog management        | nutritionist, admin |
+| `/admin/nutrition/templates`      | Nutrition templates list       | nutritionist, admin |
+| `/admin/nutrition/templates/new`  | Create nutrition template      | nutritionist, admin |
+| `/admin/nutrition/templates/[id]` | Edit nutrition template        | nutritionist, admin |
+| `/admin/nutrition/plans`          | Assigned nutrition plans       | nutritionist, admin |
+| `/admin/nutrition/plans/[id]`     | Nutrition plan detail view     | nutritionist, admin |
+| `/admin/nutrition/adherence`      | Adherence analytics dashboard  | nutritionist, admin |
+| `/admin/nutrition/progress`       | User progress analytics        | nutritionist, admin |
+| `/admin/nutrition/hydration`      | Hydration monitoring dashboard | nutritionist, admin |
+
+---
+
+## User Dashboard Routes
+
+| Route                            | Purpose                      | Role |
+| -------------------------------- | ---------------------------- | ---- |
+| `/dashboard/nutrition`           | Nutrition dashboard home     | user |
+| `/dashboard/nutrition/plan`      | Active nutrition plan        | user |
+| `/dashboard/nutrition/adherence` | Personal adherence analytics | user |
+| `/dashboard/nutrition/hydration` | Hydration tracking           | user |
+| `/dashboard/nutrition/progress`  | Progress tracking            | user |
+
+---
+
+# Nutrition Frontend Components
+
+## Components Directory
+
+```ts
+components/nutrition/*
+```
+
+---
+
+## Core Components
+
+| Component                       | Purpose                            |
+| ------------------------------- | ---------------------------------- |
+| `nutrition-dashboard-cards.tsx` | Dashboard KPI summary cards        |
+| `adherence-progress-card.tsx`   | Adherence percentage visualization |
+| `hydration-widget.tsx`          | Water intake tracking widget       |
+| `macro-summary-card.tsx`        | Protein/carbs/fat summaries        |
+| `calorie-summary-card.tsx`      | Daily calorie summary              |
+| `nutrition-template-form.tsx`   | Create/edit template form          |
+| `nutrition-plan-table.tsx`      | Nutrition plans table              |
+| `meal-log-form.tsx`             | Meal logging form                  |
+| `meal-completion-toggle.tsx`    | Meal completion checkbox/toggle    |
+| `progress-chart.tsx`            | Weight/progress charts             |
+| `hydration-chart.tsx`           | Hydration analytics charts         |
+| `nutrition-empty-state.tsx`     | Nutrition-specific empty states    |
+
+---
+
+## Shared UI Conventions
+
+The Nutrition Module uses:
+
+* `SkeletonTable`
+* `SkeletonCard`
+* `EmptyState`
+* `status-badge.tsx`
+
+Loading and empty-state behavior must remain visually consistent with the existing frontdesk dashboard.
+
+---
+
+# Nutrition Service Layer
+
+## Service File
+
+```ts
+lib/services/nutrition.service.ts
+```
+
+---
+
+## Service Responsibilities
+
+### Food APIs
+
+* getFoods
+* getFoodById
+* createFood
+* updateFood
+* deleteFood
+
+### Template APIs
+
+* getTemplates
+* getTemplateById
+* createTemplate
+* updateTemplate
+* assignTemplate
+
+### Plan APIs
+
+* getPlans
+* getPlanById
+* updatePlan
+* updatePlanStatus
+
+### Meal Log APIs
+
+* getMealLogs
+* createMealLog
+* updateMealLog
+* deleteMealLog
+* markMealComplete
+
+### Hydration APIs
+
+* getHydration
+* addHydration
+* updateHydrationGoal
+
+### Adherence APIs
+
+* getAdherence
+* getAdherenceSummary
+
+### Progress APIs
+
+* getProgress
+* createProgressEntry
+
+### PDF APIs
+
+* getPlanPdf
+* generatePlanPdf
+
+---
+
+# Nutrition React Query Hooks
+
+## Hook Naming Convention
+
+```ts
+hooks/use-nutrition-*.ts
+```
+
+---
+
+## Query Hooks
+
+| Hook                         | Purpose             |
+| ---------------------------- | ------------------- |
+| `use-nutrition-dashboard.ts` | Dashboard analytics |
+| `use-nutrition-foods.ts`     | Food catalog        |
+| `use-nutrition-templates.ts` | Template management |
+| `use-nutrition-plans.ts`     | Assigned plans      |
+| `use-nutrition-meal-logs.ts` | Meal tracking       |
+| `use-nutrition-hydration.ts` | Hydration tracking  |
+| `use-nutrition-adherence.ts` | Adherence analytics |
+| `use-nutrition-progress.ts`  | Progress tracking   |
+
+---
+
+## Query Key Structure
+
+Nutrition query keys are centralized in:
+
+```ts
+lib/query-keys.ts
+```
+
+Example:
+
+```ts
+nutritionKeys = {
+  all: ["nutrition"],
+  dashboard: () => [...],
+  foods: () => [...],
+  templates: () => [...],
+  plans: () => [...],
+  adherence: () => [...],
+}
+```
+
+---
+
+## Query Invalidation Strategy
+
+### Automatic invalidation occurs after:
+
+* meal completion
+* meal log creation
+* hydration updates
+* progress updates
+* template assignment
+* plan updates
+
+---
+
+## Optimistic Updates
+
+Optimistic UI updates are used for:
+
+* meal completion toggles
+* hydration entry updates
+* progress tracking submissions
+
+Rollback behavior must restore previous cache state on API failure.
+
+---
+
+# Nutrition Dashboard UX Behavior
+
+## Dashboard Loading States
+
+Dashboard pages use:
+
+* `SkeletonCard`
+* `SkeletonTable`
+
+during React Query loading states.
+
+---
+
+## Empty States
+
+When no data exists:
+
+* show `EmptyState`
+* provide CTA actions
+* avoid blank tables/charts
+
+Examples:
+
+* No meal logs
+* No assigned plans
+* No hydration entries
+* No templates
+
+---
+
+## Error Handling
+
+All API errors:
+
+* surface toast notifications using `sonner`
+* preserve existing page state when possible
+* avoid full-page crashes
+
+401 responses:
+
+* trigger existing auth flow behavior
+
+403 responses:
+
+* hide restricted UI actions
+
+---
+
+## Mobile Responsiveness
+
+Nutrition dashboards support:
+
+* stacked card layouts on mobile
+* responsive tables
+* collapsible analytics widgets
+* mobile-friendly meal logging flows
+
+---
+
+## Charts & Analytics
+
+Charts use:
+
+* Recharts
+* responsive containers
+
+Supported visualizations:
+
+* adherence trends
+* hydration trends
+* calorie trends
+* macro distributions
+* progress history
+
+---
+
+# PDF Button Behavior
+
+## Current Backend Status
+
+PDF generation infrastructure is deferred.
+
+The frontend still exposes:
+
+* PDF buttons
+* PDF actions
+* PDF placeholders
+
+---
+
+## Frontend Handling Rules
+
+When backend PDF generation is unavailable:
+
+* disable unavailable actions gracefully
+* show deferred/unavailable UI state
+* avoid crashing or broken navigation
+* surface backend no-op responses cleanly
+
+Example states:
+
+* "PDF Not Ready"
+* "Coming Soon"
+* disabled download buttons
+
+---
+
+# Nutrition Dashboard Responsibilities
+
+## Nutritionist Dashboard Responsibilities
+
+The nutritionist/admin dashboard supports:
+
+* food catalog management
+* nutrition template management
+* assigning plans to users
+* adherence monitoring
+* hydration analytics
+* progress monitoring
+* nutrition plan review
+* meal analytics
+
+---
+
+## User Dashboard Responsibilities
+
+The user nutrition dashboard supports:
+
+* viewing assigned plans
+* meal completion tracking
+* hydration tracking
+* progress submissions
+* adherence analytics
+* macro summaries
+* calorie summaries
+* PDF visibility state
+
+---
+
+# Frontend Integration Notes
+
+## Backend Integration
+
+The Nutrition frontend consumes backend APIs under:
+
+```ts
+/nutrition/*
+```
+
+The backend is the source of truth for:
+
+* plans
+* templates
+* adherence
+* hydration
+* progress
+* meal logs
+
+Frontend should not duplicate backend business logic.
+
+---
+
+## Data Flow
+
+```txt
+Backend Nutrition APIs
+        ↓
+nutrition.service.ts
+        ↓
+React Query Hooks
+        ↓
+Dashboard Pages
+        ↓
+Reusable Components
+```
+
+---
+
+# Frontend Implementation Guidelines
+
+## Keep:
+
+* thin pages
+* reusable components
+* hook-driven data access
+* service-layer abstraction
+
+## Avoid:
+
+* giant page components
+* duplicated API logic
+* direct Axios calls inside pages
+* unnecessary global state
+* duplicated adherence calculations
+
+---
+  
+>>>>>>> origin/nutritionist-ui
