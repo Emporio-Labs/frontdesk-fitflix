@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { Suspense, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -900,7 +900,7 @@ function ActiveUsersTab() {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-export default function NutritionDashboardPage() {
+function NutritionDashboardContent() {
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') ?? 'overview')
   const [assignOpen, setAssignOpen] = useState(false)
@@ -990,5 +990,13 @@ export default function NutritionDashboardPage() {
         userId={assignUserId}
       />
     </div>
+  )
+}
+
+export default function NutritionDashboardPage() {
+  return (
+    <Suspense fallback={<div className="flex-1 space-y-6 p-8 pt-6">Loading nutrition dashboard...</div>}>
+      <NutritionDashboardContent />
+    </Suspense>
   )
 }
