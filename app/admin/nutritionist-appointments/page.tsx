@@ -89,6 +89,10 @@ function NutritionistStatusBadge({ status }: { status: NutritionistBookingStatus
       label: 'REJECTED',
       cls: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-transparent',
     },
+    Completed: {
+      label: 'COMPLETED',
+      cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-transparent',
+    },
   }
   const { label, cls } = map[status]
   return <Badge className={cls}>{label}</Badge>

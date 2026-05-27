@@ -528,8 +528,6 @@ export type TemplateFormValues = z.infer<typeof templateSchema>
 export const assignPlanSchema = z.object({
   userId: z.string().min(1, 'Select a member'),
   planId: z.string().min(1, 'Select a plan'),
-  startDate: z.string().min(1, 'Start date is required'),
-  endDate: z.string().optional(),
 })
 export type AssignPlanFormValues = z.infer<typeof assignPlanSchema>
 
@@ -561,8 +559,6 @@ export type UpdateTemplatePayload = Partial<CreateTemplatePayload>
 export interface AssignPlanPayload {
   planId: string
   userId: string
-  startDate: string
-  endDate?: string
 }
 
 export interface LogMealPayload {

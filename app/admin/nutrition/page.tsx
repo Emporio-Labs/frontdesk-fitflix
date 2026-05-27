@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -35,6 +35,12 @@ import { AssignPlanForm } from '@/components/nutrition/assign-plan-form'
 import { FoodForm } from '@/components/nutrition/food-form'
 import { MyNutritionDashboard } from '@/components/nutrition/my-nutrition-dashboard'
 import { EditAssignedPlanModal } from '@/components/nutrition/edit-assigned-plan-modal'
+import { ClinicalUserDialog } from '@/components/nutrition/clinical-user-dialog'
+import {
+  BookingStatusTabs,
+  type BookingSegment,
+} from '@/components/nutrition/booking-status-tabs'
+import { Progress } from '@/components/ui/progress'
 import {
   IconCalendarEvent,
   IconUsers,
@@ -50,6 +56,8 @@ import {
   IconTrash,
   IconRefresh,
   IconExternalLink,
+  IconCheck,
+  IconCircleCheck,
 } from '@tabler/icons-react'
 import {
   useNutritionMembers,
@@ -58,11 +66,15 @@ import {
   useDeletePlan,
   useDeleteFood,
 } from '@/hooks/use-nutrition'
+import {
+  useAcceptNutritionistBooking,
+  useCompleteNutritionistBooking,
+} from '@/hooks/use-nutritionist-bookings'
 import { useCanAccess } from '@/hooks/use-auth'
 import { useUsers } from '@/hooks/use-users'
-import { NUTRITION_GOAL_LABELS } from '@/lib/types/nutrition'
+import type { User } from '@/lib/services/user.service'
 import type { NutritionDashboardMember, FoodItem, UserNutritionPlan } from '@/lib/types/nutrition'
-import { onboardingStepLabel } from '@/components/onboarding-timeline'
+import { onboardingStepLabel, ONBOARDING_STEP_ORDER } from '@/components/onboarding-timeline'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -71,18 +83,124 @@ function memberDisplayName(m?: NutritionDashboardMember['member']): string {
   return m.username || m.fullName || m.email || 'Unknown User'
 }
 
+type RosterStatus = 'pending' | 'booked' | 'completed' | 'ignored'
+
+interface NutritionRosterRow {
+  user: User
+  rosterStatus: RosterStatus
+  onboardingStep?: string
+  bookingStatus?: string
+  bookingDate?: string
+}
+
+function normalizeRosterStatus(value?: string | number | null): string {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function deriveNutritionRosterStatus(
+  user: User,
+  hasActivePlan: boolean
+): RosterStatus {
+  const nutritionistAppointment = user.expertAppointments?.find(
+    (appointment) => appointment.expertType === 'nutritionist'
+  )
+  const bookingStatus = normalizeRosterStatus(
+    nutritionistAppointment?.bookingStatus ??
+      (user.onboardingStatus?.nutritionistBooked ? 'confirmed' : undefined)
+  )
+  const onboardingStep = normalizeRosterStatus(
+    user.onboardingStatus?.currentStep ??
+      (nutritionistAppointment ? 'NUTRITIONIST_BOOKING' : undefined)
+  )
+
+  const onboardingCompleted =
+    user.onboardingStatus?.onboardingCompleted === true ||
+    user.onboarded === true
+
+  // Completed = onboarding done AND there's at least one active nutrition plan,
+  // OR the booking was explicitly marked completed
+  if (onboardingCompleted && hasActivePlan) return 'completed'
+  if (bookingStatus === 'completed') return 'completed'
+
+  const booked =
+    bookingStatus === 'booked' ||
+    bookingStatus === 'confirmed' ||
+    bookingStatus === '0' ||
+    bookingStatus === '1' ||
+    onboardingCompleted ||
+    user.onboardingStatus?.nutritionistBooked === true
+
+  if (booked) return 'booked'
+
+  const cancelled = bookingStatus === 'cancelled' || bookingStatus === '2'
+  if (cancelled) return 'ignored'
+
+  const pending =
+    bookingStatus === 'pending' ||
+    bookingStatus === 'requested' ||
+    bookingStatus === '' ||
+    onboardingStep === 'nutritionist_booking' ||
+    user.onboardingStatus?.completedSteps?.includes('NUTRITIONIST_BOOKING') === true
+
+  return pending ? 'pending' : 'ignored'
+}
+
+function toNutritionRosterRow(
+  user: User,
+  hasActivePlan: boolean
+): NutritionRosterRow {
+  const nutritionistAppointment = user.expertAppointments?.find(
+    (appointment) => appointment.expertType === 'nutritionist'
+  )
+  return {
+    user,
+    onboardingStep:
+      user.onboardingStatus?.currentStep ??
+      (nutritionistAppointment ? 'NUTRITIONIST_BOOKING' : undefined),
+    bookingStatus:
+      nutritionistAppointment?.bookingStatus ??
+      (user.onboardingStatus?.nutritionistBooked ? 'Confirmed' : undefined),
+    bookingDate: nutritionistAppointment?.appointmentDate ?? undefined,
+    rosterStatus: deriveNutritionRosterStatus(user, hasActivePlan),
+  }
+}
+
 function planMemberName(p: UserNutritionPlan): string {
   return p.member?.username || p.member?.fullName || p.member?.email || p.userName || 'Unknown User'
 }
 
-function matchesSearch(m: NutritionDashboardMember, q: string): boolean {
-  if (!q) return true
-  const lower = q.toLowerCase()
-  const { member } = m
+
+// ── Summary card (compact — used in BookingsTab) ─────────────────────────────
+
+function SummaryCard({
+  label,
+  value,
+  helper,
+  loading,
+}: {
+  label: string
+  value: number | string
+  helper?: string
+  loading?: boolean
+}) {
   return (
-    (member.username?.toLowerCase().includes(lower) ?? false) ||
-    (member.email?.toLowerCase().includes(lower) ?? false) ||
-    (member.phone?.toLowerCase().includes(lower) ?? false)
+    <div className="rounded-lg border bg-card px-3 py-2.5 shadow-sm">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-0.5 flex items-baseline gap-1.5">
+        {loading ? (
+          <Skeleton className="h-6 w-10" />
+        ) : (
+          <span className="text-2xl font-bold leading-none">{value}</span>
+        )}
+        {helper && (
+          <span className="text-[11px] text-muted-foreground truncate">
+            {helper}
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -314,40 +432,109 @@ function OverviewTab({
 
 // ── Bookings Tab ──────────────────────────────────────────────────────────────
 
-function BookingsTab() {
-  const [rosterSegment, setRosterSegment] = useState<'pending' | 'booked' | 'all'>('pending')
-  const [rosterSearch, setRosterSearch] = useState('')
+function BookingsTab({
+  onAssign,
+  initialReviewUserId,
+}: {
+  onAssign: (userId?: string) => void
+  initialReviewUserId?: string | null
+}) {
+  const [segment, setSegment] = useState<BookingSegment>('pending')
+  const [search, setSearch] = useState('')
+  const [reviewUserId, setReviewUserId] = useState<string | null>(
+    initialReviewUserId ?? null
+  )
+  const [dialogOpen, setDialogOpen] = useState<boolean>(!!initialReviewUserId)
+
+  const accept = useAcceptNutritionistBooking()
+  const complete = useCompleteNutritionistBooking()
+
+  // React when the parent provides a deep-link ?review=<userId>
+  useEffect(() => {
+    if (initialReviewUserId) {
+      setReviewUserId(initialReviewUserId)
+      setDialogOpen(true)
+    }
+  }, [initialReviewUserId])
+
   const {
-    data: members = [],
+    data: users = [],
     isLoading: usersLoading,
     isError: usersError,
     refetch: refetchUsers,
-  } = useNutritionMembers()
+  } = useUsers()
+  const { data: plans = [] } = useNutritionPlans()
 
-  const isBooked = (m: NutritionDashboardMember) =>
-    (m.bookingStatus ?? '').toLowerCase() === 'booked'
+  const activePlanByUserId = useMemo(() => {
+    const map = new Map<string, boolean>()
+    for (const p of plans) {
+      if (p.status === 'Active') map.set(p.userId, true)
+    }
+    return map
+  }, [plans])
 
-  const rosterCounts = useMemo(() => {
-    const booked = members.filter(isBooked).length
-    return { booked, pending: members.length - booked, total: members.length }
-  }, [members])
+  const rows = useMemo(
+    () =>
+      users
+        .map((u) =>
+          toNutritionRosterRow(u, activePlanByUserId.get(u._id) === true)
+        )
+        .filter((r) => r.rosterStatus !== 'ignored'),
+    [users, activePlanByUserId]
+  )
 
-  const rosterFiltered = useMemo(() => {
-    let list: NutritionDashboardMember[] = members
-    if (rosterSegment === 'booked') list = list.filter(isBooked)
-    if (rosterSegment === 'pending') list = list.filter((m) => !isBooked(m))
-    if (rosterSearch.trim()) {
-      list = list.filter((m) => matchesSearch(m, rosterSearch))
+  const counts = useMemo(() => {
+    const acc = { all: rows.length, pending: 0, booked: 0, completed: 0 }
+    for (const r of rows) {
+      if (r.rosterStatus === 'pending') acc.pending++
+      else if (r.rosterStatus === 'booked') acc.booked++
+      else if (r.rosterStatus === 'completed') acc.completed++
+    }
+    return acc
+  }, [rows])
+
+  const filtered = useMemo(() => {
+    let list = rows
+    if (segment !== 'all') {
+      list = list.filter((r) => r.rosterStatus === segment)
+    }
+    const q = search.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        (r) =>
+          r.user.username?.toLowerCase().includes(q) ||
+          r.user.email?.toLowerCase().includes(q) ||
+          (r.user.phone ?? '').toLowerCase().includes(q)
+      )
     }
     return list
-  }, [members, rosterSegment, rosterSearch])
+  }, [rows, segment, search])
 
-  const rosterEmptyMessage =
-    rosterSegment === 'booked'
+  const emptyMessage =
+    segment === 'booked'
       ? 'No members have booked the nutritionist yet.'
-      : rosterSegment === 'pending'
+      : segment === 'pending'
       ? 'No members are pending the nutritionist step.'
+      : segment === 'completed'
+      ? 'No members have completed the nutritionist workflow yet.'
       : 'No members found.'
+
+  const handleReview = (userId: string) => {
+    setReviewUserId(userId)
+    setDialogOpen(true)
+  }
+
+  const handleDialogChange = (open: boolean) => {
+    setDialogOpen(open)
+    if (!open) {
+      // clear ?review= from URL so the dialog won't re-open on refresh
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('review')) {
+        url.searchParams.delete('review')
+        window.history.replaceState({}, '', url.toString())
+      }
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -355,142 +542,197 @@ function BookingsTab() {
         <CardHeader className="px-4 pt-4 pb-3">
           <CardTitle className="text-base">Nutritionist Onboarding Roster</CardTitle>
           <CardDescription className="text-sm">
-            Members segmented by nutritionist booking status
+            Review members, then create or assign a personalized plan
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 px-4 pb-4 pt-0">
-            {/* Stat chips */}
-            <div className="grid grid-cols-3 gap-3">
-              <Card>
-                <CardHeader className="pb-1.5 pt-3 px-4">
-                  <CardDescription className="text-sm">Booked</CardDescription>
-                  <CardTitle className="text-xl">
-                    {usersLoading ? '—' : rosterCounts.booked}
-                  </CardTitle>
-                </CardHeader>
-              </Card>
-              <Card>
-                <CardHeader className="pb-1.5 pt-3 px-4">
-                  <CardDescription className="text-sm">Pending</CardDescription>
-                  <CardTitle className="text-xl">
-                    {usersLoading ? '—' : rosterCounts.pending}
-                  </CardTitle>
-                </CardHeader>
-              </Card>
-              <Card>
-                <CardHeader className="pb-1.5 pt-3 px-4">
-                  <CardDescription className="text-sm">Total Members</CardDescription>
-                  <CardTitle className="text-xl">
-                    {usersLoading ? '—' : rosterCounts.total}
-                  </CardTitle>
-                </CardHeader>
-              </Card>
-            </div>
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <SummaryCard
+              label="Total Members"
+              value={counts.all}
+              helper="visible in roster"
+              loading={usersLoading}
+            />
+            <SummaryCard
+              label="Pending"
+              value={counts.pending}
+              helper="awaiting nutrition workflow"
+              loading={usersLoading}
+            />
+            <SummaryCard
+              label="Booked"
+              value={counts.booked}
+              helper="appointments scheduled"
+              loading={usersLoading}
+            />
+            <SummaryCard
+              label="Completed"
+              value={counts.completed}
+              helper="onboarded & plan assigned"
+              loading={usersLoading}
+            />
+          </div>
 
-            {/* Filter row */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex gap-1 rounded-md border p-1">
-                {(['pending', 'booked', 'all'] as const).map((seg) => (
-                  <button
-                    key={seg}
-                    onClick={() => setRosterSegment(seg)}
-                    className={`rounded px-3 py-1 text-sm capitalize transition-colors ${
-                      rosterSegment === seg
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {seg}
-                  </button>
-                ))}
-              </div>
-              <div className="relative flex-1 min-w-[200px] max-w-sm">
-                <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search by username, email, or phone…"
-                  value={rosterSearch}
-                  onChange={(e) => setRosterSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Button variant="outline" size="sm" className="text-sm" onClick={() => refetchUsers()}>
-                <IconRefresh className="mr-1 h-4 w-4" />
-                Refresh
-              </Button>
+          {/* Filter row */}
+          <div className="flex flex-wrap items-center gap-3">
+            <BookingStatusTabs
+              value={segment}
+              onChange={setSegment}
+              counts={counts}
+            />
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by username, email, or phone…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-sm"
+              onClick={() => refetchUsers()}
+            >
+              <IconRefresh className="mr-1 h-4 w-4" />
+              Refresh
+            </Button>
+          </div>
 
-            {/* Roster table */}
-            {usersError ? (
-              <div className="py-8 text-center text-red-500">
-                Failed to load members.{' '}
-                <button className="underline" onClick={() => refetchUsers()}>
-                  Retry
-                </button>
-              </div>
-            ) : usersLoading ? (
-              <SkeletonTable />
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-sm">Username</TableHead>
-                      <TableHead className="text-sm">Email</TableHead>
-                      <TableHead className="text-sm">Phone</TableHead>
-                      <TableHead className="text-sm">Onboarding Step</TableHead>
-                      <TableHead className="text-sm">Nutritionist</TableHead>
-                      <TableHead className="text-right text-sm">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rosterFiltered.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="py-8 text-center text-muted-foreground"
-                        >
-                          {rosterEmptyMessage}
+          {usersError ? (
+            <div className="py-8 text-center text-red-500">
+              Failed to load members.{' '}
+              <button className="underline" onClick={() => refetchUsers()}>
+                Retry
+              </button>
+            </div>
+          ) : usersLoading ? (
+            <SkeletonTable />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              icon={<IconUsers className="h-10 w-10" />}
+              title="No members"
+              description={emptyMessage}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-sm">Username</TableHead>
+                    <TableHead className="text-sm">Email</TableHead>
+                    <TableHead className="text-sm">Phone</TableHead>
+                    <TableHead className="text-sm">Onboarding Step</TableHead>
+                    <TableHead className="text-sm w-[160px]">Progress</TableHead>
+                    <TableHead className="text-sm">Nutritionist</TableHead>
+                    <TableHead className="text-right text-sm">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((row) => {
+                    const { user } = row
+                    const completedCount =
+                      user.onboardingStatus?.completedSteps?.length ?? 0
+                    const totalSteps = ONBOARDING_STEP_ORDER.length
+                    const pct = Math.round((completedCount / totalSteps) * 100)
+                    const stepLabel = onboardingStepLabel(
+                      user.onboardingStatus?.currentStep ?? row.onboardingStep
+                    )
+                    const statusLabel =
+                      row.rosterStatus === 'completed'
+                        ? 'completed'
+                        : row.rosterStatus === 'booked'
+                        ? 'booked'
+                        : 'pending'
+                    return (
+                      <TableRow key={user._id}>
+                        <TableCell className="text-sm font-medium">
+                          {user.username || '—'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {user.email || '—'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {user.phone || '—'}
+                        </TableCell>
+                        <TableCell className="text-sm">{stepLabel}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress value={pct} className="h-1.5 w-20" />
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {completedCount}/{totalSteps}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={statusLabel} size="sm" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {(() => {
+                              const bookingId = user.expertAppointments?.find(
+                                (a) => a.expertType === 'nutritionist'
+                              )?._id
+                              if (row.rosterStatus === 'pending' && bookingId) {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => accept.mutate(bookingId)}
+                                    disabled={accept.isPending && accept.variables === bookingId}
+                                  >
+                                    <IconCheck className="mr-1 h-4 w-4" />
+                                    {accept.isPending && accept.variables === bookingId
+                                      ? 'Accepting…'
+                                      : 'Accept Booking'}
+                                  </Button>
+                                )
+                              }
+                              if (row.rosterStatus === 'booked' && bookingId) {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-green-600 border-green-600 hover:bg-green-50 dark:hover:bg-green-950"
+                                    onClick={() => complete.mutate(bookingId)}
+                                    disabled={complete.isPending && complete.variables === bookingId}
+                                  >
+                                    <IconCircleCheck className="mr-1 h-4 w-4" />
+                                    {complete.isPending && complete.variables === bookingId
+                                      ? 'Completing…'
+                                      : 'Complete Consultation'}
+                                  </Button>
+                                )
+                              }
+                              return null
+                            })()}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleReview(user._id)}
+                            >
+                              <IconEye className="mr-1 h-4 w-4" />
+                              View User
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      rosterFiltered.map((m) => {
-                        const booked = isBooked(m)
-                        const step = onboardingStepLabel(m.onboardingStep)
-                        return (
-                          <TableRow key={m._id}>
-                            <TableCell className="text-sm font-medium">
-                              {memberDisplayName(m.member)}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {m.member.email ?? '—'}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {m.member.phone || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm">{step}</TableCell>
-                            <TableCell>
-                              <StatusBadge
-                                status={booked ? 'booked' : 'pending'}
-                                size="sm"
-                              />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button asChild size="sm" variant="outline">
-                                <Link href={`/admin/users/${m.member._id}`}>
-                                  View User
-                                </Link>
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ClinicalUserDialog
+        userId={reviewUserId}
+        open={dialogOpen}
+        onOpenChange={handleDialogChange}
+        onAssignExisting={(uid) => onAssign(uid)}
+      />
     </div>
   )
 }
@@ -902,7 +1144,11 @@ function ActiveUsersTab() {
 
 export default function NutritionDashboardPage() {
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') ?? 'overview')
+  const initialTab = searchParams.get('tab') ?? 'overview'
+  const reviewUserIdFromUrl = searchParams.get('review')
+  const [activeTab, setActiveTab] = useState(() =>
+    reviewUserIdFromUrl ? 'bookings' : initialTab
+  )
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignUserId, setAssignUserId] = useState<string | undefined>()
 
@@ -955,7 +1201,10 @@ export default function NutritionDashboardPage() {
         </TabsContent>
 
         <TabsContent value="bookings" className="mt-6">
-          <BookingsTab />
+          <BookingsTab
+            onAssign={handleAssign}
+            initialReviewUserId={reviewUserIdFromUrl}
+          />
         </TabsContent>
 
         <TabsContent value="my-nutrition" className="mt-6">

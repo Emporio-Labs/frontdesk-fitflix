@@ -86,14 +86,17 @@ function normalizeMembershipBalance(raw: any): CreditMembershipBalance {
 }
 
 function normalizeBalance(raw: any): CreditBalance {
-  const memberships = Array.isArray(raw?.memberships)
-    ? raw.memberships.map(normalizeMembershipBalance)
-    : []
+  const rawMemberships = Array.isArray(raw?.membershipDetails)
+    ? raw.membershipDetails
+    : Array.isArray(raw?.memberships)
+      ? raw.memberships
+      : []
+  const memberships = rawMemberships.map(normalizeMembershipBalance)
 
   return {
     userId: String(raw?.userId || raw?.user || ''),
-    totalIncluded: parseNumber(raw?.totalIncluded, 0),
-    totalRemaining: parseNumber(raw?.totalRemaining, 0),
+    totalIncluded: parseNumber(raw?.totalCredits ?? raw?.totalIncluded, 0),
+    totalRemaining: parseNumber(raw?.availableCredits ?? raw?.totalRemaining, 0),
     memberships,
   }
 }

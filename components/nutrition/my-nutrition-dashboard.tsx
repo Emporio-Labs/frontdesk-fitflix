@@ -43,7 +43,20 @@ import {
   IconButterfly,
   IconSparkles,
   IconInfoCircle,
+  IconTrendingUp,
+  IconTrendingDown,
+  IconMinus,
+  IconScale,
+  IconPercentage,
 } from '@tabler/icons-react'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
 import {
   useNutritionPlans,
   useMealLogs,
@@ -60,9 +73,11 @@ import {
   type UserNutritionPlan,
   type NutritionAssessment,
   type NutritionGoal,
+  type NutritionProgress,
 } from '@/lib/types/nutrition'
 import { normalizeMeal, optionCalories } from '@/lib/nutrition-normalize'
 import { cn } from '@/lib/utils'
+import { toNumberSafe } from '@/lib/health-insights'
 import type { User, ActivityLevel } from '@/lib/services/user.service'
 
 // ── Constants & types ─────────────────────────────────────────────────────────
@@ -628,11 +643,11 @@ function NutritionWorkspace({
     const goal = goalFromPlan ?? inferNutritionGoal(selectedUser.healthGoals)
     const ageNum = selectedUser.age ? Number(selectedUser.age) : NaN
     return {
-      weight:   selectedUser.healthMarkers?.weight ?? latestWeightKg,
-      height:   selectedUser.healthMarkers?.height ?? null,
+      weight:   toNumberSafe(selectedUser.healthMarkers?.weight) ?? latestWeightKg,
+      height:   toNumberSafe(selectedUser.healthMarkers?.height) ?? null,
       age:      Number.isFinite(ageNum) && ageNum > 0 ? ageNum : null,
       gender:   selectedUser.gender || null,
-      activity: selectedUser.healthMarkers?.activityLevel ?? 'Moderate',
+      activity: (selectedUser.healthMarkers?.activityLevel ?? 'Moderate') as ActivityLevel,
       goal,
     }
   }, [selectedUser, latestWeightKg, plan])
@@ -766,6 +781,16 @@ function NutritionWorkspace({
                 </span>
               </div>
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Last Updated</span>
+                <span>
+                  {plan.updatedAt
+                    ? new Date(plan.updatedAt).toLocaleDateString()
+                    : plan.createdAt
+                    ? new Date(plan.createdAt).toLocaleDateString()
+                    : '—'}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Duration</span>
                 <span>{plan.durationDays ? `${plan.durationDays} days` : '—'}</span>
               </div>
@@ -773,12 +798,6 @@ function NutritionWorkspace({
                 <span className="text-muted-foreground">Meals / day</span>
                 <span>{allMeals.length}</span>
               </div>
-              <Link href={`/admin/nutrition/members/${userId}`} className="block pt-2">
-                <Button variant="outline" size="sm" className="w-full">
-                  <IconExternalLink className="mr-2 h-4 w-4" />
-                  Open full profile
-                </Button>
-              </Link>
             </CardContent>
           </Card>
 
@@ -852,45 +871,363 @@ function NutritionWorkspace({
         </Card>
       </div>
 
-      {/* Recent adherence */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Adherence</CardTitle>
-          <CardDescription>Last 7 days</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {adherence.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No adherence data yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Consumed / Planned</TableHead>
-                    <TableHead>Adherence</TableHead>
-                    <TableHead>Status</TableHead>
+      {/* Recent meal logs */}
+      <RecentMealLogsCard meals={allMeals} mealLogs={mealLogs} />
+
+      {/* Progress tracking */}
+      <ProgressTrackingSection progress={progress} goal={profile.goal} />
+    </div>
+  )
+}
+
+// ── Recent Meal Logs section ──────────────────────────────────────────────────
+
+function RecentMealLogsCard({
+  meals,
+  mealLogs,
+}: {
+  meals: StoredMeal[]
+  mealLogs: MealLog[]
+}) {
+  const mealBySlot = useMemo(() => {
+    const map = new Map<string, StoredMeal>()
+    for (const m of meals) map.set(m.mealType, m)
+    return map
+  }, [meals])
+
+  const rows = useMemo(() => {
+    return [...mealLogs]
+      .sort((a, b) => {
+        const ta = a.loggedAt ? new Date(a.loggedAt).getTime() : 0
+        const tb = b.loggedAt ? new Date(b.loggedAt).getTime() : 0
+        return tb - ta
+      })
+      .map((log) => {
+        const meal = mealBySlot.get(log.slot)
+        const option = meal ? normalizeMeal(meal).defaultOption : null
+        const macros = option ? sumMealMacros(option.items) : { calories: 0, protein: 0, carbs: 0, fat: 0 }
+        const calories = option ? optionCalories(option) : (log.calories ?? 0)
+        const foods = option?.items.length
+          ? option.items.map((i) => `${i.foodName} (${i.quantityG}g)`).join(', ')
+          : '—'
+        const when = log.loggedAt
+          ? new Date(log.loggedAt).toLocaleString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })
+          : new Date(log.date).toLocaleDateString()
+        return {
+          id: log._id,
+          slot: log.slot,
+          consumed: log.consumed,
+          foods,
+          calories,
+          macros,
+          when,
+        }
+      })
+  }, [mealLogs, mealBySlot])
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Recent Meal Logs</CardTitle>
+        <CardDescription>
+          {rows.length
+            ? `${rows.length} meal log${rows.length === 1 ? '' : 's'} today`
+            : 'Track which meals have been logged today'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <EmptyState
+            icon={<IconSalad className="h-10 w-10" />}
+            title="No meal logs yet"
+            description="Meals logged today will appear here."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Meal</TableHead>
+                  <TableHead>Foods</TableHead>
+                  <TableHead className="whitespace-nowrap">Calories</TableHead>
+                  <TableHead>Macros</TableHead>
+                  <TableHead className="whitespace-nowrap">Logged At</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {MEAL_TYPE_LABELS[r.slot] ?? r.slot}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[280px]">
+                      <span className="line-clamp-2 text-sm">{r.foods}</span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      {Math.round(r.calories)} kcal
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1 text-xs">
+                        <span className="rounded-md bg-muted px-2 py-0.5">
+                          P {Math.round(r.macros.protein)}g
+                        </span>
+                        <span className="rounded-md bg-muted px-2 py-0.5">
+                          C {Math.round(r.macros.carbs)}g
+                        </span>
+                        <span className="rounded-md bg-muted px-2 py-0.5">
+                          F {Math.round(r.macros.fat)}g
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      {r.when}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge
+                        status={r.consumed ? 'completed' : 'skipped'}
+                        size="sm"
+                      />
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {adherence.slice(0, 7).map((a) => (
-                    <TableRow key={a.date}>
-                      <TableCell>{new Date(a.date).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        {a.consumedCalories} / {a.plannedCalories} kcal
-                      </TableCell>
-                      <TableCell>{Math.round(a.adherencePct)}%</TableCell>
-                      <TableCell>
-                        <NutritionStatusCell status={a.status} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── Progress Tracking section ─────────────────────────────────────────────────
+
+type TrendDirection = 'up' | 'down' | 'flat'
+
+interface ProgressMetricEntry {
+  date: string
+  value: number
+}
+
+function pickEntries(
+  progress: NutritionProgress[],
+  field: 'weight' | 'bodyFatPct'
+): ProgressMetricEntry[] {
+  return [...progress]
+    .filter((p) => typeof p[field] === 'number' && (p[field] as number) > 0)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((p) => ({ date: p.date, value: p[field] as number }))
+}
+
+function classifyTrend(
+  delta: number,
+  metric: 'weight' | 'bodyFatPct',
+  goal: NutritionGoal
+): { color: string; positive: boolean } {
+  if (Math.abs(delta) < 0.05) return { color: 'text-muted-foreground', positive: false }
+  if (metric === 'bodyFatPct') {
+    return delta < 0
+      ? { color: 'text-green-600 dark:text-green-400', positive: true }
+      : { color: 'text-amber-600 dark:text-amber-400', positive: false }
+  }
+  // Weight
+  const goingDown = delta < 0
+  const aligned =
+    (goal === 'WeightLoss' && goingDown) ||
+    (goal === 'MuscleGain' && !goingDown) ||
+    (goal === 'Maintenance' && Math.abs(delta) < 1) ||
+    (goal === 'Endurance' && Math.abs(delta) < 1)
+  return aligned
+    ? { color: 'text-green-600 dark:text-green-400', positive: true }
+    : { color: 'text-amber-600 dark:text-amber-400', positive: false }
+}
+
+function ProgressMetricCard({
+  title,
+  description,
+  icon: Icon,
+  entries,
+  unit,
+  metric,
+  goal,
+  strokeColor,
+}: {
+  title: string
+  description: string
+  icon: React.ElementType
+  entries: ProgressMetricEntry[]
+  unit: string
+  metric: 'weight' | 'bodyFatPct'
+  goal: NutritionGoal
+  strokeColor: string
+}) {
+  const current = entries.length ? entries[entries.length - 1] : null
+  const previous = entries.length > 1 ? entries[entries.length - 2] : null
+  const delta = current && previous ? current.value - previous.value : null
+
+  const trend: TrendDirection =
+    delta == null ? 'flat' : delta > 0.05 ? 'up' : delta < -0.05 ? 'down' : 'flat'
+  const TrendIcon =
+    trend === 'up' ? IconTrendingUp : trend === 'down' ? IconTrendingDown : IconMinus
+  const trendClass = delta != null ? classifyTrend(delta, metric, goal).color : 'text-muted-foreground'
+
+  const chartData = useMemo(
+    () =>
+      entries.slice(-10).map((e) => ({
+        date: new Date(e.date).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+        }),
+        value: e.value,
+      })),
+    [entries]
+  )
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Icon className="h-4 w-4 text-muted-foreground" />
+            {title}
+          </CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {current == null ? (
+          <p className="text-sm text-muted-foreground">
+            No {metric === 'weight' ? 'weight' : 'body fat'} entries yet — log
+            progress to start tracking.
+          </p>
+        ) : (
+          <>
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold leading-none">
+                    {current.value.toFixed(1)}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{unit}</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Current ·{' '}
+                  {new Date(current.date).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </p>
+              </div>
+              <div className="text-right">
+                {previous ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Previous{' '}
+                      <span className="font-medium text-foreground">
+                        {previous.value.toFixed(1)}
+                        {unit}
+                      </span>
+                    </p>
+                    {delta != null && (
+                      <div
+                        className={cn(
+                          'mt-1 flex items-center justify-end gap-1 text-sm font-medium',
+                          trendClass
+                        )}
+                      >
+                        <TrendIcon className="h-4 w-4" />
+                        <span>
+                          {delta > 0 ? '+' : ''}
+                          {delta.toFixed(1)}
+                          {unit}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    First entry — log again to see a trend
+                  </p>
+                )}
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {chartData.length > 1 && (
+              <div className="h-[140px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={chartData}
+                    margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+                  >
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                    <YAxis
+                      tick={{ fontSize: 10 }}
+                      domain={['auto', 'auto']}
+                      width={36}
+                    />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                      formatter={(v: any) => [`${Number(v).toFixed(1)}${unit}`, title]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke={strokeColor}
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ProgressTrackingSection({
+  progress,
+  goal,
+}: {
+  progress: NutritionProgress[]
+  goal: NutritionGoal
+}) {
+  const weightEntries = useMemo(() => pickEntries(progress, 'weight'), [progress])
+  const bodyFatEntries = useMemo(() => pickEntries(progress, 'bodyFatPct'), [progress])
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <ProgressMetricCard
+        title="Weight Progress"
+        description="Tracked from member progress entries"
+        icon={IconScale}
+        entries={weightEntries}
+        unit="kg"
+        metric="weight"
+        goal={goal}
+        strokeColor="#3b82f6"
+      />
+      <ProgressMetricCard
+        title="Body Fat Progress"
+        description="Body fat percentage trend"
+        icon={IconPercentage}
+        entries={bodyFatEntries}
+        unit="%"
+        metric="bodyFatPct"
+        goal={goal}
+        strokeColor="#10b981"
+      />
     </div>
   )
 }

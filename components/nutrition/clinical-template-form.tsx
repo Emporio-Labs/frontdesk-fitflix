@@ -64,6 +64,7 @@ import {
   useCreateTemplate,
   useUpdateTemplate,
   useUpdatePlan,
+  useAssignPlan,
 } from '@/hooks/use-nutrition'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -843,18 +844,45 @@ interface ClinicalTemplateFormProps {
   template?: NutritionTemplate
   plan?: any // UserNutritionPlan, but imported lazily or type is close enough
   mode?: 'template' | 'plan'
+  /** When provided, after creating the template assign it to this user as a plan. */
+  userId?: string
+  /** Auto-fill calorie / macro / water targets in the form's default values. */
+  initialTargets?: {
+    calories?: number | null
+    proteinG?: number | null
+    carbsG?: number | null
+    fatG?: number | null
+    waterMl?: number | null
+  }
+  /**
+   * Live override applied at submit time. When provided, these values replace
+   * `values.targetCaloriesKcal` and `values.targetMacros` in the create-plan
+   * payload — letting a parent screen (e.g. the new-plan page's editable
+   * nutrition target cards) own the targets UI.
+   */
+  targetsOverride?: {
+    calories?: number | null
+    proteinG?: number | null
+    carbsG?: number | null
+    fatG?: number | null
+    waterMl?: number | null
+  }
 }
 
 export function ClinicalTemplateForm({
   template,
   plan,
   mode = 'template',
+  userId,
+  initialTargets,
+  targetsOverride,
 }: ClinicalTemplateFormProps) {
   const router = useRouter()
   const { data: foods = [] } = useFoods()
   const createTemplate = useCreateTemplate()
   const updateTemplate = useUpdateTemplate()
   const updatePlanMutation = useUpdatePlan()
+  const assignPlanMutation = useAssignPlan()
   
   const sourceData = plan || template
   const isEdit = !!sourceData
@@ -914,6 +942,18 @@ export function ClinicalTemplateForm({
         name: '',
         description: '',
         goal: 'WeightLoss' as const,
+        targetCaloriesKcal: initialTargets?.calories ?? undefined,
+        targetMacros:
+          initialTargets &&
+          (initialTargets.proteinG != null ||
+            initialTargets.carbsG != null ||
+            initialTargets.fatG != null)
+            ? {
+                proteinG: initialTargets.proteinG ?? undefined,
+                carbsG: initialTargets.carbsG ?? undefined,
+                fatG: initialTargets.fatG ?? undefined,
+              }
+            : undefined,
         durationDays: 7,
         conditionTags: [],
         foodPreference: undefined,
@@ -978,12 +1018,25 @@ export function ClinicalTemplateForm({
     })
     })
 
+    const overrideMacros =
+      targetsOverride &&
+      (targetsOverride.proteinG != null ||
+        targetsOverride.carbsG != null ||
+        targetsOverride.fatG != null)
+        ? {
+            proteinG: targetsOverride.proteinG ?? undefined,
+            carbsG: targetsOverride.carbsG ?? undefined,
+            fatG: targetsOverride.fatG ?? undefined,
+          }
+        : undefined
+
     const payload = {
       name: values.name,
       description: values.description || undefined,
       goal: values.goal,
-      targetCaloriesKcal: values.targetCaloriesKcal ?? undefined,
-      targetMacros: values.targetMacros,
+      targetCaloriesKcal:
+        targetsOverride?.calories ?? values.targetCaloriesKcal ?? undefined,
+      targetMacros: overrideMacros ?? values.targetMacros,
       durationDays: values.durationDays,
       days,
       lifestyle: values.lifestyle?.length ? values.lifestyle : undefined,
@@ -1002,12 +1055,25 @@ export function ClinicalTemplateForm({
       await updateTemplate.mutateAsync({ id: template._id, payload })
       router.push('/admin/nutrition?tab=diet-plans')
     } else {
-      await createTemplate.mutateAsync(payload)
-      router.push('/admin/nutrition?tab=diet-plans')
+      const created = await createTemplate.mutateAsync(payload)
+      if (userId && created?.template?._id) {
+        await assignPlanMutation.mutateAsync({
+          planId: created.template._id,
+          userId,
+          startDate: new Date().toISOString().slice(0, 10),
+        })
+        router.push(`/admin/nutrition?tab=bookings&review=${userId}`)
+      } else {
+        router.push('/admin/nutrition?tab=diet-plans')
+      }
     }
   }
 
-  const isPending = createTemplate.isPending || updateTemplate.isPending || updatePlanMutation.isPending
+  const isPending =
+    createTemplate.isPending ||
+    updateTemplate.isPending ||
+    updatePlanMutation.isPending ||
+    assignPlanMutation.isPending
 
   return (
     <Form {...form}>

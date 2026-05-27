@@ -42,3 +42,19 @@ export function useRejectNutritionistBooking() {
     },
   })
 }
+
+export function useCompleteNutritionistBooking() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => nutritionistBookingService.complete(id),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.nutritionistBookings.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.users.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.onboarding.all() })
+      toast.success(data.message || 'Consultation marked as completed')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to complete consultation')
+    },
+  })
+}

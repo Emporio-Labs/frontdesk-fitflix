@@ -196,6 +196,20 @@ export default function UserDetailPage() {
   }, [rawProfile, userId])
 
   const profile = useMemo(() => normalizeProfile(rawProfile), [rawProfile])
+  const onboardingGoals = useMemo(() => {
+    const hg = profile?.healthGoals
+    if (!hg) return []
+    const rawGoals = hg.goals || hg.primaryGoals
+    if (!rawGoals) return []
+    if (Array.isArray(rawGoals)) {
+      return rawGoals.filter(Boolean)
+    }
+    if (typeof rawGoals === 'string') {
+      return rawGoals.split(',').map((g) => g.trim()).filter(Boolean)
+    }
+    return []
+  }, [profile])
+
   const healthMarkers = useMemo(
     () => normalizeHealthMarkers(profile.healthMarkers),
     [profile.healthMarkers],
@@ -357,17 +371,17 @@ export default function UserDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle>Health Goals</CardTitle>
-              <CardDescription>User-submitted goals</CardDescription>
+              <CardDescription>Submitted during onboarding</CardDescription>
             </CardHeader>
             <CardContent>
-              {user.healthGoals && user.healthGoals.length ? (
+              {onboardingGoals && onboardingGoals.length ? (
                 <ul className="list-disc pl-5 space-y-1 text-sm">
-                  {user.healthGoals.map((goal) => (
+                  {onboardingGoals.map((goal) => (
                     <li key={goal}>{goal}</li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-gray-500">No goals provided yet.</p>
+                <p className="text-sm text-gray-500">No onboarding goals submitted yet.</p>
               )}
             </CardContent>
           </Card>

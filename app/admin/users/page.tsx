@@ -24,6 +24,9 @@ import { useMemberships } from '@/hooks/use-memberships'
 import { User } from '@/lib/services/user.service'
 import { Admin } from '@/lib/services/admin.service'
 import { StatusBadge } from '@/components/status-badge'
+import { toast } from 'sonner'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other']
 
@@ -54,7 +57,7 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [memberForm, setMemberForm] = useState({
     username: '', email: '', phone: '', password: '',
-    age: '', gender: 'Male', healthGoalsInput: '',
+    age: '', gender: 'Male',
   })
 
   // Admin state
@@ -107,7 +110,7 @@ export default function UsersPage() {
   )
 
   const resetMemberForm = () => {
-    setMemberForm({ username: '', email: '', phone: '', password: '', age: '', gender: 'Male', healthGoalsInput: '' })
+    setMemberForm({ username: '', email: '', phone: '', password: '', age: '', gender: 'Male' })
     setEditingUser(null)
   }
 
@@ -115,28 +118,47 @@ export default function UsersPage() {
     setEditingUser(user)
     setMemberForm({
       username: user.username, email: user.email, phone: user.phone,
-      password: '', age: user.age, gender: user.gender,
-      healthGoalsInput: user.healthGoals.join(', '),
+      password: '', age: String(user.age ?? ''), gender: user.gender,
     })
     setIsMemberDialogOpen(true)
   }
 
   const handleMemberSubmit = async () => {
-    const healthGoals = memberForm.healthGoalsInput.split(',').map(s => s.trim()).filter(Boolean)
-    if (editingUser) {
-      await updateUser.mutateAsync({
-        id: editingUser._id,
-        payload: { username: memberForm.username, phone: memberForm.phone, age: memberForm.age, gender: memberForm.gender, healthGoals },
-      })
-    } else {
-      if (!memberForm.username || !memberForm.email || !memberForm.phone || !memberForm.password || !memberForm.age) return
-      await createUser.mutateAsync({
-        username: memberForm.username, email: memberForm.email, phone: memberForm.phone,
-        password: memberForm.password, age: memberForm.age, gender: memberForm.gender, healthGoals,
-      })
+    const ageNum = Number.parseInt(memberForm.age, 10)
+    if (!Number.isInteger(ageNum) || ageNum < 0 || ageNum > 130) {
+      toast.error('Age must be a whole number between 0 and 130')
+      return
     }
-    setIsMemberDialogOpen(false)
-    resetMemberForm()
+    try {
+      if (editingUser) {
+        await updateUser.mutateAsync({
+          id: editingUser._id,
+          payload: { username: memberForm.username, phone: memberForm.phone, age: ageNum, gender: memberForm.gender },
+        })
+      } else {
+        if (!memberForm.username || !memberForm.email || !memberForm.phone || !memberForm.password) {
+          toast.error('Username, email, phone, and password are required')
+          return
+        }
+        if (!EMAIL_RE.test(memberForm.email)) {
+          toast.error('Enter a valid email address')
+          return
+        }
+        const pw = memberForm.password
+        if (pw.length < 8 || !/[A-Za-z]/.test(pw) || !/\d/.test(pw)) {
+          toast.error('Password must be at least 8 characters and include a letter and a number')
+          return
+        }
+        await createUser.mutateAsync({
+          username: memberForm.username, email: memberForm.email, phone: memberForm.phone,
+          password: memberForm.password, age: ageNum, gender: memberForm.gender,
+        })
+      }
+      setIsMemberDialogOpen(false)
+      resetMemberForm()
+    } catch {
+      // toast already shown by mutation onError; keep dialog open so admin can fix and resubmit
+    }
   }
 
   // --- Admin helpers ---
@@ -220,7 +242,7 @@ export default function UsersPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-sm font-medium">Username *</label>
-                        <Input value={memberForm.username} onChange={(e) => setMemberForm({ ...memberForm, username: e.target.value })} placeholder="john_doe" />
+                        <Input autoComplete="off" value={memberForm.username} onChange={(e) => setMemberForm({ ...memberForm, username: e.target.value })} placeholder="john_doe" />
                       </div>
                       <div>
                         <label className="text-sm font-medium">Age *</label>
@@ -230,17 +252,17 @@ export default function UsersPage() {
                     {!editingUser && (
                       <div>
                         <label className="text-sm font-medium">Email *</label>
-                        <Input type="email" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} placeholder="john@example.com" />
+                        <Input type="email" autoComplete="off" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} placeholder="john@example.com" />
                       </div>
                     )}
                     <div>
                       <label className="text-sm font-medium">Phone *</label>
-                      <Input value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} placeholder="+1234567890" />
+                      <Input autoComplete="off" value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} placeholder="+1234567890" />
                     </div>
                     {!editingUser && (
                       <div>
                         <label className="text-sm font-medium">Password *</label>
-                        <Input type="password" value={memberForm.password} onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })} placeholder="Min 8 characters" />
+                        <Input type="password" autoComplete="new-password" value={memberForm.password} onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })} placeholder="Min 8 characters" />
                       </div>
                     )}
                     <div>
@@ -252,10 +274,7 @@ export default function UsersPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium">Health Goals (comma-separated)</label>
-                      <Input value={memberForm.healthGoalsInput} onChange={(e) => setMemberForm({ ...memberForm, healthGoalsInput: e.target.value })} placeholder="Build muscle, Improve stamina" />
-                    </div>
+
                     <div className="flex gap-2 pt-2">
                       <Button variant="outline" onClick={() => { setIsMemberDialogOpen(false); resetMemberForm() }}>Cancel</Button>
                       <Button onClick={handleMemberSubmit} disabled={createUser.isPending || updateUser.isPending}>
@@ -391,16 +410,16 @@ export default function UsersPage() {
                     </div>
                     <div>
                       <label className="text-sm font-medium">Email *</label>
-                      <Input type="email" value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} placeholder="alice@fitflix.com" />
+                      <Input type="email" autoComplete="off" value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} placeholder="alice@fitflix.com" />
                     </div>
                     <div>
                       <label className="text-sm font-medium">Phone *</label>
-                      <Input value={adminForm.phone} onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })} placeholder="+1234567890" />
+                      <Input autoComplete="off" value={adminForm.phone} onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })} placeholder="+1234567890" />
                     </div>
                     {!editingAdmin && (
                       <div>
                         <label className="text-sm font-medium">Password *</label>
-                        <Input type="password" value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} />
+                        <Input type="password" autoComplete="new-password" value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} />
                       </div>
                     )}
                     <div className="flex gap-2 pt-2">

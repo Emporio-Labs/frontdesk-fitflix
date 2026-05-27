@@ -54,7 +54,7 @@ export interface User {
   username: string
   email: string
   phone: string
-  age: string
+  age: number
   gender: string
   healthGoals: string[]
   createdAt: string
@@ -71,15 +71,15 @@ export interface CreateUserPayload {
   email: string
   phone: string
   password: string
-  age: string
+  age: number
   gender: string
-  healthGoals: string[]
+  healthGoals?: string[]
 }
 
 export interface UpdateUserPayload {
   username?: string
   phone?: string
-  age?: string
+  age?: number
   gender?: string
   healthGoals?: string[]
 }
@@ -92,10 +92,14 @@ export const userService = {
 
   getById: async (id: string) => {
     const { data } = await apiClient.get(`/users/${id}`)
-    return data as { user: User }
+    return ('user' in data ? data : { user: data }) as { user: User }
   },
 
   create: async (payload: CreateUserPayload) => {
+    // TODO(debug): remove after member-create flow verified
+    if (process.env.NEXT_PUBLIC_DEBUG_AUTH) {
+      console.debug('[userService.create] payload', payload)
+    }
     const { data } = await apiClient.post('/users', payload)
     return data as { message: string; user: User }
   },

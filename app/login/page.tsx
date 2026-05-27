@@ -46,7 +46,8 @@ export default function LoginPage() {
         admin: 'clinic_admin',
         doctor: 'clinician',
         trainer: 'staff',
-        user: 'staff',
+        nutritionist: 'staff',
+        user: 'sales', // restrict normal 'user' from accessing powerful dashboard reads if they shouldn't
       }
       const mappedRole = roleMap[apiUser?.role] ?? 'clinic_admin'
       login(email, password, {

@@ -3,7 +3,7 @@ import type { PopulatedUserRef } from '@/lib/populated'
 
 export type AppointmentMode = 'IN_PERSON' | 'ONLINE'
 
-export type NutritionistBookingStatus = 'Pending' | 'Confirmed' | 'Cancelled'
+export type NutritionistBookingStatus = 'Pending' | 'Confirmed' | 'Cancelled' | 'Completed'
 
 export interface NutritionistBooking {
   _id: string
@@ -55,6 +55,13 @@ export const nutritionistBookingService = {
     const { data } = await apiClient.patch(`/nutritionist/bookings/${id}/reject`)
     return {
       message: data?.message ?? 'Booking rejected',
+      booking: normalizeBooking(data?.booking),
+    }
+  },
+  complete: async (id: string): Promise<NutritionistBookingActionResponse> => {
+    const { data } = await apiClient.patch(`/nutritionist/bookings/${id}/complete`)
+    return {
+      message: data?.message ?? 'Consultation completed',
       booking: normalizeBooking(data?.booking),
     }
   },

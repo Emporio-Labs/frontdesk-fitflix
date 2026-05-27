@@ -47,8 +47,6 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
     defaultValues: {
       userId: userId ?? '',
       planId: '',
-      startDate: new Date().toISOString().slice(0, 10),
-      endDate: '',
     },
   })
 
@@ -57,8 +55,6 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
       form.reset({
         userId: userId ?? '',
         planId: '',
-        startDate: new Date().toISOString().slice(0, 10),
-        endDate: '',
       })
     }
   }, [open, userId, form])
@@ -67,8 +63,6 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
     await assignPlan.mutateAsync({
       userId: values.userId,
       planId: values.planId,
-      startDate: values.startDate,
-      endDate: values.endDate || undefined,
     })
     onOpenChange(false)
   }
@@ -133,35 +127,7 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Start Date *</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-2 pt-2 mt-4">
               <Button
                 type="button"
                 variant="outline"

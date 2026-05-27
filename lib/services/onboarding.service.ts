@@ -30,7 +30,7 @@ export interface MedicalReport {
 
 // ── Expert appointment (returned by POST /onboarding/appointments) ────────────
 export type ExpertType = 'sports_scientist' | 'nutritionist'
-export type ExpertAppointmentStatus = 'Pending' | 'Confirmed' | 'Cancelled'
+export type ExpertAppointmentStatus = 'Pending' | 'Confirmed' | 'Cancelled' | 'Completed'
 
 export interface ExpertAppointment {
   _id: string
