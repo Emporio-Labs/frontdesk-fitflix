@@ -1,4 +1,11 @@
 import { apiClient } from '@/lib/api-client'
+import type {
+  PopulatedDoctorRef,
+  PopulatedReportRef,
+  PopulatedServiceRef,
+  PopulatedSlotRef,
+  PopulatedUserRef,
+} from '@/lib/populated'
 
 // Booking status enum
 export const BOOKING_STATUS = {
@@ -15,12 +22,13 @@ export interface Booking {
   _id: string
   bookingDate: string
   status: BookingStatusValue
-  user: string
-  slot: string
-  service: string
+  user: PopulatedUserRef
+  slot: PopulatedSlotRef
+  service: PopulatedServiceRef
+  doctor?: PopulatedDoctorRef
   creditCostSnapshot?: number
   creditsBypassed?: boolean
-  report?: string
+  report?: PopulatedReportRef
   createdAt: string
   updatedAt: string
 }

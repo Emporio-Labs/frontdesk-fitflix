@@ -20,8 +20,11 @@ import { Label } from '@/components/ui/label'
 import { IconSearch, IconCalendar, IconLoader2 } from '@tabler/icons-react'
 import { useUsers } from '@/hooks/use-users'
 import { useWorkoutStore } from '@/stores/workout-store'
-import { useAssignPlanUsers } from '@/hooks/use-workout-plans'
+import { useAssignWorkoutPlan } from '@/hooks/use-workout-plans'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+
+const isMongoId = (id?: string): boolean => !!id && /^[0-9a-f]{24}$/i.test(id)
 
 export function AssignUsersDialog({
   open,
@@ -41,8 +44,9 @@ export function AssignUsersDialog({
     toggleUserAssignment,
     assignmentStartDate,
     setAssignmentStartDate,
+    currentPlan,
   } = useWorkoutStore()
-  const assignMutation = useAssignPlanUsers()
+  const assignMutation = useAssignWorkoutPlan()
 
   const filtered = users.filter((u: any) => {
     const term = search.toLowerCase()
@@ -58,30 +62,32 @@ export function AssignUsersDialog({
     return new Date(y, m - 1, d)
   })()
 
-  const handleDone = () => {
-    if (!planId) {
-      // Create flow: just stash selections; PlanBuilderLayout will POST /assign after create.
-      onOpenChange(false)
+  const handleDone = async () => {
+    const targetPlanId = planId || currentPlan?.id
+    if (!isMongoId(targetPlanId)) {
+      toast.error('Save the plan to the server first before assigning users')
       return
     }
     if (assignedUserIds.length === 0) {
       onOpenChange(false)
       return
     }
-    assignMutation.mutate(
-      {
-        id: planId,
-        userIds: assignedUserIds,
-        startDate: new Date(assignmentStartDate).toISOString(),
-      },
-      {
-        onSuccess: () => onOpenChange(false),
-      },
-    )
+    try {
+      await assignMutation.mutateAsync({
+        id: targetPlanId!,
+        payload: {
+          userIds: assignedUserIds,
+          startDate: new Date(assignmentStartDate).toISOString(),
+        },
+      })
+      onOpenChange(false)
+    } catch {
+      // errors surfaced via mutation's onError toast
+    }
   }
 
   const isPending = assignMutation.isPending
-  const ctaLabel = planId
+  const ctaLabel = planId || currentPlan?.id
     ? isPending
       ? 'Assigning…'
       : 'Assign Now'
