@@ -79,4 +79,13 @@ export const queryKeys = {
     userHistory: (userId: string, limit = 50, sourceType?: string) =>
       ['credits', 'users', userId, 'history', limit, sourceType || 'all'] as const,
   },
+  onboarding: {
+    all: () => ['onboarding'] as const,
+    mine: () => ['onboarding', 'me'] as const,
+    byUser: (userId: string) => ['onboarding', 'user', userId] as const,
+  },
+  nutritionistBookings: {
+    all: () => ['nutritionist-bookings'] as const,
+    detail: (id: string) => ['nutritionist-bookings', id] as const,
+  },
 }

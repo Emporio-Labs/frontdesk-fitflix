@@ -30,7 +30,9 @@ export default function LoginPage() {
 
     setIsLoading(true)
     try {
-      const data = await authService.login({ email, password })
+      if (data?.accessToken) {
+        storeToken(data.accessToken)
+      }
       const apiUser = data.user
       const token = data.accessToken || data.token
       // Always log login response shape for debugging (remove after fixing)

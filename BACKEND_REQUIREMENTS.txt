@@ -1,0 +1,314 @@
+================================================================================
+ BACKEND REQUIREMENTS — Admin Member Profile Dashboard
+================================================================================
+
+Context
+-------
+The admin member profile page (/admin/users/:id) was enhanced to surface real
+member data: memberships, bookings, onboarding health markers, uploaded
+reports, and expert appointments.
+
+The frontend already integrates with existing endpoints where possible. The
+items below are the remaining gaps the backend needs to fill so the dashboard
+is fully functional. Until they ship, the affected sections gracefully fall
+back to empty states — nothing breaks.
+
+================================================================================
+ 1. GET /users/:id   (REQUIRED — extend response payload)
+================================================================================
+
+The admin member profile reads everything from this single endpoint. The
+frontend `User` interface (lib/services/user.service.ts) now expects the
+following OPTIONAL fields on the response. None are breaking — add when ready.
+
+Current shape (kept):
+  {
+    _id, username, email, phone, age, gender,
+    healthGoals, createdAt, updatedAt,
+    onboarded, onboardingStatus { ...flags }
+  }
+
+ADD the following to the same response:
+
+  healthMarkers: {
+    height?:          number | string
+    weight?:          number | string
+    age?:             number | string
+    gender?:          string
+    bodyFatPercent?:  number | string
+    medicalConditions?: string[] | string
+    injuries?:          string[] | string
+    allergies?:         string[] | string
+    medications?:       string[] | string
+    diseaseHistory?:    string[] | string
+    sleepHours?:        number | string
+    activityLevel?:     string
+    smoking?:           string
+    alcohol?:           string
+    diet?:              string
+    occupation?:        string
+    stressLevel?:       string
+    hydration?:         string | number
+    // any additional fields are auto-rendered under "Other"
+  }
+
+  reports: [
+    {
+      _id:         string
+      userId:      string
+      reportName:  string
+      reportType:  string
+      reportUrl?:  string | null   // direct-accessible URL (signed if private)
+      uploadedAt:  string          // ISO date
+      createdAt?:  string
+      updatedAt?:  string
+    },
+    ...
+  ]
+
+  expertAppointments: [
+    {
+      _id:               string
+      userId:            string
+      expertType:        'sports_scientist' | 'nutritionist'
+      bookingStatus:     'Pending' | 'Confirmed' | 'Cancelled'
+      appointmentDate?:  string | null      // ISO
+      meetingLink?:      string | null
+      calComBookingId?:  string | null
+      createdAt?:        string
+      updatedAt?:        string
+    },
+    ...
+  ]
+
+Notes:
+  - All three additions are OPTIONAL on the type. Missing/empty values render
+    as "not yet submitted" / empty-state messages in the UI.
+  - `reportUrl` should be a URL the browser can open directly (View opens it
+    in a new tab; Download uses the same URL with the `download` attribute).
+    If reports are stored privately, return a short-lived signed URL.
+  - Access control: this is an admin-only endpoint, so returning a member's
+    full health markers and reports is acceptable here. Do NOT expose this
+    payload on the public user endpoint.
+
+================================================================================
+ 2. GET /onboarding/status   (DO NOT change)
+================================================================================
+
+This endpoint already exists and is User-only (reads caller's auth context;
+does not accept a userId). Admin dashboard does NOT call it — admin reads
+onboarding state from `user.onboardingStatus` on GET /users/:id (see #1).
+
+Keep it as-is. Do not add a `?userId=` param.
+
+================================================================================
+ 3. GET /bookings  and  GET /memberships   (OPTIONAL — efficiency)
+================================================================================
+
+Today the dashboard calls these endpoints and filters by userId on the client.
+This works for small/medium datasets. For scale, add OPTIONAL query support:
+
+  GET /bookings?userId=<id>
+  GET /memberships?userId=<id>
+
+Behavior:
+  - When the param is present, return only records belonging to that user.
+  - When absent, return all records (existing behavior — do not break).
+  - Response shape stays the same: { bookings: [...] } / { memberships: [...] }.
+
+Frontend will switch to per-user fetching once available (no UI change
+required from the backend side).
+
+================================================================================
+ 4. Booking response — "appointment type" enrichment   (NICE-TO-HAVE)
+================================================================================
+
+Current `Booking` payload exposes `service` as a string ID. The frontend
+resolves it to a human name via GET /services. If the backend can include the
+service category/expert type on the booking (or on the service record), the
+UI can show "Sports Scientist / Nutritionist / Trainer / Consultation" as a
+distinct column rather than just the service name.
+
+Option A — extend Service:
+  GET /services → each item gains:
+    category?: 'sports_scientist' | 'nutritionist' | 'trainer' | 'consultation' | string
+
+Option B — extend Booking:
+  GET /bookings → each booking gains:
+    appointmentType?: string
+    meetingMode?: 'online' | 'offline'
+    assignedStaffName?: string       // doctor/trainer/nutritionist name
+
+Both options are additive and optional. The frontend will render the new
+columns conditionally — no breaking change.
+
+================================================================================
+ 5. Membership response — trainer/nutritionist assignment   (NICE-TO-HAVE)
+================================================================================
+
+Current `Membership` payload has no field for an assigned trainer or
+nutritionist. The dashboard plan called this out as "Assigned Trainer /
+Nutritionist if available."
+
+To enable this column, add OPTIONAL fields to each membership record:
+
+  GET /memberships → each item gains:
+    assignedTrainerId?:       string
+    assignedTrainerName?:     string
+    assignedNutritionistId?:  string
+    assignedNutritionistName?:string
+
+================================================================================
+ 6. DELETE /onboarding/appointments/nutritionist/:userId   (REQUIRED — new)
+================================================================================
+
+The admin Nutritionist page (`/admin/nutritionist`) now exposes a destructive
+"Delete" button on every Booked row. It calls:
+
+  DELETE /onboarding/appointments/nutritionist/:userId
+
+Expected response:
+  200 OK
+  { "message": string }
+
+Required side-effects on the user record:
+  - Remove (or mark Cancelled) the user's active nutritionist `ExpertAppointment`.
+  - Flip `onboardingStatus.nutritionistBooked` to `false`.
+  - Rewind `onboardingStatus.currentStep` to `NUTRITIONIST_BOOKING` so the user
+    can re-book without manual intervention. Do NOT remove
+    `NUTRITIONIST_BOOKING` from `completedSteps` if it was previously completed
+    by the user (let the workflow engine re-resolve based on its own rules — the
+    frontend only relies on `nutritionistBooked` to segment the table).
+
+Auth: admin-only (same auth profile as DELETE /users/:id).
+
+Error cases the frontend handles via toast:
+  - 404 if the user has no active nutritionist appointment.
+  - 401/403 on missing/insufficient auth.
+
+Frontend wiring (already shipped, awaiting backend):
+  - Service:  `onboardingService.cancelNutritionistAppointment(userId)`
+              in `lib/services/onboarding.service.ts`
+  - Hook:     `useCancelNutritionistBooking()` in `hooks/use-onboarding.ts`
+              (invalidates `users.all`, `users.detail`, `onboarding.byUser`)
+
+If the backend prefers an appointment-id-scoped route instead
+(e.g. `DELETE /onboarding/appointments/:appointmentId`), update the
+`apiClient.delete(...)` URL in `cancelNutritionistAppointment` — that path also
+requires shipping `expertAppointments[]._id` on `GET /users` so the table row
+can pass it in (currently the list endpoint doesn't include
+`expertAppointments`).
+
+================================================================================
+ 7. Nutritionist Bookings — admin module endpoints   (REQUIRED — new)
+================================================================================
+
+The admin page `/admin/nutritionist-appointments` lists all nutritionist
+bookings and lets the frontdesk team accept or reject the pending ones. The
+record shape is COMPATIBLE with the existing `ExpertAppointment` model
+(see lib/services/onboarding.service.ts) — backend can serve from the same
+Mongo collection filtered to `expertType: 'nutritionist'`.
+
+Three endpoints are required.
+
+--------------------------------------------------------------------------------
+ 7.1  GET /nutritionist/bookings   (admin-only)
+--------------------------------------------------------------------------------
+
+Response 200:
+  {
+    "bookings": [
+      {
+        "_id":              string,
+        "userId": {
+          "_id":            string,
+          "username":       string,
+          "email":          string,
+          "phone":          string
+        },
+        "expertType":       "nutritionist",
+        "bookingStatus":    "Pending" | "Confirmed" | "Cancelled",
+        "appointmentDate":  string | null,                       // ISO
+        "appointmentMode":  "IN_PERSON" | "ONLINE" | null,       // optional
+        "meetingLink":      string | null,
+        "calComBookingId":  string | null,                       // either name accepted
+        "timeSlot":         string | null,                       // optional pre-formatted label e.g. "2:00 PM - 3:00 PM"
+        "createdAt":        string,
+        "updatedAt":        string
+      },
+      ...
+    ]
+  }
+
+  - Sort: createdAt DESC
+  - Populate `userId` with username, email, phone
+  - Auth: admin-only
+
+--------------------------------------------------------------------------------
+ 7.2  PATCH /nutritionist/bookings/:id/accept   (admin-only)
+--------------------------------------------------------------------------------
+
+Required side-effects:
+  - Set `bookingStatus = "Confirmed"`.
+  - If `appointmentMode === "ONLINE"` and `meetingLink` is null, generate one
+    (Cal.com hook or internal placeholder) and persist it on the record.
+  - Flip `user.onboardingStatus.nutritionistBooked = true` (if not already).
+  - Slot remains occupied (do NOT restore capacity on accept).
+
+Response 200:
+  { "message": string, "booking": <full booking record> }
+
+Error cases (handled by frontend toast):
+  - 404 if no booking with :id
+  - 409 if booking is already Confirmed or Cancelled
+
+--------------------------------------------------------------------------------
+ 7.3  PATCH /nutritionist/bookings/:id/reject   (admin-only)
+--------------------------------------------------------------------------------
+
+Required side-effects:
+  - Set `bookingStatus = "Cancelled"`.
+  - Restore slot capacity: `slot.remainingCapacity += 1`; if previously full,
+    set `slot.isBooked = false`.
+  - If a Cal.com booking exists, cancel it best-effort.
+  - DO NOT delete the record — the admin "Rejected" tab needs to display it.
+  - Rewind user's onboarding status the same way as #6
+    (`onboardingStatus.nutritionistBooked = false`,
+     `currentStep = NUTRITIONIST_BOOKING`).
+
+Response 200:
+  { "message": string, "booking": <full booking record> }
+
+Error cases (handled by frontend toast):
+  - 404 if no booking with :id
+  - 409 if booking is already Cancelled
+
+--------------------------------------------------------------------------------
+Frontend wiring (already shipped, awaiting backend):
+  - Service:  lib/services/nutritionist-booking.service.ts
+  - Hooks:    hooks/use-nutritionist-bookings.ts
+              (invalidates: nutritionistBookings.all, users.all, onboarding.all)
+  - Page:     app/admin/nutritionist-appointments/page.tsx
+              (sidebar entry "Nutritionist Appointments" registered)
+
+================================================================================
+ Priority recap
+================================================================================
+
+  P0 (blocks full dashboard parity):
+    - #1 GET /users/:id → add `healthMarkers`, `reports`, `expertAppointments`
+    - #6 DELETE /onboarding/appointments/nutritionist/:userId
+    - #7 GET /nutritionist/bookings + PATCH .../accept + PATCH .../reject
+
+  P1 (efficiency at scale):
+    - #3 GET /bookings?userId=  and  GET /memberships?userId=
+
+  P2 (UX polish):
+    - #4 Booking/service type metadata
+    - #5 Membership assigned staff
+
+Frontend is wired to consume all of the above the moment they land — no
+follow-up frontend ticket needed for fields 1, 4, 5, 6, and 7. For #3, the
+frontend will need a tiny hook switch (one-line per service).
+
+================================================================================
