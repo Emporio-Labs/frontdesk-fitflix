@@ -50,7 +50,7 @@ function normalizeMembership(raw: any): Membership {
   const legacyPlan = raw?.planType || 'Standard Plan'
   const normalizedStatus = String(raw?.status || 'Active')
   const userRef = raw?.userId || raw?.user
-  const userId = typeof userRef === 'object' ? String(userRef?._id || '') : String(userRef || '')
+  const userId = typeof userRef === 'object' ? String(userRef?._id || userRef?.id || '') : String(userRef || '')
   const creditsIncluded = Number(raw?.creditsIncluded ?? 0)
   const creditsRemaining = Number(raw?.creditsRemaining ?? raw?.creditsIncluded ?? 0)
 
@@ -62,7 +62,7 @@ function normalizeMembership(raw: any): Membership {
     creditsIncluded: Number.isFinite(creditsIncluded) ? creditsIncluded : 0,
     creditsRemaining: Number.isFinite(creditsRemaining) ? creditsRemaining : 0,
     price: Number(raw?.price ?? 0),
-    currency: raw?.currency || 'USD',
+    currency: raw?.currency || 'INR',
     status: (['Active', 'Paused', 'Cancelled', 'Expired'].includes(normalizedStatus)
       ? normalizedStatus
       : 'Active') as MembershipStatus,

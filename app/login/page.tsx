@@ -47,6 +47,8 @@ export default function LoginPage() {
       }
       const roleMap: Record<string, any> = {
         admin: 'clinic_admin',
+        super_admin: 'super_admin',
+        frontdesk: 'staff',
         doctor: 'clinician',
         trainer: 'staff',
         user: 'staff',

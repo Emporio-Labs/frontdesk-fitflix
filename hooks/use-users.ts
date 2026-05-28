@@ -41,7 +41,7 @@ export function useUpdateUser() {
       userService.update(id, payload),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.users.all() })
-      qc.invalidateQueries({ queryKey: queryKeys.users.detail(data.user._id) })
+      qc.invalidateQueries({ queryKey: queryKeys.users.detail(data.user.id) })
       toast.success(data.message || 'User updated successfully')
     },
     onError: (err: any) => {

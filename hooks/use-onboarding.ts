@@ -19,6 +19,18 @@ export function useOnboardingStatus() {
   })
 }
 
+// Admin visibility — fetches a specific member's live onboarding state.
+// Use in lead detail panels and user detail cards when `user.onboardingStatus`
+// from the user cache needs a dedicated refresh.
+export function useAdminOnboardingStatus(userId: string) {
+  return useQuery({
+    queryKey: queryKeys.onboarding.byUser(userId),
+    queryFn: () => onboardingService.getStatusByUser(userId),
+    enabled: !!userId,
+    staleTime: 30_000,
+  })
+}
+
 function invalidateOnboarding(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: queryKeys.onboarding.all() })
   qc.invalidateQueries({ queryKey: queryKeys.users.all() })

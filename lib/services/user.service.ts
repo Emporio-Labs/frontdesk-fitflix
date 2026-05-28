@@ -41,6 +41,9 @@ export interface HealthGoalsSnapshot {
 }
 
 export interface User {
+  /** Canonical ID — use this for new code, API calls, and cache keys. */
+  id: string
+  /** Backward-compat alias for id — populated identically. Existing UI code using ._id continues to work. */
   _id: string
   username: string
   email: string
@@ -74,29 +77,62 @@ export interface UpdateUserPayload {
   healthGoals?: string[]
 }
 
+function normalizeUser(raw: any): User {
+  const id = String(raw?._id || raw?.id || '')
+  return {
+    id,
+    _id: id,
+    username: String(raw?.username || ''),
+    email: String(raw?.email || ''),
+    phone: String(raw?.phone || ''),
+    age: String(raw?.age || ''),
+    gender: String(raw?.gender || ''),
+    healthGoals: Array.isArray(raw?.healthGoals) ? raw.healthGoals.map(String) : [],
+    createdAt: String(raw?.createdAt || ''),
+    updatedAt: String(raw?.updatedAt || raw?.createdAt || ''),
+    onboarded: raw?.onboarded != null ? Boolean(raw.onboarded) : undefined,
+    onboardingStatus: raw?.onboardingStatus ?? undefined,
+    healthMarkers: raw?.healthMarkers ?? undefined,
+    healthGoalsSnapshot: raw?.healthGoalsSnapshot ?? undefined,
+  }
+}
+
+function extractUserList(data: any): any[] {
+  if (Array.isArray(data?.users)) return data.users
+  if (Array.isArray(data?.data)) return data.data
+  if (Array.isArray(data)) return data
+  return []
+}
+
 export const userService = {
-  getAll: async () => {
+  getAll: async (): Promise<{ users: User[] }> => {
     const { data } = await apiClient.get('/users')
-    return data as { users: User[] }
+    return { users: extractUserList(data).map(normalizeUser) }
   },
 
-  getById: async (id: string) => {
+  getById: async (id: string): Promise<{ user: User }> => {
     const { data } = await apiClient.get(`/users/${id}`)
-    return data as { user: User }
+    return { user: normalizeUser(data?.user ?? data?.data ?? data) }
   },
 
-  create: async (payload: CreateUserPayload) => {
+  create: async (payload: CreateUserPayload): Promise<{ message: string; user: User }> => {
     const { data } = await apiClient.post('/users', payload)
-    return data as { message: string; user: User }
+    return {
+      message: data?.message || 'User created successfully',
+      user: normalizeUser(data?.user ?? data?.data ?? data),
+    }
   },
 
-  update: async (id: string, payload: UpdateUserPayload) => {
+  update: async (id: string, payload: UpdateUserPayload): Promise<{ message: string; user: User }> => {
     const { data } = await apiClient.patch(`/users/${id}`, payload)
-    return data as { message: string; user: User }
+    return {
+      message: data?.message || 'User updated successfully',
+      user: normalizeUser(data?.user ?? data?.data ?? data),
+    }
   },
 
-  delete: async (id: string) => {
+  delete: async (id: string): Promise<{ message: string }> => {
     const { data } = await apiClient.delete(`/users/${id}`)
-    return data as { message: string }
+    return { message: data?.message || 'User deleted successfully' }
   },
 }

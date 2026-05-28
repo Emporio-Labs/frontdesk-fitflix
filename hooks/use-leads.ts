@@ -6,6 +6,9 @@ import {
   CreateLeadPayload,
   UpdateLeadPayload,
   ConvertLeadPayload,
+  buildLeadAnalytics,
+  buildReminderSummary,
+  buildDailyDigest,
 } from '@/lib/services/lead.service'
 import { queryKeys } from '@/lib/query-keys'
 import { toast } from 'sonner'
@@ -32,21 +35,16 @@ export function useLead(id: string) {
   })
 }
 
+// These three hooks share queryKeys.leads.all() — the same key as useLeads().
+// React Query deduplicates the HTTP request: only one GET /leads fires even when
+// all four hooks are mounted simultaneously. `select` transforms the shared
+// cache entry locally without storing the derived value in a separate cache key.
+
 export function useLeadReminders() {
   return useQuery({
-    queryKey: [...queryKeys.leads.all(), 'reminders'],
-    queryFn: async () => {
-      try {
-        return await leadService.getReminders()
-      } catch {
-        return {
-          today: [],
-          missed: [],
-          generatedAt: '',
-          timezone: 'Asia/Kolkata',
-        }
-      }
-    },
+    queryKey: queryKeys.leads.all(),
+    queryFn: () => leadService.getAll(10),
+    select: (data) => buildReminderSummary(data.leads),
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchInterval: 10000,
@@ -55,33 +53,9 @@ export function useLeadReminders() {
 
 export function useLeadAnalytics() {
   return useQuery({
-    queryKey: [...queryKeys.leads.all(), 'analytics'],
-    queryFn: async () => {
-      try {
-        return await leadService.getAnalytics()
-      } catch {
-        return {
-          stageCounts: { new: 0, contacted: 0, qualified: 0, converted: 0, lost: 0 },
-          heatDistribution: { cold: 0, warm: 0, hot: 0 },
-          dropOff: { newToContacted: 0, contactedToQualified: 0, qualifiedToConverted: 0 },
-          stageDurations: {
-            new: { totalDays: 0, samples: 0, averageDays: 0 },
-            contacted: { totalDays: 0, samples: 0, averageDays: 0 },
-            qualified: { totalDays: 0, samples: 0, averageDays: 0 },
-            converted: { totalDays: 0, samples: 0, averageDays: 0 },
-            lost: { totalDays: 0, samples: 0, averageDays: 0 },
-          },
-          conversionTimeline: [],
-          lifecycleMetrics: {
-            totalActiveLeads: 0,
-            convertedLeads: 0,
-            lostLeads: 0,
-            avgContactAttempts: 0,
-            avgLeadAgeDays: 0,
-          },
-        }
-      }
-    },
+    queryKey: queryKeys.leads.all(),
+    queryFn: () => leadService.getAll(10),
+    select: (data) => buildLeadAnalytics(data.leads),
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchInterval: 10000,
@@ -90,14 +64,9 @@ export function useLeadAnalytics() {
 
 export function useLeadDigest() {
   return useQuery({
-    queryKey: [...queryKeys.leads.all(), 'digest'],
-    queryFn: async () => {
-      try {
-        return await leadService.getDigest()
-      } catch {
-        return {}
-      }
-    },
+    queryKey: queryKeys.leads.all(),
+    queryFn: () => leadService.getAll(10),
+    select: (data) => buildDailyDigest(buildReminderSummary(data.leads)),
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchInterval: 10000,
@@ -180,8 +149,6 @@ export function useUpdateLead() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
       qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })
-      qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'reminders'] })
-      qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'analytics'] })
       toast.success(data.message || 'Lead updated successfully')
     },
     onError: (err: any, _vars, ctx) => {
@@ -200,8 +167,6 @@ export function useDeleteLead() {
     mutationFn: (id: string) => leadService.delete(id),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
-      qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'reminders'] })
-      qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'analytics'] })
       toast.success(data.message || 'Lead deleted successfully')
     },
     onError: (err: any) => {
@@ -218,8 +183,6 @@ export function useConvertLead() {
       leadService.convert(id, payload),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
-      qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'reminders'] })
-      qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'analytics'] })
       toast.success(data.message || 'Lead converted successfully')
     },
     onError: (err: any) => {
@@ -258,8 +221,6 @@ export function useRecordLeadContactAttempt() {
         setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
       )
       qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })
-      qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'reminders'] })
-      qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'analytics'] })
       toast.success(data.message || 'Contact attempt recorded')
     },
     onError: (err: any) => {

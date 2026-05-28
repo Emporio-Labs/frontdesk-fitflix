@@ -17,6 +17,7 @@ export interface OnboardingStatusResponse {
 
 // ── Medical report (returned by POST /onboarding/reports) ─────────────────────
 export interface MedicalReport {
+  id: string
   _id: string
   userId: string
   reportName: string
@@ -32,6 +33,7 @@ export type ExpertType = 'sports_scientist' | 'nutritionist'
 export type ExpertAppointmentStatus = 'Pending' | 'Confirmed' | 'Cancelled'
 
 export interface ExpertAppointment {
+  id: string
   _id: string
   userId: string
   expertType: ExpertType
@@ -85,6 +87,14 @@ export const onboardingService = {
   // call this — use `user.onboardingStatus` from `GET /users/:id` instead.
   getStatus: async () => {
     const { data } = await apiClient.get('/onboarding/status')
+    return data as OnboardingStatusResponse
+  },
+
+  // ASSUMPTION: admin visibility endpoint is GET /onboarding/status/:userId
+  // (path param). If the backend uses a query param instead, change to:
+  // apiClient.get('/onboarding/status', { params: { userId } })
+  getStatusByUser: async (userId: string): Promise<OnboardingStatusResponse> => {
+    const { data } = await apiClient.get(`/onboarding/status/${userId}`)
     return data as OnboardingStatusResponse
   },
 
