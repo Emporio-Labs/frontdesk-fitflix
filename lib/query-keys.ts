@@ -85,6 +85,10 @@ export const queryKeys = {
     all: () => ['onboarding'] as const,
     mine: () => ['onboarding', 'me'] as const,
   },
+  invoices: {
+    all: () => ['invoices'] as const,
+    detail: (id: string) => ['invoices', id] as const,
+  },
   nutrition: {
     all: () => ['nutrition'] as const,
     members: () => ['nutrition', 'members'] as const,

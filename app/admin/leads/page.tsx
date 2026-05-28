@@ -30,7 +30,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { IconPlus, IconEdit, IconTrash, IconCheck } from '@tabler/icons-react'
+import { IconPlus, IconEdit, IconTrash, IconCheck, IconFileInvoice } from '@tabler/icons-react'
+import { CreateInvoiceSheet } from '@/components/invoices/create-invoice-sheet'
 import {
   useAddLeadInteraction,
   useConvertLead,
@@ -50,8 +51,10 @@ import KanbanCard from './kanban-card'
 export default function LeadsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false)
+  const [isInvoiceSheetOpen, setIsInvoiceSheetOpen] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null)
+  const [invoicingLead, setInvoicingLead] = useState<Lead | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
@@ -211,6 +214,11 @@ export default function LeadsPage() {
       assignedStaffName: lead.assignedStaffName || '',
     })
     setIsAddDialogOpen(true)
+  }
+
+  const handleInvoiceLead = (lead: Lead) => {
+    setInvoicingLead(lead)
+    setIsInvoiceSheetOpen(true)
   }
 
   const handleConvertLead = (lead: Lead) => {
@@ -694,6 +702,7 @@ export default function LeadsPage() {
                     key={`new-${lead.id}`}
                     lead={lead}
                     onConvert={() => handleConvertLead(lead)}
+                    onInvoice={() => handleInvoiceLead(lead)}
                     onEdit={() => handleEditLead(lead)}
                     onCall={() => handleQuickCall(lead)}
                     onWhatsApp={() => handleQuickWhatsApp(lead)}
@@ -718,6 +727,7 @@ export default function LeadsPage() {
                     key={`contacted-${lead.id}`}
                     lead={lead}
                     onConvert={() => handleConvertLead(lead)}
+                    onInvoice={() => handleInvoiceLead(lead)}
                     onEdit={() => handleEditLead(lead)}
                     onCall={() => handleQuickCall(lead)}
                     onWhatsApp={() => handleQuickWhatsApp(lead)}
@@ -742,6 +752,7 @@ export default function LeadsPage() {
                     key={`qualified-${lead.id}`}
                     lead={lead}
                     onConvert={() => handleConvertLead(lead)}
+                    onInvoice={() => handleInvoiceLead(lead)}
                     onEdit={() => handleEditLead(lead)}
                     onCall={() => handleQuickCall(lead)}
                     onWhatsApp={() => handleQuickWhatsApp(lead)}
@@ -902,9 +913,22 @@ export default function LeadsPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
+                                className="text-blue-600 hover:text-blue-700"
+                                onClick={() => handleInvoiceLead(lead)}
+                                disabled={isPending}
+                                title="Convert & Invoice"
+                              >
+                                <IconFileInvoice className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {lead.status !== 'converted' && lead.status !== 'lost' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 className="text-green-600"
                                 onClick={() => handleConvertLead(lead)}
                                 disabled={isPending}
+                                title="Convert lead"
                               >
                                 <IconCheck className="w-4 h-4" />
                               </Button>
@@ -1294,6 +1318,17 @@ export default function LeadsPage() {
                 </DialogContent>
               </Dialog>
             )}
+
+      {invoicingLead && (
+        <CreateInvoiceSheet
+          lead={invoicingLead}
+          open={isInvoiceSheetOpen}
+          onOpenChange={(open) => {
+            setIsInvoiceSheetOpen(open)
+            if (!open) setInvoicingLead(null)
+          }}
+        />
+      )}
     </div>
   )
 }
