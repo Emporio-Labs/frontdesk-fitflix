@@ -4,7 +4,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Lead, LeadTemperature } from '@/lib/services/lead.service'
-import { IconBrandWhatsapp, IconCheck, IconEdit, IconGripVertical, IconMessage, IconPhone, IconUser } from '@tabler/icons-react'
+import { IconBrandWhatsapp, IconCheck, IconEdit, IconGripVertical, IconMessage, IconPhone, IconUser, IconFileInvoice } from '@tabler/icons-react'
 
 interface KanbanCardProps {
   lead: Lead
@@ -13,6 +13,7 @@ interface KanbanCardProps {
   onCall: () => void
   onWhatsApp: () => void
   onAddNote: () => void
+  onInvoice?: () => void
   isPending: boolean
   source: string
   isFollowUpToday: boolean
@@ -27,6 +28,7 @@ export default function KanbanCard({
   onCall,
   onWhatsApp,
   onAddNote,
+  onInvoice,
   isPending,
   source,
   isFollowUpToday,
@@ -171,15 +173,30 @@ export default function KanbanCard({
         >
           <IconMessage className="w-4 h-4" />
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-green-600 hover:text-green-700 hover:bg-green-100 flex-1"
-          disabled={isPending}
-          onClick={onConvert}
-        >
-          <IconCheck className="w-4 h-4" />
-        </Button>
+        {lead.status !== 'converted' && onInvoice && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-100 flex-1"
+            disabled={isPending}
+            onClick={onInvoice}
+            title="Convert & Invoice"
+          >
+            <IconFileInvoice className="w-4 h-4" />
+          </Button>
+        )}
+        {lead.status !== 'converted' && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-green-600 hover:text-green-700 hover:bg-green-100 flex-1"
+            disabled={isPending}
+            onClick={onConvert}
+            title="Convert lead"
+          >
+            <IconCheck className="w-4 h-4" />
+          </Button>
+        )}
         <Button
           size="sm"
           variant="ghost"

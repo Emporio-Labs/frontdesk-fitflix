@@ -95,6 +95,10 @@ export const queryKeys = {
     all: () => ['nutritionist-bookings'] as const,
     detail: (id: string) => ['nutritionist-bookings', id] as const,
   },
+  invoices: {
+    all: () => ['invoices'] as const,
+    detail: (id: string) => ['invoices', id] as const,
+  },
   nutrition: {
     all: () => ['nutrition'] as const,
     members: () => ['nutrition', 'members'] as const,
