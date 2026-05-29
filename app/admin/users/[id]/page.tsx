@@ -45,6 +45,13 @@ import { HealthGoalsDialog } from '@/components/health-goals-dialog'
 import { ConsentDialog } from '@/components/consent-dialog'
 import { OnboardingReportsDialog } from '@/components/onboarding-reports-dialog'
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import {
   computeBmi,
   computeProteinGoalGrams,
   computeWaterIntakeLiters,
@@ -205,6 +212,8 @@ export default function UserDetailPage() {
   const [goalsOpen, setGoalsOpen] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
   const [reportsOpen, setReportsOpen] = useState(false)
+  const [calOpen, setCalOpen] = useState(false)
+  const [calExpertType, setCalExpertType] = useState<'sports_scientist' | 'nutritionist' | null>(null)
 
   const { data: memberships, isLoading: membershipsLoading } = useMemberships()
   const { data: bookings, isLoading: bookingsLoading } = useBookings()
@@ -653,6 +662,8 @@ export default function UserDetailPage() {
                           const statusLabel =
                             appt?.bookingStatus?.toLowerCase() ||
                             (booked ? 'booked' : 'pending')
+                          const displayDate = appt?.appointmentDate || appt?.appointmentStart
+                          const displayLink = appt?.meetingLink || appt?.meetingUrl
                           return (
                             <div
                               key={key}
@@ -662,17 +673,17 @@ export default function UserDetailPage() {
                                 <Icon className="h-5 w-5 text-muted-foreground mt-0.5" />
                                 <div>
                                   <p className="font-medium text-sm">{label}</p>
-                                  {appt?.appointmentDate && (
+                                  {displayDate && (
                                     <p className="text-xs text-muted-foreground mt-0.5">
-                                      {formatDateForDisplay(appt.appointmentDate)}
+                                      {formatDateForDisplay(displayDate)}
                                     </p>
                                   )}
-                                  {appt?.meetingLink && (
+                                  {displayLink && (
                                     <a
-                                      href={appt.meetingLink}
+                                      href={displayLink}
                                       target="_blank"
                                       rel="noreferrer noopener"
-                                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline block mt-0.5"
                                     >
                                       Meeting link
                                     </a>
@@ -680,6 +691,19 @@ export default function UserDetailPage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
+                                {statusLabel === 'pending' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => {
+                                      setCalExpertType(expertType)
+                                      setCalOpen(true)
+                                    }}
+                                  >
+                                    Schedule
+                                  </Button>
+                                )}
                                 {booked && (
                                   <IconCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
                                 )}
@@ -723,6 +747,26 @@ export default function UserDetailPage() {
             onOpenChange={setReportsOpen}
             reports={profile.reports}
           />
+          <Dialog open={calOpen} onOpenChange={setCalOpen}>
+            <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-4">
+              <DialogHeader className="pb-2">
+                <DialogTitle>Schedule Expert Appointment</DialogTitle>
+                <DialogDescription>
+                  Book a {calExpertType === 'sports_scientist' ? 'Sports Scientist' : 'Nutritionist'} slot on behalf of {user.username}.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 w-full h-full min-h-[400px] overflow-hidden rounded-md border bg-card">
+                {calOpen && calExpertType && (
+                  <iframe
+                    src={`https://cal.com/fitflix/${calExpertType === 'sports_scientist' ? 'sports-scientist' : 'nutritionist'}?email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.username)}&metadata[userId]=${userId}`}
+                    width="100%"
+                    height="100%"
+                    className="border-0"
+                  />
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>
