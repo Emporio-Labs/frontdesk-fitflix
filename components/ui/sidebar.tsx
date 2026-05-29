@@ -220,24 +220,36 @@ const Sidebar = React.forwardRef<
       )
     }
 
+    const [isHovered, setIsHovered] = React.useState(false)
+
     return (
       <div
         ref={ref}
         className="group peer hidden md:block text-sidebar-foreground"
-        data-state={state}
-        data-collapsible={state === 'collapsed' ? collapsible : ''}
+        data-state={isHovered ? 'expanded' : state}
+        data-collapsible={isHovered ? '' : (state === 'collapsed' ? collapsible : '')}
         data-variant={variant}
         data-side={side}
+        data-hovered={isHovered}
+        onMouseEnter={() => {
+          if (state === 'collapsed') {
+            setIsHovered(true)
+          }
+        }}
+        onMouseLeave={() => {
+          setIsHovered(false)
+        }}
       >
         {/* This is what handles the sidebar gap on desktop */}
         <div
           className={cn(
-            'duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear',
-            'group-data-[collapsible=offcanvas]:w-0',
-            'group-data-[side=right]:rotate-180',
-            variant === 'floating' || variant === 'inset'
-              ? 'group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]'
-              : 'group-data-[collapsible=icon]:w-[--sidebar-width-icon]',
+            'duration-200 relative h-svh bg-transparent transition-[width] ease-linear',
+            side === 'right' && 'rotate-180',
+            state === 'collapsed'
+              ? (variant === 'floating' || variant === 'inset'
+                  ? 'w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]'
+                  : 'w-[--sidebar-width-icon]')
+              : 'w-[--sidebar-width]'
           )}
         />
         <div
@@ -256,7 +268,11 @@ const Sidebar = React.forwardRef<
         >
           <div
             data-sidebar="sidebar"
-            className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
+            className={cn(
+              "flex h-full w-full flex-col bg-sidebar transition-shadow duration-200",
+              "group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow",
+              "group-data-[hovered=true]:shadow-2xl group-data-[hovered=true]:border-r group-data-[hovered=true]:border-sidebar-border/50"
+            )}
           >
             {children}
           </div>
