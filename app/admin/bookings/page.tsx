@@ -22,7 +22,9 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
-import { IconTrash, IconRefresh } from '@tabler/icons-react'
+import { IconTrash, IconRefresh, IconCalendar } from '@tabler/icons-react'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useBookings, useCreateBooking, useDeleteBooking, useChangeBookingStatus } from '@/hooks/use-bookings'
 import { useSlots } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
@@ -52,12 +54,13 @@ interface BookingWithNames extends Booking {
 }
 
 const STATUS_COLORS: Record<number, string> = {
-  0: 'bg-blue-100 text-blue-800',
-  1: 'bg-green-100 text-green-800',
-  2: 'bg-red-100 text-red-800',
-  3: 'bg-emerald-100 text-emerald-800',
-  4: 'bg-gray-100 text-gray-800',
+  0: 'bg-blue-100 text-blue-800 hover:bg-blue-100 border-transparent whitespace-nowrap',
+  1: 'bg-green-100 text-green-800 hover:bg-green-100 border-transparent whitespace-nowrap',
+  2: 'bg-red-100 text-red-800 hover:bg-red-100 border-transparent whitespace-nowrap',
+  3: 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-transparent whitespace-nowrap',
+  4: 'bg-gray-100 text-gray-800 hover:bg-gray-100 border-transparent whitespace-nowrap',
 }
+
 
 const UTC_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -342,6 +345,23 @@ export default function BookingsPage() {
     [enrichedBookings, todayDateKey, slotById]
   )
 
+  const selectedDate = useMemo(() => {
+    if (!formData.bookingDate) return undefined
+    const parsed = new Date(`${formData.bookingDate}T00:00:00.000Z`)
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed
+  }, [formData.bookingDate])
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    const dateKey = localDate.toISOString().slice(0, 10)
+    setFormData((prev) => ({
+      ...prev,
+      bookingDate: dateKey,
+      slotId: '',
+    }))
+  }
+
   const canCreateBooking =
     Boolean(formData.bookingDate && formData.userId && formData.slotId && formData.serviceId) &&
     !createBooking.isPending &&
@@ -450,17 +470,32 @@ export default function BookingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Booking Day</label>
-              <Input
-                type="date"
-                value={formData.bookingDate}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    bookingDate: e.target.value,
-                    slotId: '',
-                  }))
-                }
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-9 bg-background focus:ring-1 border-input",
+                      !formData.bookingDate && "text-muted-foreground"
+                    )}
+                  >
+                    <IconCalendar className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
+                    {formData.bookingDate ? (
+                      formatDateKey(formData.bookingDate)
+                    ) : (
+                      <span className="text-muted-foreground">Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
@@ -926,16 +961,19 @@ export default function BookingsPage() {
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => deleteBooking.mutate(booking._id)}
-                            disabled={deleteBooking.isPending}
-                          >
-                            <IconTrash className="w-4 h-4" />
-                          </Button>
+                        <TableCell className="text-right py-2 pr-6">
+                          <div className="flex justify-end items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              onClick={() => { if (confirm('Delete booking?')) deleteBooking.mutate(booking._id) }}
+                              disabled={deleteBooking.isPending}
+                              title="Delete Booking"
+                            >
+                              <IconTrash className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

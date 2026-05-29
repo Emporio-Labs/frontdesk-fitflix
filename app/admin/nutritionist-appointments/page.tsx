@@ -76,26 +76,27 @@ function formatDateTime(value?: string | null): string {
 }
 
 function NutritionistStatusBadge({ status }: { status: NutritionistBookingStatus }) {
-  const map: Record<NutritionistBookingStatus, { label: string; cls: string }> = {
-    Pending: {
+  const map: Record<string, { label: string; cls: string }> = {
+    pending: {
       label: 'PENDING',
       cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-transparent',
     },
-    Confirmed: {
+    confirmed: {
       label: 'ACCEPTED',
       cls: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-transparent',
     },
-    Cancelled: {
+    cancelled: {
       label: 'REJECTED',
       cls: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-transparent',
     },
-    Completed: {
+    completed: {
       label: 'COMPLETED',
       cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-transparent',
     },
   }
-  const { label, cls } = map[status]
-  return <Badge className={cls}>{label}</Badge>
+  const statusKey = String(status || '').toLowerCase()
+  const match = map[statusKey] || map.pending
+  return <Badge className={match.cls}>{match.label}</Badge>
 }
 
 function AppointmentModeCell({ booking }: { booking: NutritionistBooking }) {
@@ -177,17 +178,18 @@ export default function NutritionistAppointmentsPage() {
     let confirmed = 0
     let cancelled = 0
     for (const b of bookings) {
-      if (b.bookingStatus === 'Pending') pending++
-      else if (b.bookingStatus === 'Confirmed') confirmed++
-      else if (b.bookingStatus === 'Cancelled') cancelled++
+      const status = String(b.bookingStatus || '').toLowerCase()
+      if (status === 'pending') pending++
+      else if (status === 'confirmed') confirmed++
+      else if (status === 'cancelled') cancelled++
     }
     return { pending, confirmed, cancelled, total: bookings.length }
   }, [bookings])
 
   const segmented = useMemo(() => {
     if (tab === 'all') return bookings
-    const target = STATUS_BY_TAB[tab]
-    return bookings.filter((b) => b.bookingStatus === target)
+    const target = STATUS_BY_TAB[tab].toLowerCase()
+    return bookings.filter((b) => String(b.bookingStatus || '').toLowerCase() === target)
   }, [bookings, tab])
 
   const filtered = useMemo(() => {
