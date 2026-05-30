@@ -75,8 +75,12 @@ function formatDateTime(value?: string | null): string {
   )}`
 }
 
-function NutritionistStatusBadge({ status }: { status: NutritionistBookingStatus }) {
-  const map: Record<NutritionistBookingStatus, { label: string; cls: string }> = {
+function NutritionistStatusBadge({ status }: { status: string }) {
+  const key = status
+    ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
+    : 'Pending'
+
+  const map: Record<string, { label: string; cls: string }> = {
     Pending: {
       label: 'PENDING',
       cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-transparent',
@@ -90,8 +94,13 @@ function NutritionistStatusBadge({ status }: { status: NutritionistBookingStatus
       cls: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-transparent',
     },
   }
-  const { label, cls } = map[status]
-  return <Badge className={cls}>{label}</Badge>
+
+  const match = map[key] || {
+    label: (status || 'PENDING').toUpperCase(),
+    cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-transparent',
+  }
+
+  return <Badge className={match.cls}>{match.label}</Badge>
 }
 
 function AppointmentModeCell({ booking }: { booking: NutritionistBooking }) {
@@ -103,8 +112,8 @@ function AppointmentModeCell({ booking }: { booking: NutritionistBooking }) {
       <div className="flex items-start gap-1.5 text-sm">
         <IconMapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
         <div>
-          <div className="font-medium">Hybrid Human Clinic</div>
-          <div className="text-xs text-muted-foreground">Jubilee Hills</div>
+          <div className="font-medium">Fitflix</div>
+          <div className="text-xs text-muted-foreground">Sainikpuri</div>
         </div>
       </div>
     )

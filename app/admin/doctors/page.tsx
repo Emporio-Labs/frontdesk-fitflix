@@ -29,6 +29,7 @@ export default function DoctorsPage() {
   const createDoctor = useCreateDoctor()
   const updateDoctor = useUpdateDoctor()
   const deleteDoctor = useDeleteDoctor()
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const filtered = doctors.filter(
     (d) =>
@@ -38,6 +39,7 @@ export default function DoctorsPage() {
 
   const resetForm = () => {
     setFormData({ doctorName: '', email: '', phone: '', password: '', description: '', specialitiesInput: '' })
+    setFormErrors({})
     setEditingDoctor(null)
   }
 
@@ -51,22 +53,50 @@ export default function DoctorsPage() {
     setIsDialogOpen(true)
   }
 
-  const handleSubmit = async () => {
-    const specialities = formData.specialitiesInput.split(',').map(s => s.trim()).filter(Boolean)
-    if (editingDoctor) {
-      await updateDoctor.mutateAsync({
-        id: editingDoctor._id,
-        payload: { doctorName: formData.doctorName, description: formData.description, specialities },
-      })
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {}
+    if (!formData.doctorName.trim()) errors.doctorName = 'Name is required'
+    if (!editingDoctor && !formData.email.trim()) errors.email = 'Email is required'
+    if (!editingDoctor && formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Invalid email format'
+    
+    if (!formData.phone.trim()) {
+      errors.phone = 'Phone is required'
     } else {
-      if (!formData.doctorName || !formData.email || !formData.phone || !formData.password) return
-      await createDoctor.mutateAsync({
-        doctorName: formData.doctorName, email: formData.email, phone: formData.phone,
-        password: formData.password, description: formData.description, specialities,
-      })
+      const cleanPhone = formData.phone.replace(/[\s\-()]/g, '')
+      const indianPhoneRegex = /^(?:\+91|91|0)?[6-9]\d{9}$/
+      if (!indianPhoneRegex.test(cleanPhone)) {
+        errors.phone = 'Please enter a valid Indian mobile number (e.g. +91 98765 43210 or 9876543210)'
+      }
     }
-    setIsDialogOpen(false)
-    resetForm()
+    
+    if (!editingDoctor && !formData.password) errors.password = 'Password is required'
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleSubmit = async () => {
+    if (!validateForm()) return
+    const specialities = formData.specialitiesInput.split(',').map(s => s.trim()).filter(Boolean)
+    const cleanPhone = formData.phone.replace(/[\s\-()]/g, '')
+    
+    try {
+      if (editingDoctor) {
+        await updateDoctor.mutateAsync({
+          id: editingDoctor._id,
+          payload: { doctorName: formData.doctorName, description: formData.description, specialities },
+        })
+      } else {
+        await createDoctor.mutateAsync({
+          doctorName: formData.doctorName, email: formData.email, phone: cleanPhone,
+          password: formData.password, description: formData.description, specialities,
+        })
+      }
+      setIsDialogOpen(false)
+      resetForm()
+    } catch (err: any) {
+      console.error(err)
+    }
   }
 
   const isPending = createDoctor.isPending || updateDoctor.isPending
@@ -96,20 +126,24 @@ export default function DoctorsPage() {
                 <div>
                   <label className="text-sm font-medium">Name *</label>
                   <Input value={formData.doctorName} onChange={(e) => setFormData({ ...formData, doctorName: e.target.value })} placeholder="Dr. Smith" />
+                  {formErrors.doctorName && <p className="text-xs text-red-500 mt-1">{formErrors.doctorName}</p>}
                 </div>
                 {!editingDoctor && (
                   <>
                     <div>
-                      <label className="text-sm font-medium">Email *</label>
-                      <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="smith@fitflix.com" />
+                      <label className="text-sm font-medium">Phone *</label>
+                      <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+91 98765 43210" />
+                      {formErrors.phone && <p className="text-xs text-red-500 mt-1">{formErrors.phone}</p>}
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Phone *</label>
-                      <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+1234567890" />
+                      <label className="text-sm font-medium">Email *</label>
+                      <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="smith@fitflix.com" />
+                      {formErrors.email && <p className="text-xs text-red-500 mt-1">{formErrors.email}</p>}
                     </div>
                     <div>
                       <label className="text-sm font-medium">Password *</label>
                       <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+                      {formErrors.password && <p className="text-xs text-red-500 mt-1">{formErrors.password}</p>}
                     </div>
                   </>
                 )}
@@ -179,7 +213,7 @@ export default function DoctorsPage() {
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button size="sm" variant="outline" onClick={() => handleOpenEdit(doctor)}><IconEdit className="w-4 h-4" /></Button>
-                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => deleteDoctor.mutate(doctor._id)} disabled={deleteDoctor.isPending}><IconTrash className="w-4 h-4" /></Button>
+                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${doctor.doctorName}?`)) deleteDoctor.mutate(doctor._id) }} disabled={deleteDoctor.isPending}><IconTrash className="w-4 h-4" /></Button>
                           </div>
                         </TableCell>
                       </TableRow>

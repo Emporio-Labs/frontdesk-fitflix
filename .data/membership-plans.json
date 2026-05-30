@@ -20,5 +20,24 @@
     "status": "active",
     "created_at": "2026-04-10T18:54:18.835Z",
     "updated_at": "2026-04-10T18:54:18.835Z"
+  },
+  {
+    "plan_id": "fb87317a-d66c-4e42-a90d-29302d89c5c4",
+    "gym_id": "default-gym",
+    "plan_name": "bvtr",
+    "duration_months": 1,
+    "total_price": 50,
+    "currency": "INR",
+    "features": [],
+    "benefits": {
+      "credits": 45,
+      "pauseDays": 4,
+      "trainerSessions": 6,
+      "transferSessions": 7,
+      "transferWindowDays": 654
+    },
+    "status": "inactive",
+    "created_at": "2026-05-30T07:49:10.270Z",
+    "updated_at": "2026-05-30T07:55:22.875Z"
   }
 ]

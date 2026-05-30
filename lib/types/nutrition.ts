@@ -475,7 +475,14 @@ export const templateMealSchema = z
   .object({
     mealType: z.enum(MEAL_TYPES),
     name: z.string().min(1),
-    timeOfDay: z.string().nullable().optional(),
+    timeOfDay: z
+      .string()
+      .refine(
+        (val) => !val || /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(val),
+        'Invalid time format (HH:MM)',
+      )
+      .nullable()
+      .optional(),
     timelineSlot: z.enum(TIMELINE_SLOTS).nullable().optional(),
     notes: z.string().max(1000).optional(),
     reasoning: mealReasoningSchema,

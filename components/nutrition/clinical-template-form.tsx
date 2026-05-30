@@ -453,7 +453,7 @@ function ClinicalMealCard({
                   <FormLabel className="text-xs">Time</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="07:30"
+                      type="time"
                       className="h-8"
                       value={field.value ?? ''}
                       onChange={field.onChange}
@@ -1152,7 +1152,7 @@ export function ClinicalTemplateForm({
                           <Badge
                             key={allergy}
                             variant={isSelected ? 'default' : 'outline'}
-                            className="cursor-pointer hover:bg-primary/90 transition-colors"
+                            className="cursor-pointer hover:bg-primary/90 hover:text-primary-foreground transition-colors"
                             onClick={() => {
                               const next = isSelected 
                                 ? (field.value || []).filter((a: string) => a !== allergy)
@@ -1182,7 +1182,7 @@ export function ClinicalTemplateForm({
                           <Badge
                             key={cond}
                             variant={isSelected ? 'default' : 'outline'}
-                            className="cursor-pointer hover:bg-primary/90 transition-colors"
+                            className="cursor-pointer hover:bg-primary/90 hover:text-primary-foreground transition-colors"
                             onClick={() => {
                               const next = isSelected 
                                 ? (field.value || []).filter((c: string) => c !== cond)

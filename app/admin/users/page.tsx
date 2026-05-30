@@ -118,7 +118,17 @@ export default function UsersPage() {
     if (!memberForm.username.trim()) errors.username = 'Username is required'
     if (!editingUser && !memberForm.email.trim()) errors.email = 'Email is required'
     if (!editingUser && memberForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(memberForm.email)) errors.email = 'Invalid email format'
-    if (!memberForm.phone.trim()) errors.phone = 'Phone is required'
+    
+    if (!memberForm.phone.trim()) {
+      errors.phone = 'Phone is required'
+    } else {
+      const cleanPhone = memberForm.phone.replace(/[\s\-()]/g, '')
+      const indianPhoneRegex = /^(?:\+91|91|0)?[6-9]\d{9}$/
+      if (!indianPhoneRegex.test(cleanPhone)) {
+        errors.phone = 'Please enter a valid Indian mobile number (e.g. +91 98765 43210 or 9876543210)'
+      }
+    }
+
     if (!memberForm.age || Number(memberForm.age) < 1 || Number(memberForm.age) > 130) errors.age = 'Age must be between 1 and 130'
     if (!editingUser) {
       if (!memberForm.password) {
@@ -148,15 +158,16 @@ export default function UsersPage() {
   const handleMemberSubmit = async () => {
     if (!validateMemberForm()) return
     const healthGoals = memberForm.healthGoalsInput.split(',').map(s => s.trim()).filter(Boolean)
+    const cleanPhone = memberForm.phone.replace(/[\s\-()]/g, '')
     try {
       if (editingUser) {
         await updateUser.mutateAsync({
           id: editingUser._id,
-          payload: { username: memberForm.username, phone: memberForm.phone, age: Number(memberForm.age), gender: memberForm.gender, healthGoals },
+          payload: { username: memberForm.username, phone: cleanPhone, age: Number(memberForm.age), gender: memberForm.gender, healthGoals },
         })
       } else {
         await createUser.mutateAsync({
-          username: memberForm.username, email: memberForm.email, phone: memberForm.phone,
+          username: memberForm.username, email: memberForm.email, phone: cleanPhone,
           password: memberForm.password, age: Number(memberForm.age), gender: memberForm.gender, healthGoals,
         })
       }
@@ -276,7 +287,7 @@ export default function UsersPage() {
                     )}
                     <div>
                       <label className="text-sm font-medium">Phone *</label>
-                      <Input value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} placeholder="+1234567890" />
+                      <Input value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} placeholder="+91 98765 43210" />
                       {memberFormErrors.phone && <p className="text-xs text-red-500 mt-1">{memberFormErrors.phone}</p>}
                     </div>
                     {!editingUser && (

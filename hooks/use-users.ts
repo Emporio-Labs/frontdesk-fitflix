@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   userService,
+  User,
   CreateUserPayload,
   UpdateUserPayload,
   OnboardUserPayload,
@@ -21,7 +22,10 @@ export function useUser(id: string) {
   return useQuery({
     queryKey: queryKeys.users.detail(id),
     queryFn: () => userService.getById(id),
-    select: (data) => data.user,
+    select: (data: any): User | undefined => {
+      if (!data) return undefined
+      return data.user !== undefined ? data.user : data
+    },
     enabled: !!id,
   })
 }

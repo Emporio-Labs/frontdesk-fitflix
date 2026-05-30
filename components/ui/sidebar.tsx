@@ -35,6 +35,8 @@ type SidebarContext = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  isHovered: boolean
+  setIsHovered: (hovered: boolean) => void
 }
 
 const SidebarContext = React.createContext<SidebarContext | null>(null)
@@ -70,6 +72,7 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
+    const [isHovered, setIsHovered] = React.useState(false)
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
@@ -126,6 +129,8 @@ const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        isHovered,
+        setIsHovered,
       }),
       [
         state,
@@ -135,6 +140,7 @@ const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        isHovered,
       ],
     )
 
@@ -184,7 +190,7 @@ const Sidebar = React.forwardRef<
     },
     ref,
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { isMobile, state, openMobile, setOpenMobile, isHovered, setIsHovered } = useSidebar()
 
     if (collapsible === 'none') {
       return (
@@ -228,10 +234,12 @@ const Sidebar = React.forwardRef<
       <div
         ref={ref}
         className="group peer hidden md:block text-sidebar-foreground"
-        data-state={state}
-        data-collapsible={state === 'collapsed' ? collapsible : ''}
+        data-state={state === 'collapsed' && isHovered ? 'expanded' : state}
+        data-collapsible={state === 'collapsed' && !isHovered ? collapsible : ''}
         data-variant={variant}
         data-side={side}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
         {/* This is what handles the sidebar gap on desktop */}
         <div
@@ -239,9 +247,11 @@ const Sidebar = React.forwardRef<
             'duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear',
             'group-data-[collapsible=offcanvas]:w-0',
             'group-data-[side=right]:rotate-180',
-            variant === 'floating' || variant === 'inset'
-              ? 'group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]'
-              : 'group-data-[collapsible=icon]:w-[--sidebar-width-icon]',
+            state === 'collapsed'
+              ? (variant === 'floating' || variant === 'inset'
+                ? 'w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]'
+                : 'w-[--sidebar-width-icon]')
+              : '',
           )}
         />
         <div
@@ -252,15 +262,18 @@ const Sidebar = React.forwardRef<
               : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',
             // Adjust the padding for floating and inset variants.
             variant === 'floating' || variant === 'inset'
-              ? 'p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]'
-              : 'group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l',
+              ? 'p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)] group-hover:w-[--sidebar-width]'
+              : 'group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l group-hover:w-[--sidebar-width]',
             className,
           )}
           {...props}
         >
           <div
             data-sidebar="sidebar"
-            className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
+            className={cn(
+              "flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow transition-shadow duration-200",
+              state === 'collapsed' && isHovered ? cn("shadow-2xl", side === 'left' ? "border-r border-sidebar-border" : "border-l border-sidebar-border") : ""
+            )}
           >
             {children}
           </div>
@@ -330,12 +343,17 @@ const SidebarInset = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<'main'>
 >(({ className, ...props }, ref) => {
+  const { state } = useSidebar()
   return (
     <main
       ref={ref}
       className={cn(
         'relative flex min-h-svh flex-1 flex-col bg-background',
-        'peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow',
+        'peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2',
+        state === 'collapsed'
+          ? 'md:peer-data-[variant=inset]:ml-2'
+          : 'md:peer-data-[variant=inset]:ml-0',
+        'md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow',
         className,
       )}
       {...props}
@@ -566,7 +584,7 @@ const SidebarMenuButton = React.forwardRef<
     ref,
   ) => {
     const Comp = asChild ? Slot : 'button'
-    const { isMobile, state } = useSidebar()
+    const { isMobile, state, isHovered } = useSidebar()
 
     const button = (
       <Comp
@@ -574,7 +592,11 @@ const SidebarMenuButton = React.forwardRef<
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
-        className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+        className={cn(
+          sidebarMenuButtonVariants({ variant, size }),
+          isActive && "bg-sidebar-accent font-semibold text-sidebar-accent-foreground relative before:absolute before:left-0 before:top-[20%] before:h-[60%] before:w-[3px] before:rounded-r before:bg-primary",
+          className,
+        )}
         {...props}
       />
     )
@@ -595,7 +617,7 @@ const SidebarMenuButton = React.forwardRef<
         <TooltipContent
           side="right"
           align="center"
-          hidden={state !== 'collapsed' || isMobile}
+          hidden={state !== 'collapsed' || isHovered || isMobile}
           {...tooltip}
         />
       </Tooltip>

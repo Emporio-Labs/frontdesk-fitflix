@@ -16,6 +16,7 @@ export interface Membership {
   endDate: string
   features: string[]
   notes: string
+  createdAt?: string
 }
 
 export interface CreateMembershipPayload {
@@ -70,6 +71,7 @@ function normalizeMembership(raw: any): Membership {
     endDate: raw?.endDate || '',
     features: Array.isArray(raw?.features) ? raw.features : [],
     notes: raw?.notes || '',
+    createdAt: raw?.createdAt || '',
   }
 }
 

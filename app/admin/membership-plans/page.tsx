@@ -35,6 +35,8 @@ import {
   useMembershipPlans,
   useUpdateMembershipPlan,
 } from '@/hooks/use-membership-plans'
+import { toast } from 'sonner'
+import { useMemberships } from '@/hooks/use-memberships'
 
 type FormState = {
   planName: string
@@ -80,6 +82,7 @@ export default function MembershipPlansPage() {
   const createPlan = useCreateMembershipPlan()
   const updatePlan = useUpdateMembershipPlan()
   const deletePlan = useDeleteMembershipPlan()
+  const { data: memberships = [] } = useMemberships()
 
   const filteredPlans = useMemo(
     () =>
@@ -199,8 +202,32 @@ export default function MembershipPlansPage() {
     })
   }
 
-  const onDelete = async (planId: string) => {
-    await deletePlan.mutateAsync(planId)
+  const onDelete = async (plan: MembershipPlan) => {
+    if (plan.status === 'Active') {
+      toast.error('Cannot delete an active membership plan. Please deactivate it first.')
+      return
+    }
+
+    const isAssigned = memberships.some(
+      (m) =>
+        m.planId === plan.id ||
+        m.planName.toLowerCase() === plan.planName.toLowerCase()
+    )
+
+    if (isAssigned) {
+      toast.error('Cannot delete this plan because it is currently assigned to one or more members.')
+      return
+    }
+
+    if (!confirm(`Are you sure you want to delete the membership plan "${plan.planName}"?`)) {
+      return
+    }
+
+    try {
+      await deletePlan.mutateAsync(plan.id)
+    } catch (error) {
+      // toast.error is handled inside mutation onError
+    }
   }
 
   const isSaving = createPlan.isPending || updatePlan.isPending
@@ -588,7 +615,12 @@ export default function MembershipPlansPage() {
                             <Button size="sm" variant="outline" onClick={() => openEdit(plan)}>
                               <IconEdit className="h-4 w-4" />
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => onDelete(plan.id)}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onDelete(plan)}
+                              disabled={deletePlan.isPending}
+                            >
                               <IconTrash className="h-4 w-4" />
                             </Button>
                           </div>
