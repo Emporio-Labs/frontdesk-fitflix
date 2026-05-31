@@ -29,10 +29,17 @@ export interface Invoice {
   paidAt?: string
 }
 
+export interface InvoicePlanSnapshot {
+  name: string
+  durationInDays: number
+  price: number
+  includedCredits: number
+}
+
 export interface CreateInvoicePayload {
   userId?: string
   leadId?: string
-  membershipPlanId?: string
+  planSnapshot: InvoicePlanSnapshot
   items: InvoiceItem[]
   discount?: number
   tax?: number

@@ -53,7 +53,12 @@ export function CreateInvoiceSheet({ lead, open, onOpenChange, onSuccess }: Prop
     try {
       await createInvoice.mutateAsync({
         leadId: lead.id,
-        membershipPlanId: selectedPlan.id,
+        planSnapshot: {
+          name: selectedPlan.planName,
+          durationInDays: selectedPlan.durationMonths * 30,
+          price: selectedPlan.totalPrice,
+          includedCredits: (selectedPlan.benefits?.credits as number | undefined) ?? 0,
+        },
         items: [
           {
             name: selectedPlan.planName,
