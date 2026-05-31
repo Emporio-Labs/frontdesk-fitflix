@@ -64,7 +64,7 @@ export default function LeadsPage() {
   } = useLeads()
   const { data: reminderSummary } = useLeadReminders()
   const { data: leadAnalytics } = useLeadAnalytics()
-  const { data: leadDigest } = useLeadDigest()
+  const { data: leadDigest } = useLeadDigest() as { data: any }
   const createLead = useCreateLead()
   const updateLead = useUpdateLead()
   const deleteLead = useDeleteLead()

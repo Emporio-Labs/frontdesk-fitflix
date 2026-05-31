@@ -559,6 +559,8 @@ export type UpdateTemplatePayload = Partial<CreateTemplatePayload>
 export interface AssignPlanPayload {
   planId: string
   userId: string
+  startDate?: string
+  endDate?: string
 }
 
 export interface LogMealPayload {

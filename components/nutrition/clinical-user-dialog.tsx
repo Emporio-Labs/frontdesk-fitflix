@@ -43,6 +43,7 @@ import {
 import { useUser } from '@/hooks/use-users'
 import { useNutritionPlans } from '@/hooks/use-nutrition'
 import { useNutritionistWorkspace } from '@/stores/nutritionist-workspace-store'
+import type { ExpertAppointment, MedicalReport } from '@/lib/services/onboarding.service'
 
 interface ClinicalUserDialogProps {
   userId: string | null
@@ -93,7 +94,7 @@ export function ClinicalUserDialog({
   const nutritionistAppointment = useMemo(
     () =>
       user?.expertAppointments?.find(
-        (a) => a.expertType === 'nutritionist'
+        (a: ExpertAppointment) => a.expertType === 'nutritionist'
       ),
     [user]
   )
@@ -220,7 +221,7 @@ export function ClinicalUserDialog({
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
-                    {healthGoals.map((g) => (
+                    {healthGoals.map((g: string) => (
                       <Badge key={g} variant="secondary">
                         {g}
                       </Badge>
@@ -248,7 +249,7 @@ export function ClinicalUserDialog({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {reports.map((r) => (
+                      {reports.map((r: MedicalReport) => (
                         <TableRow key={r._id}>
                           <TableCell className="text-sm font-medium">
                             {r.reportName}

@@ -278,7 +278,7 @@ export default function BookingsPage() {
   )
 
   const userNameById = useMemo(
-    () => new Map(users.map((user) => [user._id, user.name || user.username || user.email || 'Unknown User'])),
+    () => new Map(users.map((user) => [user._id, user.username || user.email || 'Unknown User'])),
     [users]
   )
 

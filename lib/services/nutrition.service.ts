@@ -118,7 +118,7 @@ export const nutritionService = {
   // ── Hydration ───────────────────────────────────────────────────────────────
   getHydration: async (userId: string, date?: string) => {
     const { data } = await apiClient.get('/nutrition/my/hydration', {
-      params: { ...(date ? { date } : {}) },
+      params: { userId, ...(date ? { date } : {}) },
     })
     return data as { items: HydrationLog[] }
   },
@@ -130,7 +130,7 @@ export const nutritionService = {
   // ── Adherence (read-only materialized daily rollup) ─────────────────────────
   getAdherence: async (userId: string, from?: string, to?: string) => {
     const { data } = await apiClient.get('/nutrition/my/adherence', {
-      params: { ...(from ? { from } : {}), ...(to ? { to } : {}) },
+      params: { userId, ...(from ? { from } : {}), ...(to ? { to } : {}) },
     })
     return data as { items: AdherenceDaily[] }
   },
