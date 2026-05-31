@@ -4,8 +4,8 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
 import { authService } from '@/lib/services/auth.service'
-import { toast } from 'sonner'
 import { storeToken } from '@/lib/api-client'
+import { toast } from 'sonner'
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -38,12 +38,21 @@ export default function LoginPage() {
         localStorage.setItem('hh_refresh_token', data.refreshToken)
       }
       const apiUser = data.user
+      const token = data.accessToken || data.token
+      // Always log login response shape for debugging (remove after fixing)
+      console.log('[login] response data:', { keys: Object.keys(data), hasToken: !!token, user: apiUser })
       if (authDebug) {
-        console.debug('[auth-debug] login success', {
+        console.debug('[auth-debug] login response', {
           userId: apiUser?.id,
           email: apiUser?.email,
           role: apiUser?.role,
+          hasToken: !!token,
+          responseKeys: Object.keys(data),
         })
+      }
+      // Store JWT token if the backend provides one
+      if (token) {
+        storeToken(token)
       }
       const roleMap: Record<string, any> = {
         admin: 'clinic_admin',

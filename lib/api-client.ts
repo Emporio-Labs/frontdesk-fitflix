@@ -83,13 +83,17 @@ apiClient.interceptors.request.use((config) => {
       return config
     }
 
-    // Fallback: existing Basic behaviour
-    const credentials = localStorage.getItem('hh_credentials')
-    if (credentials) {
-      const headers = AxiosHeaders.from(config.headers)
-      headers.set('Authorization', `Basic ${credentials}`)
-      config.headers = headers
-      hasAuthHeader = true
+    // Unsafe Basic Auth fallback should NOT be applied on JWT-only paths
+    const requiresJwt = !isAuthEndpoint && requestPath !== '/health'
+    if (!requiresJwt) {
+      // Fallback: existing Basic behaviour
+      const credentials = localStorage.getItem('hh_credentials')
+      if (credentials) {
+        const headers = AxiosHeaders.from(config.headers)
+        headers.set('Authorization', `Basic ${credentials}`)
+        config.headers = headers
+        hasAuthHeader = true
+      }
     }
 
     logAuthDebug('request', {
@@ -131,6 +135,9 @@ async function tryRefreshToken(): Promise<string | null> {
   return _refreshing
 }
 
+// Guard: prevent multiple 401 logouts firing at the same time
+let _isLoggingOut = false
+
 apiClient.interceptors.response.use(
   (response) => {
     const url = `${response.config.baseURL ?? API_BASE_URL}${response.config.url ?? ''}`
@@ -152,9 +159,10 @@ apiClient.interceptors.response.use(
       serverMessage: error?.response?.data?.message,
     })
 
-    // Auto-refresh on 401 (but not for auth endpoints or retried requests)
-    const isAuthEndpoint = (config.url ?? '').startsWith('/auth/')
+    const requestPath = config.url ?? ''
+    const isAuthEndpoint = requestPath.startsWith('/auth/') || requestPath === '/auth'
     const alreadyRetried = (config as any).__retried
+
     if (error?.response?.status === 401 && !isAuthEndpoint && !alreadyRetried) {
       const newToken = await tryRefreshToken()
       if (newToken) {
@@ -163,12 +171,22 @@ apiClient.interceptors.response.use(
         return apiClient.request(config)
       }
       // Refresh failed — clear session and redirect to login
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && !_isLoggingOut && window.location.pathname !== '/login') {
+        _isLoggingOut = true
+        logAuthDebug('401 auto-logout triggered', { url, path: window.location.pathname })
+        clearCredentials()
         clearToken()
         localStorage.removeItem('hh_refresh_token')
         localStorage.removeItem('hh_user')
-        document.cookie = 'hh_authed=; path=/; max-age=0; SameSite=Lax'
-        window.location.href = '/login'
+        if (typeof document !== 'undefined') {
+          document.cookie = 'hh_authed=; path=/; max-age=0; SameSite=Lax'
+        }
+        setTimeout(() => {
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login'
+          }
+          _isLoggingOut = false
+        }, 100)
       }
     }
 

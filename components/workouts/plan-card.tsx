@@ -66,7 +66,7 @@ export function PlanCard({
             </Button>
           ) : (
             <Button size="sm" variant="outline" className="flex-1" asChild>
-              <Link href={`/dashboard/workouts/${plan.id}`}>View Plan</Link>
+              <Link href={`/dashboard/workouts/${plan._id}`}>View Plan</Link>
             </Button>
           )}
         </div>

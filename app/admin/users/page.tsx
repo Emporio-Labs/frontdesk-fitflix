@@ -10,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -28,7 +28,7 @@ import { toast } from 'sonner'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-const GENDER_OPTIONS = ['Male', 'Female', 'Other']
+const GENDER_OPTIONS = ['Male', 'Female', 'Others']
 
 type OnboardingState = 'completed' | 'in_progress' | 'not_started'
 
@@ -57,8 +57,9 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [memberForm, setMemberForm] = useState({
     username: '', email: '', phone: '', password: '',
-    age: '', gender: 'Male',
+    age: '', gender: 'Male', healthGoalsInput: '',
   })
+  const [memberFormErrors, setMemberFormErrors] = useState<Record<string, string>>({})
 
   // Admin state
   const [adminSearch, setAdminSearch] = useState('')
@@ -121,8 +122,41 @@ export default function UsersPage() {
   )
 
   const resetMemberForm = () => {
-    setMemberForm({ username: '', email: '', phone: '', password: '', age: '', gender: 'Male' })
+    setMemberForm({ username: '', email: '', phone: '', password: '', age: '', gender: 'Male', healthGoalsInput: '' })
+    setMemberFormErrors({})
     setEditingUser(null)
+  }
+
+  const validateMemberForm = (): boolean => {
+    const errors: Record<string, string> = {}
+    if (!memberForm.username.trim()) errors.username = 'Username is required'
+    if (!editingUser && !memberForm.email.trim()) errors.email = 'Email is required'
+    if (!editingUser && memberForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(memberForm.email)) errors.email = 'Invalid email format'
+    
+    if (!memberForm.phone.trim()) {
+      errors.phone = 'Phone is required'
+    } else {
+      const cleanPhone = memberForm.phone.replace(/[\s\-()]/g, '')
+      const indianPhoneRegex = /^(?:\+91|91|0)?[6-9]\d{9}$/
+      if (!indianPhoneRegex.test(cleanPhone)) {
+        errors.phone = 'Please enter a valid Indian mobile number (e.g. +91 98765 43210 or 9876543210)'
+      }
+    }
+
+    if (!memberForm.age || Number(memberForm.age) < 1 || Number(memberForm.age) > 130) errors.age = 'Age must be between 1 and 130'
+    if (!editingUser) {
+      if (!memberForm.password) {
+        errors.password = 'Password is required'
+      } else if (memberForm.password.length < 8) {
+        errors.password = 'Password must be at least 8 characters'
+      } else if (!/[A-Za-z]/.test(memberForm.password)) {
+        errors.password = 'Password must include at least one letter'
+      } else if (!/\d/.test(memberForm.password)) {
+        errors.password = 'Password must include at least one number'
+      }
+    }
+    setMemberFormErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   const handleOpenEditUser = (user: User) => {
@@ -130,45 +164,38 @@ export default function UsersPage() {
     setMemberForm({
       username: user.username, email: user.email, phone: user.phone,
       password: '', age: String(user.age ?? ''), gender: user.gender,
+      healthGoalsInput: user.healthGoals.join(', '),
     })
     setIsMemberDialogOpen(true)
   }
 
   const handleMemberSubmit = async () => {
-    const ageNum = Number.parseInt(memberForm.age, 10)
-    if (!Number.isInteger(ageNum) || ageNum < 0 || ageNum > 130) {
-      toast.error('Age must be a whole number between 0 and 130')
-      return
-    }
+    if (!validateMemberForm()) return
+    const healthGoals = memberForm.healthGoalsInput.split(',').map(s => s.trim()).filter(Boolean)
+    const cleanPhone = memberForm.phone.replace(/[\s\-()]/g, '')
     try {
       if (editingUser) {
         await updateUser.mutateAsync({
           id: editingUser._id,
-          payload: { username: memberForm.username, phone: memberForm.phone, age: ageNum, gender: memberForm.gender },
+          payload: { username: memberForm.username, phone: cleanPhone, age: Number(memberForm.age), gender: memberForm.gender, healthGoals },
         })
       } else {
-        if (!memberForm.username || !memberForm.email || !memberForm.phone || !memberForm.password) {
-          toast.error('Username, email, phone, and password are required')
-          return
-        }
-        if (!EMAIL_RE.test(memberForm.email)) {
-          toast.error('Enter a valid email address')
-          return
-        }
-        const pw = memberForm.password
-        if (pw.length < 8 || !/[A-Za-z]/.test(pw) || !/\d/.test(pw)) {
-          toast.error('Password must be at least 8 characters and include a letter and a number')
-          return
-        }
         await createUser.mutateAsync({
-          username: memberForm.username, email: memberForm.email, phone: memberForm.phone,
-          password: memberForm.password, age: ageNum, gender: memberForm.gender,
+          username: memberForm.username, email: memberForm.email, phone: cleanPhone,
+          password: memberForm.password, age: Number(memberForm.age), gender: memberForm.gender, healthGoals,
         })
       }
       setIsMemberDialogOpen(false)
       resetMemberForm()
-    } catch {
-      // toast already shown by mutation onError; keep dialog open so admin can fix and resubmit
+    } catch (err: any) {
+      const details = err?.response?.data?.details
+      if (details && typeof details === 'object') {
+        const serverErrors: Record<string, string> = {}
+        for (const [field, msg] of Object.entries(details)) {
+          serverErrors[field] = String(msg)
+        }
+        setMemberFormErrors(serverErrors)
+      }
     }
   }
 
@@ -248,32 +275,40 @@ export default function UsersPage() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>{editingUser ? 'Edit Member' : 'Create Member'}</DialogTitle>
+                    <DialogDescription>
+                      {editingUser ? 'Update member details below.' : 'Fill in the details to add a new member.'}
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-3 pt-2">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-sm font-medium">Username *</label>
                         <Input autoComplete="off" value={memberForm.username} onChange={(e) => setMemberForm({ ...memberForm, username: e.target.value })} placeholder="john_doe" />
+                        {memberFormErrors.username && <p className="text-xs text-red-500 mt-1">{memberFormErrors.username}</p>}
                       </div>
                       <div>
                         <label className="text-sm font-medium">Age *</label>
-                        <Input type="number" min="1" max="120" value={memberForm.age} onChange={(e) => setMemberForm({ ...memberForm, age: e.target.value })} placeholder="28" />
+                        <Input type="number" min="1" max="130" value={memberForm.age} onChange={(e) => setMemberForm({ ...memberForm, age: e.target.value })} placeholder="28" />
+                        {memberFormErrors.age && <p className="text-xs text-red-500 mt-1">{memberFormErrors.age}</p>}
                       </div>
                     </div>
                     {!editingUser && (
                       <div>
                         <label className="text-sm font-medium">Email *</label>
                         <Input type="email" autoComplete="off" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} placeholder="john@example.com" />
+                        {memberFormErrors.email && <p className="text-xs text-red-500 mt-1">{memberFormErrors.email}</p>}
                       </div>
                     )}
                     <div>
                       <label className="text-sm font-medium">Phone *</label>
-                      <Input autoComplete="off" value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} placeholder="+1234567890" />
+                      <Input autoComplete="off" value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} placeholder="+91 98765 43210" />
+                      {memberFormErrors.phone && <p className="text-xs text-red-500 mt-1">{memberFormErrors.phone}</p>}
                     </div>
                     {!editingUser && (
                       <div>
                         <label className="text-sm font-medium">Password *</label>
-                        <Input type="password" autoComplete="new-password" value={memberForm.password} onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })} placeholder="Min 8 characters" />
+                        <Input type="password" autoComplete="new-password" value={memberForm.password} onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })} placeholder="Min 8 chars, 1 letter, 1 number" />
+                        {memberFormErrors.password && <p className="text-xs text-red-500 mt-1">{memberFormErrors.password}</p>}
                       </div>
                     )}
                     <div>
@@ -284,6 +319,10 @@ export default function UsersPage() {
                           {GENDER_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Health Goals (comma-separated)</label>
+                      <Input value={memberForm.healthGoalsInput} onChange={(e) => setMemberForm({ ...memberForm, healthGoalsInput: e.target.value })} placeholder="Build muscle, Improve stamina" />
                     </div>
 
                     <div className="flex gap-2 pt-2">
@@ -431,6 +470,9 @@ export default function UsersPage() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>{editingAdmin ? 'Edit Admin' : 'Create Admin'}</DialogTitle>
+                    <DialogDescription>
+                      {editingAdmin ? 'Update admin details below.' : 'Fill in the details to add a new admin.'}
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-3 pt-2">
                     <div>

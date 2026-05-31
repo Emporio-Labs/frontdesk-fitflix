@@ -9,15 +9,19 @@ import {
   ResizableHandle,
 } from '@/components/ui/resizable'
 import { Button } from '@/components/ui/button'
-import { IconArrowLeft, IconDeviceFloppy, IconPlayerPlay } from '@tabler/icons-react'
+import { IconArrowLeft, IconDeviceFloppy, IconPlayerPlay, IconLoader2 } from '@tabler/icons-react'
 import { useWorkoutStore } from '@/stores/workout-store'
 import { PlanConfigPanel } from '@/components/workouts/plan-config-panel'
 import { DayBuilderPanel } from '@/components/workouts/day-builder-panel'
 import { MobilePreviewPanel } from '@/components/workouts/mobile-preview-panel'
 import { AssignUsersDialog } from '@/components/workouts/assign-users-dialog'
+import {
+  useCreateWorkoutPlan,
+  useUpdateWorkoutPlan,
+  useAssignWorkoutPlan,
+} from '@/hooks/use-workout-plans'
 import { toast } from 'sonner'
 import type { WorkoutPlan } from '@/types/workout'
-import { useCreateWorkoutPlan, useUpdateWorkoutPlan } from '@/hooks/use-workout-plans'
 import type { CreateWorkoutPlanPayload } from '@/lib/services/workout-plan.service'
 
 const isMongoId = (id?: string): boolean => !!id && /^[0-9a-f]{24}$/i.test(id)
@@ -60,10 +64,20 @@ export function PlanBuilderLayout({
   plan?: WorkoutPlan
 }) {
   const router = useRouter()
-  const { loadPlan, resetPlan, savePlan, currentPlan, setPlanField } = useWorkoutStore()
+  const {
+    loadPlan,
+    resetPlan,
+    currentPlan,
+    setPlanField,
+    savePlan,
+    assignedUserIds,
+    assignmentStartDate,
+  } = useWorkoutStore()
   const [assignOpen, setAssignOpen] = useState(false)
-  const createPlanMutation = useCreateWorkoutPlan()
-  const updatePlanMutation = useUpdateWorkoutPlan()
+  const createMutation = useCreateWorkoutPlan()
+  const updateMutation = useUpdateWorkoutPlan()
+  const assignMutation = useAssignWorkoutPlan()
+  const isSaving = createMutation.isPending || updateMutation.isPending
 
   useEffect(() => {
     if (mode === 'edit' && plan) {
@@ -71,24 +85,40 @@ export function PlanBuilderLayout({
     } else if (mode === 'create') {
       resetPlan()
     }
-  }, [mode, plan?.id])
+  }, [mode, plan?._id])
+
+  const assignAfterCreate = (savedId: string) => {
+    if (assignedUserIds.length === 0) return
+    assignMutation.mutate({
+      id: savedId,
+      payload: {
+        userIds: assignedUserIds,
+        startDate: new Date(assignmentStartDate).toISOString(),
+      },
+    })
+  }
 
   const handleSave = async () => {
     if (!currentPlan.name?.trim()) {
       toast.error('Please enter a plan name')
       return
     }
+
     const payload = buildApiPayload(currentPlan)
+    const id = currentPlan._id || currentPlan.id
     try {
-      if (isMongoId(currentPlan.id)) {
-        await updatePlanMutation.mutateAsync({ id: currentPlan.id!, payload })
+      if (isMongoId(id)) {
+        await updateMutation.mutateAsync({ id: id!, payload })
         savePlan()
+        toast.success('Draft saved successfully')
       } else {
-        const result = await createPlanMutation.mutateAsync(payload)
-        // Store the real MongoDB _id so subsequent saves and assigns use it
-        setPlanField('id', (result as any)._id ?? result.id)
+        const result = await createMutation.mutateAsync(payload)
+        const savedId = (result as any)._id ?? result.id
+        setPlanField('_id', savedId)
+        setPlanField('id', savedId)
         savePlan()
-        router.push(`/dashboard/workouts/${(result as any)._id ?? result.id}`)
+        assignAfterCreate(savedId)
+        router.push(`/dashboard/workouts/${savedId}`)
       }
     } catch {
       // errors surfaced via mutation's onError toast
@@ -101,18 +131,22 @@ export function PlanBuilderLayout({
       return
     }
     const payload = buildApiPayload(currentPlan, 'Active')
+    const id = currentPlan._id || currentPlan.id
     try {
-      if (isMongoId(currentPlan.id)) {
-        await updatePlanMutation.mutateAsync({ id: currentPlan.id!, payload })
+      if (isMongoId(id)) {
+        await updateMutation.mutateAsync({ id: id!, payload })
         setPlanField('status', 'Active')
         savePlan()
+        toast.success('Plan published successfully')
       } else {
-        const result = await createPlanMutation.mutateAsync(payload)
-        const mongoId = (result as any)._id ?? result.id
-        setPlanField('id', mongoId)
+        const result = await createMutation.mutateAsync(payload)
+        const savedId = (result as any)._id ?? result.id
+        setPlanField('_id', savedId)
+        setPlanField('id', savedId)
         setPlanField('status', 'Active')
         savePlan()
-        router.push(`/dashboard/workouts/${mongoId}`)
+        assignAfterCreate(savedId)
+        router.push(`/dashboard/workouts/${savedId}`)
       }
     } catch {
       // errors surfaced via mutation's onError toast
@@ -139,12 +173,31 @@ export function PlanBuilderLayout({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleSave}>
-            <IconDeviceFloppy className="w-3.5 h-3.5 mr-1" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <IconLoader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <IconDeviceFloppy className="w-3.5 h-3.5 mr-1" />
+            )}
             Save Draft
           </Button>
-          <Button size="sm" className="h-8 text-xs" onClick={handlePublish}>
-            <IconPlayerPlay className="w-3.5 h-3.5 mr-1" />
+          <Button
+            size="sm"
+            className="h-8 text-xs"
+            onClick={handlePublish}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <IconLoader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <IconPlayerPlay className="w-3.5 h-3.5 mr-1" />
+            )}
             Publish
           </Button>
         </div>
@@ -165,7 +218,11 @@ export function PlanBuilderLayout({
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      <AssignUsersDialog open={assignOpen} onOpenChange={setAssignOpen} />
+      <AssignUsersDialog
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        planId={mode === 'edit' ? plan?._id : undefined}
+      />
     </div>
   )
 }

@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { PlanStatusBadge } from '@/components/workouts/plan-status-badge'
 import { DifficultyBadge } from '@/components/workouts/difficulty-badge'
-import { useWorkoutStore } from '@/stores/workout-store'
+import { useWorkoutPlans } from '@/hooks/use-workout-plans'
 
 export function RecentPlansList() {
-  const plans = useWorkoutStore((s) => s.plans)
-  const recent = plans.slice(0, 5)
+  const { data: plansData } = useWorkoutPlans({ limit: 5 })
+  const recent = plansData?.plans ?? []
 
   return (
     <Card>
@@ -31,8 +31,8 @@ export function RecentPlansList() {
           <div className="space-y-2">
             {recent.map((plan) => (
               <Link
-                key={plan.id}
-                href={`/dashboard/workouts/${plan.id}`}
+                key={plan._id}
+                href={`/dashboard/workouts/${plan._id}`}
                 className="flex items-center justify-between py-2.5 px-2 rounded-md border-b last:border-0 hover:bg-muted/50 transition-colors"
               >
                 <div className="min-w-0 flex-1">

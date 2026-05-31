@@ -13,13 +13,14 @@ import type {
 } from '@/types/workout'
 
 interface WorkoutStore {
-  // Persisted plan list (localStorage — no backend plan model yet)
+  // Persisted plan list (localStorage)
   plans: WorkoutPlan[]
 
   // Builder draft state
   currentPlan: Partial<WorkoutPlan>
   selectedDayIndex: number
   assignedUserIds: string[]
+  assignmentStartDate: string // ISO date (YYYY-MM-DD)
 
   // Plan CRUD
   setPlanField: <K extends keyof WorkoutPlan>(field: K, value: WorkoutPlan[K]) => void
@@ -41,6 +42,15 @@ interface WorkoutStore {
   deletePlan: (planId: string) => void
   toggleUserAssignment: (userId: string) => void
   setAssignedUsers: (userIds: string[]) => void
+  setAssignmentStartDate: (date: string) => void
+}
+
+const todayIsoDate = (): string => {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 const DEFAULT_PLAN: Partial<WorkoutPlan> = {
@@ -63,6 +73,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
       currentPlan: { ...DEFAULT_PLAN },
       selectedDayIndex: 0,
       assignedUserIds: [],
+      assignmentStartDate: todayIsoDate(),
 
       setPlanField: (field, value) =>
         set((s) => ({ currentPlan: { ...s.currentPlan, [field]: value } })),
@@ -166,6 +177,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
           currentPlan: { ...plan },
           selectedDayIndex: 0,
           assignedUserIds: [...plan.assignedUsers],
+          assignmentStartDate: todayIsoDate(),
         }),
 
       resetPlan: () =>
@@ -173,6 +185,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
           currentPlan: { ...DEFAULT_PLAN, days: [] },
           selectedDayIndex: 0,
           assignedUserIds: [],
+          assignmentStartDate: todayIsoDate(),
         }),
 
       savePlan: () => {
@@ -181,7 +194,8 @@ export const useWorkoutStore = create<WorkoutStore>()(
         const isNew = !s.currentPlan.id
 
         const plan: WorkoutPlan = {
-          id: s.currentPlan.id || `plan_${Date.now()}`,
+          _id: s.currentPlan._id || s.currentPlan.id || `plan_${Date.now()}`,
+          id: s.currentPlan._id || s.currentPlan.id || `plan_${Date.now()}`,
           name: s.currentPlan.name || 'Untitled Plan',
           description: s.currentPlan.description || '',
           difficulty: s.currentPlan.difficulty || 'Intermediate',
@@ -226,6 +240,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
         }),
 
       setAssignedUsers: (userIds) => set({ assignedUserIds: userIds }),
+      setAssignmentStartDate: (date) => set({ assignmentStartDate: date }),
     }),
     {
       name: 'fitflix-workout-plans',

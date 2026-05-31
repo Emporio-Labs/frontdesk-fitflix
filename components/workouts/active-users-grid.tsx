@@ -6,11 +6,12 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useUsers } from '@/hooks/use-users'
-import { useWorkoutStore } from '@/stores/workout-store'
+import { useWorkoutPlans } from '@/hooks/use-workout-plans'
 
 export function ActiveUsersGrid() {
   const { data: users = [], isLoading } = useUsers()
-  const plans = useWorkoutStore((s) => s.plans)
+  const { data: plansData } = useWorkoutPlans()
+  const plans = plansData?.plans ?? []
 
   const assignedUserIds = new Set(plans.flatMap((p) => p.assignedUsers))
   const assignedUsers = users.filter((u: any) => assignedUserIds.has(u._id))

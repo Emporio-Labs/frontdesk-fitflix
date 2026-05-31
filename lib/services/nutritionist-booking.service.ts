@@ -34,6 +34,7 @@ function normalizeBooking(raw: any): NutritionistBooking {
   if (!raw) return raw
   return {
     ...raw,
+    appointmentDate: raw?.appointmentDate ?? raw?.date ?? null,
     calBookingId: raw?.calBookingId ?? raw?.calComBookingId ?? null,
   }
 }

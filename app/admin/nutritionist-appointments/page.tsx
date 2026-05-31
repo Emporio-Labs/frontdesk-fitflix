@@ -108,8 +108,8 @@ function AppointmentModeCell({ booking }: { booking: NutritionistBooking }) {
       <div className="flex items-start gap-1.5 text-sm">
         <IconMapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
         <div>
-          <div className="font-medium">Hybrid Human Clinic</div>
-          <div className="text-xs text-muted-foreground">Jubilee Hills</div>
+          <div className="font-medium">Fitflix</div>
+          <div className="text-xs text-muted-foreground">Sainikpuri</div>
         </div>
       </div>
     )

@@ -15,6 +15,14 @@ export function useMemberships() {
   })
 }
 
+export function useMyMemberships() {
+  return useQuery({
+    queryKey: queryKeys.memberships.mine(),
+    queryFn: membershipService.getMine,
+    select: (data) => data.memberships,
+  })
+}
+
 export function useMembership(id: string) {
   return useQuery({
     queryKey: queryKeys.memberships.detail(id),

@@ -4,7 +4,7 @@ Single-source HTTP reference for the Fitflix Express + MongoDB backend that powe
 
 - **Base URL (production):** `https://api.example.com`
 - **Base URL (local):** `http://localhost:3000` (configurable via `PORT`)
-- **Content type:** `application/json` for all request bodies
+- **Content type:** `application/json` unless otherwise noted (file uploads use `multipart/form-data`)
 - **Date format:** ISO-8601 (`2026-05-22T10:30:00.000Z`)
 - **Object IDs:** 24-character MongoDB hex strings
 
@@ -26,18 +26,23 @@ Single-source HTTP reference for the Fitflix Express + MongoDB backend that powe
 12. [Services — `/services`](#services--services)
 13. [Therapies — `/therapies`](#therapies--therapies)
 14. [Bookings — `/bookings`](#bookings--bookings)
-15. [Appointments — `/appointments`](#appointments--appointments)
-16. [Credits — `/credits`](#credits--credits)
-17. [Memberships — `/memberships`](#memberships--memberships)
-18. [Schedules — `/schedules`](#schedules--schedules)
-19. [Exercises — `/exercises`](#exercises--exercises)
-20. [Workouts — `/workouts`](#workouts--workouts)
-21. [Workout plans — `/workout-plans`](#workout-plans--workout-plans)
-22. [Leads — `/leads`](#leads--leads)
-23. [Webhook — `/webhook`](#webhook--webhook)
-24. [Nutrition — `/nutrition`](#nutrition--nutrition)
-25. [Health check — `/health`](#health-check--health)
-26. [Appendix A: Onboarding step order](#appendix-a-onboarding-step-order)
+15. [Appointments (Doctors) — `/appointments`](#appointments--appointments)
+16. [Expert Appointments — `/expert-appointments`](#expert-appointments--expert-appointments)
+17. [Credits — `/credits`](#credits--credits)
+18. [Memberships — `/memberships`](#memberships--memberships)
+19. [Schedules — `/schedules`](#schedules--schedules)
+20. [Exercises — `/exercises`](#exercises--exercises)
+21. [Workouts — `/workouts`](#workouts--workouts)
+22. [Workout plans — `/workout-plans`](#workout-plans--workout-plans)
+23. [Leads — `/leads`](#leads--leads)
+24. [Webhook — `/webhook`](#webhook--webhook)
+25. [Cal ID webhook — `/webhooks/cal`](#cal-id-webhook--webhookscal)
+26. [Nutrition — `/nutrition`](#nutrition--nutrition)
+27. [Nutritionist bookings — `/nutritionist`](#nutritionist-bookings--nutritionist)
+28. [Notifications — `/notifications`](#notifications--notifications)
+29. [Internal — `/internal`](#internal--internal)
+30. [Health check — `/health`](#health-check--health)
+31. [Appendix A: Onboarding step order](#appendix-a-onboarding-step-order)
 
 ---
 
@@ -53,6 +58,8 @@ Authorization: Bearer <token>
 - **Roles:** `user`, `admin`, `doctor`, `trainer`, `nutritionist`. The token's role determines which endpoints are accessible.
 - **Public endpoints** are explicitly labelled `Auth: Public`.
 - **Webhook endpoint** uses a shared-secret header (`X-Webhook-Secret`) instead of JWT.
+- **Cal ID webhook** uses `X-Cal-Signature-256` (HMAC) and requires the raw request body.
+- **Internal endpoints** use `X-Internal-Secret` (or `X-Webhook-Secret` as an alias) instead of JWT.
 
 Failed authentication returns `401 UNAUTHORIZED`. Insufficient role returns `403 FORBIDDEN`.
 
@@ -60,7 +67,9 @@ Failed authentication returns `401 UNAUTHORIZED`. Insufficient role returns `403
 
 ### Request
 
-- All bodies are JSON. Set `Content-Type: application/json`.
+- All bodies are JSON unless explicitly noted. Set `Content-Type: application/json`.
+- File uploads (for example `/onboarding/reports`) use `multipart/form-data`.
+- `/webhooks/cal` uses a raw body for signature verification.
 - Query parameters use standard URL encoding.
 - Path params noted as `:id` accept a 24-character MongoDB ObjectId. Anything else returns `400 BAD_REQUEST`.
 
@@ -119,19 +128,27 @@ Authoritative source: [src/models/Enums.ts](../src/models/Enums.ts). Numeric enu
 
 | Enum | Values |
 |---|---|
-| `Gender` *(numeric)* | `Male` (0), `Female` (1), `Others` (2) |
+| `Gender` | `Male`, `Female`, `Other` (legacy numeric inputs `0`/`1`/`2` are accepted on signup and normalized) |
 | `BookingStatus` *(numeric)* | `Booked` (0), `Confirmed` (1), `Cancelled` (2), `Attended` (3), `Unattended` (4) |
 | `MembershipStatus` | `Active`, `Paused`, `Cancelled`, `Expired` |
 | `TodoStatus` *(numeric)* | `Todo` (0), `Doing` (1), `Done` (2) |
 | `LeadStatus` | `New`, `Contacted`, `Qualified`, `Warm`, `Hot`, `Cold`, `Converted`, `Lost` |
 | `CreditTransactionType` | `Consume`, `Refund`, `AdminTopUp`, `Void` |
 | `CreditTransactionSource` | `Booking`, `Appointment`, `Admin` |
-| `MuscleGroup` | `Chest`, `Back`, `Legs`, `Shoulders`, `Arms`, `Core` |
+| `MuscleGroup` | `Chest`, `Back`, `Legs`, `Shoulders`, `Arms`, `Core`, `FullBody` |
 | `ExerciseDifficulty` | `Beginner`, `Intermediate`, `Advanced` |
+| `ExerciseSection` | `warmup`, `workout`, `stretching` |
 | `WorkoutSessionStatus` | `Active`, `Completed`, `Abandoned` |
 | `OnboardingStep` | `HEALTH_MARKERS`, `HEALTH_GOALS`, `CONSENT`, `REPORT_UPLOAD`, `SPORTS_SCIENTIST_BOOKING`, `NUTRITIONIST_BOOKING`, `COMPLETED` |
 | `ExpertType` | `sports_scientist`, `nutritionist` |
-| `AppointmentBookingStatus` | `Pending`, `Confirmed`, `Cancelled` |
+| `AppointmentBookingStatus` | `Pending`, `Confirmed`, `Cancelled`, `Rescheduled`, `Completed`, `NoShow` |
+| `WebhookSyncStatus` | `PENDING`, `SYNCED`, `FAILED`, `STALE` |
+| `AppointmentSource` | `USER_APP`, `ADMIN`, `CAL_DASHBOARD` |
+| `WebhookEventStatus` | `RECEIVED`, `PROCESSING`, `PROCESSED`, `FAILED`, `DLQ` |
+| `NotificationChannel` | `INAPP`, `PUSH`, `SOCKET` |
+| `NotificationKind` | `appointment_booked`, `appointment_rescheduled`, `appointment_cancelled`, `appointment_reminder`, `onboarding_step_updated` |
+| `ReminderKind` | `T_MINUS_24H`, `T_MINUS_1H`, `T_MINUS_15M` |
+| `ReminderStatus` | `SCHEDULED`, `FIRED`, `CANCELLED` |
 | `PlanGoal` *(workout)* | `Strength`, `Hypertrophy`, `Endurance`, `WeightLoss`, `Maintenance`, `Custom` |
 | `PlanStatus` *(workout)* | `Draft`, `Active`, `Paused`, `Completed`, `Archived` |
 | `SplitType` | `FullBody`, `UpperLower`, `PushPull`, `PushPullLegs`, `Custom` |
@@ -143,6 +160,10 @@ Authoritative source: [src/models/Enums.ts](../src/models/Enums.ts). Numeric enu
 | `MealLogStatus` | `Logged`, `Skipped`, `Partial`, `Pending` |
 | `MealLogSource` | `Manual`, `AI`, `Wearable`, `Scan` |
 | `ProgressRecordedBy` | `User`, `Nutritionist` |
+| `ConsentType` | `WELLNESS_SERVICES`, `GYM_FITNESS` |
+| `AppointmentMode` | `IN_PERSON`, `ONLINE` |
+| `NutritionistBookingStatus` | `PENDING`, `ACCEPTED`, `REJECTED`, `COMPLETED` |
+| `NutritionistApprovalStatus` | `PENDING`, `APPROVED`, `REJECTED` |
 | `ActivityLevel` *(health markers)* | `Sedentary`, `Light`, `Moderate`, `Active`, `VeryActive` |
 | `WorkoutExperience` *(health goals)* | `None`, `Beginner`, `Intermediate`, `Advanced` |
 
@@ -168,9 +189,8 @@ Register a new end-user account. Returns a `userId`; the client must call `/auth
 | `phone` | string | yes | min 1 |
 | `email` | string | yes | valid email, unique |
 | `age` | number | yes | 0–130 |
-| `gender` | Gender | yes | `Male` \| `Female` \| `Others` or numeric (0–2) |
+| `gender` | Gender | yes | `Male` \| `Female` \| `Other` (legacy numeric `0`–`2` accepted) |
 | `password` | string | yes | min 8, must contain letter + number |
-| `healthGoals` | string[] | no | default `[]` |
 
 **Example request**
 
@@ -183,8 +203,7 @@ curl -X POST "https://api.example.com/auth/signup" \
     "email": "user@example.com",
     "age": 29,
     "gender": "Female",
-    "password": "Sup3rSecret!",
-    "healthGoals": ["weight loss", "better sleep"]
+    "password": "Sup3rSecret!"
   }'
 ```
 
@@ -198,7 +217,6 @@ const { data } = await axios.post("https://api.example.com/auth/signup", {
   age: 29,
   gender: "Female",
   password: "Sup3rSecret!",
-  healthGoals: ["weight loss", "better sleep"],
 });
 ```
 
@@ -248,7 +266,7 @@ const { data } = await axios.post("https://api.example.com/auth/login", {
   email: "user@example.com",
   password: "Sup3rSecret!",
 });
-const token: string = data.token;
+const accessToken: string = data.accessToken;
 ```
 
 **Success response (200)**
@@ -256,9 +274,10 @@ const token: string = data.token;
 ```json
 {
   "message": "Login successful",
-  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
   "tokenType": "Bearer",
-  "expiresIn": 43200,
+  "expiresIn": "12h",
   "user": {
     "id": "5f1a2b3c4d5e6f7a8b9c0d1e",
     "email": "user@example.com",
@@ -278,6 +297,51 @@ const token: string = data.token;
 **Notes**
 
 - Legacy users with weakly-hashed passwords are silently re-hashed on first successful login.
+- `refreshToken` is only returned when `JWT_REFRESH_SECRET` is configured.
+
+### POST /auth/refresh
+
+Exchange a refresh token for a new access token.
+
+**Auth:** Public (rate-limited)
+
+**Request body**
+
+| Field | Type | Required |
+|---|---|---|
+| `refreshToken` | string | yes |
+
+```bash
+curl -X POST "https://api.example.com/auth/refresh" \
+  -H "Content-Type: application/json" \
+  -d '{ "refreshToken": "<refresh-token>" }'
+```
+
+**Success (200)**
+
+```json
+{
+  "message": "Token refreshed",
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "tokenType": "Bearer",
+  "expiresIn": "12h"
+}
+```
+
+**Errors:** 400 invalid payload, 401 invalid/expired refresh token, 503 refresh not configured.
+
+### POST /auth/logout
+
+Invalidate the current access token by adding it to the blacklist until it expires.
+
+**Auth:** Bearer (any role)
+
+```bash
+curl -X POST "https://api.example.com/auth/logout" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Success (200):** `{ "message": "Logged out successfully" }`
 
 ---
 
@@ -423,7 +487,6 @@ Create a user (admin-managed). Use `/auth/signup` for self-service signup.
 | Field | Type | Required | Constraints |
 |---|---|---|---|
 | `username`, `phone`, `email`, `password`, `age`, `gender` | — | yes | Same as `/auth/signup` |
-| `healthGoals` | string[] | no | default `[]` |
 | `dateOfBirth` | string/Date | no | ISO date |
 | `emergencyContact` | string | no | |
 | `address` | string | no | |
@@ -459,7 +522,7 @@ const { data } = await axios.post(
 
 List users with search, filter, pagination.
 
-**Auth:** Bearer (`admin`, `doctor`)
+**Auth:** Bearer (`admin`, `doctor`, `nutritionist`)
 
 **Query params**
 
@@ -553,6 +616,32 @@ curl "https://api.example.com/users/me/reports" -H "Authorization: Bearer $TOKEN
     }
   ]
 }
+
+### GET /users/me/medical-reports
+
+List the authenticated user's uploaded medical/DNA reports with short-lived signed URLs.
+
+**Auth:** Bearer (`user`)
+
+```bash
+curl "https://api.example.com/users/me/medical-reports" -H "Authorization: Bearer $TOKEN"
+```
+
+**Success (200)**
+
+```json
+{
+  "reports": [
+    {
+      "_id": "5f1a2b3c4d5e6f7a8b9c0d1e",
+      "reportName": "Blood Panel April 2026",
+      "reportType": "Blood Test",
+      "reportUrl": "https://fitflix-storage.s3.ap-south-1.amazonaws.com/...",
+      "createdAt": "2026-05-25T08:49:09.886Z"
+    }
+  ]
+}
+```
 ```
 
 ### GET /users/me/hpod-metrics
@@ -622,9 +711,9 @@ await axios.patch(
 
 ### GET /users/:id
 
-Get any user (admin/doctor).
+Get any user (admin/doctor/nutritionist).
 
-**Auth:** Bearer (`admin`, `doctor`)
+**Auth:** Bearer (`admin`, `doctor`, `nutritionist`)
 
 **Path params:** `id` — user ObjectId.
 
@@ -634,6 +723,36 @@ curl "https://api.example.com/users/5f1a2b3c4d5e6f7a8b9c0d1e" \
 ```
 
 **Success (200):** `{ "user": { /* ... */ } }`
+
+### GET /users/:id/onboarding-profile
+
+Return the aggregated onboarding profile for a user (markers, goals, consent, reports, appointments).
+
+**Auth:** Bearer (`admin`, `doctor`, `nutritionist`)
+
+```bash
+curl "https://api.example.com/users/5f1a2b3c4d5e6f7a8b9c0d1e/onboarding-profile" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Success (200):** `{ "user": { /* ... */ }, "healthMarkers": { /* ... */ }, "healthGoals": { /* ... */ } }`
+
+### GET /users/:id/reports/:reportId/url
+
+Generate a short-lived signed URL for a specific uploaded report.
+
+**Auth:** Bearer (`admin`, `doctor`, `nutritionist`)
+
+```bash
+curl "https://api.example.com/users/5f1a2b3c4d5e6f7a8b9c0d1e/reports/5f1a2b3c4d5e6f7a8b9c0d2f/url" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Success (200)**
+
+```json
+{ "url": "https://fitflix-storage.s3.ap-south-1.amazonaws.com/...", "expiresIn": 900 }
+```
 
 ### PATCH /users/:id/onboard
 
@@ -783,17 +902,23 @@ curl -X POST "https://api.example.com/onboarding/health-goals" \
 
 Step 3. Captures the requester IP automatically.
 
-**Request body**
+**Request body** (either format)
 
-| Field | Type | Required |
-|---|---|---|
-| `accepted` | literal `true` | yes |
-| `signatureUrl` | string | no |
+**Preferred (dual-consent)**
 
-```bash
-curl -X POST "https://api.example.com/onboarding/consent" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{ "accepted": true }'
+```json
+{
+  "consents": [
+    { "type": "WELLNESS_SERVICES", "accepted": true, "signatureName": "Rahul" },
+    { "type": "GYM_FITNESS", "accepted": true, "signatureName": "Rahul" }
+  ]
+}
+```
+
+**Legacy (still accepted)**
+
+```json
+{ "accepted": true, "signatureUrl": "https://cdn.example.com/signatures/user.png" }
 ```
 
 **Success (201):** `{ "message": "Consent submitted", "consentForm": { /* ... */ } }`
@@ -804,40 +929,96 @@ Step 4. Multiple reports allowed; call repeatedly.
 
 **Request body**
 
-| Field | Type | Required |
-|---|---|---|
-| `reportName` | string | yes |
-| `reportType` | string | yes |
-| `reportUrl` | string | no |
+Prefer `multipart/form-data` with a file upload (field name `file`). JSON-only payloads are accepted as a legacy fallback.
+
+**Multipart form-data**
+
+- `file` (required) - PDF or image
+- `reportName` (required)
+- `reportType` (required)
 
 ```bash
 curl -X POST "https://api.example.com/onboarding/reports" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{ "reportName": "Blood Panel", "reportType": "lab", "reportUrl": "https://files.example.com/report.pdf" }'
+  -H "Authorization: Bearer $TOKEN" \
+  -F "reportName=Blood Panel" \
+  -F "reportType=lab" \
+  -F "file=@/path/to/report.pdf"
+```
+
+**Legacy JSON**
+
+```json
+{ "reportName": "Blood Panel", "reportType": "lab", "reportUrl": "https://files.example.com/report.pdf" }
 ```
 
 **Success (201):** `{ "message": "Report uploaded", "report": { /* ... */ } }`
 
-### POST /onboarding/appointments
+### POST /onboarding/sports-scientist
 
-Steps 5 & 6. `sports_scientist` must be booked before `nutritionist`.
+Step 5. Book the sports scientist appointment (legacy expert appointment record).
 
 **Request body**
 
-| Field | Type | Required |
-|---|---|---|
-| `expertType` | `ExpertType` | yes |
-| `appointmentDate` | ISO date | no |
-| `meetingLink` | string | no |
-| `calComBookingId` | string | no |
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `appointmentDate` | ISO date | no | |
+| `meetingLink` | string | no | |
+| `calIdBookingId` | string | no | |
+| `calComBookingId` | string | no | legacy alias for `calIdBookingId` |
 
-```bash
-curl -X POST "https://api.example.com/onboarding/appointments" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{ "expertType": "sports_scientist", "appointmentDate": "2026-06-01T10:00:00.000Z" }'
-```
+**Success (201):** `{ "message": "Sports scientist appointment booked", "appointment": { /* ... */ } }`
 
-**Success (201):** `{ "message": "sports_scientist appointment booked", "appointment": { /* ... */ } }`
+### POST /onboarding/nutritionist
+
+Step 6. Book the nutritionist appointment (legacy expert appointment record).
+
+**Request body:** same as `/onboarding/sports-scientist`.
+
+**Success (201):** `{ "message": "Nutritionist appointment booked", "appointment": { /* ... */ } }`
+
+### POST /onboarding/nutritionist/book
+
+Submit a slot-based nutritionist booking for approval.
+
+**Request body**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `slotId` | ObjectId | yes | Slot template or concrete slot id |
+| `date` | ISO date | yes | Booking date (UTC day) |
+| `appointmentMode` | `AppointmentMode` | yes | `IN_PERSON` or `ONLINE` |
+| `clinicLocation` | string | no | Required for in-person appointments |
+
+**Success (201):** `{ "message": "Nutritionist booking submitted for approval", "booking": { /* ... */ } }`
+
+### POST /onboarding/appointments
+
+Legacy endpoint that accepts `expertType` explicitly.
+
+**Request body**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `expertType` | `ExpertType` | yes | `sports_scientist` or `nutritionist` |
+| `appointmentDate` | ISO date | no | |
+| `meetingLink` | string | no | |
+| `calIdBookingId` | string | no | |
+| `calComBookingId` | string | no | legacy alias for `calIdBookingId` |
+
+**Success (201):** `{ "message": "<Sports scientist|Nutritionist> appointment booked", "appointment": { /* ... */ } }`
+
+### DELETE /onboarding/appointments/nutritionist/:userId
+
+Admin-only cancellation that also rewinds the onboarding step.
+
+**Auth:** Bearer (`admin`)
+
+**Success (200):** `{ "success": true, "message": "Nutritionist appointment cancelled successfully", "onboardingStatus": { /* ... */ } }`
+
+### Expert Appointments — `/expert-appointments`
+
+> [!NOTE]
+> The Expert Appointments endpoints (User & Admin routes) have been promoted to their own dedicated top-level section. See [Expert Appointments — `/expert-appointments`](#expert-appointments--expert-appointments) for complete routing details.
 
 ### POST /onboarding/complete
 
@@ -1006,6 +1187,41 @@ curl "https://api.example.com/slots" -H "Authorization: Bearer $TOKEN"
 ```
 
 **Success (200):** `{ "slots": [ /* ... */ ] }`
+
+### GET /slots/available
+
+Return available slots for a given date (UTC day). Combines concrete dated slots and daily templates that have not yet been materialized for the day.
+
+**Auth:** Bearer (`admin`, `doctor`, `trainer`, `user`)
+
+**Query params**
+
+| Name | Type | Required | Example |
+|---|---|---|---|
+| `date` | string | yes | `2026-06-01` |
+
+```bash
+curl "https://api.example.com/slots/available?date=2026-06-01" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Success (200)**
+
+```json
+{
+  "date": "2026-06-01T00:00:00.000Z",
+  "slots": [
+    {
+      "slotId": "5f1a2b3c4d5e6f7a8b9c0d2f",
+      "date": "2026-06-01T00:00:00.000Z",
+      "startTime": "09:00",
+      "endTime": "09:30",
+      "capacity": 4,
+      "remainingCapacity": 4
+    }
+  ]
+}
+```
 
 ### GET /slots/:id
 
@@ -1433,6 +1649,325 @@ curl -X PATCH "https://api.example.com/appointments/5f1a2b3c4d5e6f7a8b9c0d1e/sta
 ```
 
 **Success (200):** `{ "message": "Appointment status updated", "appointment": { /* ... */ }, "credits": { "refunded": 0 } }`
+
+---
+
+## Expert Appointments — `/expert-appointments`
+
+Specialized appointment scheduling for booking Sports Scientist and Nutritionist consultations during and after onboarding. Powered by Cal ID and integrated with Google Meet and Google Calendar.
+
+### User Routes — `/expert-appointments`
+
+These endpoints require `Authorization: Bearer <token>` with the role `user`.
+
+#### GET /expert-appointments/availability
+
+Query available slot dates and times for a specific expert type.
+
+**Query parameters**
+
+| Parameter | Type | Required | Constraints |
+|---|---|---|---|
+| `expertType` | string | yes | `sports_scientist` \| `nutritionist` |
+| `startDate` | string | yes | `YYYY-MM-DD` |
+| `endDate` | string | yes | `YYYY-MM-DD` |
+| `timezone` | string | yes | IANA timezone string (e.g. `Asia/Kolkata`) |
+
+**Example request**
+```bash
+curl "https://api.example.com/expert-appointments/availability?expertType=nutritionist&startDate=2026-05-27&endDate=2026-06-09&timezone=Asia/Kolkata" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Success response (200)**
+```json
+{
+  "days": [
+    {
+      "date": "2026-05-27",
+      "slots": [
+        {
+          "start": "2026-05-27T10:00:00.000Z",
+          "end": "2026-05-27T10:30:00.000Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### POST /expert-appointments/book
+
+Book a selected availability slot. Marks the corresponding onboarding step complete.
+
+**Request body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `expertType` | string | yes | `sports_scientist` \| `nutritionist` |
+| `slotStart` | string | yes | ISO-8601 timestamp (e.g., `2026-05-27T10:00:00.000Z`) |
+| `timezone` | string | yes | IANA timezone string (e.g. `Asia/Kolkata`) |
+| `idempotencyKey` | string | no | Custom unique string to prevent duplicate booking |
+
+**Example request**
+```bash
+curl -X POST "https://api.example.com/expert-appointments/book" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "expertType": "nutritionist",
+    "slotStart": "2026-05-27T10:00:00.000Z",
+    "timezone": "Asia/Kolkata"
+  }'
+```
+
+**Success response (201)**
+```json
+{
+  "message": "Appointment booked",
+  "appointment": {
+    "_id": "6a155160963fc70a99e94cb2",
+    "userId": "6a154915d00ec8d02047e53d",
+    "expertType": "nutritionist",
+    "bookingStatus": "Confirmed",
+    "appointmentStart": "2026-05-27T10:00:00.000Z",
+    "appointmentEnd": "2026-05-27T10:30:00.000Z",
+    "calIdBookingId": "bKHU7iV8fynVuG9vYqhaSr",
+    "calIdEventTypeId": "86433",
+    "meetingUrl": "https://meet.google.com/qvi-ufui-kca",
+    "webhookSyncStatus": "SYNCED"
+  }
+}
+```
+
+#### GET /expert-appointments/me
+
+Retrieve the authenticated user's own expert appointments categorized by their temporal status.
+
+**Example request**
+```bash
+curl "https://api.example.com/expert-appointments/me" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Success response (200)**
+```json
+{
+  "upcoming": [
+    {
+      "_id": "6a155160963fc70a99e94cb2",
+      "userId": "6a154915d00ec8d02047e53d",
+      "expertType": "nutritionist",
+      "bookingStatus": "Confirmed",
+      "appointmentStart": "2026-05-27T10:00:00.000Z",
+      "appointmentEnd": "2026-05-27T10:30:00.000Z",
+      "calIdBookingId": "bKHU7iV8fynVuG9vYqhaSr",
+      "calIdEventTypeId": "86433",
+      "meetingUrl": "https://meet.google.com/qvi-ufui-kca",
+      "webhookSyncStatus": "SYNCED"
+    }
+  ],
+  "completed": [],
+  "cancelled": [],
+  "missed": []
+}
+```
+
+#### PATCH /expert-appointments/:id/reschedule
+
+Reschedule a confirmed active appointment to a new slot.
+
+**Request body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `slotStart` | string | yes | New ISO-8601 timestamp |
+| `timezone` | string | yes | IANA timezone string |
+| `reason` | string | no | Max 500 characters |
+
+**Example request**
+```bash
+curl -X PATCH "https://api.example.com/expert-appointments/6a155160963fc70a99e94cb2/reschedule" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "slotStart": "2026-05-27T11:00:00.000Z",
+    "timezone": "Asia/Kolkata"
+  }'
+```
+
+**Success response (200)**
+```json
+{
+  "message": "Appointment rescheduled",
+  "appointment": {
+    "_id": "6a155160963fc70a99e94cb2",
+    "userId": "6a154915d00ec8d02047e53d",
+    "expertType": "nutritionist",
+    "bookingStatus": "Rescheduled",
+    "appointmentStart": "2026-05-27T11:00:00.000Z",
+    "appointmentEnd": "2026-05-27T11:30:00.000Z",
+    "calIdBookingId": "bKHU7iV8fynVuG9vYqhaSr",
+    "calIdEventTypeId": "86433",
+    "meetingUrl": "https://meet.google.com/qvi-ufui-kca",
+    "webhookSyncStatus": "SYNCED"
+  }
+}
+```
+
+#### PATCH /expert-appointments/:id/cancel
+
+Cancel a confirmed active appointment. Automatically rewinds the corresponding onboarding step if onboarding has not been finalized.
+
+**Request body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `reason` | string | no | Max 500 characters |
+
+**Example request**
+```bash
+curl -X PATCH "https://api.example.com/expert-appointments/6a155160963fc70a99e94cb2/cancel" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "reason": "Schedule conflict"
+  }'
+```
+
+**Success response (200)**
+```json
+{
+  "message": "Appointment cancelled"
+}
+```
+
+---
+
+### Admin Routes — `/admin/expert-appointments`
+
+These endpoints require `Authorization: Bearer <token>` with the role `admin`.
+
+#### GET /admin/expert-appointments
+
+Retrieve a paginated, filterable list of all expert appointments.
+
+**Query parameters**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `expertType` | string | no | `sports_scientist` \| `nutritionist` |
+| `status` | string | no | Filter by status |
+| `userId` | string | no | Filter by 24-character user ObjectId |
+| `date` | string | no | `YYYY-MM-DD` |
+| `page` | number | no | Default: 1 |
+| `limit` | number | no | Default: 20, max 100 |
+
+**Example request**
+```bash
+curl "https://api.example.com/admin/expert-appointments?expertType=nutritionist&page=1&limit=20" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Success response (200)**
+```json
+{
+  "appointments": [
+    {
+      "_id": "6a155160963fc70a99e94cb2",
+      "userId": {
+        "_id": "6a154915d00ec8d02047e53d",
+        "username": "jane.doe",
+        "email": "user@example.com",
+        "phone": "+15555550123"
+      },
+      "expertType": "nutritionist",
+      "bookingStatus": "Confirmed",
+      "appointmentStart": "2026-05-27T10:00:00.000Z",
+      "appointmentEnd": "2026-05-27T10:30:00.000Z",
+      "calIdBookingId": "bKHU7iV8fynVuG9vYqhaSr",
+      "calIdEventTypeId": "86433",
+      "meetingUrl": "https://meet.google.com/qvi-ufui-kca",
+      "webhookSyncStatus": "SYNCED"
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "limit": 20,
+    "pages": 1
+  }
+}
+```
+
+#### GET /admin/expert-appointments/:id
+
+Retrieve detailed information for a specific expert appointment, along with its comprehensive audit log history.
+
+**Path parameters:** `id` — appointment ObjectId.
+
+**Example request**
+```bash
+curl "https://api.example.com/admin/expert-appointments/6a155160963fc70a99e94cb2" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Success response (200)**
+```json
+{
+  "appointment": {
+    "_id": "6a155160963fc70a99e94cb2",
+    "userId": {
+      "_id": "6a154915d00ec8d02047e53d",
+      "username": "jane.doe",
+      "email": "user@example.com",
+      "phone": "+15555550123"
+    },
+    "expertType": "nutritionist",
+    "bookingStatus": "Confirmed",
+    "appointmentStart": "2026-05-27T10:00:00.000Z",
+    "appointmentEnd": "2026-05-27T10:30:00.000Z",
+    "calIdBookingId": "bKHU7iV8fynVuG9vYqhaSr",
+    "calIdEventTypeId": "86433",
+    "meetingUrl": "https://meet.google.com/qvi-ufui-kca",
+    "webhookSyncStatus": "SYNCED"
+  },
+  "auditLogs": [
+    {
+      "_id": "6a155165963fc70a99e94cc3",
+      "appointmentId": "6a155160963fc70a99e94cb2",
+      "userId": "6a154915d00ec8d02047e53d",
+      "action": "booked",
+      "actor": "user",
+      "actorId": "6a154915d00ec8d02047e53d",
+      "calBookingId": "bKHU7iV8fynVuG9vYqhaSr",
+      "createdAt": "2026-05-26T13:45:00.000Z"
+    }
+  ]
+}
+```
+
+#### PATCH /admin/expert-appointments/:id/cancel
+
+Cancel an expert appointment as an administrator.
+
+**Request body**
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `reason` | string | no | Max 500 characters |
+
+**Example request**
+```bash
+curl -X PATCH "https://api.example.com/admin/expert-appointments/6a155160963fc70a99e94cb2/cancel" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "reason": "Administrative release of slot"
+  }'
+```
+
+**Success response (200)**
+```json
+{
+  "message": "Appointment cancelled"
+}
 
 ---
 
@@ -2064,7 +2599,22 @@ curl -X DELETE "https://api.example.com/workouts/.../sets/5f1a2b3c4d5e6f7a8b9c0d
 
 ## Workout plans — `/workout-plans`
 
-Trainer/admin-managed workout plans (templates). All routes require auth + role `admin` or `trainer`.
+Workout plans include user assignment endpoints plus trainer/admin plan management. All routes require auth.
+
+### Assignment endpoints (user)
+
+These endpoints require role `user`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/workout-plans/assignments/mine` | Get my current assignment |
+| GET | `/workout-plans/assignments/mine/schedule` | Get assignment schedule |
+| GET | `/workout-plans/assignments/mine/today` | Get today's assigned workout |
+| GET | `/workout-plans/assignments/mine/days/:dayNumber` | Get assigned workout for a day |
+| POST | `/workout-plans/assignments/mine/complete-day` | Mark a day completed |
+| PATCH | `/workout-plans/assignments/mine/days/:dayNumber` | Update my day exercises |
+
+### Plan endpoints (admin/trainer)
 
 | Method | Path | Description |
 |---|---|---|
@@ -2074,6 +2624,10 @@ Trainer/admin-managed workout plans (templates). All routes require auth + role 
 | PATCH | `/workout-plans/:id` | Update plan |
 | DELETE | `/workout-plans/:id` | Delete plan |
 | POST | `/workout-plans/:id/assign` | Assign plan to users |
+
+### Self-assign
+
+`POST /workout-plans/:planId/assign-to-me` allows `user`, `trainer`, or `admin` to assign a plan to themselves.
 
 **Example: list**
 
@@ -2203,6 +2757,28 @@ curl "https://api.example.com/leads" -H "Authorization: Bearer $TOKEN"
 
 **Success (200):** `{ "leads": [ /* ... */ ] }`
 
+### GET /leads/stats
+
+Aggregate lead counts by status and source, plus app-signup funnel metrics.
+
+**Auth:** Bearer (`admin`)
+
+```bash
+curl "https://api.example.com/leads/stats" -H "Authorization: Bearer $TOKEN"
+```
+
+**Success (200)**
+
+```json
+{
+  "byStatus": { "New": 42, "Warm": 11, "Converted": 9 },
+  "bySource": { "fitflix.in": 30, "app-signup": 18 },
+  "signupFunnel": [
+    { "_id": { "onboarded": true, "currentStep": "COMPLETED" }, "count": 5 }
+  ]
+}
+```
+
 ### GET /leads/:id
 
 **Auth:** Bearer (`admin`, `doctor`, `trainer`)
@@ -2252,14 +2828,13 @@ Convert a lead into a `User`. If a user with that email already exists, the exis
 | `username` | string | no | defaults to lead name |
 | `phone` | string | yes | |
 | `age` | string | yes | numeric string |
-| `gender` | enum | yes | `M` \| `F` \| `Other` \| `PreferNotToSay` |
-| `healthGoals` | string[] | no | |
+| `gender` | `Gender` | yes | `Male` \| `Female` \| `Other` |
 | `password` | string | yes | |
 
 ```bash
 curl -X POST "https://api.example.com/leads/5f1a2b3c4d5e6f7a8b9c0d1e/convert" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{ "phone": "+15555550123", "age": "29", "gender": "F", "password": "Sup3rSecret!" }'
+  -d '{ "phone": "+15555550123", "age": "29", "gender": "Female", "password": "Sup3rSecret!" }'
 ```
 
 **Success (201 or 200)**
@@ -2332,6 +2907,31 @@ curl "https://api.example.com/webhook/reports/user/5f1a2b3c4d5e6f7a8b9c0d1e" \
 ```
 
 **Success (200):** `{ "reports": [ /* filtered by user */ ] }`
+
+---
+
+## Cal ID webhook — `/webhooks/cal`
+
+### POST /webhooks/cal
+
+Cal ID webhook receiver. Verifies the request signature using `X-Cal-Signature-256` against the raw request body.
+
+**Auth:** Signature header `X-Cal-Signature-256`
+
+```bash
+curl -X POST "https://api.example.com/webhooks/cal" \
+  -H "X-Cal-Signature-256: <hmac>" \
+  -H "Content-Type: application/json" \
+  -d '{ "triggerEvent": "BOOKING_CREATED", "payload": { "uid": "..." } }'
+```
+
+**Success (200)**
+
+```json
+{ "received": true }
+```
+
+**Errors:** 401 invalid signature, 400 invalid payload, 500 processing error.
 
 ---
 
@@ -2813,6 +3413,150 @@ curl -X POST "https://api.example.com/nutrition/admin/adherence/rebuild" \
 
 ---
 
+## Nutritionist bookings — `/nutritionist`
+
+Slot-based nutritionist booking workflow. All routes require authentication.
+
+### GET /nutritionist/my-booking
+
+Return the authenticated user's active booking (or latest booking if none active).
+
+**Auth:** Bearer (`user`)
+
+```bash
+curl "https://api.example.com/nutritionist/my-booking" -H "Authorization: Bearer $TOKEN"
+```
+
+**Success (200):** `{ "booking": { /* NutritionistBooking */ } }`
+
+### GET /nutritionist/bookings
+
+List bookings for admin/frontdesk review.
+
+**Auth:** Bearer (`admin`)
+
+**Query params**
+
+| Name | Type | Required | Notes |
+|---|---|---|---|
+| `status` | `NutritionistBookingStatus` | no | `PENDING`, `ACCEPTED`, `REJECTED`, `COMPLETED` |
+| `date` | string | no | `YYYY-MM-DD` (UTC day) |
+
+**Success (200):** `{ "bookings": [ /* ... */ ], "total": 12 }`
+
+### PATCH /nutritionist/bookings/:id/accept
+
+Accept a pending booking.
+
+**Auth:** Bearer (`admin`)
+
+**Request body**
+
+| Field | Type | Required |
+|---|---|---|
+| `meetingLink` | string (url) | no |
+| `clinicLocation` | string | no |
+| `calBookingId` | string | no |
+
+**Success (200):** `{ "message": "Nutritionist booking accepted", "booking": { /* ... */ } }`
+
+### PATCH /nutritionist/bookings/:id/reject
+
+Reject a booking and release slot capacity.
+
+**Auth:** Bearer (`admin`)
+
+**Request body**
+
+| Field | Type | Required |
+|---|---|---|
+| `reason` | string | no |
+
+**Success (200):** `{ "message": "Nutritionist booking rejected; slot capacity restored", "booking": { /* ... */ } }`
+
+---
+
+## Notifications — `/notifications`
+
+In-app notifications and push token registration. All routes require authentication.
+
+### GET /notifications
+
+List notifications for the authenticated user.
+
+**Auth:** Bearer (any role)
+
+**Query params**
+
+| Name | Type | Required | Default |
+|---|---|---|---|
+| `page` | number | no | 1 |
+| `limit` | number | no | 20 (max 50) |
+
+**Success (200)**
+
+```json
+{
+  "notifications": [ /* ... */ ],
+  "unread": 3,
+  "pagination": { "total": 42, "page": 1, "limit": 20, "pages": 3 }
+}
+```
+
+### PATCH /notifications/read-all
+
+Mark all notifications as read.
+
+**Auth:** Bearer (any role)
+
+**Success (200):** `{ "message": "All notifications marked as read" }`
+
+### PATCH /notifications/:id/read
+
+Mark a single notification as read.
+
+**Auth:** Bearer (any role)
+
+**Success (200):** `{ "notification": { /* ... */ } }`
+
+### POST /notifications/fcm-token
+
+Register a device push token.
+
+**Auth:** Bearer (any role)
+
+**Request body**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `token` | string | yes | FCM device token |
+| `platform` | string | yes | `ios` or `android` |
+
+**Success (200):** `{ "message": "FCM token registered" }`
+
+---
+
+## Internal — `/internal`
+
+Internal routes protected by `REMINDER_TICK_SECRET`.
+
+### POST /internal/reminders/tick
+
+Process due appointment reminders. Intended for cron/scheduler use.
+
+**Auth:** `X-Internal-Secret` header (or `X-Webhook-Secret` alias)
+
+```bash
+curl -X POST "https://api.example.com/internal/reminders/tick" \
+  -H "X-Internal-Secret: $REMINDER_TICK_SECRET"
+```
+
+**Success (200):** `{ "ok": true, "fired": 10, "failed": 0 }`
+
+**Errors:** 401 unauthorized, 503 not configured.
+
+---
+
 ## Health check — `/health`
 
 ### GET /health
@@ -2843,8 +3587,8 @@ Steps are enforced server-side via [src/utils/onboarding.service.ts](../src/util
 | 2 | `HEALTH_GOALS` | `POST /onboarding/health-goals` | |
 | 3 | `CONSENT` | `POST /onboarding/consent` | Captures IP automatically |
 | 4 | `REPORT_UPLOAD` | `POST /onboarding/reports` | Multiple submissions allowed |
-| 5 | `SPORTS_SCIENTIST_BOOKING` | `POST /onboarding/appointments` (`expertType: "sports_scientist"`) | Must precede step 6 |
-| 6 | `NUTRITIONIST_BOOKING` | `POST /onboarding/appointments` (`expertType: "nutritionist"`) | |
+| 5 | `SPORTS_SCIENTIST_BOOKING` | `POST /expert-appointments/book` (`expertType: "sports_scientist"`) or `POST /onboarding/sports-scientist` | Must precede step 6 |
+| 6 | `NUTRITIONIST_BOOKING` | `POST /expert-appointments/book` (`expertType: "nutritionist"`) or `POST /onboarding/nutritionist` or `POST /onboarding/nutritionist/book` | |
 | 7 | `COMPLETED` | `POST /onboarding/complete` | Sets `user.onboarded = true` |
 
 Legacy single-step alternative: `PATCH /users/:id/onboard` — still supported but bypasses the granular step tracking. New clients should use the steps above.
@@ -2853,4 +3597,5 @@ Legacy single-step alternative: `PATCH /users/:id/onboard` — still supported b
 
 ## Changelog
 
+- **2026-05-27** — Added missing endpoints (logout, slots availability, nutritionist bookings, notifications, internal, Cal ID webhook) and refreshed enums.
 - **2026-05-22** — Initial consolidated reference covering all 17 routers and `/health`.

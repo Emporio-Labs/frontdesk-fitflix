@@ -38,8 +38,11 @@ export interface ExpertAppointment {
   expertType: ExpertType
   bookingStatus: ExpertAppointmentStatus
   appointmentDate?: string | null
+  appointmentStart?: string | null
   meetingLink?: string | null
+  meetingUrl?: string | null
   calComBookingId?: string | null
+  calIdBookingId?: string | null
   createdAt?: string
   updatedAt?: string
 }

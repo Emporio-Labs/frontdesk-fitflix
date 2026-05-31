@@ -21,6 +21,7 @@ import {
   IconBarbell,
   IconActivity,
   IconSalad,
+  IconFileInvoice,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -127,6 +128,11 @@ const navMain = [
       title: "Leads",
       url: "/admin/leads",
       icon: IconTarget,
+    },
+    {
+      title: "Invoices",
+      url: "/admin/invoices",
+      icon: IconFileInvoice,
     },
     {
       title: "Audit Logs",

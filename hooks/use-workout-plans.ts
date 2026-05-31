@@ -8,7 +8,13 @@ import type {
   BatchUpdateSchedulePayload,
 } from '@/lib/services/workout-plan.service'
 
-export function useWorkoutPlans(filters?: { page?: number; limit?: number; status?: string; goal?: string; difficulty?: string }) {
+export function useWorkoutPlans(filters?: {
+  page?: number
+  limit?: number
+  status?: string
+  goal?: string
+  difficulty?: string
+}) {
   return useQuery({
     queryKey: queryKeys.workoutPlans.list(filters),
     queryFn: () => workoutPlanService.getAll(filters),
@@ -32,7 +38,13 @@ export function useCreateWorkoutPlan() {
       toast.success('Workout plan created successfully')
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.error || 'Failed to create workout plan')
+      console.error('Create Plan Error:', err?.response?.data || err)
+      const details = err?.response?.data?.details
+      const detailsMsg = Array.isArray(details)
+        ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
+        : ''
+      const errorMsg = err?.response?.data?.error || 'Failed to create plan'
+      toast.error(detailsMsg ? `${errorMsg} (${detailsMsg})` : errorMsg)
     },
   })
 }
@@ -48,7 +60,13 @@ export function useUpdateWorkoutPlan() {
       toast.success('Workout plan updated successfully')
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.error || 'Failed to update workout plan')
+      console.error('Update Plan Error:', err?.response?.data || err)
+      const details = err?.response?.data?.details
+      const detailsMsg = Array.isArray(details)
+        ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
+        : ''
+      const errorMsg = err?.response?.data?.error || 'Failed to update plan'
+      toast.error(detailsMsg ? `${errorMsg} (${detailsMsg})` : errorMsg)
     },
   })
 }
@@ -70,15 +88,26 @@ export function useDeleteWorkoutPlan() {
 export function useAssignWorkoutPlan() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: { userIds: string[]; startDate?: string } }) =>
-      workoutPlanService.assignUsers(id, payload),
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string
+      payload: { userIds: string[]; startDate?: string }
+    }) => workoutPlanService.assignUsers(id, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.workoutPlans.all() })
       qc.invalidateQueries({ queryKey: queryKeys.workoutPlans.assignments.all() })
       toast.success('Users assigned to workout plan')
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.error || 'Failed to assign users')
+      console.error('Assign Users Error:', err?.response?.data || err)
+      const details = err?.response?.data?.details
+      const detailsMsg = Array.isArray(details)
+        ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
+        : ''
+      const errorMsg = err?.response?.data?.error || 'Failed to assign users'
+      toast.error(detailsMsg ? `${errorMsg} (${detailsMsg})` : errorMsg)
     },
   })
 }
@@ -145,8 +174,13 @@ export function useSwapWorkoutDays() {
 export function useBatchUpdateWorkoutSchedule() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ assignmentId, payload }: { assignmentId: string; payload: BatchUpdateSchedulePayload }) =>
-      workoutPlanService.batchUpdateSchedule(assignmentId, payload),
+    mutationFn: ({
+      assignmentId,
+      payload,
+    }: {
+      assignmentId: string
+      payload: BatchUpdateSchedulePayload
+    }) => workoutPlanService.batchUpdateSchedule(assignmentId, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.workoutPlans.assignments.all() })
       toast.success('Workout schedule updated')

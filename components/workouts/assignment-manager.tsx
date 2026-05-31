@@ -37,16 +37,9 @@ import {
   IconClock,
 } from '@tabler/icons-react'
 import { useWorkoutPlans, useAssignWorkoutPlan } from '@/hooks/use-workout-plans'
-import { useQuery } from '@tanstack/react-query'
-import { apiClient } from '@/lib/api-client'
+import { useUsers } from '@/hooks/use-users'
 import { toast } from 'sonner'
 import type { WorkoutPlan } from '@/types/workout'
-
-interface User {
-  id: string
-  name: string
-  email: string
-}
 
 interface PlanAssignment {
   planId: string
@@ -67,13 +60,7 @@ export function AssignmentManager() {
     status: 'Active',
   })
 
-  const { data: users } = useQuery({
-    queryKey: ['users'],
-    queryFn: async () => {
-      const response = await apiClient.get('/users')
-      return response.data as User[]
-    },
-  })
+  const { data: users = [] } = useUsers()
 
   const assignMutation = useAssignWorkoutPlan()
 
@@ -89,7 +76,7 @@ export function AssignmentManager() {
 
     try {
       await assignMutation.mutateAsync({
-        id: selectedPlan.id,
+        id: selectedPlan._id,
         payload: {
           userIds: selectedUsers,
           startDate: startDate || undefined,
@@ -153,9 +140,9 @@ export function AssignmentManager() {
                       <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                         {filteredPlans.map((plan) => (
                           <Button
-                            key={plan.id}
+                            key={plan._id}
                             variant={
-                              selectedPlan?.id === plan.id ? 'default' : 'outline'
+                              selectedPlan?._id === plan._id ? 'default' : 'outline'
                             }
                             className="justify-start h-auto py-2 px-3 text-left"
                             onClick={() => setSelectedPlan(plan)}
@@ -180,27 +167,27 @@ export function AssignmentManager() {
                       Assign to Users
                     </label>
                     <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
-                      {users?.map((user) => (
+                      {users.map((user) => (
                         <label
-                          key={user.id}
+                          key={user._id}
                           className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded"
                         >
                           <input
                             type="checkbox"
-                            checked={selectedUsers.includes(user.id)}
+                            checked={selectedUsers.includes(user._id)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedUsers([...selectedUsers, user.id])
+                                setSelectedUsers([...selectedUsers, user._id])
                               } else {
                                 setSelectedUsers(
-                                  selectedUsers.filter((id) => id !== user.id)
+                                  selectedUsers.filter((id) => id !== user._id)
                                 )
                               }
                             }}
                             className="rounded"
                           />
                           <div>
-                            <div className="text-sm font-medium">{user.name}</div>
+                            <div className="text-sm font-medium">{user.username}</div>
                             <div className="text-xs text-muted-foreground">
                               {user.email}
                             </div>
@@ -253,7 +240,7 @@ export function AssignmentManager() {
           ) : (
             <div className="space-y-4">
               {filteredPlans.map((plan) => (
-                <Card key={plan.id} className="bg-muted/20">
+                <Card key={plan._id} className="bg-muted/20">
                   <CardContent className="pt-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">

@@ -5,6 +5,7 @@ import { useWorkoutStore } from '@/stores/workout-store'
 import { useWorkoutPlan } from '@/hooks/use-workout-plans'
 import { PlanBuilderLayout } from '@/components/workouts/plan-builder-layout'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import Link from 'next/link'
 import type { WorkoutPlan } from '@/types/workout'
 

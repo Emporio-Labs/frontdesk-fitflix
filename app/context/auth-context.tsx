@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, ReactNode, useEffect } from 'react'
 import { UserRole } from '@/lib/rbac'
-import { storeCredentials, clearCredentials, getStoredCredentials, getStoredToken } from '@/lib/api-client'
+import { storeCredentials, clearCredentials, clearToken, getStoredCredentials, getStoredToken } from '@/lib/api-client'
 
 // Helpers for auth cookie (read by Next.js middleware)
 function setAuthCookie() {
@@ -72,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleLogout = () => {
     clearCredentials()
+    clearToken()
     clearAuthCookie()
     if (typeof window !== 'undefined') {
       localStorage.removeItem('hh_user')

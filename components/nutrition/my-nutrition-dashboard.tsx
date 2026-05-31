@@ -647,7 +647,7 @@ function NutritionWorkspace({
       height:   toNumberSafe(selectedUser.healthMarkers?.height) ?? null,
       age:      Number.isFinite(ageNum) && ageNum > 0 ? ageNum : null,
       gender:   selectedUser.gender || null,
-      activity: (selectedUser.healthMarkers?.activityLevel ?? 'Moderate') as ActivityLevel,
+      activity: (selectedUser.healthMarkers?.activityLevel as ActivityLevel) ?? 'Moderate',
       goal,
     }
   }, [selectedUser, latestWeightKg, plan])

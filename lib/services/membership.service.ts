@@ -16,6 +16,7 @@ export interface Membership {
   endDate: string
   features: string[]
   notes: string
+  createdAt?: string
 }
 
 export interface CreateMembershipPayload {
@@ -70,10 +71,22 @@ function normalizeMembership(raw: any): Membership {
     endDate: raw?.endDate || '',
     features: Array.isArray(raw?.features) ? raw.features : [],
     notes: raw?.notes || '',
+    createdAt: raw?.createdAt || '',
   }
 }
 
 export const membershipService = {
+  getMine: async (): Promise<{ memberships: Membership[] }> => {
+    const { data } = await apiClient.get('/memberships/me')
+    if (Array.isArray(data?.memberships)) {
+      return { memberships: data.memberships.map(normalizeMembership) }
+    }
+    if (Array.isArray(data)) {
+      return { memberships: data.map(normalizeMembership) }
+    }
+    return { memberships: [] }
+  },
+
   getAll: async (): Promise<{ memberships: Membership[] }> => {
     const { data } = await apiClient.get('/memberships')
     if (Array.isArray(data?.memberships)) {
