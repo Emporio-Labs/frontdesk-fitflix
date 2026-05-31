@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import {
   DndContext,
@@ -30,8 +31,18 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { IconPlus, IconEdit, IconTrash, IconCheck, IconFileInvoice } from '@tabler/icons-react'
+import {
+  IconPlus, IconEdit, IconTrash, IconCheck, IconFileInvoice,
+  IconFlame, IconUserPlus, IconAlertTriangle, IconPhone, IconUserCheck, IconFilter,
+} from '@tabler/icons-react'
 import { CreateInvoiceSheet } from '@/components/invoices/create-invoice-sheet'
+import {
+  CrmStatCard,
+  FollowUpCard,
+  SignupLeadCard,
+  FunnelView,
+  toISTDateStr,
+} from '@/components/crm/crm-widgets'
 import {
   useAddLeadInteraction,
   useConvertLead,
@@ -61,11 +72,11 @@ export default function LeadsPage() {
 
   const {
     data: leads = [],
-    isLoading,
+    isLoading: leadsLoading,
     isError,
     refetch,
   } = useLeads()
-  const { data: reminderSummary } = useLeadReminders()
+  const { data: reminderSummary, isLoading: remindersLoading } = useLeadReminders()
   const { data: leadAnalytics } = useLeadAnalytics()
   const { data: leadDigest } = useLeadDigest()
   const createLead = useCreateLead()
@@ -143,6 +154,35 @@ export default function LeadsPage() {
       sourceCounts,
     }
   }, [filteredLeads, leadAnalytics])
+
+  // ── CRM Overview computed ─────────────────────────────────────────────────
+  const todayStr = toISTDateStr(new Date())
+
+  const signupLeads = useMemo(
+    () =>
+      leads
+        .filter((l) => l.tags.some((t) => t.toLowerCase() === 'signup'))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [leads],
+  )
+
+  const todaySignups = useMemo(
+    () => signupLeads.filter((l) => toISTDateStr(new Date(l.createdAt)) === todayStr),
+    [signupLeads, todayStr],
+  )
+
+  const pendingFollowups = useMemo(
+    () => [...(reminderSummary?.missed ?? []), ...(reminderSummary?.today ?? [])],
+    [reminderSummary],
+  )
+
+  const stageCounts = leadAnalytics?.stageCounts ?? {
+    new: 0,
+    contacted: 0,
+    qualified: 0,
+    converted: 0,
+    lost: 0,
+  }
 
   const handleAddLead = async () => {
     if (!formData.name.trim() || !formData.email.trim()) {
@@ -612,6 +652,141 @@ export default function LeadsPage() {
         </TabsList>
 
         <TabsContent value="board" className="space-y-4">
+
+          {/* ── SECTION 1: CRM Overview Cards ──────────────────────────────── */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              CRM Overview
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <CrmStatCard
+                title="Today's Signups"
+                value={leadsLoading ? null : todaySignups.length}
+                sub="new app registrations"
+                icon={<IconUserPlus className="w-4 h-4 text-blue-500" />}
+                href="/admin/leads"
+              />
+              <CrmStatCard
+                title="Pending Follow-ups"
+                value={remindersLoading ? null : pendingFollowups.length}
+                sub={`${reminderSummary?.missed?.length ?? 0} overdue`}
+                icon={<IconAlertTriangle className="w-4 h-4 text-amber-500" />}
+                href="/admin/leads"
+                urgent={(reminderSummary?.missed?.length ?? 0) > 0}
+              />
+              <CrmStatCard
+                title="Contacted Leads"
+                value={stageCounts.contacted}
+                sub="in pipeline"
+                icon={<IconPhone className="w-4 h-4 text-violet-500" />}
+                href="/admin/leads"
+              />
+              <CrmStatCard
+                title="Converted Members"
+                value={stageCounts.converted}
+                sub="from leads"
+                icon={<IconUserCheck className="w-4 h-4 text-emerald-500" />}
+                href="/admin/leads"
+              />
+            </div>
+          </div>
+
+          {/* ── SECTION 2: Today's Follow-ups + New Signups ─────────────────── */}
+          {/* On mobile the two columns stack vertically; lg+ they sit side-by-side */}
+          <div className="grid gap-4 lg:grid-cols-2">
+
+            {/* Today's Follow-ups Panel */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <IconFlame className="w-4 h-4 text-orange-500" />
+                    Today's Follow-ups
+                    {pendingFollowups.length > 0 && (
+                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                        {pendingFollowups.length}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription>Leads needing contact now</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
+                {remindersLoading ? (
+                  [...Array(3)].map((_, i) => (
+                    <Skeleton key={i} className="h-[84px] w-full" />
+                  ))
+                ) : pendingFollowups.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                    <IconUserCheck className="w-8 h-8 mb-2 opacity-30" />
+                    <p className="text-sm">All caught up for today!</p>
+                  </div>
+                ) : (
+                  pendingFollowups.slice(0, 6).map((lead) => (
+                    <FollowUpCard
+                      key={lead.id}
+                      lead={lead}
+                      onCall={() => contactAttempt.mutate({ id: lead.id, channel: 'call' })}
+                      onWhatsApp={() => contactAttempt.mutate({ id: lead.id, channel: 'whatsapp' })}
+                      onMarkContacted={() => handleStatusChange(lead.id, 'contacted')}
+                    />
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            {/* New Signups Panel */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <IconUserPlus className="w-4 h-4 text-blue-500" />
+                    New Signups
+                    {todaySignups.length > 0 && (
+                      <Badge className="text-[10px] px-1.5 py-0 bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-300">
+                        {todaySignups.length} today
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription>Recent app registrations</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
+                {leadsLoading ? (
+                  [...Array(3)].map((_, i) => (
+                    <Skeleton key={i} className="h-[84px] w-full" />
+                  ))
+                ) : signupLeads.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                    <IconUserPlus className="w-8 h-8 mb-2 opacity-30" />
+                    <p className="text-sm">No app signups yet</p>
+                  </div>
+                ) : (
+                  signupLeads.slice(0, 6).map((lead) => (
+                    <SignupLeadCard key={lead.id} lead={lead} />
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ── SECTION 3: Lead Funnel Pipeline ────────────────────────────── */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <IconFilter className="w-4 h-4" />
+                  Lead Funnel
+                </CardTitle>
+                <CardDescription>Live pipeline stage distribution</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <FunnelView stageCounts={stageCounts} />
+            </CardContent>
+          </Card>
+
+          {/* ── SECTION 4: Existing Board Stats ────────────────────────────── */}
           {/* Lead Funnel Stats */}
           <div className="grid gap-4 md:grid-cols-5">
             <Card>
@@ -817,7 +992,7 @@ export default function LeadsPage() {
               <CardDescription>Total: {filteredLeads.length} leads</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading && (
+              {leadsLoading && (
                 <div className="space-y-2 pb-4">
                   <Skeleton className="h-8 w-full" />
                   <Skeleton className="h-8 w-full" />
