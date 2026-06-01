@@ -4,15 +4,22 @@ import React, { createContext, useState, ReactNode, useEffect } from 'react'
 import { UserRole } from '@/lib/rbac'
 import { storeCredentials, clearCredentials, clearToken, getStoredCredentials, getStoredToken } from '@/lib/api-client'
 
-// Helpers for auth cookie (read by Next.js middleware)
+// Helpers for auth cookie (read by Next.js middleware for route protection).
+// Note: this is a presence-only indicator cookie, NOT the auth token.
+// The real token lives in localStorage (see lib/api-client.ts).
+// SameSite=Strict prevents CSRF. Secure is added when on HTTPS.
 function setAuthCookie() {
   if (typeof document !== 'undefined') {
-    document.cookie = 'hh_authed=1; path=/; max-age=86400; SameSite=Lax'
+    const isSecure = window.location.protocol === 'https:'
+    const secureFlag = isSecure ? '; Secure' : ''
+    document.cookie = `hh_authed=1; path=/; max-age=86400; SameSite=Strict${secureFlag}`
   }
 }
 function clearAuthCookie() {
   if (typeof document !== 'undefined') {
-    document.cookie = 'hh_authed=; path=/; max-age=0; SameSite=Lax'
+    const isSecure = window.location.protocol === 'https:'
+    const secureFlag = isSecure ? '; Secure' : ''
+    document.cookie = `hh_authed=; path=/; max-age=0; SameSite=Strict${secureFlag}`
   }
 }
 

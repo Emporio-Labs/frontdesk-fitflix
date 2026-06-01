@@ -22,6 +22,7 @@ export function useUsers() {
     queryKey: queryKeys.users.all(),
     queryFn: userService.getAll,
     select: (data) => data.users,
+    staleTime: 0, // user list must always be fresh (memberships, roles can change)
   })
 }
 
@@ -34,6 +35,7 @@ export function useUser(id: string) {
       return data.user !== undefined ? data.user : data
     },
     enabled: !!id,
+    staleTime: 0, // individual user profile must always be fresh
   })
 }
 
@@ -42,6 +44,7 @@ export function useMe() {
     queryKey: ['users', 'me'] as const,
     queryFn: userService.getMe,
     select: (data) => data.user,
+    staleTime: 0, // current user's own profile — never serve stale auth data
   })
 }
 
