@@ -299,59 +299,55 @@ export default function UsersPage() {
                       {filteredUsers.length === 0 ? (
                         <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
                       ) : (
-                        filteredUsers.map((user) => (
-                          <TableRow key={user._id}>
-                            {(() => {
-                              const membership = getUserMembership(user)
-                              return (
-                                <>
-                            <TableCell className="font-medium">{user.username}</TableCell>
-                            <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                            <TableCell>{user.age}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{user.gender}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1 max-w-[200px]">
-                                {user.healthGoals.slice(0, 2).map((g) => (
-                                  <Badge key={g} variant="secondary" className="text-xs">{g}</Badge>
-                                ))}
-                                {user.healthGoals.length > 2 && (
-                                  <Badge variant="secondary" className="text-xs">+{user.healthGoals.length - 2}</Badge>
+                        filteredUsers.map((user) => {
+                          const membership = getUserMembership(user)
+                          return (
+                            <TableRow key={user._id}>
+                              <TableCell className="font-medium">{user.username}</TableCell>
+                              <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                              <TableCell>{user.age}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{user.gender}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                  {user.healthGoals.slice(0, 2).map((g) => (
+                                    <Badge key={g} variant="secondary" className="text-xs">{g}</Badge>
+                                  ))}
+                                  {user.healthGoals.length > 2 && (
+                                    <Badge variant="secondary" className="text-xs">+{user.healthGoals.length - 2}</Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                              <TableCell>
+                                <StatusBadge status={deriveOnboardingState(user)} size="sm" />
+                              </TableCell>
+                              <TableCell>
+                                {membership ? (
+                                  <Badge variant="secondary">{membership.planName}</Badge>
+                                ) : (
+                                  <Badge variant="outline">Not Assigned</Badge>
                                 )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">{new Date(user.createdAt).toLocaleDateString()}</TableCell>
-                            <TableCell>
-                              <StatusBadge status={deriveOnboardingState(user)} size="sm" />
-                            </TableCell>
-                            <TableCell>
-                              {membership ? (
-                                <Badge variant="secondary">{membership.planName}</Badge>
-                              ) : (
-                                <Badge variant="outline">Not Assigned</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">{formatDateOnly(membership?.startDate)}</TableCell>
-                            <TableCell className="text-muted-foreground">{formatDateOnly(membership?.endDate)}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                {!membership && (
-                                  <Button asChild size="sm">
-                                    <Link href={`/admin/memberships?assignUserId=${encodeURIComponent(user._id)}`}>
-                                      Assign Membership
-                                    </Link>
-                                  </Button>
-                                )}
-                                <Button size="sm" variant="outline" onClick={() => handleOpenEditUser(user)}><IconEdit className="w-4 h-4" /></Button>
-                                <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${user.username}?`)) deleteUser.mutate(user._id) }} disabled={deleteUser.isPending}><IconTrash className="w-4 h-4" /></Button>
-                              </div>
-                            </TableCell>
-                                </>
-                              )
-                            })()}
-                          </TableRow>
-                        ))
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">{formatDateOnly(membership?.startDate)}</TableCell>
+                              <TableCell className="text-muted-foreground">{formatDateOnly(membership?.endDate)}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  {!membership && (
+                                    <Button asChild size="sm">
+                                      <Link href={`/admin/memberships?assignUserId=${encodeURIComponent(user._id)}`}>
+                                        Assign Membership
+                                      </Link>
+                                    </Button>
+                                  )}
+                                  <Button size="sm" variant="outline" onClick={() => handleOpenEditUser(user)}><IconEdit className="w-4 h-4" /></Button>
+                                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${user.username}?`)) deleteUser.mutate(user._id) }} disabled={deleteUser.isPending}><IconTrash className="w-4 h-4" /></Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })
                       )}
                     </TableBody>
                   </Table>
