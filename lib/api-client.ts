@@ -163,7 +163,8 @@ apiClient.interceptors.response.use(
     const isAuthEndpoint = requestPath.startsWith('/auth/') || requestPath === '/auth'
     const alreadyRetried = (config as any).__retried
 
-    if (error?.response?.status === 401 && !isAuthEndpoint && !alreadyRetried) {
+    const status = error?.response?.status
+    if ((status === 401 || status === 403) && !isAuthEndpoint && !alreadyRetried) {
       const newToken = await tryRefreshToken()
       if (newToken) {
         ;(config as any).__retried = true

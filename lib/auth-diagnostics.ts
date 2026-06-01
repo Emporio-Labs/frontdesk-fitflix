@@ -183,17 +183,15 @@ export function initAuthDiagnostics() {
     try {
       const response = await originalFetch.apply(this, [input, init]);
       if (response.status === 401 || response.status === 403) {
+        const cls = hasAuthHeader ? 'TOKEN REJECTED' : 'STORAGE EMPTY (no auth header sent)'
         console.error(
-          `%c[AUTH-DIAGNOSTIC] HTTP Error ${response.status} on FETCH: ${method} ${url}%c`,
+          `%c[AUTH-DIAGNOSTIC] HTTP Error ${response.status} on FETCH [${cls}]: ${method} ${url}%c`,
           'background: #7f1d1d; color: #fecaca; padding: 4px 8px; border-radius: 4px; font-weight: bold;',
           '',
           {
             url,
             method,
             status: response.status,
-            classification: hasAuthHeader 
-              ? 'Token Rejected (Server-Side Invalidation) - The Authorization header was sent, but the server rejected it.'
-              : 'Storage Empty (Client-Side Loss) - No Authorization header was sent, which caused the authentication check to fail.',
             stack: new Error().stack
           }
         );
@@ -232,17 +230,15 @@ export function initAuthDiagnostics() {
     xhr.addEventListener('load', function() {
       if (xhr.status === 401 || xhr.status === 403) {
         const hasAuthHeader = xhr._requestHeaders ? !!xhr._requestHeaders['authorization'] : false;
+        const cls = hasAuthHeader ? 'TOKEN REJECTED' : 'STORAGE EMPTY (no auth header sent)'
         console.error(
-          `%c[AUTH-DIAGNOSTIC] HTTP Error ${xhr.status} on XHR: ${method} ${url}%c`,
+          `%c[AUTH-DIAGNOSTIC] HTTP Error ${xhr.status} on XHR [${cls}]: ${method} ${url}%c`,
           'background: #7f1d1d; color: #fecaca; padding: 4px 8px; border-radius: 4px; font-weight: bold;',
           '',
           {
             url,
             method,
             status: xhr.status,
-            classification: hasAuthHeader 
-              ? 'Token Rejected (Server-Side Invalidation) - The Authorization header was sent, but the server rejected it.'
-              : 'Storage Empty (Client-Side Loss) - No Authorization header was sent, which caused the authentication check to fail.',
             response: xhr.responseText ? xhr.responseText.substring(0, 500) : null,
             stack: stack
           }
