@@ -31,8 +31,14 @@ export default function LoginPage() {
     setIsLoading(true)
     try {
       const data = await authService.login({ email, password })
+      if (data?.accessToken) {
+        storeToken(data.accessToken)
+      }
+      if (data?.refreshToken && typeof window !== 'undefined') {
+        localStorage.setItem('hh_refresh_token', data.refreshToken)
+      }
       const apiUser = data.user
-      const token = data.token
+      const token = data.accessToken || data.token
       // Always log login response shape for debugging (remove after fixing)
       console.log('[login] response data:', { keys: Object.keys(data), hasToken: !!token, user: apiUser })
       if (authDebug) {
@@ -52,7 +58,8 @@ export default function LoginPage() {
         admin: 'clinic_admin',
         doctor: 'clinician',
         trainer: 'staff',
-        user: 'staff',
+        nutritionist: 'staff',
+        user: 'sales', // restrict normal 'user' from accessing powerful dashboard reads if they shouldn't
       }
       const mappedRole = roleMap[apiUser?.role] ?? 'clinic_admin'
       login(email, password, {

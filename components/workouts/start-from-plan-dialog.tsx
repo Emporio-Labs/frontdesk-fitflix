@@ -26,11 +26,11 @@ export function StartFromPlanDialog({
   const router = useRouter()
   const [selectedPlan, setSelectedPlan] = useState<WorkoutPlan | null>(null)
 
-  const { data: plansData } = useWorkoutPlans({ status: 'Active', limit: 100 })
+  const { data: plansData } = useWorkoutPlans({ status: 'Published', limit: 100 })
   const createMutation = useCreateWorkoutSession()
 
   const plans = plansData?.plans ?? []
-  const activePlans = plans.filter((p) => p.status === 'Active')
+  const activePlans = plans.filter((p) => p.status === 'Published')
 
   const handleStart = () => {
     if (!selectedPlan) return

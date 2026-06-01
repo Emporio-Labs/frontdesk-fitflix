@@ -21,6 +21,7 @@ import {
   IconBarbell,
   IconActivity,
   IconSalad,
+  IconFileInvoice,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -64,9 +65,14 @@ const navMain = [
       icon: IconActivity,
     },
     {
-      title: "Nutritionist",
-      url: "/admin/nutritionist",
+      title: "Nutrition",
+      url: "/admin/nutrition",
       icon: IconSalad,
+    },
+    {
+      title: "Nutritionist Appointments",
+      url: "/admin/nutritionist-appointments",
+      icon: IconCalendarEvent,
     },
     {
       title: "Workouts",
@@ -122,6 +128,11 @@ const navMain = [
       title: "Leads",
       url: "/admin/leads",
       icon: IconTarget,
+    },
+    {
+      title: "Invoices",
+      url: "/admin/invoices",
+      icon: IconFileInvoice,
     },
     {
       title: "Audit Logs",

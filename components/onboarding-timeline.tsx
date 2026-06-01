@@ -12,6 +12,17 @@ export const ONBOARDING_STEP_ORDER: { key: OnboardingStep; label: string }[] = [
   { key: 'COMPLETED', label: 'Completed' },
 ]
 
+export function onboardingStepLabel(step?: string | null): string {
+  if (!step) return '—'
+  const found = ONBOARDING_STEP_ORDER.find((s) => s.key === step)
+  if (found) return found.label
+  return step
+    .toLowerCase()
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
+
 interface OnboardingTimelineProps {
   currentStep?: OnboardingStep
   completedSteps?: OnboardingStep[]
@@ -19,18 +30,22 @@ interface OnboardingTimelineProps {
 
 export function OnboardingTimeline({ currentStep, completedSteps = [] }: OnboardingTimelineProps) {
   const completedSet = new Set(completedSteps)
+  
+  const displaySteps = ONBOARDING_STEP_ORDER.filter(
+    (step) => step.key !== 'SPORTS_SCIENTIST_BOOKING'
+  )
 
   return (
     <div className="w-full overflow-x-auto">
       <ol className="flex items-start min-w-max gap-0 py-2">
-        {ONBOARDING_STEP_ORDER.map((step, idx) => {
+        {displaySteps.map((step, idx) => {
           const isCompleted = completedSet.has(step.key) || step.key === 'COMPLETED' && completedSet.has('COMPLETED')
           const isCurrent = currentStep === step.key
-          const isLast = idx === ONBOARDING_STEP_ORDER.length - 1
+          const isLast = idx === displaySteps.length - 1
 
           return (
-            <li key={step.key} className="flex items-start flex-1 min-w-[110px]">
-              <div className="flex flex-col items-center text-center px-2">
+            <li key={step.key} className="flex items-start flex-1 min-w-[100px]">
+              <div className="flex flex-col items-center text-center px-1">
                 <div
                   className={cn(
                     'flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold transition-colors',
@@ -45,7 +60,7 @@ export function OnboardingTimeline({ currentStep, completedSteps = [] }: Onboard
                 </div>
                 <span
                   className={cn(
-                    'mt-2 text-xs leading-tight max-w-[90px]',
+                    'mt-2 text-[11px] leading-tight max-w-[80px]',
                     isCompleted || isCurrent ? 'text-foreground font-medium' : 'text-muted-foreground'
                   )}
                 >
@@ -55,7 +70,7 @@ export function OnboardingTimeline({ currentStep, completedSteps = [] }: Onboard
               {!isLast && (
                 <div
                   className={cn(
-                    'mt-4 h-px flex-1 min-w-[16px]',
+                    'mt-4 h-px flex-1 min-w-[12px]',
                     isCompleted ? 'bg-primary' : 'bg-border'
                   )}
                 />

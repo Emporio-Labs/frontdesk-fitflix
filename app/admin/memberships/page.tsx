@@ -35,6 +35,20 @@ import {
   useDeleteMembership,
 } from '@/hooks/use-memberships'
 
+function formatDateToInput(value?: string) {
+  if (!value) return ''
+  return value.split('T')[0] || ''
+}
+
+function formatDateOnly(value?: string) {
+  if (!value) return '-'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return value.split('T')[0] || value
+  }
+  return parsed.toISOString().slice(0, 10)
+}
+
 function MembershipsPageContent() {
   const searchParams = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
@@ -61,6 +75,20 @@ function MembershipsPageContent() {
   const deleteMembership = useDeleteMembership()
 
   const assignUserId = searchParams.get('assignUserId') || ''
+
+  const isStartDateDisabled = useMemo(() => {
+    if (!editingMembership) return false
+    const startDateStr = formatDateToInput(editingMembership.startDate)
+    if (!startDateStr) return false
+
+    const d = new Date()
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const todayStr = `${year}-${month}-${day}`
+
+    return startDateStr < todayStr
+  }, [editingMembership])
 
   const selectedPlan = useMemo(
     () => membershipPlans.find((plan) => plan.id === formData.planId),
@@ -123,14 +151,7 @@ function MembershipsPageContent() {
     return match?.email || '-'
   }
 
-  const formatDateOnly = (value?: string) => {
-    if (!value) return '-'
-    const parsed = new Date(value)
-    if (Number.isNaN(parsed.getTime())) {
-      return value.split('T')[0] || value
-    }
-    return parsed.toISOString().slice(0, 10)
-  }
+
 
   useEffect(() => {
     if (!assignUserId || hasHandledAssignParam || users.length === 0) {
@@ -176,7 +197,8 @@ function MembershipsPageContent() {
       return
     }
 
-    const start = new Date(`${formData.startDate}T00:00:00`)
+    const cleanStartStr = formData.startDate.split('T')[0]
+    const start = new Date(`${cleanStartStr}T00:00:00`)
     if (Number.isNaN(start.getTime())) {
       return
     }
@@ -197,6 +219,27 @@ function MembershipsPageContent() {
     m.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.notes.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const sortedMemberships = useMemo(() => {
+    return [...filteredMemberships].sort((a, b) => {
+      // 1. Sort by creation date (if available) descending
+      if (a.createdAt && b.createdAt) {
+        const timeA = new Date(a.createdAt).getTime()
+        const timeB = new Date(b.createdAt).getTime()
+        if (timeA !== timeB) return timeB - timeA
+      }
+      
+      // 2. Fallback to MongoDB ObjectId (encoded timestamp) comparison descending
+      if (a.id && b.id && a.id.length === 24 && b.id.length === 24) {
+        if (a.id !== b.id) return b.id.localeCompare(a.id)
+      }
+      
+      // 3. Fallback to startDate descending
+      const startA = new Date(a.startDate).getTime() || 0
+      const startB = new Date(b.startDate).getTime() || 0
+      return startB - startA
+    })
+  }, [filteredMemberships])
 
   const handleSaveMembership = async () => {
     if (!formData.userId.trim() || !formData.startDate || !formData.endDate) {
@@ -265,8 +308,8 @@ function MembershipsPageContent() {
       planId: matchingPlan?.id || '',
       discountPercent: derivedDiscountPercent,
       status: membership.status,
-      startDate: membership.startDate,
-      endDate: membership.endDate,
+      startDate: formatDateToInput(membership.startDate),
+      endDate: formatDateToInput(membership.endDate),
       notes: membership.notes,
     })
     setIsAddDialogOpen(true)
@@ -366,11 +409,14 @@ function MembershipsPageContent() {
                       className="w-full rounded-md border px-3 py-2"
                     >
                       <option value="">Select a plan</option>
-                      {membershipPlans.map((plan) => (
-                        <option key={plan.id} value={plan.id}>
-                          {plan.planName} - {plan.durationMonths} month{plan.durationMonths > 1 ? 's' : ''}
-                        </option>
-                      ))}
+                      {membershipPlans
+                        .filter((plan) => plan.status === 'Active' || plan.id === formData.planId)
+                        .map((plan) => (
+                          <option key={plan.id} value={plan.id}>
+                            {plan.planName} - {plan.durationMonths} month{plan.durationMonths > 1 ? 's' : ''}
+                            {plan.status === 'Inactive' ? ' (Inactive)' : ''}
+                          </option>
+                        ))}
                     </select>
                   </div>
                   <div className="rounded-md border p-3 text-sm">
@@ -460,6 +506,7 @@ function MembershipsPageContent() {
                       type="date"
                       value={formData.startDate}
                       onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      disabled={isStartDateDisabled}
                     />
                   </div>
                   <div>
@@ -527,7 +574,7 @@ function MembershipsPageContent() {
         <CardHeader>
           <CardTitle>All Memberships</CardTitle>
           <CardDescription>
-            {isLoading ? 'Loading memberships...' : `Total: ${filteredMemberships.length} memberships`}
+            {isLoading ? 'Loading memberships...' : `Total: ${sortedMemberships.length} memberships`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -560,14 +607,14 @@ function MembershipsPageContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredMemberships.length === 0 ? (
+                  {sortedMemberships.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                         No memberships found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredMemberships.map((membership) => (
+                    sortedMemberships.map((membership) => (
                       <TableRow key={membership.id}>
                         <TableCell className="font-medium">{getMembershipUsername(membership)}</TableCell>
                         <TableCell>{membership.planName}</TableCell>

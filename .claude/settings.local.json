@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(git -C \"C:/Users/Yeshwanth/Yugaas/github_clones/frontdesk-fitflix\" log --oneline -5 4a0685be0e0fb4a1f62307154c6ffb0f3059afb2)",
+      "Bash(git -C \"C:/Users/Yeshwanth/Yugaas/github_clones/frontdesk-fitflix\" diff --name-only --diff-filter=U)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(netstat -ano)",
+      "Bash(powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue | Select-Object -First 3 OwningProcess,State\")",
+      "Bash(powershell -NoProfile -Command \"Get-Process -Id 2952 -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,StartTime\")",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(grep -E \"\\\\.\\(tsx?|service\\)$\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/admin/users)",
+      "Bash(findstr /n \"healthGoals\" \"C:\\\\Users\\\\Yeshwanth\\\\Yugaas\\\\github_clones\\\\frontdesk-fitflix\\\\components\\\\nutrition\\\\clinical-user-dialog.tsx\" \"C:\\\\Users\\\\Yeshwanth\\\\Yugaas\\\\github_clones\\\\frontdesk-fitflix\\\\components\\\\nutrition\\\\user-clinical-summary.tsx\")"
+    ]
+  }
+}

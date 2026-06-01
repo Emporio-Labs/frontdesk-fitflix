@@ -21,7 +21,7 @@ export function WorkoutStatsCards() {
   const { data: backendStats, isLoading: statsLoading } = useWorkoutStats()
 
   const plans = plansData?.plans ?? []
-  const activePlans = plans.filter((p) => p.status === 'Active').length
+  const activePlans = plans.filter((p) => p.status === 'Active' || p.status === 'Published').length
   const draftPlans = plans.filter((p) => p.status === 'Draft').length
   const templates = plans.filter((p) => p.isTemplate).length
   const assignedUsers = new Set(plans.flatMap((p) => p.assignedUsers)).size

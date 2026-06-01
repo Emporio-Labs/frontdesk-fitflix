@@ -24,6 +24,7 @@ import { useTherapies } from '@/hooks/use-therapies'
 import { useSlots } from '@/hooks/use-slots'
 import { useUsers } from '@/hooks/use-users'
 import { APPOINTMENT_STATUS, AppointmentStatusValue } from '@/lib/services/appointment.service'
+import { getDoctorDisplayName, getUserDisplayName } from '@/lib/populated'
 import { toUtcDateKey } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -110,11 +111,14 @@ export default function AppointmentsPage() {
     return byBookableItem.filter((slot) => slot.remainingCapacity > 0)
   }, [selectedDateKey, formData.serviceId, selectedBookableSlotRefs, slots])
 
-  const filtered = appointments.filter(
-    (a) =>
-      a._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.user.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filtered = appointments.filter((a) => {
+    const term = searchTerm.toLowerCase()
+    return (
+      a._id.toLowerCase().includes(term) ||
+      getUserDisplayName(a.user).toLowerCase().includes(term) ||
+      (a.user?.email?.toLowerCase().includes(term) ?? false)
+    )
+  })
 
   const handleCreate = async () => {
     if (!formData.appointmentDate || !formData.userId || !formData.slotId || !formData.doctorId) return
@@ -330,8 +334,8 @@ export default function AppointmentsPage() {
                     filtered.map((appt) => (
                       <TableRow key={appt._id}>
                         <TableCell className="font-mono text-xs">{appt._id.slice(-8)}</TableCell>
-                        <TableCell className="font-mono text-xs">{appt.user.slice(-8)}</TableCell>
-                        <TableCell className="font-mono text-xs">{appt.doctor.slice(-8)}</TableCell>
+                        <TableCell className="text-sm">{getUserDisplayName(appt.user)}</TableCell>
+                        <TableCell className="text-sm">{getDoctorDisplayName(appt.doctor)}</TableCell>
                         <TableCell>{new Date(appt.appointmentDate).toLocaleDateString()}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">

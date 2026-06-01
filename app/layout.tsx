@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/app/context/auth-context'
 import { ReactQueryProvider } from '@/app/context/react-query-provider'
 import { Toaster } from 'sonner'
+import { AuthDiagnostics } from '@/lib/auth-diagnostics'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -42,6 +43,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <ReactQueryProvider>
           <AuthProvider>
+            <AuthDiagnostics />
             {children}
             <Toaster richColors position="top-right" />
           </AuthProvider>
@@ -51,3 +53,4 @@ export default function RootLayout({
     </html>
   )
 }
+

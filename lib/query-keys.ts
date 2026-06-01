@@ -59,6 +59,18 @@ export const queryKeys = {
     list: (filters?: Record<string, any>) => ['exercises', 'list', filters] as const,
     detail: (id: string) => ['exercises', id] as const,
   },
+  workoutPlans: {
+    all: () => ['workout-plans'] as const,
+    list: (filters?: Record<string, any>) => ['workout-plans', 'list', filters] as const,
+    detail: (id: string) => ['workout-plans', id] as const,
+    assignments: {
+      all: () => ['workout-plans', 'assignments'] as const,
+      mine: () => ['workout-plans', 'assignments', 'me'] as const,
+      today: () => ['workout-plans', 'assignments', 'me', 'today'] as const,
+      schedule: (from?: string, to?: string) =>
+        ['workout-plans', 'assignments', 'me', 'schedule', from ?? '', to ?? ''] as const,
+    },
+  },
   workoutSessions: {
     all: () => ['workout-sessions'] as const,
     today: () => ['workout-sessions', 'today'] as const,
@@ -66,11 +78,6 @@ export const queryKeys = {
     detail: (id: string) => ['workout-sessions', id] as const,
     stats: () => ['workout-sessions', 'stats'] as const,
     history: (params?: Record<string, any>) => ['workout-sessions', 'history', params] as const,
-  },
-  workoutPlans: {
-    all: () => ['workout-plans'] as const,
-    list: (filters?: Record<string, any>) => ['workout-plans', 'list', filters] as const,
-    detail: (id: string) => ['workout-plans', id] as const,
   },
   credits: {
     myBalance: () => ['credits', 'me', 'balance'] as const,
@@ -82,5 +89,36 @@ export const queryKeys = {
   onboarding: {
     all: () => ['onboarding'] as const,
     mine: () => ['onboarding', 'me'] as const,
+    byUser: (userId: string) => ['onboarding', 'user', userId] as const,
+  },
+  nutritionistBookings: {
+    all: () => ['nutritionist-bookings'] as const,
+    detail: (id: string) => ['nutritionist-bookings', id] as const,
+  },
+  invoices: {
+    all: () => ['invoices'] as const,
+    detail: (id: string) => ['invoices', id] as const,
+  },
+  nutrition: {
+    all: () => ['nutrition'] as const,
+    members: () => ['nutrition', 'members'] as const,
+    foods: (search?: string) => ['nutrition', 'foods', search ?? ''] as const,
+    templates: {
+      all: () => ['nutrition', 'templates'] as const,
+    },
+    plans: {
+      all: (userId?: string) => ['nutrition', 'plans', userId ?? 'all'] as const,
+      detail: (id: string) => ['nutrition', 'plans', id] as const,
+      mine: () => ['nutrition', 'plans', 'me'] as const,
+    },
+    mealLogs: (planId: string, date?: string) =>
+      ['nutrition', 'meal-logs', planId, date ?? ''] as const,
+    hydration: (userId: string, date?: string) =>
+      ['nutrition', 'hydration', userId, date ?? ''] as const,
+    adherence: (userId: string, from?: string, to?: string) =>
+      ['nutrition', 'adherence', userId, from ?? '', to ?? ''] as const,
+    progress: (userId: string) => ['nutrition', 'progress', userId] as const,
+    assessment: (userId: string) =>
+      ['nutrition', 'assessment', userId] as const,
   },
 }

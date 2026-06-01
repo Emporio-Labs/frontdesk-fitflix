@@ -19,6 +19,14 @@ export function useOnboardingStatus() {
   })
 }
 
+export function useOnboardingProfile(userId: string) {
+  return useQuery({
+    queryKey: queryKeys.onboarding.byUser(userId),
+    queryFn: () => onboardingService.getOnboardingProfile(userId),
+    enabled: !!userId,
+  })
+}
+
 function invalidateOnboarding(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: queryKeys.onboarding.all() })
   qc.invalidateQueries({ queryKey: queryKeys.users.all() })
@@ -104,6 +112,22 @@ export function useCompleteOnboarding() {
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to complete onboarding')
+    },
+  })
+}
+
+export function useCancelNutritionistBooking() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: string) => onboardingService.cancelNutritionistAppointment(userId),
+    onSuccess: (data, userId) => {
+      invalidateOnboarding(qc)
+      qc.invalidateQueries({ queryKey: queryKeys.users.detail(userId) })
+      qc.invalidateQueries({ queryKey: queryKeys.onboarding.byUser(userId) })
+      toast.success(data.message || 'Nutritionist booking cancelled')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to cancel booking')
     },
   })
 }

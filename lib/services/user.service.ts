@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/api-client'
+import type { MedicalReport, ExpertAppointment } from './onboarding.service'
 
 export type OnboardingStep =
   | 'HEALTH_MARKERS'
@@ -21,6 +22,47 @@ export interface UserOnboardingSummary {
   onboardingCompleted: boolean
 }
 
+export type ActivityLevel = 'Sedentary' | 'Light' | 'Moderate' | 'Active' | 'VeryActive'
+
+export interface HealthMarkers {
+  height?: number | string
+  weight?: number | string
+  age?: number | string
+  gender?: string
+  bodyFatPercent?: number | string
+  medicalConditions?: string[] | string
+  injuries?: string[] | string
+  allergies?: string[] | string
+  medications?: string[] | string
+  diseaseHistory?: string[] | string
+  sleepHours?: number | string
+  activityLevel?: string
+  smoking?: string
+  alcohol?: string
+  diet?: string
+  occupation?: string
+  stressLevel?: string
+  hydration?: string | number
+  bmi?: number | string
+  createdAt?: string
+  updatedAt?: string
+  [key: string]: unknown
+}
+
+export interface HealthMarkersSnapshot {
+  weight?: number          // kg
+  height?: number          // cm
+  activityLevel?: ActivityLevel
+  sleepHours?: number
+  allergies?: string[]
+}
+
+export interface HealthGoalsSnapshot {
+  targetWeight?: number
+  workoutExperience?: 'None' | 'Beginner' | 'Intermediate' | 'Advanced'
+  foodPreferences?: string[]
+}
+
 export interface User {
   _id: string
   username: string
@@ -35,8 +77,11 @@ export interface User {
   onboarded?: boolean
   createdAt: string
   updatedAt: string
-  onboarded?: boolean
   onboardingStatus?: UserOnboardingSummary
+  healthMarkers?: HealthMarkers
+  healthGoalsSnapshot?: HealthGoalsSnapshot
+  reports?: MedicalReport[]
+  expertAppointments?: ExpertAppointment[]
 }
 
 export interface CreateUserPayload {
@@ -46,7 +91,7 @@ export interface CreateUserPayload {
   password: string
   age: number
   gender: string
-  healthGoals: string[]
+  healthGoals?: string[]
   dateOfBirth?: string
   emergencyContact?: string
   address?: string
@@ -117,7 +162,7 @@ export const userService = {
 
   getById: async (id: string) => {
     const { data } = await apiClient.get(`/users/${id}`)
-    return data as { user: User }
+    return ('user' in data ? data : { user: data }) as { user: User }
   },
 
   getMe: async () => {
@@ -136,6 +181,10 @@ export const userService = {
   },
 
   create: async (payload: CreateUserPayload) => {
+    // TODO(debug): remove after member-create flow verified
+    if (process.env.NEXT_PUBLIC_DEBUG_AUTH) {
+      console.debug('[userService.create] payload', payload)
+    }
     const { data } = await apiClient.post('/users', payload)
     return data as { message: string; user: User }
   },

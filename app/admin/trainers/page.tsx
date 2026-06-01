@@ -29,6 +29,7 @@ export default function TrainersPage() {
   const createTrainer = useCreateTrainer()
   const updateTrainer = useUpdateTrainer()
   const deleteTrainer = useDeleteTrainer()
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const filtered = trainers.filter(
     (t) =>
@@ -38,6 +39,7 @@ export default function TrainersPage() {
 
   const resetForm = () => {
     setFormData({ trainerName: '', email: '', phone: '', password: '', description: '', specialitiesInput: '' })
+    setFormErrors({})
     setEditingTrainer(null)
   }
 
@@ -51,22 +53,50 @@ export default function TrainersPage() {
     setIsDialogOpen(true)
   }
 
-  const handleSubmit = async () => {
-    const specialities = formData.specialitiesInput.split(',').map(s => s.trim()).filter(Boolean)
-    if (editingTrainer) {
-      await updateTrainer.mutateAsync({
-        id: editingTrainer._id,
-        payload: { trainerName: formData.trainerName, description: formData.description, specialities },
-      })
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {}
+    if (!formData.trainerName.trim()) errors.trainerName = 'Name is required'
+    if (!editingTrainer && !formData.email.trim()) errors.email = 'Email is required'
+    if (!editingTrainer && formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Invalid email format'
+    
+    if (!formData.phone.trim()) {
+      errors.phone = 'Phone is required'
     } else {
-      if (!formData.trainerName || !formData.email || !formData.phone || !formData.password) return
-      await createTrainer.mutateAsync({
-        trainerName: formData.trainerName, email: formData.email, phone: formData.phone,
-        password: formData.password, description: formData.description, specialities,
-      })
+      const cleanPhone = formData.phone.replace(/[\s\-()]/g, '')
+      const indianPhoneRegex = /^(?:\+91|91|0)?[6-9]\d{9}$/
+      if (!indianPhoneRegex.test(cleanPhone)) {
+        errors.phone = 'Please enter a valid Indian mobile number (e.g. +91 98765 43210 or 9876543210)'
+      }
     }
-    setIsDialogOpen(false)
-    resetForm()
+    
+    if (!editingTrainer && !formData.password) errors.password = 'Password is required'
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleSubmit = async () => {
+    if (!validateForm()) return
+    const specialities = formData.specialitiesInput.split(',').map(s => s.trim()).filter(Boolean)
+    const cleanPhone = formData.phone.replace(/[\s\-()]/g, '')
+    
+    try {
+      if (editingTrainer) {
+        await updateTrainer.mutateAsync({
+          id: editingTrainer._id,
+          payload: { trainerName: formData.trainerName, description: formData.description, specialities },
+        })
+      } else {
+        await createTrainer.mutateAsync({
+          trainerName: formData.trainerName, email: formData.email, phone: cleanPhone,
+          password: formData.password, description: formData.description, specialities,
+        })
+      }
+      setIsDialogOpen(false)
+      resetForm()
+    } catch (err: any) {
+      console.error(err)
+    }
   }
 
   const isPending = createTrainer.isPending || updateTrainer.isPending
@@ -96,20 +126,24 @@ export default function TrainersPage() {
                 <div>
                   <label className="text-sm font-medium">Name *</label>
                   <Input value={formData.trainerName} onChange={(e) => setFormData({ ...formData, trainerName: e.target.value })} placeholder="Coach John" />
+                  {formErrors.trainerName && <p className="text-xs text-red-500 mt-1">{formErrors.trainerName}</p>}
                 </div>
                 {!editingTrainer && (
                   <>
                     <div>
-                      <label className="text-sm font-medium">Email *</label>
-                      <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                      <label className="text-sm font-medium">Phone *</label>
+                      <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+91 98765 43210" />
+                      {formErrors.phone && <p className="text-xs text-red-500 mt-1">{formErrors.phone}</p>}
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Phone *</label>
-                      <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+                      <label className="text-sm font-medium">Email *</label>
+                      <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="smith@fitflix.com" />
+                      {formErrors.email && <p className="text-xs text-red-500 mt-1">{formErrors.email}</p>}
                     </div>
                     <div>
                       <label className="text-sm font-medium">Password *</label>
                       <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+                      {formErrors.password && <p className="text-xs text-red-500 mt-1">{formErrors.password}</p>}
                     </div>
                   </>
                 )}
@@ -179,7 +213,7 @@ export default function TrainersPage() {
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button size="sm" variant="outline" onClick={() => handleOpenEdit(trainer)}><IconEdit className="w-4 h-4" /></Button>
-                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => deleteTrainer.mutate(trainer._id)} disabled={deleteTrainer.isPending}><IconTrash className="w-4 h-4" /></Button>
+                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${trainer.trainerName}?`)) deleteTrainer.mutate(trainer._id) }} disabled={deleteTrainer.isPending}><IconTrash className="w-4 h-4" /></Button>
                           </div>
                         </TableCell>
                       </TableRow>

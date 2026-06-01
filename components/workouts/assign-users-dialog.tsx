@@ -14,21 +14,39 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
-import { IconSearch } from '@tabler/icons-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { Label } from '@/components/ui/label'
+import { IconSearch, IconCalendar, IconLoader2 } from '@tabler/icons-react'
 import { useUsers } from '@/hooks/use-users'
 import { useWorkoutStore } from '@/stores/workout-store'
+import { useAssignWorkoutPlan } from '@/hooks/use-workout-plans'
+import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+
+const isMongoId = (id?: string): boolean => !!id && /^[0-9a-f]{24}$/i.test(id)
 
 export function AssignUsersDialog({
   open,
   onOpenChange,
+  planId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** When provided, "Assign Now" sends to the server immediately. Otherwise selections are stored locally for create flow. */
+  planId?: string
 }) {
   const [search, setSearch] = useState('')
+  const [calendarOpen, setCalendarOpen] = useState(false)
   const { data: users = [], isLoading } = useUsers()
-  const { assignedUserIds, toggleUserAssignment } = useWorkoutStore()
+  const {
+    assignedUserIds,
+    toggleUserAssignment,
+    assignmentStartDate,
+    setAssignmentStartDate,
+    currentPlan,
+  } = useWorkoutStore()
+  const assignMutation = useAssignWorkoutPlan()
 
   const filtered = users.filter((u: any) => {
     const term = search.toLowerCase()
@@ -38,12 +56,94 @@ export function AssignUsersDialog({
     )
   })
 
+  const startDateAsDate = (() => {
+    const [y, m, d] = assignmentStartDate.split('-').map(Number)
+    if (!y || !m || !d) return new Date()
+    return new Date(y, m - 1, d)
+  })()
+
+  const handleDone = async () => {
+    const targetPlanId = planId || currentPlan?.id
+    if (!isMongoId(targetPlanId)) {
+      toast.error('Save the plan to the server first before assigning users')
+      return
+    }
+    if (assignedUserIds.length === 0) {
+      onOpenChange(false)
+      return
+    }
+    try {
+      await assignMutation.mutateAsync({
+        id: targetPlanId!,
+        payload: {
+          userIds: assignedUserIds,
+          startDate: new Date(assignmentStartDate).toISOString(),
+        },
+      })
+      onOpenChange(false)
+    } catch {
+      // errors surfaced via mutation's onError toast
+    }
+  }
+
+  const isPending = assignMutation.isPending
+  const ctaLabel = planId || currentPlan?.id
+    ? isPending
+      ? 'Assigning…'
+      : 'Assign Now'
+    : 'Done'
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Assign Users to Plan</DialogTitle>
         </DialogHeader>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Start date</Label>
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  'w-full justify-start text-left font-normal',
+                  !assignmentStartDate && 'text-muted-foreground',
+                )}
+              >
+                <IconCalendar className="mr-2 h-4 w-4" />
+                {startDateAsDate.toLocaleDateString(undefined, {
+                  weekday: 'short',
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={startDateAsDate}
+                onSelect={(d) => {
+                  if (!d) return
+                  const y = d.getFullYear()
+                  const m = String(d.getMonth() + 1).padStart(2, '0')
+                  const day = String(d.getDate()).padStart(2, '0')
+                  setAssignmentStartDate(`${y}-${m}-${day}`)
+                  setCalendarOpen(false)
+                }}
+                disabled={(d) => {
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  return d < today
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+          <p className="text-[11px] text-muted-foreground">
+            Day 1 is scheduled for this date. Missed days roll forward automatically.
+          </p>
+        </div>
 
         <div className="relative">
           <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -55,7 +155,7 @@ export function AssignUsersDialog({
           />
         </div>
 
-        <ScrollArea className="h-[320px] -mx-2 px-2">
+        <ScrollArea className="h-[280px] -mx-2 px-2">
           {isLoading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
@@ -101,8 +201,9 @@ export function AssignUsersDialog({
           <span className="text-xs text-muted-foreground">
             {assignedUserIds.length} user{assignedUserIds.length !== 1 ? 's' : ''} selected
           </span>
-          <Button size="sm" onClick={() => onOpenChange(false)}>
-            Done
+          <Button size="sm" onClick={handleDone} disabled={isPending}>
+            {isPending && <IconLoader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
+            {ctaLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
