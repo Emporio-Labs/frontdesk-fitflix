@@ -18,6 +18,7 @@ export interface OnboardingStatusResponse {
 
 // ── Medical report (returned by POST /onboarding/reports) ─────────────────────
 export interface MedicalReport {
+  id: string
   _id: string
   userId: string
   reportName: string
@@ -33,6 +34,7 @@ export type ExpertType = 'sports_scientist' | 'nutritionist'
 export type ExpertAppointmentStatus = 'Pending' | 'Confirmed' | 'Cancelled' | 'Completed'
 
 export interface ExpertAppointment {
+  id: string
   _id: string
   userId: PopulatedUserRef
   expertType: ExpertType
@@ -147,6 +149,12 @@ export const onboardingService = {
   getOnboardingProfile: async (userId: string) => {
     const { data } = await apiClient.get(`/users/${userId}/onboarding-profile`)
     return data as OnboardingProfileResponse
+  },
+
+  // Admin visibility — GET /onboarding/status/:userId
+  getStatusByUser: async (userId: string): Promise<OnboardingStatusResponse> => {
+    const { data } = await apiClient.get(`/onboarding/status/${userId}`)
+    return data as OnboardingStatusResponse
   },
 
   submitHealthMarkers: async (payload: HealthMarkersPayload) => {

@@ -161,7 +161,7 @@ export default function InvoicesPage() {
                   )}
                   {filtered.map((invoice) => (
                     <TableRow
-                      key={invoice._id}
+                      key={invoice.id}
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => handleRowClick(invoice)}
                     >

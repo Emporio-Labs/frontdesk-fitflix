@@ -270,7 +270,7 @@ function isUnsupportedEndpointError(error: unknown): boolean {
   return status === 404 || status === 405 || status === 501
 }
 
-function buildReminderSummary(leads: Lead[]): LeadRemindersResponse {
+export function buildReminderSummary(leads: Lead[]): LeadRemindersResponse {
   const activeLeads = leads.filter((lead) => !lead.isDeleted)
   const todayIst = nowIstDateOnly()
 
@@ -288,7 +288,7 @@ function buildReminderSummary(leads: Lead[]): LeadRemindersResponse {
   }
 }
 
-function buildDailyDigest(summary: LeadRemindersResponse): Record<string, unknown> {
+export function buildDailyDigest(summary: LeadRemindersResponse): Record<string, unknown> {
   return {
     title: 'Leads Daily Digest',
     date: nowIstDateOnly(),
@@ -304,7 +304,7 @@ function buildDailyDigest(summary: LeadRemindersResponse): Record<string, unknow
   }
 }
 
-function buildLeadAnalytics(leads: Lead[]): LeadAnalyticsResponse {
+export function buildLeadAnalytics(leads: Lead[]): LeadAnalyticsResponse {
   const activeLeads = leads.filter((lead) => !lead.isDeleted)
   const stages: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted', 'lost']
 

@@ -99,6 +99,9 @@ export const queryKeys = {
     all: () => ['invoices'] as const,
     detail: (id: string) => ['invoices', id] as const,
   },
+  dashboard: {
+    metrics: () => ['dashboard', 'metrics'] as const,
+  },
   nutrition: {
     all: () => ['nutrition'] as const,
     members: () => ['nutrition', 'members'] as const,
