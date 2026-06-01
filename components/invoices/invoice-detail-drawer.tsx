@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { IconDownload, IconCheck } from '@tabler/icons-react'
 import { Invoice } from '@/lib/services/invoice.service'
 import { invoiceService } from '@/lib/services/invoice.service'
+import { useInvoice } from '@/hooks/use-invoices'
 import { InvoiceStatusBadge } from './invoice-status-badge'
 import { MarkPaidDialog } from './mark-paid-dialog'
 import { toast } from 'sonner'
@@ -46,17 +47,24 @@ export function InvoiceDetailDrawer({ invoice, open, onOpenChange }: Props) {
   const [markPaidOpen, setMarkPaidOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
 
-  const canMarkPaid = invoice?.paymentStatus === 'DRAFT' || invoice?.paymentStatus === 'PENDING'
+  // Subscribe to the live cache entry so the drawer reflects mutations
+  // (e.g. Mark as Paid) without requiring the parent page to update its state.
+  // Falls back to the prop when the cache entry isn't yet populated.
+  const { data: liveInvoice } = useInvoice(invoice?.id ?? '')
+  const displayInvoice = liveInvoice ?? invoice
+
+  const canMarkPaid =
+    displayInvoice?.paymentStatus === 'DRAFT' || displayInvoice?.paymentStatus === 'PENDING'
 
   const handleDownload = async () => {
-    if (!invoice || isDownloading) return
+    if (!displayInvoice || isDownloading) return
     setIsDownloading(true)
     try {
-      const blob = await invoiceService.downloadPdf(invoice._id)
+      const blob = await invoiceService.downloadPdf(displayInvoice.id)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `invoice-${invoice.invoiceNumber}.pdf`
+      a.download = `invoice-${displayInvoice.invoiceNumber}.pdf`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -68,7 +76,7 @@ export function InvoiceDetailDrawer({ invoice, open, onOpenChange }: Props) {
     }
   }
 
-  if (!invoice) return null
+  if (!displayInvoice) return null
 
   return (
     <>
@@ -76,12 +84,12 @@ export function InvoiceDetailDrawer({ invoice, open, onOpenChange }: Props) {
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
-              Invoice {invoice.invoiceNumber}
-              <InvoiceStatusBadge status={invoice.paymentStatus} />
+              Invoice {displayInvoice.invoiceNumber}
+              <InvoiceStatusBadge status={displayInvoice.paymentStatus} />
             </SheetTitle>
             <SheetDescription>
-              Issued {formatDate(invoice.issuedAt)}
-              {invoice.paidAt && ` · Paid ${formatDate(invoice.paidAt)}`}
+              Issued {formatDate(displayInvoice.issuedAt)}
+              {displayInvoice.paidAt && ` · Paid ${formatDate(displayInvoice.paidAt)}`}
             </SheetDescription>
           </SheetHeader>
 
@@ -89,15 +97,15 @@ export function InvoiceDetailDrawer({ invoice, open, onOpenChange }: Props) {
             {/* Member */}
             <div className="rounded-lg border bg-muted/40 p-4 space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Member</p>
-              <p className="text-sm font-semibold">{invoice.userId?.name ?? '—'}</p>
-              <p className="text-xs text-muted-foreground">{invoice.userId?.email ?? '—'}</p>
+              <p className="text-sm font-semibold">{displayInvoice.userId?.name ?? '—'}</p>
+              <p className="text-xs text-muted-foreground">{displayInvoice.userId?.email ?? '—'}</p>
             </div>
 
             {/* Payment Method */}
-            {invoice.paymentMethod !== 'NONE' && (
+            {displayInvoice.paymentMethod !== 'NONE' && (
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-muted-foreground">Payment via</span>
-                <span className="font-medium">{invoice.paymentMethod.replace('_', ' ')}</span>
+                <span className="font-medium">{displayInvoice.paymentMethod.replace('_', ' ')}</span>
               </div>
             )}
 
@@ -113,7 +121,7 @@ export function InvoiceDetailDrawer({ invoice, open, onOpenChange }: Props) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoice.items.map((item, i) => (
+                  {displayInvoice.items.map((item, i) => (
                     <TableRow key={i}>
                       <TableCell className="text-sm">{item.name}</TableCell>
                       <TableCell className="text-center text-sm">{item.quantity}</TableCell>
@@ -128,21 +136,21 @@ export function InvoiceDetailDrawer({ invoice, open, onOpenChange }: Props) {
             <div className="rounded-lg border p-4 space-y-2 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span>{formatINR(invoice.subtotal)}</span>
+                <span>{formatINR(displayInvoice.subtotal)}</span>
               </div>
-              {invoice.discount > 0 && (
+              {displayInvoice.discount > 0 && (
                 <div className="flex justify-between text-muted-foreground">
                   <span>Discount</span>
-                  <span className="text-red-600">− {formatINR(invoice.discount)}</span>
+                  <span className="text-red-600">− {formatINR(displayInvoice.discount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-muted-foreground">
                 <span>Tax</span>
-                <span>{formatINR(invoice.tax)}</span>
+                <span>{formatINR(displayInvoice.tax)}</span>
               </div>
               <div className="flex justify-between font-semibold text-base border-t pt-2">
                 <span>Total</span>
-                <span>{formatINR(invoice.total)}</span>
+                <span>{formatINR(displayInvoice.total)}</span>
               </div>
             </div>
 
@@ -168,7 +176,7 @@ export function InvoiceDetailDrawer({ invoice, open, onOpenChange }: Props) {
               </Button>
             </div>
 
-            {invoice.paymentStatus === 'PAID' && (
+            {displayInvoice.paymentStatus === 'PAID' && (
               <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 px-4 py-3">
                 <IconCheck className="w-4 h-4 text-green-700 shrink-0" />
                 <p className="text-sm text-green-700 font-medium">Payment received · Membership activated</p>
@@ -178,13 +186,11 @@ export function InvoiceDetailDrawer({ invoice, open, onOpenChange }: Props) {
         </SheetContent>
       </Sheet>
 
-      {invoice && (
-        <MarkPaidDialog
-          invoice={invoice}
-          open={markPaidOpen}
-          onOpenChange={setMarkPaidOpen}
-        />
-      )}
+      <MarkPaidDialog
+        invoice={displayInvoice}
+        open={markPaidOpen}
+        onOpenChange={setMarkPaidOpen}
+      />
     </>
   )
 }

@@ -32,6 +32,7 @@ export function useCreateInvoice() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.invoices.all() })
       qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard.metrics() })
       toast.success(data.message || 'Invoice created successfully')
     },
     onError: (err: any) => {
@@ -46,11 +47,14 @@ export function useUpdateInvoiceStatus() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: UpdateInvoiceStatusPayload }) =>
       invoiceService.updateStatus(id, payload),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: queryKeys.invoices.all() })
-      qc.invalidateQueries({ queryKey: queryKeys.invoices.detail(data.invoice._id) })
-      qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
-      qc.invalidateQueries({ queryKey: [...queryKeys.leads.all(), 'analytics'] })
+    onSuccess: async (data) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.invoices.all() }),
+        qc.invalidateQueries({ queryKey: queryKeys.invoices.detail(data.invoice.id) }),
+        qc.invalidateQueries({ queryKey: queryKeys.leads.all() }),
+        qc.invalidateQueries({ queryKey: queryKeys.memberships.all() }),
+        qc.invalidateQueries({ queryKey: queryKeys.dashboard.metrics() }),
+      ])
       if (data.invoice.paymentStatus === 'PAID') {
         toast.success('Payment recorded — membership activated')
       } else {

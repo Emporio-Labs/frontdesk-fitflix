@@ -50,24 +50,33 @@ export function CreateInvoiceSheet({ lead, open, onOpenChange, onSuccess }: Prop
   const handleGenerate = async () => {
     if (!selectedPlan) return
 
-    await createInvoice.mutateAsync({
-      leadId: lead.id,
-      membershipPlanId: selectedPlan.id,
-      items: [
-        {
+    try {
+      await createInvoice.mutateAsync({
+        leadId: lead.id,
+        planSnapshot: {
           name: selectedPlan.planName,
+          durationInDays: selectedPlan.durationMonths * 30,
           price: selectedPlan.totalPrice,
-          quantity: 1,
+          includedCredits: (selectedPlan.benefits?.credits as number | undefined) ?? 0,
         },
-      ],
-      discount: discountAmount,
-      tax: taxAmount,
-    })
+        items: [
+          {
+            name: selectedPlan.planName,
+            price: selectedPlan.totalPrice,
+            quantity: 1,
+          },
+        ],
+        discount: discountAmount,
+        tax: taxAmount,
+      })
 
-    setSelectedPlanId('')
-    setDiscount('0')
-    onOpenChange(false)
-    onSuccess?.()
+      setSelectedPlanId('')
+      setDiscount('0')
+      onOpenChange(false)
+      onSuccess?.()
+    } catch {
+      // onError in useCreateInvoice surfaces the toast; keep sheet open for retry
+    }
   }
 
   const handleClose = () => {

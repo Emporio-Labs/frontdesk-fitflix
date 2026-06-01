@@ -35,11 +35,15 @@ export function MarkPaidDialog({ invoice, open, onOpenChange }: Props) {
   const updateStatus = useUpdateInvoiceStatus()
 
   const handleConfirm = async () => {
-    await updateStatus.mutateAsync({
-      id: invoice._id,
-      payload: { paymentStatus: 'PAID', paymentMethod: method },
-    })
-    onOpenChange(false)
+    try {
+      await updateStatus.mutateAsync({
+        id: invoice.id,
+        payload: { paymentStatus: 'PAID', paymentMethod: method },
+      })
+      onOpenChange(false)
+    } catch {
+      // onError in the hook surfaces the toast; keep the dialog open so the user can retry
+    }
   }
 
   return (
