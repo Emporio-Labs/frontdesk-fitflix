@@ -165,7 +165,7 @@ function normalizeUser(raw: any): User {
     username: String(raw?.username || ''),
     email: String(raw?.email || ''),
     phone: String(raw?.phone || ''),
-    age: String(raw?.age || ''),
+    age: Number(raw?.age || 0),
     gender: String(raw?.gender || ''),
     healthGoals: Array.isArray(raw?.healthGoals) ? raw.healthGoals.map(String) : [],
     createdAt: String(raw?.createdAt || ''),

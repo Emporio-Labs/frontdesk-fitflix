@@ -20,11 +20,14 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
-import { IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconPlus, IconTrash, IconSparkles, IconLeaf } from '@tabler/icons-react'
 import { MEAL_TYPES, MEAL_TYPE_LABELS, UserNutritionPlan } from '@/lib/types/nutrition'
-import { useFoods, useUpdatePlan } from '@/hooks/use-nutrition'
+import { useFoods, useRecipes, useUpdatePlan } from '@/hooks/use-nutrition'
+import { nutritionService } from '@/lib/services/nutrition.service'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -50,6 +53,7 @@ interface TargetedMealEditorProps {
 
 export function TargetedMealEditor({ plan, onSuccess, onCancel }: TargetedMealEditorProps) {
   const { data: foods = [] } = useFoods()
+  const { data: recipes = [] } = useRecipes()
   const updatePlan = useUpdatePlan()
 
   const form = useForm<TargetedMealFormValues>({
@@ -206,18 +210,63 @@ export function TargetedMealEditor({ plan, onSuccess, onCancel }: TargetedMealEd
                   name={`items.${index}.foodId`}
                   render={({ field: f }) => (
                     <FormItem className="flex-1">
-                      <Select value={f.value} onValueChange={f.onChange}>
+                      <Select
+                        value={f.value}
+                        onValueChange={async (val) => {
+                          if (val.startsWith('recipe:')) {
+                            const recipeId = val.replace('recipe:', '')
+                            try {
+                              const res = await nutritionService.getRecipeWithIngredients(recipeId)
+                              if (res?.ingredients?.length) {
+                                const firstIng = res.ingredients[0]
+                                if (firstIng?.foodId) {
+                                  f.onChange(firstIng.foodId)
+                                  form.setValue(`items.${index}.quantityG` as `items.0.quantityG`, firstIng.quantity ?? 100, { shouldDirty: true })
+                                }
+                                res.ingredients.slice(1).forEach((ing) => {
+                                  if (ing.foodId) {
+                                    append({ foodId: ing.foodId, quantityG: ing.quantity ?? 100 })
+                                  }
+                                })
+                              }
+                            } catch (e) {
+                              console.error("Failed to load recipe ingredients:", e)
+                            }
+                          } else {
+                            f.onChange(val)
+                          }
+                        }}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a food" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {foods.map((food) => (
-                            <SelectItem key={food._id} value={food._id}>
-                              {food.name} ({food.servingLabel})
-                            </SelectItem>
-                          ))}
+                          <SelectGroup>
+                            <SelectLabel>Individual Foods</SelectLabel>
+                            {foods.map((food) => (
+                              <SelectItem key={food._id} value={food._id}>
+                                <span className="flex items-center gap-1">
+                                  {food.isVeg && (
+                                    <IconLeaf className="h-3 w-3 text-green-600" />
+                                  )}
+                                  {food.name} ({food.servingLabel})
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                          <SelectGroup>
+                            <SelectLabel>Recipes</SelectLabel>
+                            {recipes.map((r) => (
+                              <SelectItem key={r._id} value={`recipe:${r._id}`}>
+                                <span className="flex items-center gap-1 text-primary">
+                                  <IconSparkles className="h-3 w-3" />
+                                  {r.name}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         </SelectContent>
                       </Select>
                       <FormMessage />

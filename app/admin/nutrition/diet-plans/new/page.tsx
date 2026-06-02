@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,7 @@ import {
   profileFromUser,
 } from '@/lib/nutrition/derive-targets'
 
-export default function NewClinicalTemplatePage() {
+function NewClinicalTemplatePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { selectedUserId } = useNutritionistWorkspace()
@@ -93,28 +93,17 @@ export default function NewClinicalTemplatePage() {
         </p>
       </div>
 
-      {userId && (
-        <>
-          {/* Section A — User Clinical Summary */}
-          <div className="space-y-2">
-            <h3 className="text-base font-semibold">Clinical Summary</h3>
-            <UserClinicalSummary user={user} />
-          </div>
-
-          {/* Section B — Editable nutritional targets */}
-          <NutritionTargetCards
-            value={targets}
-            onChange={handleTargetsChange}
-            autoFilled={!touched && !!derived}
-          />
-        </>
-      )}
-
       <ClinicalTemplateForm
         userId={userId || undefined}
-        initialTargets={targets}
-        targetsOverride={targets}
       />
     </div>
+  )
+}
+
+export default function NewClinicalTemplatePage() {
+  return (
+    <Suspense fallback={<div className="flex-1 p-8 pt-6 text-muted-foreground">Loading plan page...</div>}>
+      <NewClinicalTemplatePageContent />
+    </Suspense>
   )
 }

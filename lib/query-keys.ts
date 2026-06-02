@@ -106,6 +106,7 @@ export const queryKeys = {
     all: () => ['nutrition'] as const,
     members: () => ['nutrition', 'members'] as const,
     foods: (search?: string) => ['nutrition', 'foods', search ?? ''] as const,
+    recipes: (search?: string) => ['nutrition', 'recipes', search ?? ''] as const,
     templates: {
       all: () => ['nutrition', 'templates'] as const,
     },

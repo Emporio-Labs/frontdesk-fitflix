@@ -18,6 +18,8 @@ import type {
   UpdateFoodPayload,
   UpdateTemplatePayload,
   UserNutritionPlan,
+  Recipe,
+  RecipeIngredient,
 } from '@/lib/types/nutrition'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,12 +42,29 @@ export const nutritionService = {
     return data as { members: NutritionDashboardMember[] }
   },
 
-  // ── Food catalog ────────────────────────────────────────────────────────────
+  // ── Food catalog / Recipes ──────────────────────────────────────────────────
   getFoods: async (search?: string) => {
     const { data } = await apiClient.get('/nutrition/foods', {
-      params: search ? { query: search } : undefined,
+      params: {
+        limit: 1000,
+        ...(search ? { query: search } : {}),
+      },
     })
     return data as { items: FoodItem[]; total: number; page: number; limit: number }
+  },
+  getRecipes: async (search?: string) => {
+    const { data } = await apiClient.get('/nutrition/recipes', {
+      params: search ? { categoryId: search } : undefined,
+    })
+    return data as { recipes: Recipe[]; total: number }
+  },
+  getCategories: async () => {
+    const { data } = await apiClient.get('/nutrition/categories')
+    return data as { categories: { _id: string; name: string }[] }
+  },
+  getRecipeWithIngredients: async (id: string) => {
+    const { data } = await apiClient.get(`/nutrition/recipes/${id}`)
+    return data as { recipe: Recipe; ingredients: RecipeIngredient[] }
   },
   createFood: async (payload: CreateFoodPayload) => {
     const { data } = await apiClient.post('/nutrition/foods', payload)

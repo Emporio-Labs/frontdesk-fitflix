@@ -268,6 +268,43 @@ export interface FoodItem {
   updatedAt?: string
 }
 
+export interface Recipe {
+  _id: string
+  name: string
+  slug: string
+  categoryId: string
+  isVeg: boolean | null
+  defaultMealType: MealType | null
+  totals: MacroSnapshot
+  source: 'System' | 'Custom'
+  isActive: boolean
+  description?: string
+  prepTimeMinutes?: number | null
+  cookingDirections?: string[]
+  imageUrl?: string | null
+  tags?: string[]
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface RecipeIngredient {
+  _id: string
+  recipeId: string
+  foodId: string | null
+  rawIngredientName: string
+  rawQuantityStr?: string | null
+  quantity?: number | null
+  unit?: string
+  caloriesKcal?: number | null
+  proteinG?: number | null
+  carbsG?: number | null
+  fatG?: number | null
+  fiberG?: number | null
+  sugarG?: number | null
+  sortOrder: number
+}
+
+
 export interface StoredMealItem {
   foodId: string
   foodName: string
@@ -448,6 +485,7 @@ export type FoodFormValues = z.infer<typeof foodSchema>
 export const templateMealItemSchema = z.object({
   foodId: z.string().min(1, 'Select a food'),
   quantityG: z.coerce.number().positive('Qty > 0').max(10000),
+  recipeSource: z.string().optional(),
 })
 
 export const mealReasoningSchema = z
@@ -463,6 +501,8 @@ export const mealOptionSchema = z.object({
   isDefault: z.boolean().optional(),
   reasoning: mealReasoningSchema,
   items: z.array(templateMealItemSchema).min(1, 'Add at least one food'),
+  recipeId: z.string().optional(),
+  recipeName: z.string().optional(),
 })
 
 export const lifestyleSchema = z.object({

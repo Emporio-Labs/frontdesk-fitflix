@@ -63,6 +63,9 @@ import {
   useNutritionMembers,
   useNutritionPlans,
   useFoods,
+  useRecipes,
+  useRecipe,
+  useCategories,
   useDeletePlan,
   useDeleteFood,
 } from '@/hooks/use-nutrition'
@@ -73,6 +76,13 @@ import {
 import { useCanAccess } from '@/hooks/use-auth'
 import { useUsers } from '@/hooks/use-users'
 import type { User } from '@/lib/services/user.service'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import type { NutritionDashboardMember, FoodItem, UserNutritionPlan } from '@/lib/types/nutrition'
 import { onboardingStepLabel, ONBOARDING_STEP_ORDER } from '@/components/onboarding-timeline'
 
@@ -902,8 +912,13 @@ function FoodCatalogTab({ canCreate }: { canCreate: boolean }) {
   const [search, setSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<FoodItem | null>(null)
+  const [activeCatalogTab, setActiveCatalogTab] = useState('ingredients')
+  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
 
   const { data: foods = [], isLoading, isError, refetch } = useFoods(search || undefined)
+  const { data: recipes = [], isLoading: recipesLoading, isError: recipesError, refetch: refetchRecipes } = useRecipes()
+  const { data: categories = [] } = useCategories()
+
   const deleteFood = useDeleteFood()
   const canUpdate = useCanAccess('nutrition', 'update')
   const canDelete = useCanAccess('nutrition', 'delete')
@@ -916,20 +931,32 @@ function FoodCatalogTab({ canCreate }: { canCreate: boolean }) {
     }
   }
 
+  const categoryMap = useMemo(() => {
+    return new Map(categories.map((c) => [c._id, c.name]))
+  }, [categories])
+
+  const filteredRecipes = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return recipes
+    return recipes.filter((r) => r.name.toLowerCase().includes(q))
+  }, [recipes, search])
+
+  const { data: recipeDetails, isLoading: detailsLoading } = useRecipe(selectedRecipeId || '', !!selectedRecipeId)
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-xl font-semibold">Food Catalog</h3>
           <p className="text-sm text-muted-foreground">
-            Reusable foods with per-serving macros for nutrition plans
+            Reusable foods and pre-defined recipes for nutrition plans
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => refetch()}>
+          <Button variant="outline" size="icon" onClick={() => activeCatalogTab === 'ingredients' ? refetch() : refetchRecipes()}>
             <IconRefresh className="h-4 w-4" />
           </Button>
-          {canCreate && (
+          {canCreate && activeCatalogTab === 'ingredients' && (
             <Button onClick={openCreate}>
               <IconPlus className="mr-2 h-4 w-4" />
               Add Food
@@ -940,95 +967,255 @@ function FoodCatalogTab({ canCreate }: { canCreate: boolean }) {
 
       <Card>
         <CardContent className="pt-6 space-y-4">
-          <div className="relative max-w-sm">
-            <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search foods…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+          <Tabs value={activeCatalogTab} onValueChange={setActiveCatalogTab} className="w-full">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b">
+              <TabsList>
+                <TabsTrigger value="ingredients">Ingredients ({foods.length})</TabsTrigger>
+                <TabsTrigger value="recipes">Recipes ({recipes.length})</TabsTrigger>
+              </TabsList>
+              
+              <div className="relative max-w-sm flex-1 min-w-[200px]">
+                <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder={activeCatalogTab === 'ingredients' ? "Search ingredients…" : "Search recipes…"}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
 
-          {isLoading ? (
-            <SkeletonTable />
-          ) : isError ? (
-            <div className="py-8 text-center text-red-500">
-              Failed to load food catalog.{' '}
-              <button className="underline" onClick={() => refetch()}>
-                Retry
-              </button>
-            </div>
-          ) : foods.length === 0 ? (
-            <EmptyState
-              icon={<IconApple className="h-10 w-10" />}
-              title="No foods yet"
-              description="Add foods to build reusable nutrition plans."
-              action={
-                canCreate ? (
-                  <Button onClick={openCreate}>
-                    <IconPlus className="mr-2 h-4 w-4" />
-                    Add Food
-                  </Button>
-                ) : undefined
-              }
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Brand</TableHead>
-                    <TableHead>Serving</TableHead>
-                    <TableHead>Cal</TableHead>
-                    <TableHead>P</TableHead>
-                    <TableHead>C</TableHead>
-                    <TableHead>F</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {foods.map((food) => (
-                    <TableRow key={food._id}>
-                      <TableCell className="font-medium">{food.name}</TableCell>
-                      <TableCell>{food.brand || '—'}</TableCell>
-                      <TableCell>{food.servingLabel}</TableCell>
-                      <TableCell>{food.caloriesKcal}</TableCell>
-                      <TableCell>{food.proteinG}g</TableCell>
-                      <TableCell>{food.carbsG}g</TableCell>
-                      <TableCell>{food.fatG}g</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        {canUpdate && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEdit(food)}
-                          >
-                            <IconEdit className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-500"
-                            onClick={() => handleDelete(food)}
-                          >
-                            <IconTrash className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+            <TabsContent value="ingredients" className="mt-4">
+              {isLoading ? (
+                <SkeletonTable />
+              ) : isError ? (
+                <div className="py-8 text-center text-red-500">
+                  Failed to load food catalog.{' '}
+                  <button className="underline" onClick={() => refetch()}>
+                    Retry
+                  </button>
+                </div>
+              ) : foods.length === 0 ? (
+                <EmptyState
+                  icon={<IconApple className="h-10 w-10" />}
+                  title="No foods yet"
+                  description="Add foods to build reusable nutrition plans."
+                  action={
+                    canCreate ? (
+                      <Button onClick={openCreate}>
+                        <IconPlus className="mr-2 h-4 w-4" />
+                        Add Food
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Brand</TableHead>
+                        <TableHead>Serving</TableHead>
+                        <TableHead>Cal</TableHead>
+                        <TableHead>P</TableHead>
+                        <TableHead>C</TableHead>
+                        <TableHead>F</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {foods.map((food) => (
+                        <TableRow key={food._id}>
+                          <TableCell className="font-medium">{food.name}</TableCell>
+                          <TableCell>{food.brand || '—'}</TableCell>
+                          <TableCell>{food.servingLabel}</TableCell>
+                          <TableCell>{food.caloriesKcal}</TableCell>
+                          <TableCell>{food.proteinG}g</TableCell>
+                          <TableCell>{food.carbsG}g</TableCell>
+                          <TableCell>{food.fatG}g</TableCell>
+                          <TableCell className="text-right space-x-2">
+                            {canUpdate && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openEdit(food)}
+                              >
+                                <IconEdit className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-500"
+                                onClick={() => handleDelete(food)}
+                              >
+                                <IconTrash className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="recipes" className="mt-4">
+              {recipesLoading ? (
+                <SkeletonTable />
+              ) : recipesError ? (
+                <div className="py-8 text-center text-red-500">
+                  Failed to load recipes.{' '}
+                  <button className="underline" onClick={() => refetchRecipes()}>
+                    Retry
+                  </button>
+                </div>
+              ) : filteredRecipes.length === 0 ? (
+                <EmptyState
+                  icon={<IconToolsKitchen2 className="h-10 w-10" />}
+                  title="No recipes found"
+                  description="Use the Excel import script to populate recipes."
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Recipe Name</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Cal</TableHead>
+                        <TableHead>P</TableHead>
+                        <TableHead>C</TableHead>
+                        <TableHead>F</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredRecipes.map((recipe) => (
+                        <TableRow key={recipe._id}>
+                          <TableCell className="font-medium">{recipe.name}</TableCell>
+                          <TableCell>{categoryMap.get(recipe.categoryId) || '—'}</TableCell>
+                          <TableCell>
+                            {recipe.isVeg === true ? (
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" variant="secondary">
+                                Veg
+                              </Badge>
+                            ) : recipe.isVeg === false ? (
+                              <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" variant="secondary">
+                                Non-Veg
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">Mixed</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>{recipe.totals.caloriesKcal} kcal</TableCell>
+                          <TableCell>{recipe.totals.proteinG}g</TableCell>
+                          <TableCell>{recipe.totals.carbsG}g</TableCell>
+                          <TableCell>{recipe.totals.fatG}g</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedRecipeId(recipe._id)}
+                            >
+                              <IconEye className="mr-1 h-4 w-4" /> View Details
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
       <FoodForm open={dialogOpen} onOpenChange={setDialogOpen} food={editing} />
+
+      {/* View Recipe Dialog */}
+      <Dialog open={!!selectedRecipeId} onOpenChange={(open) => !open && setSelectedRecipeId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Recipe Details</DialogTitle>
+            <DialogDescription>Ingredients and macro breakdown for this recipe.</DialogDescription>
+          </DialogHeader>
+
+          {detailsLoading ? (
+            <div className="py-8 flex justify-center"><Skeleton className="h-20 w-full" /></div>
+          ) : recipeDetails ? (
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-lg font-bold text-foreground">{recipeDetails.recipe.name}</h4>
+                <div className="flex gap-2 mt-1">
+                  <Badge variant="outline">
+                    {categoryMap.get(recipeDetails.recipe.categoryId) || '—'}
+                  </Badge>
+                  {recipeDetails.recipe.isVeg !== null && (
+                    <Badge variant={recipeDetails.recipe.isVeg ? 'default' : 'secondary'}>
+                      {recipeDetails.recipe.isVeg ? 'Vegetarian' : 'Non-Vegetarian'}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Macros */}
+              <div className="grid grid-cols-4 gap-2 rounded-md bg-muted p-3 text-center text-sm">
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase font-semibold text-[10px]">Calories</div>
+                  <div className="font-bold text-foreground mt-0.5">{recipeDetails.recipe.totals.caloriesKcal}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase font-semibold text-[10px]">Protein</div>
+                  <div className="font-bold text-foreground mt-0.5">{recipeDetails.recipe.totals.proteinG}g</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase font-semibold text-[10px]">Carbs</div>
+                  <div className="font-bold text-foreground mt-0.5">{recipeDetails.recipe.totals.carbsG}g</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase font-semibold text-[10px]">Fat</div>
+                  <div className="font-bold text-foreground mt-0.5">{recipeDetails.recipe.totals.fatG}g</div>
+                </div>
+              </div>
+
+              {/* Ingredients */}
+              <div className="space-y-2">
+                <h5 className="text-sm font-semibold">Ingredients ({recipeDetails.ingredients.length})</h5>
+                <div className="max-h-60 overflow-y-auto border rounded-md divide-y">
+                  {recipeDetails.ingredients.map((ing) => (
+                    <div key={ing._id} className="flex justify-between px-3 py-2 text-sm">
+                      <span className="font-medium text-foreground">{ing.rawIngredientName}</span>
+                      <span className="text-muted-foreground">
+                        {ing.rawQuantityStr || `${ing.quantity}${ing.unit}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Instructions */}
+              {recipeDetails.recipe.cookingDirections && recipeDetails.recipe.cookingDirections.length > 0 && (
+                <div className="space-y-1.5">
+                  <h5 className="text-sm font-semibold">Directions</h5>
+                  <ol className="list-decimal pl-4 text-xs text-muted-foreground space-y-1">
+                    {recipeDetails.recipe.cookingDirections.map((step, idx) => (
+                      <li key={idx}>{step}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Recipe details not found.</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -42,6 +42,30 @@ export function useFoods(search?: string) {
   })
 }
 
+export function useRecipes(search?: string) {
+  return useQuery({
+    queryKey: queryKeys.nutrition.recipes(search),
+    queryFn: () => nutritionService.getRecipes(search),
+    select: (data) => data.recipes,
+  })
+}
+
+export function useCategories() {
+  return useQuery({
+    queryKey: ['nutrition', 'categories'],
+    queryFn: nutritionService.getCategories,
+    select: (data) => data.categories,
+  })
+}
+
+export function useRecipe(id: string, enabled = false) {
+  return useQuery({
+    queryKey: ['nutrition', 'recipe', id],
+    queryFn: () => nutritionService.getRecipeWithIngredients(id),
+    enabled: enabled && !!id,
+  })
+}
+
 export function useCreateFood() {
   const qc = useQueryClient()
   return useMutation({
