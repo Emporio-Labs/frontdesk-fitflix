@@ -122,6 +122,92 @@ function newOption(index: number) {
   }
 }
 
+function serializeMeals(meals: any[]) {
+  if (!meals) return ''
+  return JSON.stringify(meals.map(m => ({
+    mealType: m.mealType,
+    name: m.name,
+    timeOfDay: m.timeOfDay,
+    timelineSlot: m.timelineSlot,
+    notes: m.notes,
+    reasoning: m.reasoning,
+    options: m.options?.map((o: any) => ({
+      title: o.title || o.label,
+      isDefault: o.isDefault,
+      reasoning: o.reasoning,
+      recipeId: o.recipeId,
+      recipeName: o.recipeName,
+      foods: (o.foods || o.items || []).map((f: any) => ({
+        foodId: f.foodId,
+        quantityG: f.quantityG,
+        recipeSource: f.recipeSource
+      }))
+    })) || m.items?.map((item: any) => ({
+      foodId: item.foodId,
+      quantityG: item.quantityG
+    }))
+  })))
+}
+
+function groupDaysByMeals(days: any[]): any[] {
+  const groups: { [serialized: string]: { dayNumbers: number[], meals: any[] } } = {}
+  days.forEach((day) => {
+    const serialized = serializeMeals(day.meals)
+    if (!groups[serialized]) {
+      groups[serialized] = {
+        dayNumbers: [],
+        meals: day.meals
+      }
+    }
+    groups[serialized].dayNumbers.push(day.dayNumber)
+  })
+
+  return Object.values(groups).map((g) => {
+    const getWeekday = (num: number) => {
+      const idx = num === 7 ? 0 : num
+      return WEEKDAYS[idx] || 'Mon'
+    }
+
+    return {
+      selectedDays: g.dayNumbers.map(getWeekday),
+      meals: g.meals.map((m: any) => ({
+        mealType: m.mealType,
+        name: m.name,
+        timeOfDay: m.timeOfDay ?? undefined,
+        timelineSlot: m.timelineSlot ?? undefined,
+        notes: m.notes ?? undefined,
+        reasoning: m.reasoning,
+        items: [],
+        options: m.options?.length
+          ? m.options.map((o: any, oIdx: number) => ({
+              optionId: o.optionId || `opt-${Date.now()}-${oIdx}`,
+              label: o.title || o.label || `Option ${oIdx + 1}`,
+              isDefault: o.isDefault ?? false,
+              reasoning: o.reasoning,
+              recipeId: o.recipeId,
+              recipeName: o.recipeName,
+              items: (o.foods || o.items || []).map((item: any) => ({
+                foodId: item.foodId,
+                quantityG: item.quantityG,
+                recipeSource: item.recipeSource,
+              })),
+            }))
+          : [
+              {
+                optionId: 'opt-legacy',
+                label: 'Option 1',
+                isDefault: true,
+                items: (m.items || []).map((item: any) => ({
+                  foodId: item.foodId,
+                  quantityG: item.quantityG,
+                })),
+              },
+            ],
+      }))
+    }
+  })
+}
+
 // ── IngredientRow (single ingredient inside table grid) ──────────────────────
 
 interface IngredientRowProps {
@@ -740,6 +826,7 @@ export function ClinicalTemplateForm({
 
   const [templateImportOpen, setTemplateImportOpen] = useState(false)
   const [templateSearch, setTemplateSearch] = useState('')
+  const [selectedSourceDay, setSelectedSourceDay] = useState('')
 
   const sourceData = plan || template
   const isEdit = !!sourceData
@@ -831,44 +918,7 @@ export function ClinicalTemplateForm({
       mealPattern: (tpl.conditionTags ?? []).find((t: string) => t.startsWith('pattern:'))?.replace('pattern:', '') || '3 Meals',
       lifestyle: tpl.lifestyle ?? [],
       days: tpl.days && tpl.days.length
-        ? [
-            {
-              selectedDays: tpl.days.map((d: any) => WEEKDAYS[d.dayNumber % 7] ?? 'Mon'),
-              meals: tpl.days[0].meals.map((m: any) => ({
-                mealType: m.mealType,
-                name: m.name,
-                timeOfDay: m.timeOfDay ?? undefined,
-                timelineSlot: m.timelineSlot ?? undefined,
-                notes: m.notes ?? undefined,
-                reasoning: m.reasoning,
-                items: [],
-                options: m.options?.length
-                  ? m.options.map((o: any) => ({
-                      optionId: o.optionId ?? '',
-                      label: o.label ?? 'Option 1',
-                      isDefault: o.isDefault ?? false,
-                      reasoning: o.reasoning,
-                      recipeId: o.recipeId,
-                      recipeName: o.recipeName,
-                      items: o.items.map((item: any) => ({
-                        foodId: item.foodId,
-                        quantityG: item.quantityG,
-                      })),
-                    }))
-                  : [
-                      {
-                        optionId: 'opt-legacy',
-                        label: 'Option 1',
-                        isDefault: true,
-                        items: m.items.map((item: any) => ({
-                          foodId: item.foodId,
-                          quantityG: item.quantityG,
-                        })),
-                      },
-                    ],
-              })),
-            },
-          ]
+        ? groupDaysByMeals(tpl.days)
         : [
             {
               selectedDays: WEEKDAYS,
@@ -930,44 +980,7 @@ export function ClinicalTemplateForm({
         mealPattern: (sourceData.conditionTags ?? []).find((t: string) => t.startsWith('pattern:'))?.replace('pattern:', '') || '3 Meals',
         lifestyle: sourceData.lifestyle ?? [],
         days: sourceData.days.length
-          ? [
-              {
-                selectedDays: sourceData.days.map((d: any) => WEEKDAYS[d.dayNumber % 7] ?? 'Mon'),
-                meals: sourceData.days[0].meals.map((m: any) => ({
-                  mealType: m.mealType,
-                  name: m.name,
-                  timeOfDay: m.timeOfDay ?? undefined,
-                  timelineSlot: m.timelineSlot ?? undefined,
-                  notes: m.notes ?? undefined,
-                  reasoning: m.reasoning,
-                  items: [],
-                  options: m.options?.length
-                    ? m.options.map((o: any) => ({
-                        optionId: o.optionId ?? '',
-                        label: o.label ?? 'Option 1',
-                        isDefault: o.isDefault ?? false,
-                        reasoning: o.reasoning,
-                        recipeId: o.recipeId,
-                        recipeName: o.recipeName,
-                        items: o.items.map((item: any) => ({
-                          foodId: item.foodId,
-                          quantityG: item.quantityG,
-                        })),
-                      }))
-                    : [
-                        {
-                          optionId: 'opt-legacy',
-                          label: 'Option 1',
-                          isDefault: true,
-                          items: m.items.map((item: any) => ({
-                            foodId: item.foodId,
-                            quantityG: item.quantityG,
-                          })),
-                        },
-                      ],
-                })),
-              },
-            ]
+          ? groupDaysByMeals(sourceData.days)
           : [
               {
                 selectedDays: WEEKDAYS,
@@ -1152,6 +1165,75 @@ export function ClinicalTemplateForm({
       setTargetMealIdx(null)
       setTargetOptIdx(null)
     }
+  }
+
+  const handleApplyCopy = (sourceDay: string, strategy: string) => {
+    const currentBlocks = form.getValues('days')
+    const sourceBlock = currentBlocks.find((b) => b.selectedDays.includes(sourceDay))
+    if (!sourceBlock) {
+      toast.error(`No configured meals found for source day: ${sourceDay}`)
+      return
+    }
+    const sourceMeals = sourceBlock.meals
+
+    if (strategy === 'replicate') {
+      form.setValue('days', [
+        {
+          selectedDays: WEEKDAYS,
+          meals: sourceMeals,
+        },
+      ], { shouldDirty: true, shouldValidate: true })
+      setActiveDayBlockIdx(0)
+      toast.success(`Replicated ${sourceDay}'s structure to all days.`)
+    } else if (strategy === 'alternate') {
+      if (currentBlocks.length < 2) {
+        toast.error('Alternate strategy requires at least 2 configured day blocks.')
+        return
+      }
+      const mealsA = currentBlocks[0].meals
+      const mealsB = currentBlocks[1].meals
+
+      const selectedA = WEEKDAYS.filter((_, idx) => idx % 2 === 0)
+      const selectedB = WEEKDAYS.filter((_, idx) => idx % 2 !== 0)
+
+      form.setValue('days', [
+        { selectedDays: selectedA, meals: mealsA },
+        { selectedDays: selectedB, meals: mealsB },
+      ], { shouldDirty: true, shouldValidate: true })
+      setActiveDayBlockIdx(0)
+      toast.success('Alternated structure A and B across the week.')
+    } else if (strategy === 'split_weekdays') {
+      const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+      const updatedBlocks = currentBlocks.map((b) => ({
+        ...b,
+        selectedDays: b.selectedDays.filter((d) => !weekdays.includes(d)),
+      })).filter((b) => b.selectedDays.length > 0)
+
+      updatedBlocks.push({
+        selectedDays: weekdays,
+        meals: sourceMeals,
+      })
+
+      form.setValue('days', updatedBlocks, { shouldDirty: true, shouldValidate: true })
+      setActiveDayBlockIdx(updatedBlocks.length - 1)
+      toast.success(`Cloned ${sourceDay}'s structure to Weekdays (Mon-Fri).`)
+    } else if (strategy === 'split_weekends') {
+      const weekends = ['Sun', 'Sat']
+      const updatedBlocks = currentBlocks.map((b) => ({
+        ...b,
+        selectedDays: b.selectedDays.filter((d) => !weekends.includes(d)),
+      })).filter((b) => b.selectedDays.length > 0)
+
+      updatedBlocks.push({
+        selectedDays: weekends,
+        meals: sourceMeals,
+      })
+
+      form.setValue('days', updatedBlocks, { shouldDirty: true, shouldValidate: true })
+      setActiveDayBlockIdx(updatedBlocks.length - 1)
+      toast.success(`Cloned ${sourceDay}'s structure to Weekends (Sun, Sat).`)
+    }
+    setSelectedSourceDay('')
   }
 
   // ── Form submits ──────────────────────────────────────────────────────────
@@ -1584,6 +1666,48 @@ export function ClinicalTemplateForm({
                       {selectedDays.length === WEEKDAYS.length ? 'Clear All' : 'Select All'}
                     </button>
                   </div>
+                </div>
+
+                {/* Copy Structure Toolbar */}
+                <div className="flex flex-wrap items-center gap-3 pt-3 border-t mt-3">
+                  <span className="text-xs font-bold text-muted-foreground">Copy Structure From...</span>
+                  <Select onValueChange={(sourceDay) => {
+                    setSelectedSourceDay(sourceDay)
+                  }} value={selectedSourceDay}>
+                    <SelectTrigger className="h-8 text-xs w-32 bg-white">
+                      <SelectValue placeholder="Select Day" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WEEKDAYS.map((d) => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {selectedSourceDay && (
+                    <>
+                      <Select onValueChange={(strat) => handleApplyCopy(selectedSourceDay, strat)} value="">
+                        <SelectTrigger className="h-8 text-xs w-56 bg-white">
+                          <SelectValue placeholder="Select Copy Strategy" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="replicate">Strategy A (Replicate to Remaining)</SelectItem>
+                          <SelectItem value="alternate">Strategy B (Alternate Pattern/Zigzag)</SelectItem>
+                          <SelectItem value="split_weekdays">Strategy C (Clone to Weekdays Only)</SelectItem>
+                          <SelectItem value="split_weekends">Strategy C (Clone to Weekends Only)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-muted-foreground hover:bg-muted"
+                        onClick={() => setSelectedSourceDay('')}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
