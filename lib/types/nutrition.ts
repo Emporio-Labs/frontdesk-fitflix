@@ -333,9 +333,13 @@ export interface MealOption {
 export interface MealOptionInput {
   optionId?: string
   label?: string
-  items: MealItemInput[]
-  reasoning?: MealReasoning
+  items?: MealItemInput[]
+  foods?: MealItemInput[]
+  reasoning?: MealReasoning | string
   isDefault?: boolean
+  title?: string
+  recipeId?: string
+  recipeName?: string
 }
 
 export interface StoredMeal {
