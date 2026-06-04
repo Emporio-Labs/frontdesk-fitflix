@@ -174,6 +174,8 @@ function normalizeUser(raw: any): User {
     onboardingStatus: raw?.onboardingStatus ?? undefined,
     healthMarkers: raw?.healthMarkers ?? undefined,
     healthGoalsSnapshot: raw?.healthGoalsSnapshot ?? undefined,
+    expertAppointments: raw?.expertAppointments ?? undefined,
+    reports: raw?.reports ?? undefined,
   }
 }
 
