@@ -37,6 +37,13 @@ const nextConfig = {
       },
     ]
   },
+  webpack: (config) => {
+    config.output = {
+      ...config.output,
+      hashFunction: 'sha256',
+    };
+    return config;
+  },
 }
 
 export default nextConfig

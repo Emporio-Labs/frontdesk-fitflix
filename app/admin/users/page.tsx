@@ -21,7 +21,7 @@ import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf }
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
 import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '@/hooks/use-admins'
 import { useMemberships } from '@/hooks/use-memberships'
-import { User } from '@/lib/services/user.service'
+import { User, CreateUserPayload } from '@/lib/services/user.service'
 import { Admin } from '@/lib/services/admin.service'
 import { StatusBadge } from '@/components/status-badge'
 import { toast } from 'sonner'
