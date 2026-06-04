@@ -89,9 +89,9 @@ export interface User {
 
 export interface CreateUserPayload {
   username: string
-  email: string
+  email?: string
   phone: string
-  password: string
+  password?: string
   age: number
   gender: string
   healthGoals?: string[]

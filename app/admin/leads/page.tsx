@@ -36,6 +36,7 @@ import {
   IconFlame, IconUserPlus, IconAlertTriangle, IconPhone, IconUserCheck, IconFilter,
 } from '@tabler/icons-react'
 import { CreateInvoiceSheet } from '@/components/invoices/create-invoice-sheet'
+import { useUsers } from '@/hooks/use-users'
 import {
   CrmStatCard,
   FollowUpCard,
@@ -85,6 +86,7 @@ export default function LeadsPage() {
   const convertLead = useConvertLead()
   const addInteraction = useAddLeadInteraction()
   const contactAttempt = useRecordLeadContactAttempt()
+  const { data: users = [] } = useUsers()
 
   const [formData, setFormData] = useState({
     name: '',
@@ -107,12 +109,23 @@ export default function LeadsPage() {
     password: 'Lead@12345',
   })
 
+  const existingUserMatch = useMemo(() => {
+    if (!convertFormData.phone) return null
+    const cleanInput = convertFormData.phone.replace(/\D/g, '').slice(-10)
+    if (cleanInput.length < 10) return null
+    return users.find((u) => {
+      if (!u.phone) return null
+      const cleanUserPhone = u.phone.replace(/\D/g, '').slice(-10)
+      return cleanUserPhone === cleanInput
+    })
+  }, [convertFormData.phone, users])
+
   const filteredLeads = useMemo(() => {
     return leads.filter((l) => {
       const matchesSearch =
         l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        l.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        l.phone.toLowerCase().includes(searchTerm.toLowerCase())
+        (l.email && l.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (l.phone && l.phone.toLowerCase().includes(searchTerm.toLowerCase()))
       const matchesStatus = !filterStatus || l.status === filterStatus
       return matchesSearch && matchesStatus
     })
@@ -276,24 +289,29 @@ export default function LeadsPage() {
 
   const handleConfirmConvert = async () => {
     if (convertingLead) {
-      if (!convertFormData.phone.trim() || !convertFormData.password.trim()) {
-        toast.error('Phone and password are required for conversion')
+      if (!convertFormData.phone.trim()) {
+        toast.error('Phone number is required for conversion')
         return
+      }
+
+      const payload: any = {
+        username: convertFormData.username.trim() || convertingLead.name,
+        phone: convertFormData.phone.trim(),
+        age: convertFormData.age.trim() || '30',
+        gender: Number.parseInt(convertFormData.gender, 10) || 0,
+        healthGoals: convertFormData.healthGoals
+          .split(',')
+          .map((goal) => goal.trim())
+          .filter(Boolean),
+      }
+
+      if (convertFormData.password.trim()) {
+        payload.password = convertFormData.password.trim()
       }
 
       await convertLead.mutateAsync({
         id: convertingLead.id,
-        payload: {
-          username: convertFormData.username.trim() || convertingLead.name,
-          phone: convertFormData.phone.trim(),
-          age: convertFormData.age.trim() || '30',
-          gender: Number.parseInt(convertFormData.gender, 10) || 0,
-          healthGoals: convertFormData.healthGoals
-            .split(',')
-            .map((goal) => goal.trim())
-            .filter(Boolean),
-          password: convertFormData.password,
-        },
+        payload,
       })
       setConvertingLead(null)
       setIsConvertDialogOpen(false)
@@ -1417,6 +1435,17 @@ export default function LeadsPage() {
                       <p className="text-sm text-green-800">Email: {convertingLead.email}</p>
                       <p className="text-sm text-green-800">Phone: {convertingLead.phone}</p>
                     </div>
+                    {existingUserMatch && (
+                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg flex items-start gap-2">
+                        <IconUserCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold text-amber-900">Active App Profile Found</p>
+                          <p className="text-xs text-amber-800 mt-1">
+                            Converting will link this premium protocol directly to the user's existing mobile account ({existingUserMatch.username}) without resetting credentials.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <label className="text-sm font-medium">Username</label>
                       <Input
@@ -1463,15 +1492,17 @@ export default function LeadsPage() {
                         placeholder="weight loss, strength"
                       />
                     </div>
-                    <div>
-                      <label className="text-sm font-medium">Temporary Password</label>
-                      <Input
-                        value={convertFormData.password}
-                        onChange={(e) => setConvertFormData({ ...convertFormData, password: e.target.value })}
-                        type="password"
-                        placeholder="Temporary password"
-                      />
-                    </div>
+                    {!existingUserMatch && (
+                      <div>
+                        <label className="text-sm font-medium">Temporary Password</label>
+                        <Input
+                          value={convertFormData.password}
+                          onChange={(e) => setConvertFormData({ ...convertFormData, password: e.target.value })}
+                          type="password"
+                          placeholder="Temporary password"
+                        />
+                      </div>
+                    )}
                     <p className="text-sm text-muted-foreground">
                       This will create a new member profile and mark this lead as converted. You can then assign a membership plan.
                     </p>

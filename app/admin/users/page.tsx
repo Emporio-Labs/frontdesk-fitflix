@@ -90,7 +90,9 @@ export default function UsersPage() {
   }, [memberships])
 
   const getUserMembership = (user: User) => {
-    const keys = [user._id, user.username, user.email].map((value) => value.trim().toLowerCase())
+    const keys = [user._id, user.username, user.email, user.phone]
+      .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+      .map((value) => value.trim().toLowerCase())
     return keys.map((key) => membershipsByUserKey.get(key)).find(Boolean)
   }
 
@@ -118,7 +120,8 @@ export default function UsersPage() {
   const filteredUsers = users.filter(
     (u) =>
       u.username.toLowerCase().includes(memberSearch.toLowerCase()) ||
-      u.email.toLowerCase().includes(memberSearch.toLowerCase())
+      (u.email && u.email.toLowerCase().includes(memberSearch.toLowerCase())) ||
+      (u.phone && u.phone.includes(memberSearch))
   )
 
   const resetMemberForm = () => {
@@ -130,8 +133,9 @@ export default function UsersPage() {
   const validateMemberForm = (): boolean => {
     const errors: Record<string, string> = {}
     if (!memberForm.username.trim()) errors.username = 'Username is required'
-    if (!editingUser && !memberForm.email.trim()) errors.email = 'Email is required'
-    if (!editingUser && memberForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(memberForm.email)) errors.email = 'Invalid email format'
+    if (memberForm.email && memberForm.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(memberForm.email.trim())) {
+      errors.email = 'Invalid email format'
+    }
     
     if (!memberForm.phone.trim()) {
       errors.phone = 'Phone is required'
@@ -144,10 +148,8 @@ export default function UsersPage() {
     }
 
     if (!memberForm.age || Number(memberForm.age) < 1 || Number(memberForm.age) > 130) errors.age = 'Age must be between 1 and 130'
-    if (!editingUser) {
-      if (!memberForm.password) {
-        errors.password = 'Password is required'
-      } else if (memberForm.password.length < 8) {
+    if (!editingUser && memberForm.password) {
+      if (memberForm.password.length < 8) {
         errors.password = 'Password must be at least 8 characters'
       } else if (!/[A-Za-z]/.test(memberForm.password)) {
         errors.password = 'Password must include at least one letter'
@@ -162,7 +164,7 @@ export default function UsersPage() {
   const handleOpenEditUser = (user: User) => {
     setEditingUser(user)
     setMemberForm({
-      username: user.username, email: user.email, phone: user.phone,
+      username: user.username, email: user.email || '', phone: user.phone,
       password: '', age: String(user.age ?? ''), gender: user.gender,
       healthGoalsInput: user.healthGoals.join(', '),
     })
@@ -180,10 +182,20 @@ export default function UsersPage() {
           payload: { username: memberForm.username, phone: cleanPhone, age: Number(memberForm.age), gender: memberForm.gender, healthGoals },
         })
       } else {
-        await createUser.mutateAsync({
-          username: memberForm.username, email: memberForm.email, phone: cleanPhone,
-          password: memberForm.password, age: Number(memberForm.age), gender: memberForm.gender, healthGoals,
-        })
+        const payload: CreateUserPayload = {
+          username: memberForm.username,
+          phone: cleanPhone,
+          age: Number(memberForm.age),
+          gender: memberForm.gender,
+          healthGoals,
+        }
+        if (memberForm.email.trim()) {
+          payload.email = memberForm.email.trim()
+        }
+        if (memberForm.password.trim()) {
+          payload.password = memberForm.password.trim()
+        }
+        await createUser.mutateAsync(payload)
       }
       setIsMemberDialogOpen(false)
       resetMemberForm()
@@ -294,7 +306,7 @@ export default function UsersPage() {
                     </div>
                     {!editingUser && (
                       <div>
-                        <label className="text-sm font-medium">Email *</label>
+                        <label className="text-sm font-medium">Email</label>
                         <Input type="email" autoComplete="off" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} placeholder="john@example.com" />
                         {memberFormErrors.email && <p className="text-xs text-red-500 mt-1">{memberFormErrors.email}</p>}
                       </div>
@@ -306,7 +318,7 @@ export default function UsersPage() {
                     </div>
                     {!editingUser && (
                       <div>
-                        <label className="text-sm font-medium">Password *</label>
+                        <label className="text-sm font-medium">Password</label>
                         <Input type="password" autoComplete="new-password" value={memberForm.password} onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })} placeholder="Min 8 chars, 1 letter, 1 number" />
                         {memberFormErrors.password && <p className="text-xs text-red-500 mt-1">{memberFormErrors.password}</p>}
                       </div>
