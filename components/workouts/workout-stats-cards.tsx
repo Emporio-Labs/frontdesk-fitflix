@@ -36,7 +36,7 @@ export function WorkoutStatsCards() {
       value: plans.length,
       sub: 'workout plans created',
       icon: <IconClipboardList className="w-4 h-4 text-blue-500" />,
-      href: '/dashboard/workouts',
+      href: '/dashboard/workouts/plans',
       loading: plansLoading,
     },
     {
@@ -44,7 +44,7 @@ export function WorkoutStatsCards() {
       value: activePlans,
       sub: 'currently assigned',
       icon: <IconPlayerPlay className="w-4 h-4 text-emerald-500" />,
-      href: '/dashboard/workouts',
+      href: '/dashboard/workouts/plans?status=Active',
       loading: plansLoading,
     },
     {
@@ -52,7 +52,7 @@ export function WorkoutStatsCards() {
       value: backendStats?.weeklyWorkouts ?? 0,
       sub: 'sessions this week',
       icon: <IconFlame className="w-4 h-4 text-orange-500" />,
-      href: '/dashboard/workouts',
+      href: '/dashboard/workouts/sessions',
       loading: statsLoading,
     },
     {
@@ -60,7 +60,7 @@ export function WorkoutStatsCards() {
       value: backendStats?.currentStreak ?? 0,
       sub: 'consecutive days',
       icon: <IconBarbell className="w-4 h-4 text-violet-500" />,
-      href: '/dashboard/workouts',
+      href: '/dashboard/workouts/sessions',
       loading: statsLoading,
     },
     {
@@ -68,7 +68,7 @@ export function WorkoutStatsCards() {
       value: assignedUsers,
       sub: 'unique members',
       icon: <IconUsers className="w-4 h-4 text-violet-500" />,
-      href: '/dashboard/workouts',
+      href: '/dashboard/workouts/members',
       loading: plansLoading,
     },
     {
@@ -76,7 +76,7 @@ export function WorkoutStatsCards() {
       value: draftPlans,
       sub: 'in progress',
       icon: <IconEdit className="w-4 h-4 text-amber-500" />,
-      href: '/dashboard/workouts',
+      href: '/dashboard/workouts/plans?status=Draft',
       loading: plansLoading,
     },
     {
@@ -84,7 +84,7 @@ export function WorkoutStatsCards() {
       value: totalExercises,
       sub: 'across all plans',
       icon: <IconChartBar className="w-4 h-4 text-rose-500" />,
-      href: '/dashboard/workouts',
+      href: '/dashboard/workouts/exercises',
       loading: plansLoading,
     },
     {
