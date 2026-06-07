@@ -25,6 +25,10 @@ import { IconRefresh } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { useUsers } from '@/hooks/use-users'
 import { useMemberships } from '@/hooks/use-memberships'
+import { useAdmins } from '@/hooks/use-admins'
+import { useBookings } from '@/hooks/use-bookings'
+import { useServices } from '@/hooks/use-services'
+import { useTherapies } from '@/hooks/use-therapies'
 import {
   CreditTransactionSource,
   useTopUpUserCredits,
@@ -48,13 +52,20 @@ function formatAmount(amount: number) {
 export default function CreditsPage() {
   const [selectedUserId, setSelectedUserId] = useState('')
   const [historyLimit, setHistoryLimit] = useState(50)
+  const [historyLimitRaw, setHistoryLimitRaw] = useState('50')
   const [historySource, setHistorySource] = useState<HistorySourceFilter>('all')
   const [topUpAmount, setTopUpAmount] = useState(1)
   const [topUpMembershipId, setTopUpMembershipId] = useState('')
   const [topUpReason, setTopUpReason] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 12
 
   const { data: users = [] } = useUsers()
   const { data: allMemberships = [] } = useMemberships()
+  const { data: admins = [] } = useAdmins()
+  const { data: bookings = [] } = useBookings()
+  const { data: services = [] } = useServices()
+  const { data: therapies = [] } = useTherapies()
 
   const selectedUser = useMemo(
     () => users.find((user) => user._id === selectedUserId),
@@ -68,6 +79,57 @@ export default function CreditsPage() {
     () => allMemberships.filter((m) => m.userId === selectedUserId),
     [allMemberships, selectedUserId]
   )
+
+  const membershipNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    allMemberships.forEach((m) => {
+      if (m.id) map.set(m.id, m.planName)
+    })
+    return map
+  }, [allMemberships])
+
+  const userNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    users.forEach((u) => {
+      const name = u.username || u.email || 'Unknown User'
+      if (u._id) map.set(u._id, name)
+      if (u.id) map.set(u.id, name)
+    })
+    admins.forEach((a) => {
+      const name = a.adminName || a.email || 'Unknown Admin'
+      if (a._id) map.set(a._id, name)
+    })
+    return map
+  }, [users, admins])
+
+  const itemNameById = useMemo(
+    () =>
+      new Map([
+        ...services.map((s) => [s.id, s.name] as const),
+        ...therapies.map((t) => [t.id, t.name] as const),
+      ]),
+    [services, therapies]
+  )
+
+  const bookingLabelById = useMemo(() => {
+    const map = new Map<string, string>()
+    bookings.forEach((b) => {
+      const serviceName = b.service?.serviceName || itemNameById.get(b.service?._id ?? '') || 'Booking'
+      map.set(b._id, serviceName)
+    })
+    return map
+  }, [bookings, itemNameById])
+
+  const formatReason = (reason?: string) => {
+    if (!reason) return '-'
+    return reason.replace(/\b[0-9a-fA-F]{24}\b/g, (match) => {
+      const resolved = bookingLabelById.get(match)
+      if (resolved) {
+        return `${resolved} (${match.slice(-6)})`
+      }
+      return match.slice(-6)
+    })
+  }
 
   const sourceType = historySource === 'all' ? undefined : historySource
 
@@ -94,6 +156,11 @@ export default function CreditsPage() {
 
   const memberships = balance?.memberships || []
   const transactions = history?.transactions || []
+
+  const totalPages = Math.ceil(transactions.length / itemsPerPage)
+  const activePage = Math.max(1, Math.min(currentPage, totalPages || 1))
+  const startIndex = (activePage - 1) * itemsPerPage
+  const paginatedTransactions = transactions.slice(startIndex, startIndex + itemsPerPage)
 
   const handleRefresh = async () => {
     if (!selectedUserId) {
@@ -154,6 +221,7 @@ export default function CreditsPage() {
                 const nextUserId = value === '__none__' ? '' : value
                 setSelectedUserId(nextUserId)
                 setTopUpMembershipId('')
+                setCurrentPage(1)
               }}
             >
               <SelectTrigger>
@@ -176,14 +244,16 @@ export default function CreditsPage() {
               type="number"
               min={1}
               max={200}
-              value={historyLimit}
+              value={historyLimitRaw}
               onChange={(e) => {
+                setHistoryLimitRaw(e.target.value)
+              }}
+              onBlur={(e) => {
                 const parsed = Number.parseInt(e.target.value, 10)
-                if (Number.isNaN(parsed)) {
-                  setHistoryLimit(50)
-                  return
-                }
-                setHistoryLimit(Math.min(200, Math.max(1, parsed)))
+                const clamped = Number.isNaN(parsed) ? 50 : Math.min(200, Math.max(1, parsed))
+                setHistoryLimit(clamped)
+                setHistoryLimitRaw(String(clamped))
+                setCurrentPage(1)
               }}
             />
           </div>
@@ -192,7 +262,10 @@ export default function CreditsPage() {
             <label className="text-sm font-medium">Source Type</label>
             <Select
               value={historySource}
-              onValueChange={(value) => setHistorySource(value as HistorySourceFilter)}
+              onValueChange={(value) => {
+                setHistorySource(value as HistorySourceFilter)
+                setCurrentPage(1)
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -397,38 +470,93 @@ export default function CreditsPage() {
           ) : transactions.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">No transactions found for the selected filters</div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Membership</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Actor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell>{formatDate(tx.createdAt)}</TableCell>
-                      <TableCell>
-                        <Badge variant={tx.type === 'Consume' ? 'secondary' : 'default'}>{tx.type}</Badge>
-                      </TableCell>
-                      <TableCell>{tx.sourceType}</TableCell>
-                      <TableCell className={tx.amount < 0 ? 'text-red-600' : 'text-green-700'}>
-                        {formatAmount(tx.amount)}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{tx.membershipId || '-'}</TableCell>
-                      <TableCell className="max-w-sm truncate">{tx.reason || '-'}</TableCell>
-                      <TableCell className="font-mono text-xs">{tx.actorRole}:{tx.actorId || '-'}</TableCell>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Membership</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Actor</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedTransactions.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell>{formatDate(tx.createdAt)}</TableCell>
+                        <TableCell>
+                          <Badge variant={tx.type === 'Consume' ? 'secondary' : 'default'}>{tx.type}</Badge>
+                        </TableCell>
+                        <TableCell>{tx.sourceType}</TableCell>
+                        <TableCell className={tx.amount < 0 ? 'text-red-600' : 'text-green-700'}>
+                          {formatAmount(tx.amount)}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {(() => {
+                            if (!tx.membershipId) return '-'
+                            const planName = membershipNameById.get(tx.membershipId)
+                            if (planName) return planName
+                            return tx.membershipId.slice(-6)
+                          })()}
+                        </TableCell>
+                        <TableCell className="max-w-sm truncate">{formatReason(tx.reason)}</TableCell>
+                        <TableCell className="text-sm">
+                          {(() => {
+                            if (!tx.actorId) return '-'
+                            const actorName = userNameById.get(tx.actorId)
+                            const roleLabel = tx.actorRole ? tx.actorRole.toLowerCase() : ''
+                            if (actorName) return `${roleLabel}: ${actorName}`
+                            return `${roleLabel}: ${tx.actorId.slice(-6)}`
+                          })()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 mt-2 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, transactions.length)} of {transactions.length} transactions
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={activePage === 1}
+                    >
+                      Previous
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={activePage === page ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-9 h-9 p-0 font-medium"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={activePage === totalPages}
+                    >
+                      Next page
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

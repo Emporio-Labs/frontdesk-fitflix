@@ -17,6 +17,11 @@ export interface Invoice {
     name: string
     email: string
   }
+  lead?: {
+    id: string
+    name: string
+    email: string
+  }
   leadId?: string
   items: InvoiceItem[]
   subtotal: number
@@ -52,15 +57,27 @@ export interface UpdateInvoiceStatusPayload {
 
 function normalizeInvoice(raw: any): Invoice {
   const userRef = raw?.userId ?? {}
+  const leadRef = raw?.leadId ?? {}
   return {
     id: String(raw?._id || raw?.id || ''),
     invoiceNumber: String(raw?.invoiceNumber || ''),
     userId: {
       id: String(userRef?._id || userRef?.id || ''),
-      name: String(userRef?.name || ''),
+      name: String(userRef?.username || userRef?.name || ''),
       email: String(userRef?.email || ''),
     },
-    leadId: raw?.leadId ? String(raw.leadId) : undefined,
+    lead: (leadRef?._id || leadRef?.id)
+      ? {
+          id: String(leadRef?._id || leadRef?.id || ''),
+          name: String(leadRef?.leadName || leadRef?.name || ''),
+          email: String(leadRef?.email || ''),
+        }
+      : undefined,
+    leadId: (leadRef?._id || leadRef?.id)
+      ? String(leadRef?._id || leadRef?.id)
+      : raw?.leadId
+      ? String(raw.leadId)
+      : undefined,
     items: Array.isArray(raw?.items)
       ? raw.items.map((item: any) => ({
           name: String(item?.name || ''),

@@ -128,6 +128,8 @@ export default function BookingsPage() {
     serviceId: '',
     bypassCredits: false,
   }))
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 12
 
   const { data: bookings = [], isLoading, isError, refetch } = useBookings()
   const { data: slots = [] } = useSlots()
@@ -308,8 +310,8 @@ export default function BookingsPage() {
             'Unknown Service',
         }))
         .sort((a, b) => {
-          const aTime = new Date(a.bookingDate || a.createdAt).getTime()
-          const bTime = new Date(b.bookingDate || b.createdAt).getTime()
+          const aTime = new Date(a.createdAt || a.bookingDate).getTime()
+          const bTime = new Date(b.createdAt || b.bookingDate).getTime()
           return bTime - aTime
         }),
     [bookings, userNameById, itemNameById]
@@ -328,13 +330,18 @@ export default function BookingsPage() {
     [enrichedBookings, searchTerm]
   )
 
+  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+  const activePage = Math.max(1, Math.min(currentPage, totalPages || 1))
+  const startIndex = (activePage - 1) * itemsPerPage
+  const paginatedBookings = filtered.slice(startIndex, startIndex + itemsPerPage)
+
   const todayDateKey = getTodayDateKey()
 
   const todaysUpcomingBookings = useMemo(
     () =>
       enrichedBookings
         .filter((booking) => toUtcDateKey(booking.bookingDate) === todayDateKey)
-        .filter((booking) => booking.status === 0 || booking.status === 1)
+        .filter((booking) => Number(booking.status) === 0 || Number(booking.status) === 1)
         .sort((a, b) => {
           const aStart =
             a.slot?.startTime ?? slotById.get(a.slot?._id ?? '')?.startTime ?? '99:99'
@@ -461,134 +468,144 @@ export default function BookingsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
+      <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)_340px] items-start w-full">
         <Card>
           <CardHeader>
             <CardTitle>Date-First Panel</CardTitle>
             <CardDescription>Set the day, member, and item before selecting a slot</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Booking Day</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal h-9 bg-background focus:ring-1 border-input",
-                      !formData.bookingDate && "text-muted-foreground"
-                    )}
-                  >
-                    <IconCalendar className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
-                    {formData.bookingDate ? (
-                      formatDateKey(formData.bookingDate)
-                    ) : (
-                      <span className="text-muted-foreground">Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Member (required first)</label>
-              <Select
-                value={formData.userId || '__none__'}
-                onValueChange={(value) => {
-                  const nextUserId = value === '__none__' ? '' : value
-                  setFormData((prev) => ({
-                    ...prev,
-                    userId: nextUserId,
-                    serviceId: '',
-                    slotId: '',
-                    bypassCredits: false,
-                  }))
-                  setTopUpMembershipId('')
-                  setShowTopUp(false)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select member" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Select member</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user._id} value={user._id}>
-                      {user.username} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Item Mode</label>
-              <Select
-                value={mode}
-                onValueChange={(value) => {
-                  setMode(value as BookableMode)
-                  setFormData((prev) => ({ ...prev, serviceId: '', slotId: '' }))
-                }}
-                disabled={!formData.userId}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Services + Therapies</SelectItem>
-                  <SelectItem value="services">Services only</SelectItem>
-                  <SelectItem value="therapies">Therapies only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Bookable Item</label>
-              <Select
-                value={formData.serviceId || '__none__'}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    serviceId: value === '__none__' ? '' : value,
-                    slotId: '',
-                  }))
-                }
-                disabled={!formData.userId || visibleBookableItems.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select service or therapy" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Select item</SelectItem>
-                  {visibleBookableItems.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name} ({item.creditCost} credit{item.creditCost === 1 ? '' : 's'})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center justify-between rounded-md border p-3">
-              <div>
-                <p className="text-sm font-medium">Show Full Slots</p>
-                <p className="text-xs text-muted-foreground">Useful for availability auditing</p>
+            <div className="grid grid-cols-2 border border-border rounded-lg overflow-hidden bg-background shadow-sm">
+              <div className="p-3 space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Booking Day</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        "w-full justify-start text-left font-normal h-8 bg-transparent border-0 shadow-none p-0 text-xs hover:bg-transparent focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none",
+                        !formData.bookingDate && "text-muted-foreground"
+                      )}
+                    >
+                      <IconCalendar className="mr-1.5 h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      {formData.bookingDate ? (
+                        formatDateKey(formData.bookingDate)
+                      ) : (
+                        <span className="text-muted-foreground">Pick date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={handleDateSelect}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
-              <Switch checked={showFullSlots} onCheckedChange={setShowFullSlots} />
+
+              <div className="p-3 border-l border-border space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Member</label>
+                <Select
+                  value={formData.userId || '__none__'}
+                  onValueChange={(value) => {
+                    const nextUserId = value === '__none__' ? '' : value
+                    setFormData((prev) => ({
+                      ...prev,
+                      userId: nextUserId,
+                      serviceId: '',
+                      slotId: '',
+                      bypassCredits: false,
+                    }))
+                    setTopUpMembershipId('')
+                    setShowTopUp(false)
+                  }}
+                >
+                  <SelectTrigger className="h-8 pl-0 pr-6 text-xs border-0 shadow-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none bg-transparent hover:bg-transparent [&>span]:truncate w-full">
+                    <SelectValue placeholder="Select member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Select member</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user._id} value={user._id}>
+                        {user.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="rounded-md border p-3 text-xs text-muted-foreground space-y-1">
-              <p>Day: {formatDateKey(formData.bookingDate)}</p>
-              <p>Matched windows: {matchedSlots.length}</p>
-              <p>Available now: {availableSlots.length}</p>
+            <div className="grid grid-cols-2 border border-border rounded-lg overflow-hidden bg-background shadow-sm">
+              <div className="p-3 space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Item Mode</label>
+                <Select
+                  value={mode}
+                  onValueChange={(value) => {
+                    setMode(value as BookableMode)
+                    setFormData((prev) => ({ ...prev, serviceId: '', slotId: '' }))
+                  }}
+                  disabled={!formData.userId}
+                >
+                  <SelectTrigger className="h-8 pl-0 pr-6 text-xs border-0 shadow-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none bg-transparent hover:bg-transparent [&>span]:truncate w-full disabled:opacity-50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="services">Services</SelectItem>
+                    <SelectItem value="therapies">Therapies</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="p-3 border-l border-border space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Bookable Item</label>
+                <Select
+                  value={formData.serviceId || '__none__'}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      serviceId: value === '__none__' ? '' : value,
+                      slotId: '',
+                    }))
+                  }
+                  disabled={!formData.userId || visibleBookableItems.length === 0}
+                >
+                  <SelectTrigger className="h-8 pl-0 pr-6 text-xs border-0 shadow-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none bg-transparent hover:bg-transparent [&>span]:truncate w-full disabled:opacity-50">
+                    <SelectValue placeholder="Select item" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Select item</SelectItem>
+                    {visibleBookableItems.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} ({item.creditCost} cr)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border p-2 px-3 text-xs bg-muted/5">
+              <span className="font-semibold text-muted-foreground">Show Full Slots</span>
+              <Switch checked={showFullSlots} onCheckedChange={setShowFullSlots} className="scale-90" />
+            </div>
+
+            <div className="rounded-md border p-2.5 px-3 text-xs text-muted-foreground space-y-1 bg-muted/10">
+              <div className="flex justify-between border-b pb-1 last:border-0 last:pb-0">
+                <span>Day</span>
+                <span className="font-medium text-foreground">{formatDateKey(formData.bookingDate)}</span>
+              </div>
+              <div className="flex justify-between border-b pb-1 last:border-0 last:pb-0">
+                <span>Matched Windows</span>
+                <span className="font-medium text-foreground">{matchedSlots.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Available Now</span>
+                <span className="font-medium text-foreground">{availableSlots.length}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -618,7 +635,7 @@ export default function BookingsPage() {
                 No slot windows match this date and item. Adjust date, item, or enable full-slot view.
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
                 {displayedSlots.map((slot) => {
                   const isSelected = formData.slotId === slot._id
                   const isFull = slot.remainingCapacity <= 0
@@ -630,27 +647,27 @@ export default function BookingsPage() {
                       disabled={isFull}
                       onClick={() => setFormData((prev) => ({ ...prev, slotId: slot._id }))}
                       className={cn(
-                        'rounded-lg border p-3 text-left transition-colors',
+                        'rounded-lg border p-3 text-left transition-colors w-full',
                         isSelected && 'border-primary bg-primary/5',
                         isFull && 'cursor-not-allowed border-muted bg-muted/40 opacity-70',
                         !isSelected && !isFull && 'hover:border-primary/40 hover:bg-accent/40'
                       )}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-medium text-sm">{slot.startTime} to {slot.endTime}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {slot.isDaily || !slot.date
-                              ? 'Daily template window'
-                                : `Dated window: ${formatDateForDisplay(slot.date)}`}
-                          </p>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-3 w-full">
+                          <span className="font-semibold text-sm whitespace-nowrap">{slot.startTime} to {slot.endTime}</span>
+                          <Badge variant={isFull ? 'secondary' : 'default'} className="text-[10px] h-5 px-1.5 shrink-0">
+                            {slot.remainingCapacity}/{slot.capacity}
+                          </Badge>
                         </div>
-                        <Badge variant={isFull ? 'secondary' : 'default'}>
-                          {slot.remainingCapacity}/{slot.capacity}
-                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {slot.isDaily || !slot.date
+                            ? 'Daily template window'
+                              : `Dated window: ${formatDateForDisplay(slot.date)}`}
+                        </p>
                       </div>
                       {slot.parentTemplate ? (
-                        <p className="text-[11px] text-muted-foreground mt-2">Template-linked inventory slot</p>
+                        <p className="text-[11px] text-muted-foreground mt-1.5">Template-linked inventory slot</p>
                       ) : null}
                     </button>
                   )
@@ -666,36 +683,31 @@ export default function BookingsPage() {
             <CardDescription>Review balance impact before confirming the spot booking</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-md border p-3 space-y-1">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Member</p>
-              <p className="text-sm font-medium">
-                {selectedUser ? `${selectedUser.username} (${selectedUser.email})` : 'No member selected'}
-              </p>
+            <div className="rounded-md border p-2.5 space-y-2 bg-muted/20 text-xs">
+              <div className="flex justify-between items-start gap-2 border-b pb-1.5 last:border-b-0 last:pb-0">
+                <span className="text-muted-foreground font-medium shrink-0">Member</span>
+                <span className="font-semibold text-right truncate">
+                  {selectedUser ? `${selectedUser.username}` : 'None selected'}
+                </span>
+              </div>
+              <div className="flex justify-between items-start gap-2 border-b pb-1.5 last:border-b-0 last:pb-0">
+                <span className="text-muted-foreground font-medium shrink-0">Item</span>
+                <span className="font-semibold text-right truncate">
+                  {selectedItem ? `${selectedItem.name} (${selectedItem.time}m)` : 'None selected'}
+                </span>
+              </div>
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-muted-foreground font-medium shrink-0">Slot</span>
+                <span className="font-semibold text-right truncate" title={selectedSlot ? formatSlotWindowLabel(selectedSlot) : undefined}>
+                  {selectedSlot ? `${selectedSlot.startTime} - ${selectedSlot.endTime}` : 'None selected'}
+                </span>
+              </div>
             </div>
 
-            <div className="rounded-md border p-3 space-y-1">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Selected Item</p>
-              <p className="text-sm font-medium">
-                {selectedItem
-                  ? `${selectedItem.name} (${selectedItem.kind === 'therapy' ? 'Therapy' : 'Service'})`
-                  : 'No item selected'}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {selectedItem ? `${selectedItem.time} mins` : 'Select an item to calculate credit impact'}
-              </p>
-            </div>
-
-            <div className="rounded-md border p-3 space-y-1">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Selected Slot</p>
-              <p className="text-sm font-medium">
-                {selectedSlot ? formatSlotWindowLabel(selectedSlot) : 'No slot selected'}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-md border p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Current Credits</p>
-                <p className="text-lg font-semibold">
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="rounded-md border p-2 text-center bg-muted/10">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Current</p>
+                <p className="text-sm font-semibold mt-0.5">
                   {formData.userId
                     ? isUserBalanceLoading || isUserBalanceFetching
                       ? '...'
@@ -705,17 +717,16 @@ export default function BookingsPage() {
                     : '-'}
                 </p>
               </div>
-              <div className="rounded-md border p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estimated Deduction</p>
-                <p className="text-lg font-semibold">{estimatedCredits || '-'}</p>
+              <div className="rounded-md border p-2 text-center bg-muted/10">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Deduct</p>
+                <p className="text-sm font-semibold mt-0.5">{estimatedCredits || '-'}</p>
               </div>
-            </div>
-
-            <div className="rounded-md border p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Projected Remaining</p>
-              <p className="text-lg font-semibold">
-                {projectedCredits === null ? '-' : projectedCredits}
-              </p>
+              <div className="rounded-md border p-2 text-center bg-primary/5 border-primary/20">
+                <p className="text-[10px] uppercase tracking-wide text-primary">Projected</p>
+                <p className="text-sm font-semibold mt-0.5 text-primary">
+                  {projectedCredits === null ? '-' : projectedCredits}
+                </p>
+              </div>
             </div>
 
             {isLowCredit ? (
@@ -797,14 +808,12 @@ export default function BookingsPage() {
               </div>
             ) : null}
 
-            <div className="flex items-center justify-between rounded-md border p-3">
-              <div>
-                <p className="text-sm font-medium">Bypass Credits</p>
-                <p className="text-xs text-muted-foreground">Admin-only override for approved cases</p>
-              </div>
+            <div className="flex items-center justify-between rounded-md border p-2 px-3 text-xs">
+              <span className="font-medium text-muted-foreground">Bypass Credits Override</span>
               <Switch
                 checked={formData.bypassCredits}
                 onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, bypassCredits: checked }))}
+                className="scale-90"
               />
             </div>
 
@@ -812,23 +821,14 @@ export default function BookingsPage() {
               {createBooking.isPending ? 'Booking spot...' : 'Create Spot Booking'}
             </Button>
 
-            <p className="text-xs text-muted-foreground">
-              If the last seat is taken during submit, the API returns conflict and slot availability refreshes automatically.
+            <p className="text-[10px] text-muted-foreground text-center leading-tight">
+              If the last seat is taken during submit, slot availability refreshes automatically.
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <Input
-            placeholder="Search by booking ID, user name, or service..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-sm"
-          />
-        </CardHeader>
-      </Card>
+
 
       <Card>
         <CardHeader>
@@ -887,9 +887,20 @@ export default function BookingsPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Bookings</CardTitle>
-          <CardDescription>{isLoading ? 'Loading...' : `${filtered.length} bookings (newest first)`}</CardDescription>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <CardTitle>All Bookings</CardTitle>
+            <CardDescription>{isLoading ? 'Loading...' : `${filtered.length} bookings (newest first)`}</CardDescription>
+          </div>
+          <Input
+            placeholder="Search by booking ID, user name, or service..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setCurrentPage(1)
+            }}
+            className="max-w-sm"
+          />
         </CardHeader>
         <CardContent>
           {isError && (
@@ -902,85 +913,125 @@ export default function BookingsPage() {
               {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Booking ID</TableHead>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Credits</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Change Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.length === 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                        No bookings found
-                      </TableCell>
+                      <TableHead>Booking ID</TableHead>
+                      <TableHead>Member</TableHead>
+                      <TableHead>Service</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Credits</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Change Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ) : (
-                    filtered.map((booking) => (
-                      <TableRow key={booking._id}>
-                        <TableCell className="font-mono text-xs">{booking._id.slice(-6)}</TableCell>
-                        <TableCell className="font-medium text-sm">{booking.userName}</TableCell>
-                        <TableCell className="text-sm">{booking.serviceName}</TableCell>
-                        <TableCell>{formatDateForDisplay(booking.bookingDate)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs">
-                              {typeof booking.creditCostSnapshot === 'number'
-                                ? `${booking.creditCostSnapshot} cr`
-                                : '-'}
-                            </span>
-                            {booking.creditsBypassed ? (
-                              <Badge variant="outline" className="text-[10px]">
-                                Bypassed
-                              </Badge>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={STATUS_COLORS[booking.status as number] || 'bg-gray-100 text-gray-800'}>
-                            {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS] ?? booking.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Select onValueChange={(v) => handleStatusChange(booking._id, v)}>
-                            <SelectTrigger className="w-36 h-8 text-xs">
-                              <SelectValue placeholder="Change status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(BOOKING_STATUS).map(([key, label]) => (
-                                <SelectItem key={key} value={key}>{label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-right py-2 pr-6">
-                          <div className="flex justify-end items-center gap-1.5">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                              onClick={() => { if (confirm('Delete booking?')) deleteBooking.mutate(booking._id) }}
-                              disabled={deleteBooking.isPending}
-                              title="Delete Booking"
-                            >
-                              <IconTrash className="w-4 h-4" />
-                            </Button>
-                          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedBookings.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                          No bookings found
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    ) : (
+                      paginatedBookings.map((booking) => (
+                        <TableRow key={booking._id}>
+                          <TableCell className="font-mono text-xs">{booking._id.slice(-6)}</TableCell>
+                          <TableCell className="font-medium text-sm">{booking.userName}</TableCell>
+                          <TableCell className="text-sm">{booking.serviceName}</TableCell>
+                          <TableCell>{formatDateForDisplay(booking.bookingDate)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs">
+                                {typeof booking.creditCostSnapshot === 'number'
+                                  ? `${booking.creditCostSnapshot} cr`
+                                  : '-'}
+                              </span>
+                              {booking.creditsBypassed ? (
+                                <Badge variant="outline" className="text-[10px]">
+                                  Bypassed
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={STATUS_COLORS[booking.status as number] || 'bg-gray-100 text-gray-800'}>
+                              {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS] ?? booking.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Select onValueChange={(v) => handleStatusChange(booking._id, v)}>
+                              <SelectTrigger className="w-36 h-8 text-xs">
+                                <SelectValue placeholder="Change status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(BOOKING_STATUS).map(([key, label]) => (
+                                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right py-2 pr-6">
+                            <div className="flex justify-end items-center gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                onClick={() => { if (confirm('Delete booking?')) deleteBooking.mutate(booking._id) }}
+                                disabled={deleteBooking.isPending}
+                                title="Delete Booking"
+                              >
+                                <IconTrash className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 mt-2 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filtered.length)} of {filtered.length} bookings
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={activePage === 1}
+                    >
+                      Previous
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={activePage === page ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-9 h-9 p-0 font-medium"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={activePage === totalPages}
+                    >
+                      Next page
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

@@ -70,6 +70,13 @@ function defaultFormState(): FormState {
   }
 }
 
+function formatPrice(amount: number | string, currency?: string) {
+  const parsed = Number(amount || 0)
+  const isUSD = currency?.toUpperCase() === 'USD'
+  const symbol = isUSD ? '$' : '₹'
+  return `${symbol}${parsed.toFixed(2)}`
+}
+
 export default function MembershipPlansPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -466,7 +473,7 @@ export default function MembershipPlansPage() {
                     <Badge variant={form.status === 'Active' ? 'default' : 'secondary'}>{form.status}</Badge>
                   </div>
                   <p className="text-2xl font-bold">
-                    {form.currency.toUpperCase()} {Number(form.totalPrice || 0).toFixed(2)}
+                    {formatPrice(form.totalPrice, form.currency)}
                   </p>
                   <p className="text-sm text-muted-foreground">{form.durationMonths} month plan</p>
                   <ul className="list-disc space-y-1 pl-4 text-sm">
@@ -517,7 +524,7 @@ export default function MembershipPlansPage() {
                       </Badge>
                     </div>
                     <p className="text-2xl font-bold">
-                      {viewingPlan.currency.toUpperCase()} {Number(viewingPlan.totalPrice || 0).toFixed(2)}
+                      {formatPrice(viewingPlan.totalPrice, viewingPlan.currency)}
                     </p>
                     <p className="text-sm text-muted-foreground">{viewingPlan.durationMonths} month plan</p>
                     <ul className="list-disc space-y-1 pl-4 text-sm">
@@ -593,7 +600,7 @@ export default function MembershipPlansPage() {
                         <TableCell>{plan.planName}</TableCell>
                         <TableCell>{plan.durationMonths} months</TableCell>
                         <TableCell>
-                          {plan.currency} {plan.totalPrice.toFixed(2)}
+                          {formatPrice(plan.totalPrice, plan.currency)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">

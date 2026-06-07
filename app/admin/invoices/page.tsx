@@ -47,10 +47,15 @@ export default function InvoicesPage() {
     const q = search.toLowerCase()
     if (!q) return invoices
     return invoices.filter(
-      (inv) =>
-        inv.invoiceNumber.toLowerCase().includes(q) ||
-        inv.userId?.name?.toLowerCase().includes(q) ||
-        inv.userId?.email?.toLowerCase().includes(q)
+      (inv) => {
+        const memberName = inv.userId?.name || inv.lead?.name || ''
+        const memberEmail = inv.userId?.email || inv.lead?.email || ''
+        return (
+          inv.invoiceNumber.toLowerCase().includes(q) ||
+          memberName.toLowerCase().includes(q) ||
+          memberEmail.toLowerCase().includes(q)
+        )
+      }
     )
   }, [invoices, search])
 
@@ -169,8 +174,22 @@ export default function InvoicesPage() {
                         {invoice.invoiceNumber}
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm font-medium">{invoice.userId?.name ?? '—'}</div>
-                        <div className="text-xs text-muted-foreground">{invoice.userId?.email ?? ''}</div>
+                        {(() => {
+                          const name = invoice.userId?.name || invoice.lead?.name
+                          const email = invoice.userId?.email || invoice.lead?.email
+                          const isLead = !invoice.userId?.name && !!invoice.lead?.name
+                          return (
+                            <>
+                              <div className="text-sm font-medium flex items-center gap-1">
+                                {name || '—'}
+                                {isLead && (
+                                  <span className="text-xs text-muted-foreground">(Lead)</span>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground">{email ?? ''}</div>
+                            </>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell className="font-semibold">{formatINR(invoice.total)}</TableCell>
                       <TableCell>

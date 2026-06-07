@@ -36,7 +36,11 @@ export default function KanbanColumn({
         <CardTitle className={`text-base ${headerColor}`}>{title}</CardTitle>
         <CardDescription>{count} leads</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3 min-h-[400px]">{children}</CardContent>
+      <CardContent className="min-h-[400px]">
+        <div className="space-y-3 max-h-[470px] overflow-y-auto pr-1">
+          {children}
+        </div>
+      </CardContent>
     </Card>
   )
 }

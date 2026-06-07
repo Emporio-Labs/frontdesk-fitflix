@@ -14,6 +14,11 @@ import {
 } from '@/components/ui/dialog'
 import { IconPlus, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { useSlots, useCreateSlot, useDeleteSlot } from '@/hooks/use-slots'
+import { useServices } from '@/hooks/use-services'
+import { useTherapies } from '@/hooks/use-therapies'
+import { useBookings } from '@/hooks/use-bookings'
+import { toUtcDateKey } from '@/lib/utils'
+import { getUserDisplayName } from '@/lib/populated'
 import { toast } from 'sonner'
 
 function timeToMinutes(value: string): number | null {
@@ -48,10 +53,53 @@ function formatSlotSchedule(date?: string, isDaily?: boolean) {
 export default function SlotsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [formData, setFormData] = useState({ startTime: '', endTime: '', capacity: 1 })
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 12
 
   const { data: slots = [], isLoading, isError, refetch } = useSlots()
+  const { data: services = [] } = useServices()
+  const { data: therapies = [] } = useTherapies()
+  const { data: bookings = [] } = useBookings()
   const createSlot = useCreateSlot()
   const deleteSlot = useDeleteSlot()
+
+  const totalPages = Math.ceil(slots.length / itemsPerPage)
+  const activePage = Math.max(1, Math.min(currentPage, totalPages || 1))
+  const startIndex = (activePage - 1) * itemsPerPage
+  const paginatedSlots = slots.slice(startIndex, startIndex + itemsPerPage)
+
+  const getLinkedItems = (slotId: string) => {
+    const linked: string[] = []
+    services.forEach((service) => {
+      if (service.slots.includes(slotId)) {
+        linked.push(`${service.name} (Service)`)
+      }
+    })
+    therapies.forEach((therapy) => {
+      if (therapy.slots.includes(slotId)) {
+        linked.push(`${therapy.name} (Therapy)`)
+      }
+    })
+    return linked
+  }
+
+  const getSlotBookings = (slotId: string, slotDate?: string, isDaily?: boolean) => {
+    const now = new Date()
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+    const todayDateKey = local.toISOString().slice(0, 10)
+
+    const targetDateKey = isDaily || !slotDate ? todayDateKey : toUtcDateKey(slotDate)
+    return bookings.filter((booking) => {
+      const bookingSlotId = booking.slot?._id ?? booking.slot
+      const bookingDateKey = toUtcDateKey(booking.bookingDate)
+      const isSameSlot = bookingSlotId === slotId
+      const isSameDate = bookingDateKey === targetDateKey
+      const isActiveStatus =
+        Number(booking.status) === 0 || Number(booking.status) === 1 || Number(booking.status) === 3
+
+      return isSameSlot && isSameDate && isActiveStatus
+    })
+  }
 
   const handleCreate = async () => {
     if (!formData.startTime || !formData.endTime) {
@@ -146,49 +194,125 @@ export default function SlotsPage() {
           {isLoading ? (
             <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Schedule</TableHead>
-                    <TableHead>Start Time</TableHead>
-                    <TableHead>End Time</TableHead>
-                    <TableHead>Capacity</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {slots.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No slots found. Create your first slot.</TableCell></TableRow>
-                  ) : (
-                    slots.map((slot) => (
-                      <TableRow key={slot._id}>
-                        <TableCell>{formatSlotSchedule(slot.date, slot.isDaily)}</TableCell>
-                        <TableCell>{slot.startTime}</TableCell>
-                        <TableCell>{slot.endTime}</TableCell>
-                        <TableCell>
-                          {slot.remainingCapacity} / {slot.capacity}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={slot.remainingCapacity <= 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
-                            {slot.remainingCapacity <= 0 ? 'Full' : 'Open'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm" variant="outline" className="text-red-600"
-                            onClick={() => deleteSlot.mutate(slot._id)} disabled={deleteSlot.isPending}
-                          >
-                            <IconTrash className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Schedule</TableHead>
+                      <TableHead>Start Time</TableHead>
+                      <TableHead>End Time</TableHead>
+                      <TableHead>Capacity</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Linked Services / Therapies</TableHead>
+                      <TableHead>Today's Bookings</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {slots.length === 0 ? (
+                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No slots found. Create your first slot.</TableCell></TableRow>
+                    ) : (
+                      paginatedSlots.map((slot) => {
+                        const linkedItems = getLinkedItems(slot._id)
+                        const slotBookings = getSlotBookings(slot._id, slot.date ?? undefined, slot.isDaily)
+                        return (
+                          <TableRow key={slot._id}>
+                            <TableCell>{formatSlotSchedule(slot.date, slot.isDaily)}</TableCell>
+                            <TableCell>{slot.startTime}</TableCell>
+                            <TableCell>{slot.endTime}</TableCell>
+                            <TableCell>
+                              {slot.remainingCapacity} / {slot.capacity}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={slot.remainingCapacity <= 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
+                                {slot.remainingCapacity <= 0 ? 'Full' : 'Open'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {linkedItems.length === 0 ? (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              ) : (
+                                <div className="flex flex-wrap gap-1">
+                                  {linkedItems.map((name) => (
+                                    <Badge
+                                      key={name}
+                                      variant="outline"
+                                      className="text-xs whitespace-nowrap"
+                                    >
+                                      {name}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {slotBookings.length === 0 ? (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              ) : (
+                                <div className="flex flex-col gap-0.5">
+                                  {slotBookings.map((booking) => (
+                                    <span key={booking._id} className="text-xs font-medium">
+                                      {getUserDisplayName(booking.user)}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm" variant="outline" className="text-red-600"
+                                onClick={() => deleteSlot.mutate(slot._id)} disabled={deleteSlot.isPending}
+                              >
+                                <IconTrash className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 mt-2 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, slots.length)} of {slots.length} slots
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={activePage === 1}
+                    >
+                      Previous
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={activePage === page ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-9 h-9 p-0 font-medium"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={activePage === totalPages}
+                    >
+                      Next page
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

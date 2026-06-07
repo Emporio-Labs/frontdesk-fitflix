@@ -97,8 +97,22 @@ export function InvoiceDetailDrawer({ invoice, open, onOpenChange }: Props) {
             {/* Member */}
             <div className="rounded-lg border bg-muted/40 p-4 space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Member</p>
-              <p className="text-sm font-semibold">{displayInvoice.userId?.name ?? '—'}</p>
-              <p className="text-xs text-muted-foreground">{displayInvoice.userId?.email ?? '—'}</p>
+              {(() => {
+                const name = displayInvoice.userId?.name || displayInvoice.lead?.name
+                const email = displayInvoice.userId?.email || displayInvoice.lead?.email
+                const isLead = !displayInvoice.userId?.name && !!displayInvoice.lead?.name
+                return (
+                  <>
+                    <p className="text-sm font-semibold flex items-center gap-2">
+                      {name || '—'}
+                      {isLead && (
+                        <span className="text-xs font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Lead</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{email || '—'}</p>
+                  </>
+                )
+              })()}
             </div>
 
             {/* Payment Method */}

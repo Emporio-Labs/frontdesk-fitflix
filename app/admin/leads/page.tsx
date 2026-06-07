@@ -1021,7 +1021,7 @@ export default function LeadsPage() {
                 <p className="pb-4 text-sm text-red-600">Failed to load leads from API. Check auth credentials and backend status.</p>
               )}
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="min-w-[1800px] whitespace-nowrap">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>

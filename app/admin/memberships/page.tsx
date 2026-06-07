@@ -49,6 +49,13 @@ function formatDateOnly(value?: string) {
   return parsed.toISOString().slice(0, 10)
 }
 
+function formatPrice(amount: number | string, currency?: string) {
+  const parsed = Number(amount || 0)
+  const isUSD = currency?.toUpperCase() === 'USD'
+  const symbol = isUSD ? '$' : '₹'
+  return `${symbol}${parsed.toFixed(2)}`
+}
+
 function MembershipsPageContent() {
   const searchParams = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
@@ -66,6 +73,8 @@ function MembershipsPageContent() {
     endDate: '',
     notes: '',
   })
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 12
 
   const { data: memberships = [], isLoading, isError, refetch } = useMemberships()
   const { data: users = [] } = useUsers()
@@ -240,6 +249,11 @@ function MembershipsPageContent() {
       return startB - startA
     })
   }, [filteredMemberships])
+
+  const totalPages = Math.ceil(sortedMemberships.length / itemsPerPage)
+  const activePage = Math.max(1, Math.min(currentPage, totalPages || 1))
+  const startIndex = (activePage - 1) * itemsPerPage
+  const paginatedMemberships = sortedMemberships.slice(startIndex, startIndex + itemsPerPage)
 
   const handleSaveMembership = async () => {
     if (!formData.userId.trim() || !formData.startDate || !formData.endDate) {
@@ -423,7 +437,7 @@ function MembershipsPageContent() {
                     <p className="font-medium">Selected Plan Details</p>
                     {selectedPlan ? (
                       <div className="mt-1 space-y-1 text-muted-foreground">
-                        <p>Original Price: {selectedPlan.currency} {selectedPlanBasePrice.toFixed(2)}</p>
+                        <p>Original Price: {formatPrice(selectedPlanBasePrice, selectedPlan.currency)}</p>
                         <p>Credits: {selectedPlanCredits}</p>
                         <p>Features: {selectedPlan.features.join(', ') || '-'}</p>
                       </div>
@@ -465,7 +479,7 @@ function MembershipsPageContent() {
                   <div className="rounded-md border p-3 text-sm text-muted-foreground">
                     {selectedPlan ? (
                       <>
-                        <p>Final Price: {selectedPlan.currency} {discountedPrice.toFixed(2)}</p>
+                        <p>Final Price: {formatPrice(discountedPrice, selectedPlan.currency)}</p>
                         <p>Applied Discount: {normalizedDiscountPercent}%</p>
                         <p>Credits: {selectedPlanCredits}</p>
                       </>
@@ -563,7 +577,10 @@ function MembershipsPageContent() {
           <Input
             placeholder="Search memberships..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setCurrentPage(1)
+            }}
             className="max-w-sm"
           />
         </CardHeader>
@@ -590,79 +607,119 @@ function MembershipsPageContent() {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Plan Name</TableHead>
-                    <TableHead>Credits Included</TableHead>
-                    <TableHead>Credits Remaining</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Currency</TableHead>
-                    <TableHead>Start Date</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedMemberships.length === 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                        No memberships found
-                      </TableCell>
+                      <TableHead>Username</TableHead>
+                      <TableHead>Plan Name</TableHead>
+                      <TableHead>Credits Included</TableHead>
+                      <TableHead>Credits Remaining</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Currency</TableHead>
+                      <TableHead>Start Date</TableHead>
+                      <TableHead>End Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ) : (
-                    sortedMemberships.map((membership) => (
-                      <TableRow key={membership.id}>
-                        <TableCell className="font-medium">{getMembershipUsername(membership)}</TableCell>
-                        <TableCell>{membership.planName}</TableCell>
-                        <TableCell>{membership.creditsIncluded}</TableCell>
-                        <TableCell>{membership.creditsRemaining}</TableCell>
-                        <TableCell>${membership.price.toFixed(2)}</TableCell>
-                        <TableCell>{membership.currency}</TableCell>
-                        <TableCell>{formatDateOnly(membership.startDate)}</TableCell>
-                        <TableCell>{formatDateOnly(membership.endDate)}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(membership.status)}>{membership.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditMembership(membership)}
-                            >
-                              <IconEdit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedMembership(membership)
-                                setIsDetailsOpen(true)
-                              }}
-                            >
-                              <IconEye className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => handleDeleteMembership(membership.id)}
-                              disabled={deleteMembership.isPending}
-                            >
-                              <IconTrash className="w-4 h-4" />
-                            </Button>
-                          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedMemberships.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                          No memberships found
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    ) : (
+                      paginatedMemberships.map((membership) => (
+                        <TableRow key={membership.id}>
+                          <TableCell className="font-medium">{getMembershipUsername(membership)}</TableCell>
+                          <TableCell>{membership.planName}</TableCell>
+                          <TableCell>{membership.creditsIncluded}</TableCell>
+                          <TableCell>{membership.creditsRemaining}</TableCell>
+                          <TableCell>{formatPrice(membership.price, membership.currency)}</TableCell>
+                          <TableCell>{membership.currency}</TableCell>
+                          <TableCell>{formatDateOnly(membership.startDate)}</TableCell>
+                          <TableCell>{formatDateOnly(membership.endDate)}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(membership.status)}>{membership.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditMembership(membership)}
+                              >
+                                <IconEdit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedMembership(membership)
+                                  setIsDetailsOpen(true)
+                                }}
+                              >
+                                <IconEye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => handleDeleteMembership(membership.id)}
+                                disabled={deleteMembership.isPending}
+                              >
+                                <IconTrash className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 mt-2 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedMemberships.length)} of {sortedMemberships.length} memberships
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={activePage === 1}
+                    >
+                      Previous
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={activePage === page ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-9 h-9 p-0 font-medium"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={activePage === totalPages}
+                    >
+                      Next page
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -690,7 +747,7 @@ function MembershipsPageContent() {
                   </Badge>
                 </div>
                 <p className="text-2xl font-bold">
-                  {selectedMembership.currency.toUpperCase()} {Number(selectedMembership.price || 0).toFixed(2)}
+                  {formatPrice(selectedMembership.price, selectedMembership.currency)}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {getMembershipUsername(selectedMembership)} ({getMembershipUserEmail(selectedMembership)})
