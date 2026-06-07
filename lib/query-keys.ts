@@ -115,8 +115,8 @@ export const queryKeys = {
       detail: (id: string) => ['nutrition', 'plans', id] as const,
       mine: () => ['nutrition', 'plans', 'me'] as const,
     },
-    mealLogs: (planId: string, date?: string) =>
-      ['nutrition', 'meal-logs', planId, date ?? ''] as const,
+    mealLogs: (planId: string, date?: string, userId?: string) =>
+      ['nutrition', 'meal-logs', planId, date ?? '', userId ?? ''] as const,
     hydration: (userId: string, date?: string) =>
       ['nutrition', 'hydration', userId, date ?? ''] as const,
     adherence: (userId: string, from?: string, to?: string) =>

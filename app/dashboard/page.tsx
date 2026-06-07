@@ -12,12 +12,15 @@ import {
   IconUsers, IconStethoscope, IconRun, IconCalendarEvent,
   IconCalendarStats, IconClock, IconTrendingUp, IconRefresh,
 } from '@tabler/icons-react'
+import { useMemo } from 'react'
 import { useUsers } from '@/hooks/use-users'
 import { useBookings } from '@/hooks/use-bookings'
 import { useAppointments } from '@/hooks/use-appointments'
 import { useDoctors } from '@/hooks/use-doctors'
 import { useTrainers } from '@/hooks/use-trainers'
 import { useSlots } from '@/hooks/use-slots'
+import { useServices } from '@/hooks/use-services'
+import { useTherapies } from '@/hooks/use-therapies'
 import { BOOKING_STATUS } from '@/lib/services/booking.service'
 
 const STATUS_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6b7280']
@@ -29,14 +32,25 @@ export default function DashboardPage() {
   const { data: doctors = [], isLoading: doctorsLoading } = useDoctors()
   const { data: trainers = [], isLoading: trainersLoading } = useTrainers()
   const { data: slots = [] } = useSlots()
+  const { data: services = [] } = useServices()
+  const { data: therapies = [] } = useTherapies()
+
+  const itemNameById = useMemo(
+    () =>
+      new Map([
+        ...services.map((service) => [service.id, service.name] as const),
+        ...therapies.map((therapy) => [therapy.id, therapy.name] as const),
+      ]),
+    [services, therapies]
+  )
 
   // ── Operational computed ──────────────────────────────────────────────────────
   const bookingStatusData = Object.entries(BOOKING_STATUS).map(([key, label]) => ({
     status: label,
-    count: bookings.filter((b) => b.status === Number(key)).length,
+    count: bookings.filter((b) => Number(b.status) === Number(key)).length,
   }))
   const recentBookings = [...bookings]
-    .sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime())
+    .sort((a, b) => new Date(b.createdAt || b.bookingDate).getTime() - new Date(a.createdAt || a.bookingDate).getTime())
     .slice(0, 5)
   const recentAppointments = [...appointments]
     .sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime())
@@ -130,7 +144,9 @@ export default function DashboardPage() {
                 {recentBookings.map((b) => (
                   <div key={b._id} className="flex items-center justify-between py-2 border-b last:border-0">
                     <div>
-                      <p className="text-sm font-mono">{b._id.slice(-10)}</p>
+                      <p className="text-sm font-medium">
+                        {b.service?.serviceName || itemNameById.get(b.service?._id ?? '') || 'Unknown Service'}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(b.bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
