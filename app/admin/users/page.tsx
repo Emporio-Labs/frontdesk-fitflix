@@ -60,12 +60,15 @@ export default function UsersPage() {
     age: '', gender: 'Male', healthGoalsInput: '',
   })
   const [memberFormErrors, setMemberFormErrors] = useState<Record<string, string>>({})
+  const [memberPage, setMemberPage] = useState(1)
 
   // Admin state
   const [adminSearch, setAdminSearch] = useState('')
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false)
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null)
   const [adminForm, setAdminForm] = useState({ adminName: '', email: '', phone: '', password: '' })
+  const [adminPage, setAdminPage] = useState(1)
+  const itemsPerPage = 12
 
   const { data: users = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useUsers()
   const createUser = useCreateUser()
@@ -123,6 +126,11 @@ export default function UsersPage() {
       (u.email && u.email.toLowerCase().includes(memberSearch.toLowerCase())) ||
       (u.phone && u.phone.includes(memberSearch))
   )
+
+  const totalMemberPages = Math.ceil(filteredUsers.length / itemsPerPage)
+  const activeMemberPage = Math.max(1, Math.min(memberPage, totalMemberPages || 1))
+  const memberStartIndex = (activeMemberPage - 1) * itemsPerPage
+  const paginatedUsers = filteredUsers.slice(memberStartIndex, memberStartIndex + itemsPerPage)
 
   const resetMemberForm = () => {
     setMemberForm({ username: '', email: '', phone: '', password: '', age: '', gender: 'Male', healthGoalsInput: '' })
@@ -218,6 +226,11 @@ export default function UsersPage() {
       a.email.toLowerCase().includes(adminSearch.toLowerCase())
   )
 
+  const totalAdminPages = Math.ceil(filteredAdmins.length / itemsPerPage)
+  const activeAdminPage = Math.max(1, Math.min(adminPage, totalAdminPages || 1))
+  const adminStartIndex = (activeAdminPage - 1) * itemsPerPage
+  const paginatedAdmins = filteredAdmins.slice(adminStartIndex, adminStartIndex + itemsPerPage)
+
   const resetAdminForm = () => {
     setAdminForm({ adminName: '', email: '', phone: '', password: '' })
     setEditingAdmin(null)
@@ -271,7 +284,10 @@ export default function UsersPage() {
             <Input
               placeholder="Search by username or email..."
               value={memberSearch}
-              onChange={(e) => setMemberSearch(e.target.value)}
+              onChange={(e) => {
+                setMemberSearch(e.target.value)
+                setMemberPage(1)
+              }}
               className="max-w-sm h-9 bg-background focus-visible:ring-1"
             />
             <div className="ml-auto flex gap-2">
@@ -358,115 +374,157 @@ export default function UsersPage() {
               {usersError && <div className="text-center py-8 text-red-500">Failed to load members. Check credentials.</div>}
               {usersLoading ? (
                 <div className="p-6 space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
-              ) : (
-                <div className="overflow-x-auto w-full">
-                  <Table>
-                    <TableHeader className="bg-muted/30 border-b border-border/60">
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-[140px] pl-6 font-semibold">Username</TableHead>
-                        <TableHead className="w-[180px] font-semibold">Email</TableHead>
-                        <TableHead className="w-[60px] text-center font-semibold">Age</TableHead>
-                        <TableHead className="w-[80px] font-semibold">Gender</TableHead>
-                        <TableHead className="w-[200px] font-semibold">Health Goals</TableHead>
-                        <TableHead className="w-[110px] font-semibold">Joined</TableHead>
-                        <TableHead className="w-[125px] font-semibold">Onboarding</TableHead>
-                        <TableHead className="w-[130px] font-semibold">Membership</TableHead>
-                        <TableHead className="w-[100px] font-semibold">Plan Start</TableHead>
-                        <TableHead className="w-[100px] font-semibold">Plan Expiry</TableHead>
-                        <TableHead className="w-[150px] text-right pr-6 font-semibold">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUsers.length === 0 ? (
-                        <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
-                      ) : (
-                        filteredUsers.map((user) => (
-                          <TableRow key={user._id} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
-                            {(() => {
-                              const membership = getUserMembership(user)
-                              return (
-                                <>
-                                  <TableCell className="pl-6 font-semibold text-foreground truncate max-w-[140px]">{user.username}</TableCell>
-                                  <TableCell className="text-muted-foreground truncate max-w-[180px]" title={user.email}>{user.email}</TableCell>
-                                  <TableCell className="text-center">{user.age}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className="font-semibold px-2 py-0.5 text-xs rounded-full border-border/80 text-foreground bg-background whitespace-nowrap">{user.gender}</Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex flex-wrap gap-1 max-w-[200px]">
-                                      {user.healthGoals.slice(0, 2).map((g) => (
-                                        <Badge key={g} variant="secondary" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">{g}</Badge>
-                                      ))}
-                                      {user.healthGoals.length > 2 && (
-                                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">+{user.healthGoals.length - 2}</Badge>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground whitespace-nowrap">{formatJoinedDate(user.createdAt)}</TableCell>
-                                  <TableCell className="py-2">
-                                    <StatusBadge status={deriveOnboardingState(user)} size="sm" />
-                                  </TableCell>
-                                  <TableCell className="py-2">
-                                    {membership ? (
-                                      <Badge variant="secondary" className="font-semibold px-2.5 py-0.5 text-xs rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">{membership.planName}</Badge>
-                                    ) : (
-                                      <Badge variant="outline" className="text-muted-foreground border-dashed px-2.5 py-0.5 text-xs rounded-full bg-transparent whitespace-nowrap">Not Assigned</Badge>
+          ) : (
+            <>
+              <div className="overflow-x-auto w-full">
+                <Table>
+                  <TableHeader className="bg-muted/30 border-b border-border/60">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[140px] pl-6 font-semibold">Username</TableHead>
+                      <TableHead className="w-[180px] font-semibold">Email</TableHead>
+                      <TableHead className="w-[60px] text-center font-semibold">Age</TableHead>
+                      <TableHead className="w-[80px] font-semibold">Gender</TableHead>
+                      <TableHead className="w-[200px] font-semibold">Health Goals</TableHead>
+                      <TableHead className="w-[110px] font-semibold">Joined</TableHead>
+                      <TableHead className="w-[125px] font-semibold">Onboarding</TableHead>
+                      <TableHead className="w-[130px] font-semibold">Membership</TableHead>
+                      <TableHead className="w-[100px] font-semibold">Plan Start</TableHead>
+                      <TableHead className="w-[100px] font-semibold">Plan Expiry</TableHead>
+                      <TableHead className="w-[150px] text-right pr-6 font-semibold">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.length === 0 ? (
+                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
+                    ) : (
+                      paginatedUsers.map((user) => (
+                        <TableRow key={user._id} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
+                          {(() => {
+                            const membership = getUserMembership(user)
+                            return (
+                              <>
+                                <TableCell className="pl-6 font-semibold text-foreground truncate max-w-[140px]">{user.username}</TableCell>
+                                <TableCell className="text-muted-foreground truncate max-w-[180px]" title={user.email}>{user.email}</TableCell>
+                                <TableCell className="text-center">{user.age}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="font-semibold px-2 py-0.5 text-xs rounded-full border-border/80 text-foreground bg-background whitespace-nowrap">{user.gender}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                    {user.healthGoals.slice(0, 2).map((g) => (
+                                      <Badge key={g} variant="secondary" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">{g}</Badge>
+                                    ))}
+                                    {user.healthGoals.length > 2 && (
+                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">+{user.healthGoals.length - 2}</Badge>
                                     )}
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateOnly(membership?.startDate)}</TableCell>
-                                  <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateOnly(membership?.endDate)}</TableCell>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground whitespace-nowrap">{formatJoinedDate(user.createdAt)}</TableCell>
+                                <TableCell className="py-2">
+                                  <StatusBadge status={deriveOnboardingState(user)} size="sm" />
+                                </TableCell>
+                                <TableCell className="py-2">
+                                  {membership ? (
+                                    <Badge variant="secondary" className="font-semibold px-2.5 py-0.5 text-xs rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">{membership.planName}</Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-muted-foreground border-dashed px-2.5 py-0.5 text-xs rounded-full bg-transparent whitespace-nowrap">Not Assigned</Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateOnly(membership?.startDate)}</TableCell>
+                                <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateOnly(membership?.endDate)}</TableCell>
 
-                                  <TableCell className="text-right py-2 pr-6">
-                                    <div className="flex justify-end items-center gap-1.5">
-                                      {!membership && (
-                                        <Button asChild size="sm" className="h-8 px-2.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm">
-                                          <Link href={`/admin/memberships?assignUserId=${encodeURIComponent(user._id)}`}>
-                                            Assign Membership
-                                          </Link>
-                                        </Button>
-                                      )}
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                        onClick={() => handleOpenEditUser(user)}
-                                        title="Edit User"
-                                      >
-                                        <IconEdit className="w-4 h-4" />
+                                <TableCell className="text-right py-2 pr-6">
+                                  <div className="flex justify-end items-center gap-1.5">
+                                    {!membership && (
+                                      <Button asChild size="sm" className="h-8 px-2.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm">
+                                        <Link href={`/admin/memberships?assignUserId=${encodeURIComponent(user._id)}`}>
+                                          Assign Membership
+                                        </Link>
                                       </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                        onClick={() => { if (confirm(`Delete ${user.username}?`)) deleteUser.mutate(user._id) }}
-                                        disabled={deleteUser.isPending}
-                                        title="Delete User"
-                                      >
-                                        <IconTrash className="w-4 h-4" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </>
-                              )
-                            })()}
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                      onClick={() => handleOpenEditUser(user)}
+                                      title="Edit User"
+                                    >
+                                      <IconEdit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                      onClick={() => { if (confirm(`Delete ${user.username}?`)) deleteUser.mutate(user._id) }}
+                                      disabled={deleteUser.isPending}
+                                      title="Delete User"
+                                    >
+                                      <IconTrash className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </>
+                            )
+                          })()}
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalMemberPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 pb-4 px-6 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {memberStartIndex + 1} to {Math.min(memberStartIndex + itemsPerPage, filteredUsers.length)} of {filteredUsers.length} members
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setMemberPage((p) => Math.max(1, p - 1))}
+                      disabled={activeMemberPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    {Array.from({ length: totalMemberPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={activeMemberPage === page ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-9 h-9 p-0 font-medium"
+                        onClick={() => setMemberPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setMemberPage((p) => Math.min(totalMemberPages, p + 1))}
+                      disabled={activeMemberPage === totalMemberPages}
+                    >
+                      Next page
+                    </Button>
+                  </div>
                 </div>
               )}
+            </>
+          )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* ─── ADMINS TAB ─── */}
         <TabsContent value="admins" className="mt-4 space-y-4">
           <div className="flex items-center gap-3">
             <Input
               placeholder="Search by name or email..."
               value={adminSearch}
-              onChange={(e) => setAdminSearch(e.target.value)}
+              onChange={(e) => {
+                setAdminSearch(e.target.value)
+                setAdminPage(1)
+              }}
               className="max-w-sm h-9 bg-background focus-visible:ring-1"
             />
             <div className="ml-auto flex gap-2">
@@ -527,56 +585,96 @@ export default function UsersPage() {
               {adminsLoading ? (
                 <div className="p-6 space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
               ) : (
-                <div className="overflow-x-auto w-full">
-                  <Table>
-                    <TableHeader className="bg-muted/30 border-b border-border/60">
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-[200px] pl-6 font-semibold">Name</TableHead>
-                        <TableHead className="w-[250px] font-semibold">Email</TableHead>
-                        <TableHead className="w-[150px] font-semibold">Phone</TableHead>
-                        <TableHead className="w-[150px] font-semibold">Created</TableHead>
-                        <TableHead className="text-right pr-6 w-[120px] font-semibold">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAdmins.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No admins found</TableCell></TableRow>
-                      ) : (
-                        filteredAdmins.map((admin) => (
-                          <TableRow key={admin._id} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
-                            <TableCell className="pl-6 font-semibold text-foreground">{admin.adminName}</TableCell>
-                            <TableCell className="text-muted-foreground">{admin.email}</TableCell>
-                            <TableCell>{admin.phone}</TableCell>
-                            <TableCell className="text-muted-foreground whitespace-nowrap">{formatJoinedDate(admin.createdAt)}</TableCell>
-                            <TableCell className="text-right py-2 pr-6">
-                              <div className="flex justify-end items-center gap-1.5">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                  onClick={() => handleOpenEditAdmin(admin)}
-                                  title="Edit Admin"
-                                >
-                                  <IconEdit className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                  onClick={() => { if (confirm('Delete this admin?')) deleteAdmin.mutate(admin._id) }}
-                                  disabled={deleteAdmin.isPending}
-                                  title="Delete Admin"
-                                >
-                                  <IconTrash className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+                <>
+                  <div className="overflow-x-auto w-full">
+                    <Table>
+                      <TableHeader className="bg-muted/30 border-b border-border/60">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="w-[200px] pl-6 font-semibold">Name</TableHead>
+                          <TableHead className="w-[250px] font-semibold">Email</TableHead>
+                          <TableHead className="w-[150px] font-semibold">Phone</TableHead>
+                          <TableHead className="w-[150px] font-semibold">Created</TableHead>
+                          <TableHead className="text-right pr-6 w-[120px] font-semibold">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAdmins.length === 0 ? (
+                          <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No admins found</TableCell></TableRow>
+                        ) : (
+                          paginatedAdmins.map((admin) => (
+                            <TableRow key={admin._id} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
+                              <TableCell className="pl-6 font-semibold text-foreground">{admin.adminName}</TableCell>
+                              <TableCell className="text-muted-foreground">{admin.email}</TableCell>
+                              <TableCell>{admin.phone}</TableCell>
+                              <TableCell className="text-muted-foreground whitespace-nowrap">{formatJoinedDate(admin.createdAt)}</TableCell>
+                              <TableCell className="text-right py-2 pr-6">
+                                <div className="flex justify-end items-center gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    onClick={() => handleOpenEditAdmin(admin)}
+                                    title="Edit Admin"
+                                  >
+                                    <IconEdit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                    onClick={() => { if (confirm('Delete this admin?')) deleteAdmin.mutate(admin._id) }}
+                                    disabled={deleteAdmin.isPending}
+                                    title="Delete Admin"
+                                  >
+                                    <IconTrash className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {totalAdminPages > 1 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 pb-4 px-6 border-t">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {adminStartIndex + 1} to {Math.min(adminStartIndex + itemsPerPage, filteredAdmins.length)} of {filteredAdmins.length} admins
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 px-3"
+                          onClick={() => setAdminPage((p) => Math.max(1, p - 1))}
+                          disabled={activeAdminPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        {Array.from({ length: totalAdminPages }, (_, i) => i + 1).map((page) => (
+                          <Button
+                            key={page}
+                            variant={activeAdminPage === page ? 'default' : 'outline'}
+                            size="sm"
+                            className="w-9 h-9 p-0 font-medium"
+                            onClick={() => setAdminPage(page)}
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 px-3"
+                          onClick={() => setAdminPage((p) => Math.min(totalAdminPages, p + 1))}
+                          disabled={activeAdminPage === totalAdminPages}
+                        >
+                          Next page
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

@@ -194,6 +194,21 @@ export const userService = {
 
   getById: async (id: string): Promise<{ user: User }> => {
     const { data } = await apiClient.get(`/users/${id}`)
+    
+    if (data?.success && data?.data?.user) {
+      const normalized = normalizeUser(data.data.user)
+      if (data.data.healthMarkers) {
+        normalized.healthMarkers = data.data.healthMarkers
+      }
+      if (data.data.reports) {
+        normalized.reports = data.data.reports
+      }
+      if (data.data.onboarding) {
+        normalized.onboardingStatus = data.data.onboarding
+      }
+      return { user: normalized }
+    }
+    
     return { user: normalizeUser(data?.user ?? data?.data ?? data) }
   },
 

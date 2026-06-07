@@ -81,6 +81,7 @@ export function useCreateUser() {
       const details = data?.details
       if (details && typeof details === 'object') {
         const messages = Object.entries(details)
+          .filter(([field]) => field !== 'debug')
           .map(([field, msg]) => `${field}: ${msg}`)
           .join(', ')
         toast.error(messages || data?.error || 'Failed to create user')

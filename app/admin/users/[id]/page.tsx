@@ -82,6 +82,13 @@ function formatDateForDisplay(value?: string): string {
   return Number.isNaN(parsed.getTime()) ? value : DATE_FORMATTER.format(parsed)
 }
 
+function formatPrice(amount: number | string, currency?: string) {
+  const parsed = Number(amount || 0)
+  const isUSD = currency?.toUpperCase() === 'USD'
+  const symbol = isUSD ? '$' : '₹'
+  return `${symbol}${parsed.toFixed(2)}`
+}
+
 function isUpcoming(dateStr: string): boolean {
   if (!dateStr) return false
   const parsed = new Date(dateStr)
@@ -284,11 +291,11 @@ export default function UserDetailPage() {
   )
 
   const upcomingBookings = useMemo(
-    () => userBookings.filter((b) => isUpcoming(b.bookingDate) && b.status !== 2),
+    () => userBookings.filter((b) => isUpcoming(b.bookingDate) && Number(b.status) !== 2),
     [userBookings],
   )
   const pastBookings = useMemo(
-    () => userBookings.filter((b) => !isUpcoming(b.bookingDate) || b.status === 2),
+    () => userBookings.filter((b) => !isUpcoming(b.bookingDate) || Number(b.status) === 2),
     [userBookings],
   )
 
@@ -423,7 +430,7 @@ export default function UserDetailPage() {
                         <div>
                           <p className="font-medium text-sm">{m.planName}</p>
                           <p className="text-xs text-muted-foreground">
-                            {m.currency} {m.price}
+                            {formatPrice(m.price, m.currency)}
                           </p>
                         </div>
                         <StatusBadge status={m.status.toLowerCase()} size="sm" />
