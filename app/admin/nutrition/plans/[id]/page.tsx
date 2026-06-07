@@ -236,10 +236,10 @@ export default function NutritionPlanDetailPage() {
                             {new Date(p.date).toLocaleDateString()}
                           </TableCell>
                           <TableCell>
-                            {p.weight != null ? `${p.weight} kg` : '—'}
+                            {p.weight != null ? (String(p.weight).toLowerCase().endsWith('kg') ? p.weight : `${p.weight} kg`) : '—'}
                           </TableCell>
                           <TableCell>
-                            {p.bodyFatPct != null ? `${p.bodyFatPct}%` : '—'}
+                            {p.bodyFatPct != null ? (String(p.bodyFatPct).endsWith('%') ? p.bodyFatPct : `${p.bodyFatPct}%`) : '—'}
                           </TableCell>
                           <TableCell>{p.notes || '—'}</TableCell>
                         </TableRow>

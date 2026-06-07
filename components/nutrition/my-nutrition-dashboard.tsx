@@ -620,7 +620,7 @@ function NutritionWorkspace({
     return [...withWeight].sort((a, b) => b.date.localeCompare(a.date))[0].weight ?? null
   }, [progress])
 
-  const { data: mealLogs = [] } = useMealLogs(plan?._id ?? '', today)
+  const { data: mealLogs = [] } = useMealLogs(plan?._id ?? '', today, userId)
 
   const logBySlot = useMemo(() => {
     const map = new Map<string, MealLog>()
@@ -777,7 +777,13 @@ function NutritionWorkspace({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Start</span>
                 <span>
-                  {plan.startDate ? new Date(plan.startDate).toLocaleDateString() : '—'}
+                  {(plan.startDate || plan.createdAt)
+                    ? new Date((plan.startDate || plan.createdAt)!).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })
+                    : '—'}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -852,7 +858,7 @@ function NutritionWorkspace({
               {allMeals.length} meal{allMeals.length === 1 ? '' : 's'} in the active plan
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 max-h-[480px] overflow-y-auto pr-2">
             {allMeals.length === 0 ? (
               <EmptyState
                 title="No meals in this plan"
@@ -1256,8 +1262,8 @@ interface ProfileCardItem {
 }
 
 function ProfileSummaryCards({ user }: { user: User }) {
-  const weight  = user.healthMarkers?.weight  != null ? `${user.healthMarkers.weight}kg`  : '—'
-  const height  = user.healthMarkers?.height  != null ? `${user.healthMarkers.height}cm`  : '—'
+  const weight  = user.healthMarkers?.weight  != null ? (String(user.healthMarkers.weight).toLowerCase().endsWith('kg') ? String(user.healthMarkers.weight) : `${user.healthMarkers.weight}kg`)  : '—'
+  const height  = user.healthMarkers?.height  != null ? (String(user.healthMarkers.height).toLowerCase().endsWith('cm') ? String(user.healthMarkers.height) : `${user.healthMarkers.height}cm`)  : '—'
   const ageNum  = user.age ? Number(user.age) : NaN
   const age     = Number.isFinite(ageNum) && ageNum > 0 ? String(ageNum) : '—'
   const goal    = normalizeGoalDisplay(user.healthGoals)
@@ -1291,13 +1297,28 @@ function ProfileSummaryCards({ user }: { user: User }) {
 
 // ── Top-level export ──────────────────────────────────────────────────────────
 
-export function MyNutritionDashboard() {
+export function MyNutritionDashboard({
+  selectedUserId,
+  onSelectedUserIdChange,
+}: {
+  selectedUserId?: string | null
+  onSelectedUserIdChange?: (id: string | null) => void
+} = {}) {
   const { data: users = [], isLoading: usersLoading } = useUsers()
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [internalSelectedUserId, setInternalSelectedUserId] = useState<string | null>(null)
+
+  const activeUserId = selectedUserId !== undefined ? selectedUserId : internalSelectedUserId
+  const setActiveUserId = (id: string | null) => {
+    if (onSelectedUserIdChange) {
+      onSelectedUserIdChange(id)
+    } else {
+      setInternalSelectedUserId(id)
+    }
+  }
 
   const selectedUser = useMemo(
-    () => users.find((u) => u._id === selectedUserId),
-    [users, selectedUserId]
+    () => users.find((u) => u._id === activeUserId),
+    [users, activeUserId]
   )
 
   return (
@@ -1325,7 +1346,7 @@ export function MyNutritionDashboard() {
               users={users}
               loading={usersLoading}
               value={selectedUser}
-              onChange={(u) => setSelectedUserId(u._id)}
+              onChange={(u) => setActiveUserId(u._id)}
             />
           )}
         </div>

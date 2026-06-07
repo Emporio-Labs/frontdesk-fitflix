@@ -210,10 +210,10 @@ export function useDeletePlan() {
 }
 
 // ── Meal logs (optimistic completion toggle) ──────────────────────────────────
-export function useMealLogs(planId: string, date?: string) {
+export function useMealLogs(planId: string, date?: string, userId?: string) {
   return useQuery({
-    queryKey: queryKeys.nutrition.mealLogs(planId, date),
-    queryFn: () => nutritionService.getMealLogs(planId, date),
+    queryKey: queryKeys.nutrition.mealLogs(planId, date, userId),
+    queryFn: () => nutritionService.getMealLogs(planId, date, userId),
     select: (data) => data.items,
     enabled: !!planId,
   })

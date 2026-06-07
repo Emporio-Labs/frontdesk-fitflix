@@ -36,6 +36,7 @@ import { FoodForm } from '@/components/nutrition/food-form'
 import { MyNutritionDashboard } from '@/components/nutrition/my-nutrition-dashboard'
 import { EditAssignedPlanModal } from '@/components/nutrition/edit-assigned-plan-modal'
 import { ClinicalUserDialog } from '@/components/nutrition/clinical-user-dialog'
+import { NutritionistAppointmentsTab } from '@/components/nutrition/nutritionist-appointments-tab'
 import {
   BookingStatusTabs,
   type BookingSegment,
@@ -253,6 +254,7 @@ function OverviewTab({
   plansLoading,
   todaysAppointments,
   onAssign,
+  onSelectMember,
 }: {
   members: NutritionDashboardMember[]
   plans: UserNutritionPlan[]
@@ -260,6 +262,7 @@ function OverviewTab({
   plansLoading: boolean
   todaysAppointments: NutritionDashboardMember[]
   onAssign: (userId?: string) => void
+  onSelectMember: (userId: string) => void
 }) {
   const activePlans = plans.filter((p) => p.status === 'Active').length
 
@@ -406,12 +409,20 @@ function OverviewTab({
                     <TableHead className="text-sm">Plan</TableHead>
                     <TableHead className="text-sm">Goal</TableHead>
                     <TableHead className="text-sm">Status</TableHead>
+                    <TableHead className="text-sm">Assigned Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {recentPlans.map((p) => (
                     <TableRow key={p._id}>
-                      <TableCell className="text-sm">{planMemberName(p)}</TableCell>
+                      <TableCell className="text-sm">
+                        <button
+                          onClick={() => onSelectMember(p.userId)}
+                          className="font-medium hover:underline text-left text-primary"
+                        >
+                          {planMemberName(p)}
+                        </button>
+                      </TableCell>
                       <TableCell>
                         <Link
                           href={`/admin/nutrition/plans/${p._id}`}
@@ -427,6 +438,13 @@ function OverviewTab({
                       </TableCell>
                       <TableCell>
                         <NutritionStatusCell status={p.status} />
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {(p.startDate || p.createdAt) ? new Date(p.startDate || p.createdAt!).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        }) : '—'}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -637,6 +655,7 @@ function BookingsTab({
                     <TableHead className="text-sm">Onboarding Step</TableHead>
                     <TableHead className="text-sm w-[160px]">Progress</TableHead>
                     <TableHead className="text-sm">Nutritionist</TableHead>
+                    {segment !== 'pending' && <TableHead className="text-sm">Meeting Link</TableHead>}
                     <TableHead className="text-right text-sm">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -679,6 +698,28 @@ function BookingsTab({
                         <TableCell>
                           <StatusBadge status={statusLabel} size="sm" />
                         </TableCell>
+                        {segment !== 'pending' && (
+                          <TableCell className="text-sm">
+                            {(() => {
+                              const appt = user.expertAppointments?.find(
+                                (a) => a.expertType === 'nutritionist'
+                              )
+                              const displayLink = appt?.meetingLink || appt?.meetingUrl
+                              if (!displayLink) return <span className="text-muted-foreground">—</span>
+                              return (
+                                <a
+                                  href={displayLink}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 font-semibold"
+                                >
+                                  <IconExternalLink className="h-3 w-3" />
+                                  Meeting Link
+                                </a>
+                              )
+                            })()}
+                          </TableCell>
+                        )}
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             {(() => {
@@ -858,8 +899,12 @@ function DietPlansTab({
                         <NutritionStatusCell status={p.status} />
                       </TableCell>
                       <TableCell>
-                        {p.startDate
-                          ? new Date(p.startDate).toLocaleDateString()
+                        {(p.startDate || p.createdAt)
+                          ? new Date((p.startDate || p.createdAt)!).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })
                           : '—'}
                       </TableCell>
                       <TableCell className="text-right space-x-2 whitespace-nowrap">
@@ -1015,7 +1060,6 @@ function FoodCatalogTab({ canCreate }: { canCreate: boolean }) {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>Brand</TableHead>
                         <TableHead>Serving</TableHead>
                         <TableHead>Cal</TableHead>
                         <TableHead>P</TableHead>
@@ -1028,7 +1072,6 @@ function FoodCatalogTab({ canCreate }: { canCreate: boolean }) {
                       {foods.map((food) => (
                         <TableRow key={food._id}>
                           <TableCell className="font-medium">{food.name}</TableCell>
-                          <TableCell>{food.brand || '—'}</TableCell>
                           <TableCell>{food.servingLabel}</TableCell>
                           <TableCell>{food.caloriesKcal}</TableCell>
                           <TableCell>{food.proteinG}g</TableCell>
@@ -1338,6 +1381,7 @@ function NutritionDashboardContent() {
   )
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignUserId, setAssignUserId] = useState<string | undefined>()
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
 
   const { data: members = [], isLoading: membersLoading } = useNutritionMembers()
   const { data: plans = [], isLoading: plansLoading } = useNutritionPlans()
@@ -1373,6 +1417,7 @@ function NutritionDashboardContent() {
           <TabsTrigger value="my-nutrition" className="text-sm px-4 py-2">My Nutrition</TabsTrigger>
           <TabsTrigger value="diet-plans" className="text-sm px-4 py-2">Diet Plans</TabsTrigger>
           <TabsTrigger value="food-catalog" className="text-sm px-4 py-2">Food Catalog</TabsTrigger>
+          <TabsTrigger value="appointments" className="text-sm px-4 py-2">Nutritionist Appointments</TabsTrigger>
           <TabsTrigger value="active-users" className="text-sm px-4 py-2">Active Users</TabsTrigger>
         </TabsList>
 
@@ -1384,6 +1429,10 @@ function NutritionDashboardContent() {
             plansLoading={plansLoading}
             todaysAppointments={todaysAppointments}
             onAssign={handleAssign}
+            onSelectMember={(userId) => {
+              setSelectedMemberId(userId)
+              setActiveTab('my-nutrition')
+            }}
           />
         </TabsContent>
 
@@ -1395,7 +1444,10 @@ function NutritionDashboardContent() {
         </TabsContent>
 
         <TabsContent value="my-nutrition" className="mt-6">
-          <MyNutritionDashboard />
+          <MyNutritionDashboard
+            selectedUserId={selectedMemberId}
+            onSelectedUserIdChange={setSelectedMemberId}
+          />
         </TabsContent>
 
         <TabsContent value="diet-plans" className="mt-6">
@@ -1406,10 +1458,12 @@ function NutritionDashboardContent() {
           />
         </TabsContent>
 
-        
-
         <TabsContent value="food-catalog" className="mt-6">
           <FoodCatalogTab canCreate={canCreate} />
+        </TabsContent>
+
+        <TabsContent value="appointments" className="mt-6">
+          <NutritionistAppointmentsTab />
         </TabsContent>
 
         <TabsContent value="active-users" className="mt-6">

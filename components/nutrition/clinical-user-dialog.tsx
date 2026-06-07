@@ -111,12 +111,12 @@ export function ClinicalUserDialog({
   const ageDisplay = age !== '—' ? age : 'Not Provided'
   const genderDisplay = gender !== '—' ? gender : 'Not Provided'
   const markers = user?.healthMarkers || {}
-  const weight = markers.weight ? `${markers.weight}kg` : 'Not Provided'
-  const height = markers.height ? `${markers.height}cm` : 'Not Provided'
+  const weight = markers.weight ? (String(markers.weight).toLowerCase().endsWith('kg') ? String(markers.weight) : `${markers.weight}kg`) : 'Not Provided'
+  const height = markers.height ? (String(markers.height).toLowerCase().endsWith('cm') ? String(markers.height) : `${markers.height}cm`) : 'Not Provided'
   const bmi = markers.bmi ? String(markers.bmi) : 'Not Provided'
-  const bodyFat = markers.bodyFatPercent ? `${markers.bodyFatPercent}%` : 'Not Provided'
+  const bodyFat = markers.bodyFatPercent ? (String(markers.bodyFatPercent).endsWith('%') ? String(markers.bodyFatPercent) : `${markers.bodyFatPercent}%`) : 'Not Provided'
   const activityLvl = markers.activityLevel ? String(markers.activityLevel) : 'Not Provided'
-  const targetWeight = (markers.targetWeight || markers.goalWeight) ? `${markers.targetWeight || markers.goalWeight}kg` : 'Not Provided'
+  const targetWeight = (markers.targetWeight || markers.goalWeight) ? (String(markers.targetWeight || markers.goalWeight).toLowerCase().endsWith('kg') ? String(markers.targetWeight || markers.goalWeight) : `${markers.targetWeight || markers.goalWeight}kg`) : 'Not Provided'
   const firstGoal = healthGoals.length > 0 ? healthGoals[0] : 'Not Provided'
 
   const handleCreatePlan = () => {
@@ -372,8 +372,12 @@ export function ClinicalUserDialog({
                             <StatusBadge status={p.status} size="sm" />
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {p.startDate
-                              ? new Date(p.startDate).toLocaleDateString()
+                            {(p.startDate || p.createdAt)
+                              ? new Date((p.startDate || p.createdAt)!).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })
                               : '—'}
                           </TableCell>
                         </TableRow>

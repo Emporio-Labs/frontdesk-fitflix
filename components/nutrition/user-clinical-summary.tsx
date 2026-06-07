@@ -21,15 +21,14 @@ export function UserClinicalSummary({ user }: UserClinicalSummaryProps) {
   const goal = NUTRITION_GOAL_LABELS[inferNutritionGoal(user?.healthGoals)]
   const bmi = computeBmi(height, weight)
   const activity = user?.healthMarkers?.activityLevel ?? null
-
   const cards: Card[] = [
-    { label: 'Weight', value: weight != null ? `${weight} kg` : '—' },
+    { label: 'Weight', value: weight != null ? (String(weight).toLowerCase().endsWith('kg') ? String(weight) : `${weight} kg`) : '—' },
     {
       label: 'Age',
       value: Number.isFinite(ageNum) && ageNum > 0 ? String(ageNum) : '—',
     },
     { label: 'Goal', value: goal },
-    { label: 'Height', value: height != null ? `${height} cm` : '—' },
+    { label: 'Height', value: height != null ? (String(height).toLowerCase().endsWith('cm') ? String(height) : `${height} cm`) : '—' },
     { label: 'BMI', value: bmi != null ? String(bmi) : '—' },
     { label: 'Activity', value: activity || '—' },
   ]

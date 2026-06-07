@@ -489,7 +489,6 @@ function MealSlotCard({
         setValue(`${base}.options.${safeActiveOi}.items` as any, items)
         setValue(`${base}.options.${safeActiveOi}.recipeId` as any, recipeId)
         setValue(`${base}.options.${safeActiveOi}.recipeName` as any, recipeName)
-        setValue(`${base}.name` as any, recipeName)
         
         if (res.recipe?.defaultMealType) {
           const slot = MEALTYPE_TO_TIMELINE[res.recipe.defaultMealType as keyof typeof MEALTYPE_TO_TIMELINE]
@@ -1146,7 +1145,6 @@ export function ClinicalTemplateForm({
           form.setValue(`days.0.meals.${targetMealIdx}.options.${targetOptIdx}.items` as any, newItems)
           form.setValue(`days.0.meals.${targetMealIdx}.options.${targetOptIdx}.recipeId` as any, recipeId)
           form.setValue(`days.0.meals.${targetMealIdx}.options.${targetOptIdx}.recipeName` as any, newRecipeName)
-          form.setValue(`days.0.meals.${targetMealIdx}.name` as any, newRecipeName)
 
           if (res.recipe?.defaultMealType) {
             const slot = MEALTYPE_TO_TIMELINE[res.recipe.defaultMealType as keyof typeof MEALTYPE_TO_TIMELINE]
@@ -1381,65 +1379,73 @@ export function ClinicalTemplateForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="w-full">
+      <form
+        onSubmit={form.handleSubmit(onSubmit, (errors) => {
+          console.error('Diet Plan Validation Errors:', errors)
+          alert('Validation failed:\n' + JSON.stringify(errors, null, 2))
+        })}
+        className="w-full"
+      >
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
           {/* Main area (left column) */}
           <div className="lg:col-span-8 space-y-6">
             
             {/* Section 1: Clinical Metrics & Overrides (Read-only display) */}
-            <Card className="rounded-xl border shadow-sm bg-card">
-              <CardContent className="pt-5 space-y-4">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">1. Clinical Metrics & Overrides</h3>
-                  <button type="button" className="text-xs text-primary font-bold flex items-center gap-1 cursor-default">
-                    <span className="h-2 w-2 bg-green-500 rounded-full inline-block animate-pulse"></span>
-                    Linked to EMR
-                  </button>
-                </div>
-                
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div className="rounded-lg border bg-muted/10 px-3 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">Weight</span>
-                    <span className="text-sm font-extrabold text-foreground">{weight != null ? `${weight} kg` : '—'}</span>
+            {effectiveUserId && (
+              <Card className="rounded-xl border shadow-sm bg-card">
+                <CardContent className="pt-5 space-y-4">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Clinical Metrics & Overrides</h3>
+                    <button type="button" className="text-xs text-primary font-bold flex items-center gap-1 cursor-default">
+                      <span className="h-2 w-2 bg-green-500 rounded-full inline-block animate-pulse"></span>
+                      Linked to EMR
+                    </button>
                   </div>
-                  <div className="rounded-lg border bg-muted/10 px-3 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">Height</span>
-                    <span className="text-sm font-extrabold text-foreground">{height != null ? `${height} cm` : '—'}</span>
-                  </div>
-                  <div className="rounded-lg border bg-muted/10 px-3 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">Age</span>
-                    <span className="text-sm font-extrabold text-foreground">{ageNum != null ? `${ageNum} yrs` : '—'}</span>
-                  </div>
-                  <div className="rounded-lg border bg-muted/10 px-3 py-2 flex flex-col justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">Calculated BMI</span>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm font-extrabold text-foreground">{bmi != null ? String(bmi) : '—'}</span>
-                      {bmiCategory && (
-                        <span className={`text-[8px] font-black uppercase px-1 rounded-md tracking-wider leading-none py-0.5 ${
-                          bmiCategory === 'Normal' ? 'bg-green-100 text-green-800 border border-green-200' :
-                          bmiCategory === 'Overweight' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                          bmiCategory === 'Obese' ? 'bg-red-100 text-red-800 border border-red-200' :
-                          'bg-sky-100 text-sky-800 border border-sky-200'
-                        }`}>
-                          {bmiCategory === 'Normal' ? 'HEALTHY' : bmiCategory.toUpperCase()}
-                        </span>
-                      )}
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div className="rounded-lg border bg-muted/10 px-3 py-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">Weight</span>
+                      <span className="text-sm font-extrabold text-foreground">{weight != null ? (String(weight).toLowerCase().endsWith('kg') ? weight : `${weight} kg`) : '—'}</span>
+                    </div>
+                    <div className="rounded-lg border bg-muted/10 px-3 py-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">Height</span>
+                      <span className="text-sm font-extrabold text-foreground">{height != null ? (String(height).toLowerCase().endsWith('cm') ? height : `${height} cm`) : '—'}</span>
+                    </div>
+                    <div className="rounded-lg border bg-muted/10 px-3 py-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">Age</span>
+                      <span className="text-sm font-extrabold text-foreground">{ageNum != null ? `${ageNum} yrs` : '—'}</span>
+                    </div>
+                    <div className="rounded-lg border bg-muted/10 px-3 py-2 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">Calculated BMI</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-extrabold text-foreground">{bmi != null ? String(bmi) : '—'}</span>
+                        {bmiCategory && (
+                          <span className={`text-[8px] font-black uppercase px-1 rounded-md tracking-wider leading-none py-0.5 ${
+                            bmiCategory === 'Normal' ? 'bg-green-100 text-green-800 border border-green-200' :
+                            bmiCategory === 'Overweight' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                            bmiCategory === 'Obese' ? 'bg-red-100 text-red-800 border border-red-200' :
+                            'bg-sky-100 text-sky-800 border border-sky-200'
+                          }`}>
+                            {bmiCategory === 'Normal' ? 'HEALTHY' : bmiCategory.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border bg-muted/10 px-3 py-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">Activity Level</span>
+                      <span className="text-sm font-extrabold text-foreground truncate block">{activity || '—'}</span>
                     </div>
                   </div>
-                  <div className="rounded-lg border bg-muted/10 px-3 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">Activity Level</span>
-                    <span className="text-sm font-extrabold text-foreground truncate block">{activity || '—'}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Section 2: Plan Definitions & Rules */}
             <Card className="rounded-xl border shadow-sm bg-card">
               <CardContent className="pt-5 space-y-5">
                 <div className="border-b pb-2 flex flex-wrap items-center justify-between gap-3">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">2. Plan Definitions & Rules</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Plan Definitions & Rules</h3>
                   <Button
                     type="button"
                     variant="outline"
@@ -1780,26 +1786,11 @@ export function ClinicalTemplateForm({
 
                 <div className="flex items-center justify-between border-b pb-2">
                   <div className="space-y-0.5">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">3. Daily Itinerary Blueprint</h3>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Daily Itinerary Blueprint</h3>
                     <p className="text-[11px] text-muted-foreground">
                       Configure alternating options, or click &quot;Quick Recipe&quot; to load data from database catalog.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="bg-[#0D9488] hover:bg-[#0F766E] text-white font-bold h-8 text-xs flex items-center gap-1"
-                    onClick={() =>
-                      appendMeal({
-                        mealType: 'Lunch',
-                        name: 'Lunch',
-                        items: [],
-                        options: [newOption(0)],
-                      })
-                    }
-                  >
-                    <IconPlus className="h-3.5 w-3.5 mr-1" /> Add Meal Slot
-                  </Button>
                 </div>
 
                 <div className="space-y-4">
@@ -1816,10 +1807,28 @@ export function ClinicalTemplateForm({
                       onOpenLibraryForAppend={handleOpenLibraryForAppend}
                     />
                   ))}
-                  {mealFields.length === 0 && (
+                  {mealFields.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-6 border border-dashed rounded-lg bg-muted/5">
                       No meal slots configured yet. Click &quot;Add Meal Slot&quot; to begin formulating.
                     </p>
+                  ) : (
+                    <div className="flex justify-center pt-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-[#0D9488] hover:bg-[#0F766E] text-white font-bold h-8 text-xs flex items-center gap-1"
+                        onClick={() =>
+                          appendMeal({
+                            mealType: 'Lunch',
+                            name: 'Lunch',
+                            items: [],
+                            options: [newOption(0)],
+                          })
+                        }
+                      >
+                        <IconPlus className="h-3.5 w-3.5 mr-1" /> Add Meal Slot
+                      </Button>
+                    </div>
                   )}
                 </div>
               </CardContent>

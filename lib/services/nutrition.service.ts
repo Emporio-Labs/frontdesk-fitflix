@@ -123,9 +123,9 @@ export const nutritionService = {
   },
 
   // ── Meal logs ───────────────────────────────────────────────────────────────
-  getMealLogs: async (planId: string, date?: string) => {
+  getMealLogs: async (planId: string, date?: string, userId?: string) => {
     const { data } = await apiClient.get(`/nutrition/my/meal-logs`, {
-      params: { planId, ...(date ? { date } : {}) },
+      params: { planId, ...(date ? { date } : {}), ...(userId ? { userId } : {}) },
     })
     return data as { items: MealLog[] }
   },

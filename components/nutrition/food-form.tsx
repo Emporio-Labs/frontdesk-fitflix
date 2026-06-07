@@ -116,10 +116,14 @@ export function FoodForm({ open, onOpenChange, food }: FoodFormProps) {
   }, [open, food, form])
 
   const onSubmit = async (values: FoodFormValues) => {
+    const payload = {
+      ...values,
+      servingLabel: values.basePer ? `${values.basePer} g` : '100 g',
+    }
     if (isEdit && food) {
-      await updateFood.mutateAsync({ id: food._id, payload: values })
+      await updateFood.mutateAsync({ id: food._id, payload })
     } else {
-      await createFood.mutateAsync(values)
+      await createFood.mutateAsync(payload)
     }
     onOpenChange(false)
   }
@@ -149,62 +153,19 @@ export function FoodForm({ open, onOpenChange, food }: FoodFormProps) {
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="brand"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Brand</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Generic" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="barcode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Barcode</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Optional" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField
-                control={form.control}
-                name="basePer"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Base Per (g)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="any" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="servingLabel"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Serving Label</FormLabel>
-                    <FormControl>
-                      <Input placeholder="100 g" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+             <FormField
+              control={form.control}
+              name="basePer"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Quantity</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="any" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="caloriesKcal"

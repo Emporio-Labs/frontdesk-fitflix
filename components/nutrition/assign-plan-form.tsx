@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -29,6 +29,10 @@ import { Button } from '@/components/ui/button'
 import { assignPlanSchema, type AssignPlanFormValues } from '@/lib/types/nutrition'
 import { useAssignPlan, useNutritionTemplates } from '@/hooks/use-nutrition'
 import { useUsers } from '@/hooks/use-users'
+import { cn } from '@/lib/utils'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { IconChevronDown, IconCheck } from '@tabler/icons-react'
 
 interface AssignPlanFormProps {
   open: boolean
@@ -41,6 +45,7 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
   const { data: users = [] } = useUsers()
   const { data: dietPlans = [] } = useNutritionTemplates()
   const assignPlan = useAssignPlan()
+  const [openMemberPopover, setOpenMemberPopover] = useState(false)
 
   const form = useForm<AssignPlanFormValues>({
     resolver: zodResolver(assignPlanSchema),
@@ -78,30 +83,79 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
             <FormField
               control={form.control}
               name="userId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Member *</FormLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={!!userId}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select member" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {users.map((u) => (
-                        <SelectItem key={u._id} value={u._id}>
-                          {u.username} ({u.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const selectedUser = users.find((u) => u._id === field.value)
+                return (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Member *</FormLabel>
+                    <Popover open={openMemberPopover} onOpenChange={setOpenMemberPopover}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              'w-full justify-between font-normal text-left h-10',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                            disabled={!!userId}
+                          >
+                            <span className="truncate">
+                              {selectedUser
+                                ? `${selectedUser.username || ''} (${selectedUser.email || ''})`
+                                : 'Select member'}
+                            </span>
+                            <IconChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                        <Command
+                          filter={(itemValue, search) =>
+                            itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+                          }
+                        >
+                          <CommandInput placeholder="Search member..." />
+                          <CommandList>
+                            <CommandEmpty>No member found.</CommandEmpty>
+                            <CommandGroup>
+                              {users.map((u) => {
+                                const searchValue = `${u.username || ''} ${u.email || ''}`
+                                return (
+                                  <CommandItem
+                                    key={u._id}
+                                    value={searchValue}
+                                    onSelect={() => {
+                                      field.onChange(u._id)
+                                      setOpenMemberPopover(false)
+                                    }}
+                                  >
+                                    <IconCheck
+                                      className={cn(
+                                        'mr-2 h-4 w-4 shrink-0',
+                                        field.value === u._id ? 'opacity-100' : 'opacity-0'
+                                      )}
+                                    />
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="truncate">{u.username || ''}</span>
+                                      {u.email && (
+                                        <span className="truncate text-xs text-muted-foreground">
+                                          {u.email}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </CommandItem>
+                                )
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )
+              }}
             />
             <FormField
               control={form.control}

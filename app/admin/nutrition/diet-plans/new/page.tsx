@@ -22,8 +22,7 @@ import {
 function NewClinicalTemplatePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { selectedUserId } = useNutritionistWorkspace()
-  const userId = searchParams.get('userId') || selectedUserId || ''
+  const userId = searchParams.get('userId') || ''
 
   const { data: user } = useUser(userId)
   const { data: assessment } = useNutritionAssessment(userId)
@@ -77,7 +76,7 @@ function NewClinicalTemplatePageContent() {
               href={`/admin/nutrition?tab=bookings&review=${userId}`}
               className="font-semibold text-foreground hover:underline"
             >
-              {user.username || user.email}
+              {user.username || user.email || 'Member'}
             </Link>
           </p>
         )}
