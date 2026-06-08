@@ -725,7 +725,7 @@ function BookingsTab({
                             {(() => {
                               const bookingId = user.expertAppointments?.find(
                                 (a) => a.expertType === 'nutritionist'
-                              )?._id
+                              )?._id || user._id
                               if (row.rosterStatus === 'pending' && bookingId) {
                                 return (
                                   <Button
@@ -736,7 +736,7 @@ function BookingsTab({
                                     <IconCheck className="mr-1 h-4 w-4" />
                                     {accept.isPending && accept.variables === bookingId
                                       ? 'Accepting…'
-                                      : 'Accept Booking'}
+                                      : 'Accept'}
                                   </Button>
                                 )
                               }
