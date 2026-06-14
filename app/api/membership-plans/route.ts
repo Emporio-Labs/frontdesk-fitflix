@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createPlan, getPlansByGym } from '@/lib/server/membership-plans-store'
+import { API_BASE_URL } from '@/lib/api-client'
+
+function translateBackendPlanToFrontend(backendPlan: any) {
+  return {
+    plan_id: backendPlan.id || backendPlan._id,
+    gym_id: backendPlan.gymId || '',
+    plan_name: backendPlan.name || 'Unnamed Plan',
+    duration_months: backendPlan.durationMonths || 1,
+    total_price: backendPlan.price || 0,
+    currency: backendPlan.currency || 'USD',
+    status: backendPlan.active ? 'active' : 'inactive',
+    features: backendPlan.features || [],
+    benefits: backendPlan.benefits || {},
+    created_at: backendPlan.createdAt || '',
+    updated_at: backendPlan.updatedAt || '',
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,16 +35,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 })
     }
 
-    const plan = await createPlan({
-      gym_id: String(gym_id),
-      plan_name: String(plan_name),
-      duration_months: Number(duration_months),
-      total_price: Number(total_price),
+    const backendPayload = {
+      gymId: String(gym_id),
+      name: String(plan_name),
+      durationMonths: Number(duration_months),
+      price: Number(total_price),
       currency: String(currency || 'USD'),
-      features,
-      benefits,
-      status: status === 'inactive' ? 'inactive' : 'active',
+      features: features || [],
+      benefits: benefits && typeof benefits === 'object' ? benefits : {},
+      creditsIncluded: Number(benefits?.credits || 0),
+      active: status !== 'inactive',
+    }
+
+    const token = req.headers.get('Authorization')
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (token) {
+      headers['Authorization'] = token
+    }
+
+    const backendRes = await fetch(`${API_BASE_URL}/membership-plans`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(backendPayload),
     })
+
+    if (!backendRes.ok) {
+      const errData = await backendRes.json().catch(() => ({}))
+      return NextResponse.json(
+        { message: errData.message || 'Failed to create membership plan on backend', error: errData },
+        { status: backendRes.status }
+      )
+    }
+
+    const responseData = await backendRes.json()
+    const plan = translateBackendPlanToFrontend(responseData.plan)
 
     return NextResponse.json({ message: 'Membership plan created successfully', plan }, { status: 201 })
   } catch (error) {
@@ -43,22 +85,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'gym_id query param is required' }, { status: 400 })
     }
 
-    const plans = await getPlansByGym(gymId)
+    const token = req.headers.get('Authorization')
+    const headers: Record<string, string> = {}
+    if (token) {
+      headers['Authorization'] = token
+    }
 
-    return NextResponse.json({
-      plans: plans.map((plan) => ({
-        plan_id: plan.plan_id,
-        plan_name: plan.plan_name,
-        duration_months: plan.duration_months,
-        total_price: plan.total_price,
-        currency: plan.currency,
-        status: plan.status,
-        features: plan.features,
-        benefits: plan.benefits,
-        created_at: plan.created_at,
-        updated_at: plan.updated_at,
-      })),
+    const backendRes = await fetch(`${API_BASE_URL}/membership-plans`, {
+      method: 'GET',
+      headers,
     })
+
+    if (!backendRes.ok) {
+      const errData = await backendRes.json().catch(() => ({}))
+      return NextResponse.json(
+        { message: errData.message || 'Failed to fetch membership plans from backend', error: errData },
+        { status: backendRes.status }
+      )
+    }
+
+    const responseData = await backendRes.json()
+    const backendPlans = responseData.plans || []
+
+    const plans = backendPlans
+      .filter((plan: any) => plan.gymId === gymId)
+      .map(translateBackendPlanToFrontend)
+
+    return NextResponse.json({ plans })
   } catch (error) {
     return NextResponse.json({ message: 'Failed to fetch membership plans', error: String(error) }, { status: 500 })
   }
