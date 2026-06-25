@@ -60,6 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearCredentials()
         clearAuthCookie()
       }
+    } else {
+      // If we don't have stored session/token but are on a protected route,
+      // clear presence cookie and redirect to login.
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname
+        const isProtected = path.startsWith('/dashboard') || path.startsWith('/admin')
+        if (isProtected) {
+          clearAuthCookie()
+          window.location.href = `/login?from=${encodeURIComponent(path)}`
+        }
+      }
     }
   }, [])
 

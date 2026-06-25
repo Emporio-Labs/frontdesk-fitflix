@@ -27,11 +27,9 @@ export function RefreshButton({
   const handleClick = async () => {
     if (disabled || isBusy) return
 
-    console.debug('RefreshButton: click received', { isBusy, disabled })
     setIsRefreshing(true)
     try {
-      const res = await onClick()
-      console.debug('RefreshButton: onClick resolved', { res })
+      await onClick()
       toast.success('Refreshed')
     } catch (err) {
       console.error('RefreshButton: onClick error', err)

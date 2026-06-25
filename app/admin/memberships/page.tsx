@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +58,7 @@ function formatPrice(amount: number | string, currency?: string) {
 
 function MembershipsPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedMembership, setSelectedMembership] = useState<Membership | null>(null)
   const [editingMembership, setEditingMembership] = useState<Membership | null>(null)
@@ -221,12 +222,17 @@ function MembershipsPageContent() {
     }
   }, [selectedPlan, formData.startDate, formData.endDate])
 
-  const filteredMemberships = memberships.filter(m =>
-    m.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.planName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.notes.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredMemberships = useMemo(
+    () =>
+      memberships.filter(
+        (m) =>
+          m.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.planName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.notes.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [memberships, searchTerm]
   )
 
   const sortedMemberships = useMemo(() => {
@@ -419,10 +425,19 @@ function MembershipsPageContent() {
                     <label className="text-sm font-medium">Membership Plan</label>
                     <select
                       value={formData.planId}
-                      onChange={(e) => setFormData({ ...formData, planId: e.target.value })}
+                      onChange={(e) => {
+                        if (e.target.value === 'CREATE_NEW') {
+                          router.push('/admin/membership-plans')
+                        } else {
+                          setFormData({ ...formData, planId: e.target.value })
+                        }
+                      }}
                       className="w-full rounded-md border px-3 py-2"
                     >
                       <option value="">Select a plan</option>
+                      <option value="CREATE_NEW" className="font-semibold text-primary">
+                        + Create New Plan
+                      </option>
                       {membershipPlans
                         .filter((plan) => plan.status === 'Active' || plan.id === formData.planId)
                         .map((plan) => (
