@@ -397,77 +397,73 @@ export default function UsersPage() {
                     {filteredUsers.length === 0 ? (
                       <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
                     ) : (
-                      paginatedUsers.map((user) => (
-                        <TableRow key={user._id} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
-                          {(() => {
-                            const membership = getUserMembership(user)
-                            return (
-                              <>
-                                <TableCell className="pl-6 font-semibold text-foreground truncate max-w-[140px]">{user.username}</TableCell>
-                                <TableCell className="text-muted-foreground truncate max-w-[180px]" title={user.email}>{user.email}</TableCell>
-                                <TableCell className="text-center">{user.age}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="font-semibold px-2 py-0.5 text-xs rounded-full border-border/80 text-foreground bg-background whitespace-nowrap">{user.gender}</Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex flex-wrap gap-1 max-w-[200px]">
-                                    {user.healthGoals.slice(0, 2).map((g) => (
-                                      <Badge key={g} variant="secondary" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">{g}</Badge>
-                                    ))}
-                                    {user.healthGoals.length > 2 && (
-                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">+{user.healthGoals.length - 2}</Badge>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-muted-foreground whitespace-nowrap">{formatJoinedDate(user.createdAt)}</TableCell>
-                                <TableCell className="py-2">
-                                  <StatusBadge status={deriveOnboardingState(user)} size="sm" />
-                                </TableCell>
-                                <TableCell className="py-2">
-                                  {membership ? (
-                                    <Badge variant="secondary" className="font-semibold px-2.5 py-0.5 text-xs rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">{membership.planName}</Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="text-muted-foreground border-dashed px-2.5 py-0.5 text-xs rounded-full bg-transparent whitespace-nowrap">Not Assigned</Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateOnly(membership?.startDate)}</TableCell>
-                                <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateOnly(membership?.endDate)}</TableCell>
+                      paginatedUsers.map((user, index) => {
+                        const membership = getUserMembership(user)
+                        return (
+                          <TableRow key={user._id || index} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
+                            <TableCell className="pl-6 font-semibold text-foreground truncate max-w-[140px]">{user.username}</TableCell>
+                            <TableCell className="text-muted-foreground truncate max-w-[180px]" title={user.email}>{user.email}</TableCell>
+                            <TableCell className="text-center">{user.age}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="font-semibold px-2 py-0.5 text-xs rounded-full border-border/80 text-foreground bg-background whitespace-nowrap">{user.gender}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                {user.healthGoals.slice(0, 2).map((g, i) => (
+                                  <Badge key={`${g}-${i}`} variant="secondary" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">{g}</Badge>
+                                ))}
+                                {user.healthGoals.length > 2 && (
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">+{user.healthGoals.length - 2}</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground whitespace-nowrap">{formatJoinedDate(user.createdAt)}</TableCell>
+                            <TableCell className="py-2">
+                              <StatusBadge status={deriveOnboardingState(user)} size="sm" />
+                            </TableCell>
+                            <TableCell className="py-2">
+                              {membership ? (
+                                <Badge variant="secondary" className="font-semibold px-2.5 py-0.5 text-xs rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">{membership.planName}</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-muted-foreground border-dashed px-2.5 py-0.5 text-xs rounded-full bg-transparent whitespace-nowrap">Not Assigned</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateOnly(membership?.startDate)}</TableCell>
+                            <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateOnly(membership?.endDate)}</TableCell>
 
-                                <TableCell className="text-right py-2 pr-6">
-                                  <div className="flex justify-end items-center gap-1.5">
-                                    {!membership && (
-                                      <Button asChild size="sm" className="h-8 px-2.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm">
-                                        <Link href={`/admin/memberships?assignUserId=${encodeURIComponent(user._id)}`}>
-                                          Assign Membership
-                                        </Link>
-                                      </Button>
-                                    )}
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                      onClick={() => handleOpenEditUser(user)}
-                                      title="Edit User"
-                                    >
-                                      <IconEdit className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                      onClick={() => { if (confirm(`Delete ${user.username}?`)) deleteUser.mutate(user._id) }}
-                                      disabled={deleteUser.isPending}
-                                      title="Delete User"
-                                    >
-                                      <IconTrash className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </>
-                            )
-                          })()}
-                        </TableRow>
-                      ))
+                            <TableCell className="text-right py-2 pr-6">
+                              <div className="flex justify-end items-center gap-1.5">
+                                {!membership && (
+                                  <Button asChild size="sm" className="h-8 px-2.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm">
+                                    <Link href={`/admin/memberships?assignUserId=${encodeURIComponent(user._id)}`}>
+                                      Assign Membership
+                                    </Link>
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                  onClick={() => handleOpenEditUser(user)}
+                                  title="Edit User"
+                                >
+                                  <IconEdit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                  onClick={() => { if (confirm(`Delete ${user.username}?`)) deleteUser.mutate(user._id) }}
+                                  disabled={deleteUser.isPending}
+                                  title="Delete User"
+                                >
+                                  <IconTrash className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
                     )}
                   </TableBody>
                 </Table>
@@ -601,8 +597,8 @@ export default function UsersPage() {
                         {filteredAdmins.length === 0 ? (
                           <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No admins found</TableCell></TableRow>
                         ) : (
-                          paginatedAdmins.map((admin) => (
-                            <TableRow key={admin._id} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
+                          paginatedAdmins.map((admin, index) => (
+                            <TableRow key={admin._id || index} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
                               <TableCell className="pl-6 font-semibold text-foreground">{admin.adminName}</TableCell>
                               <TableCell className="text-muted-foreground">{admin.email}</TableCell>
                               <TableCell>{admin.phone}</TableCell>

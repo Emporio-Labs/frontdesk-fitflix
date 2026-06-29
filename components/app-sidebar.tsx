@@ -151,21 +151,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <Sidebar collapsible="none" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
+              className="data-[slot=sidebar-menu-button]:!p-1 !h-auto"
             >
               <a href="/dashboard" className="flex items-center gap-2">
                 <Image
                   src="/fitflix_logo.png"
                   alt="Fitflix Logo"
-                  width={28}
-                  height={28}
-                  className="!size-7 rounded object-contain"
+                  width={40}
+                  height={40}
+                  className="object-contain flex-shrink-0"
                 />
                 <span className="text-base font-bold tracking-tight">Fitflix</span>
               </a>

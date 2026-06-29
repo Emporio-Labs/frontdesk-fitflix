@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getStoredToken } from '@/lib/api-client'
 
 // Membership plans are served by in-app Next.js API routes.
 const membershipPlanClient = axios.create({
@@ -6,6 +7,15 @@ const membershipPlanClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+})
+
+// Attach authorization token to all outgoing requests
+membershipPlanClient.interceptors.request.use((config) => {
+  const token = getStoredToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 export type MembershipPlanStatus = 'Active' | 'Inactive'

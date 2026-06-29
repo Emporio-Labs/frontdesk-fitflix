@@ -31,16 +31,12 @@ export default function LoginPage() {
     setIsLoading(true)
     try {
       const data = await authService.login({ email, password })
-      if (data?.accessToken) {
-        storeToken(data.accessToken)
-      }
       if (data?.refreshToken && typeof window !== 'undefined') {
         localStorage.setItem('hh_refresh_token', data.refreshToken)
       }
       const apiUser = data.user
       const token = data.accessToken || data.token
-      // Always log login response shape for debugging (remove after fixing)
-      console.log('[login] response data:', { keys: Object.keys(data), hasToken: !!token, user: apiUser })
+
       if (authDebug) {
         console.debug('[auth-debug] login response', {
           userId: apiUser?.id,

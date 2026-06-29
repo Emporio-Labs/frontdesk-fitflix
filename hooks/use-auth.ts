@@ -1,5 +1,6 @@
 import { useContext } from 'react'
 import { AuthContext, AuthContextType } from '@/app/context/auth-context'
+import { hasPermission } from '@/lib/rbac'
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
@@ -16,6 +17,5 @@ export function useRole() {
 
 export function useCanAccess(resource: string, action: string): boolean {
   const { role } = useAuth()
-  const { hasPermission } = require('@/lib/rbac')
   return hasPermission(role, resource, action)
 }
