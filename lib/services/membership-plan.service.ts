@@ -34,6 +34,8 @@ export interface MembershipPlan {
   gymId: string
   planName: string
   durationMonths: number
+  /** When set, duration is expressed in days (overrides durationMonths for end-date calculation) */
+  durationDays?: number | null
   totalPrice: number
   currency: string
   status: MembershipPlanStatus
@@ -47,6 +49,8 @@ export interface CreateMembershipPlanPayload {
   gymId: string
   planName: string
   durationMonths: number
+  /** Optional day-level duration. When provided, takes priority over months for scheduling. */
+  durationDays?: number | null
   totalPrice: number
   currency: string
   status: MembershipPlanStatus
@@ -67,12 +71,17 @@ function normalizePlan(raw: any): MembershipPlan {
   const status: MembershipPlanStatus = rawStatus === 'inactive' ? 'Inactive' : 'Active'
   const totalPrice = parseNumber(raw?.total_price ?? raw?.totalPrice ?? raw?.price, 0)
   const durationMonths = parseNumber(raw?.duration_months ?? raw?.durationMonths ?? raw?.duration, 1)
+  const rawDurationDays = raw?.duration_days ?? raw?.durationDays
+  const durationDays = rawDurationDays !== undefined && rawDurationDays !== null
+    ? parseNumber(rawDurationDays, 0) || undefined
+    : undefined
 
   return {
     id: raw?.plan_id || raw?._id || raw?.id || '',
     gymId: raw?.gym_id || raw?.gymId || '',
     planName: raw?.plan_name || raw?.planName || raw?.name || 'Custom',
     durationMonths,
+    durationDays,
     totalPrice,
     currency: String(raw?.currency || 'USD').toUpperCase(),
     status,
@@ -105,6 +114,7 @@ export const membershipPlanService = {
       gym_id: payload.gymId,
       plan_name: payload.planName,
       duration_months: payload.durationMonths,
+      ...(payload.durationDays !== undefined && { duration_days: payload.durationDays }),
       total_price: payload.totalPrice,
       currency: payload.currency,
       features: payload.features,
@@ -121,6 +131,7 @@ export const membershipPlanService = {
     const { data } = await membershipPlanClient.put(`/api/membership-plans/${id}`, {
       plan_name: payload.planName,
       duration_months: payload.durationMonths,
+      duration_days: payload.durationDays !== undefined ? payload.durationDays : undefined,
       total_price: payload.totalPrice,
       currency: payload.currency,
       features: payload.features,

@@ -4,18 +4,23 @@ import { API_BASE_URL } from '@/lib/api-client'
 type Params = { params: Promise<{ plan_id: string }> }
 
 function translateBackendPlanToFrontend(backendPlan: any) {
+  // Support both camelCase and snake_case field names from the backend
+  const durationDays = backendPlan.durationDays ?? backendPlan.duration_days ?? null
   return {
     plan_id: backendPlan.id || backendPlan._id,
-    gym_id: backendPlan.gymId || '',
-    plan_name: backendPlan.name || 'Unnamed Plan',
-    duration_months: backendPlan.durationMonths || 1,
-    total_price: backendPlan.price || 0,
+    gym_id: backendPlan.gymId || backendPlan.gym_id || '',
+    plan_name: backendPlan.name || backendPlan.plan_name || 'Unnamed Plan',
+    duration_months: backendPlan.durationMonths ?? backendPlan.duration_months ?? 1,
+    duration_days: durationDays !== undefined && durationDays !== null && Number(durationDays) > 0
+      ? Number(durationDays)
+      : null,
+    total_price: backendPlan.price ?? backendPlan.total_price ?? 0,
     currency: backendPlan.currency || 'USD',
     status: backendPlan.active ? 'active' : 'inactive',
     features: backendPlan.features || [],
     benefits: backendPlan.benefits || {},
-    created_at: backendPlan.createdAt || '',
-    updated_at: backendPlan.updatedAt || '',
+    created_at: backendPlan.createdAt || backendPlan.created_at || '',
+    updated_at: backendPlan.updatedAt || backendPlan.updated_at || '',
   }
 }
 
@@ -58,6 +63,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (body?.plan_name !== undefined) backendPayload.name = String(body.plan_name)
     if (body?.total_price !== undefined) backendPayload.price = Number(body.total_price)
     if (body?.duration_months !== undefined) backendPayload.durationMonths = Number(body.duration_months)
+    if (body?.duration_days !== undefined) {
+      backendPayload.durationDays = body.duration_days !== null ? Number(body.duration_days) : null
+    }
     if (body?.currency !== undefined) backendPayload.currency = String(body.currency)
     if (body?.features !== undefined) backendPayload.features = body.features
     if (body?.benefits !== undefined) {

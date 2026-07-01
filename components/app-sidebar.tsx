@@ -90,7 +90,7 @@ const navMain = [
       icon: IconCreditCard,
     },
     {
-      title: "Services",
+      title: "Group Classes",
       url: "/admin/therapies",
       icon: IconListDetails,
     },
@@ -167,7 +167,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   height={40}
                   className="object-contain flex-shrink-0"
                 />
-                <span className="text-base font-bold tracking-tight">Fitflix</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>

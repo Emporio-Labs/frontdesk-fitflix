@@ -46,6 +46,10 @@ export const queryKeys = {
     all: () => ['therapies'] as const,
     detail: (id: string) => ['therapies', id] as const,
   },
+  groupClasses: {
+    all: () => ['group-classes'] as const,
+    detail: (id: string) => ['group-classes', id] as const,
+  },
   services: {
     all: () => ['services'] as const,
     detail: (id: string) => ['services', id] as const,
