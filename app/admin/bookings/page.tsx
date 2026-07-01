@@ -130,6 +130,7 @@ export default function BookingsPage() {
     bypassCredits: false,
   }))
   const [currentPage, setCurrentPage] = useState(1)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const itemsPerPage = 12
 
   const { data: bookings = [], isLoading, isError, refetch } = useBookings()
@@ -201,7 +202,14 @@ export default function BookingsPage() {
       return true
     })
 
-    return byMode.sort((a, b) => a.name.localeCompare(b.name))
+    const uniqueMap = new Map<string, BookableItemOption>()
+    for (const item of byMode) {
+      if (!uniqueMap.has(item.id)) {
+        uniqueMap.set(item.id, item)
+      }
+    }
+
+    return Array.from(uniqueMap.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [allBookableItems, mode])
 
   const selectedItem = useMemo(
@@ -213,8 +221,8 @@ export default function BookingsPage() {
     if (selectedItem?.kind !== 'group-class' || !formData.bookingDate) return false
     const today = new Date(getTodayDateKey() + 'T00:00:00.000Z')
     const bookingDate = new Date(formData.bookingDate + 'T00:00:00.000Z')
-    const diffTime = bookingDate.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    const diffDays = Math.round((bookingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    // Block bookings more than 3 days (72 hours) in advance
     return diffDays > 3
   }, [selectedItem, formData.bookingDate])
 
@@ -228,7 +236,7 @@ export default function BookingsPage() {
       return [] as typeof slots
     }
 
-    return slots
+    const rawMatches = slots
       .filter((slot) => {
         const matchesBookableSlots =
           selectedSlotRefs.includes(slot._id) ||
@@ -238,6 +246,16 @@ export default function BookingsPage() {
 
         const slotDateKey = toUtcDateKey(slot.date)
         return slot.isDaily || slotDateKey === formData.bookingDate
+      })
+
+    const concreteTemplates = new Set(
+      rawMatches.filter(s => !s.isDaily && s.parentTemplate).map(s => s.parentTemplate)
+    )
+
+    return rawMatches
+      .filter(s => {
+         if (s.isDaily && concreteTemplates.has(s._id)) return false;
+         return true;
       })
       .sort((a, b) => {
         const startCompare = a.startTime.localeCompare(b.startTime)
@@ -475,10 +493,25 @@ export default function BookingsPage() {
         slotId: formData.slotId,
         serviceId: formData.serviceId,
         bypassCredits: formData.bypassCredits,
+        // Admins always bypass the backend booking-window check so they can
+        // make spot bookings for any date the slot is scheduled on.
+        bypassBookingWindow: true,
       })
       setFormData((prev) => ({ ...prev, slotId: '' }))
     } catch {
       // Error states are handled by mutation hooks.
+    }
+  }
+
+  const handleDeleteBooking = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this booking? Credits will be refunded.')) return
+    setDeletingId(id)
+    try {
+      await deleteBooking.mutateAsync(id)
+    } catch {
+      // Error toast handled by mutation hook
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -1016,8 +1049,8 @@ export default function BookingsPage() {
                                 size="sm"
                                 variant="ghost"
                                 className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                onClick={() => { if (confirm('Delete booking?')) deleteBooking.mutate(booking._id) }}
-                                disabled={deleteBooking.isPending}
+                                onClick={() => handleDeleteBooking(booking._id)}
+                                disabled={deletingId === booking._id}
                                 title="Delete Booking"
                               >
                                 <IconTrash className="w-4 h-4" />

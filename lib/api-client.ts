@@ -164,7 +164,10 @@ apiClient.interceptors.response.use(
     const alreadyRetried = (config as any).__retried
 
     const status = error?.response?.status
-    if ((status === 401 || status === 403) && !isAuthEndpoint && !alreadyRetried) {
+    // Only 401 (expired/missing token) triggers a token-refresh + logout flow.
+    // 403 (Forbidden) is a legitimate server response (e.g. trying to delete
+    // another user's booking) and must NOT trigger a logout redirect.
+    if (status === 401 && !isAuthEndpoint && !alreadyRetried) {
       const newToken = await tryRefreshToken()
       if (newToken) {
         ;(config as any).__retried = true

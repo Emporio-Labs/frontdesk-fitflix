@@ -46,6 +46,7 @@ export interface CreateBookingPayload {
   serviceId: string
   reportId?: string
   bypassCredits?: boolean
+  bypassBookingWindow?: boolean
 }
 
 export interface UpdateBookingPayload {

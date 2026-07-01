@@ -61,8 +61,13 @@ export function useCreateBooking() {
     },
     onError: (err: any) => {
       const status = err?.response?.status
+      const code = err?.response?.data?.code
 
       if (status === 409) {
+        if (code === 'DUPLICATE_BOOKING') {
+          toast.error('This member already has an active booking for this slot.')
+          return
+        }
         qc.invalidateQueries({ queryKey: queryKeys.slots.all() })
         toast.error('That slot just got filled. Availability has been refreshed.')
         return
