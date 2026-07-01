@@ -90,7 +90,7 @@ const navMain = [
       icon: IconCreditCard,
     },
     {
-      title: "Group Classes",
+      title: "Services",
       url: "/admin/therapies",
       icon: IconListDetails,
     },

@@ -29,6 +29,7 @@ import { useBookings, useCreateBooking, useDeleteBooking, useChangeBookingStatus
 import { useSlots } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
+import { useGroupClasses } from '@/hooks/use-group-classes'
 import { useUsers } from '@/hooks/use-users'
 import { useMemberships } from '@/hooks/use-memberships'
 import { useTopUpUserCredits, useUserCreditBalance } from '@/hooks/use-credits'
@@ -36,8 +37,8 @@ import { BOOKING_STATUS, BookingStatusValue, Booking } from '@/lib/services/book
 import { cn, toUtcDateKey } from '@/lib/utils'
 import { toast } from 'sonner'
 
-type BookableMode = 'all' | 'services' | 'therapies'
-type BookableKind = 'service' | 'therapy'
+type BookableMode = 'all' | 'services' | 'therapies' | 'group-classes'
+type BookableKind = 'service' | 'therapy' | 'group-class'
 
 interface BookableItemOption {
   id: string
@@ -135,6 +136,7 @@ export default function BookingsPage() {
   const { data: slots = [] } = useSlots()
   const { data: services = [] } = useServices()
   const { data: therapies = [] } = useTherapies()
+  const { data: groupClasses = [] } = useGroupClasses()
   const { data: users = [] } = useUsers()
   const { data: allMemberships = [] } = useMemberships()
   const {
@@ -179,13 +181,23 @@ export default function BookingsPage() {
       kind: 'therapy',
     }))
 
-    return [...serviceItems, ...therapyItems]
-  }, [services, therapies])
+    const groupClassItems: BookableItemOption[] = groupClasses.map((gc) => ({
+      id: gc.id,
+      name: gc.name,
+      time: gc.durationMinutes,
+      creditCost: gc.creditsRequired,
+      slots: gc.slots || [],
+      kind: 'group-class',
+    }))
+
+    return [...serviceItems, ...therapyItems, ...groupClassItems]
+  }, [services, therapies, groupClasses])
 
   const visibleBookableItems = useMemo(() => {
     const byMode = allBookableItems.filter((item) => {
       if (mode === 'services') return item.kind === 'service'
       if (mode === 'therapies') return item.kind === 'therapy'
+      if (mode === 'group-classes') return item.kind === 'group-class'
       return true
     })
 
@@ -196,6 +208,15 @@ export default function BookingsPage() {
     () => allBookableItems.find((item) => item.id === formData.serviceId),
     [allBookableItems, formData.serviceId]
   )
+
+  const isGroupClassTooFarInAdvance = useMemo(() => {
+    if (selectedItem?.kind !== 'group-class' || !formData.bookingDate) return false
+    const today = new Date(getTodayDateKey() + 'T00:00:00.000Z')
+    const bookingDate = new Date(formData.bookingDate + 'T00:00:00.000Z')
+    const diffTime = bookingDate.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays > 3
+  }, [selectedItem, formData.bookingDate])
 
   const selectedSlotRefs = useMemo(
     () => selectedItem?.slots || [],
@@ -295,27 +316,32 @@ export default function BookingsPage() {
 
   const slotById = useMemo(() => new Map(slots.map((slot) => [slot._id, slot] as const)), [slots])
 
-  const enrichedBookings = useMemo<BookingWithNames[]>(
-    () =>
-      bookings
-        .map((booking) => ({
-          ...booking,
-          userName:
-            booking.user?.username ||
-            userNameById.get(booking.user?._id ?? '') ||
-            'Unknown User',
-          serviceName:
-            booking.service?.serviceName ||
-            itemNameById.get(booking.service?._id ?? '') ||
-            'Unknown Service',
-        }))
-        .sort((a, b) => {
-          const aTime = new Date(a.createdAt || a.bookingDate).getTime()
-          const bTime = new Date(b.createdAt || b.bookingDate).getTime()
-          return bTime - aTime
-        }),
-    [bookings, userNameById, itemNameById]
-  )
+  const enrichedBookings = useMemo<BookingWithNames[]>(() => {
+    const seen = new Set<string>()
+    const uniqueBookings = bookings.filter((b) => {
+      if (seen.has(b._id)) return false
+      seen.add(b._id)
+      return true
+    })
+
+    return uniqueBookings
+      .map((booking) => ({
+        ...booking,
+        userName:
+          booking.user?.username ||
+          userNameById.get(booking.user?._id ?? '') ||
+          'Unknown User',
+        serviceName:
+          booking.service?.serviceName ||
+          itemNameById.get(booking.service?._id ?? '') ||
+          'Unknown Service',
+      }))
+      .sort((a, b) => {
+        const aTime = new Date(a.createdAt || a.bookingDate).getTime()
+        const bTime = new Date(b.createdAt || b.bookingDate).getTime()
+        return bTime - aTime
+      })
+  }, [bookings, userNameById, itemNameById])
 
   const filtered = useMemo(
     () =>
@@ -373,7 +399,8 @@ export default function BookingsPage() {
     Boolean(formData.bookingDate && formData.userId && formData.slotId && formData.serviceId) &&
     !createBooking.isPending &&
     !isCheckingCredits &&
-    !isLowCredit
+    !isLowCredit &&
+    !isGroupClassTooFarInAdvance
 
   const handleRefreshBoard = async () => {
     await refetch()
@@ -422,6 +449,11 @@ export default function BookingsPage() {
     const bookingDateIso = toUtcStartOfDayIso(formData.bookingDate)
     if (!bookingDateIso) {
       toast.error('Invalid booking date selected.')
+      return
+    }
+
+    if (isGroupClassTooFarInAdvance) {
+      toast.error('Group classes can only be booked up to 3 days in advance.')
       return
     }
 
@@ -556,6 +588,7 @@ export default function BookingsPage() {
                     <SelectItem value="all">All</SelectItem>
                     <SelectItem value="services">Services</SelectItem>
                     <SelectItem value="therapies">Therapies</SelectItem>
+                    <SelectItem value="group-classes">Group Classes</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -617,7 +650,7 @@ export default function BookingsPage() {
               {formData.userId
                 ? selectedItem
                   ? `Choose a slot for ${selectedItem.name} on ${formatDateKey(formData.bookingDate)}`
-                  : 'Select a service or therapy to load matching slots'
+                  : 'Select a service, therapy, or group class to load matching slots'
                 : 'Select a member first to start spot booking'}
             </CardDescription>
           </CardHeader>
@@ -628,7 +661,11 @@ export default function BookingsPage() {
               </div>
             ) : !formData.serviceId ? (
               <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-                Choose a service or therapy in the left panel to view eligible windows.
+                Choose a service, therapy, or group class in the left panel to view eligible windows.
+              </div>
+            ) : isGroupClassTooFarInAdvance ? (
+              <div className="rounded-md border border-dashed p-6 text-sm text-amber-600 dark:text-amber-500">
+                Group classes can only be booked up to 3 days in advance. Please select an earlier date.
               </div>
             ) : displayedSlots.length === 0 ? (
               <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
@@ -856,7 +893,7 @@ export default function BookingsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {todaysUpcomingBookings.map((booking) => {
+                  {todaysUpcomingBookings.map((booking, index) => {
                     const slot =
                       booking.slot?.startTime && booking.slot?.endTime
                         ? booking.slot
@@ -867,7 +904,7 @@ export default function BookingsPage() {
                         : 'Time TBD'
 
                     return (
-                      <TableRow key={`today-${booking._id}`}>
+                      <TableRow key={`today-${booking._id}-${index}`}>
                         <TableCell>{timeLabel}</TableCell>
                         <TableCell className="font-medium text-sm">{booking.userName}</TableCell>
                         <TableCell className="text-sm">{booking.serviceName}</TableCell>
@@ -936,8 +973,8 @@ export default function BookingsPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      paginatedBookings.map((booking) => (
-                        <TableRow key={booking._id}>
+                      paginatedBookings.map((booking, index) => (
+                        <TableRow key={`${booking._id}-${index}`}>
                           <TableCell className="font-mono text-xs">{booking._id.slice(-6)}</TableCell>
                           <TableCell className="font-medium text-sm">{booking.userName}</TableCell>
                           <TableCell className="text-sm">{booking.serviceName}</TableCell>

@@ -167,6 +167,7 @@ export default function TherapiesPage() {
   const filteredItems = useMemo(
     () =>
       items.filter((item) => {
+        if (item.tags.some(t => t.toLowerCase() === '__group_class__')) return false
         const query = searchTerm.toLowerCase()
         return (
           item.name.toLowerCase().includes(query) ||
@@ -379,7 +380,14 @@ export default function TherapiesPage() {
   const parseCsvTags = (value: string) =>
     [...new Set(value.split(',').map((t) => t.trim()).filter(Boolean))]
 
-  const resetGcForm = () => setGcForm(defaultGcForm)
+  const resetGcForm = () => {
+    setGcForm(defaultGcForm)
+    setSelectedSlotIds([])
+    setSlotSearchTerm('')
+    setManualSlotIds('')
+    setShowManualSlotInput(false)
+    setSlotPlan({ startTime: '09:00', endTime: '17:00', capacityPerHour: 1 })
+  }
 
   const openCreateGcDialog = () => {
     setEditingGc(null)
@@ -401,6 +409,11 @@ export default function TherapiesPage() {
       scheduleInfo: gc.scheduleInfo,
       isActive: gc.isActive,
     })
+    setSelectedSlotIds(gc.slots || [])
+    setSlotSearchTerm('')
+    setManualSlotIds('')
+    setShowManualSlotInput(false)
+    setSlotPlan({ startTime: '09:00', endTime: '17:00', capacityPerHour: 1 })
     setGcDialogOpen(true)
   }
 
@@ -412,6 +425,12 @@ export default function TherapiesPage() {
     if (gcForm.creditsRequired <= 0) { toast.error('Credits required must be greater than 0'); return }
     if (gcForm.maxParticipants <= 0) { toast.error('Max participants must be greater than 0'); return }
 
+    const mergedSlotIds = Array.from(new Set([...selectedSlotIds, ...parseCsvTags(manualSlotIds)]))
+    if (mergedSlotIds.length === 0) {
+      toast.error('At least one booking slot is required for the class. Use "Generate Slots" or select from the list.')
+      return
+    }
+
     const payload = {
       name: gcForm.name.trim(),
       description: gcForm.description.trim(),
@@ -422,6 +441,7 @@ export default function TherapiesPage() {
       maxParticipants: gcForm.maxParticipants,
       tags: parseCsvTags(gcForm.tags),
       scheduleInfo: gcForm.scheduleInfo.trim(),
+      slots: mergedSlotIds,
       isActive: gcForm.isActive,
     }
 
@@ -1110,6 +1130,153 @@ export default function TherapiesPage() {
                       {gcForm.isActive ? 'Active — visible for booking' : 'Inactive — hidden from booking'}
                     </span>
                   </button>
+                </div>
+
+                {/* Slot Generation & Selection for Group Classes */}
+                <div className="space-y-3 rounded-lg border border-dashed p-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Generate Hourly Slots For This Class</label>
+                    <Badge variant="outline" className="rounded-full">Hourly</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Daily recurring slots are created for each hour in this range.
+                  </p>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Capacity Per Hour</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={slotPlan.capacityPerHour}
+                        onChange={(e) =>
+                          setSlotPlan({
+                            ...slotPlan,
+                            capacityPerHour: Number.parseInt(e.target.value, 10) || 1,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Start Hour</label>
+                      <Input
+                        type="time"
+                        step={3600}
+                        value={slotPlan.startTime}
+                        onChange={(e) => setSlotPlan({ ...slotPlan, startTime: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">End Hour</label>
+                      <Input
+                        type="time"
+                        step={3600}
+                        value={slotPlan.endTime}
+                        onChange={(e) => setSlotPlan({ ...slotPlan, endTime: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleGenerateSlots}
+                    disabled={isGeneratingSlots}
+                  >
+                    {isGeneratingSlots ? 'Generating Slots...' : 'Generate Slots For This Class'}
+                  </Button>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">
+                      Booking Windows For This Class
+                      {!editingGc && <span className="ml-1 text-red-500">*</span>}
+                    </label>
+                    <Badge variant={selectedSlotIds.length === 0 ? 'destructive' : 'secondary'} className="rounded-full">
+                      {selectedSlotIds.length} linked
+                    </Badge>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Select which time windows this class can be booked in. At least one slot is required.
+                  </p>
+
+                  <Input
+                    value={slotSearchTerm}
+                    onChange={(e) => setSlotSearchTerm(e.target.value)}
+                    placeholder="Filter slots by schedule, time, or ID"
+                  />
+
+                  <div className="rounded-md border">
+                    <ScrollArea className="h-44">
+                      <div className="space-y-2 p-2">
+                        {isLoadingSlots ? (
+                          [...Array(4)].map((_, index) => (
+                            <Skeleton key={index} className="h-14 w-full" />
+                          ))
+                        ) : isSlotsError ? (
+                          <p className="p-2 text-sm text-red-500">
+                            Failed to load slots. You can still add IDs manually.
+                          </p>
+                        ) : filteredSlotOptions.length === 0 ? (
+                          <p className="p-2 text-sm text-muted-foreground">No slots match this filter.</p>
+                        ) : (
+                          filteredSlotOptions.map((slot: Slot) => (
+                            <label
+                              key={slot._id}
+                              className="flex cursor-pointer items-start gap-3 rounded-md border p-2 hover:bg-muted/40"
+                            >
+                              <Checkbox
+                                checked={selectedSlotIds.includes(slot._id)}
+                                onCheckedChange={() => toggleSlotSelection(slot._id)}
+                                className="mt-0.5"
+                              />
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium">
+                                  {formatSlotDate(slot.date, slot.isDaily)} - {slot.startTime} to {slot.endTime}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={slot.remainingCapacity <= 0 ? 'destructive' : 'secondary'}>
+                                    {slot.remainingCapacity <= 0 ? 'Full' : `Open ${slot.remainingCapacity}/${slot.capacity}`}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">ID ...{slot._id.slice(-8)}</span>
+                                </div>
+                              </div>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Use Generate Slots above for new windows, or link existing windows from this list.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowManualSlotInput((current) => !current)}
+                    >
+                      {showManualSlotInput ? 'Hide Advanced IDs' : 'Advanced: Manual IDs'}
+                    </Button>
+                  </div>
+
+                  {showManualSlotInput && (
+                    <Input
+                      value={manualSlotIds}
+                      onChange={(e) => setManualSlotIds(e.target.value)}
+                      placeholder="Advanced only: paste slot IDs separated by commas"
+                    />
+                  )}
+
+                  {missingSelectedSlotCount > 0 && (
+                    <p className="text-xs text-amber-600">
+                      {missingSelectedSlotCount} previously selected slot IDs are not in the current slot list and will still be saved.
+                    </p>
+                  )}
                 </div>
 
                 {/* Actions */}

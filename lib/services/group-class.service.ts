@@ -2,6 +2,8 @@
 // Currently uses localStorage for persistence.
 // When the backend API is ready, replace the CRUD functions with apiClient calls.
 
+import { therapyService } from './therapy.service'
+
 const STORAGE_KEY = 'fitflix_group_classes'
 
 export type GroupClassMode = 'online' | 'offline' | 'hybrid'
@@ -18,6 +20,7 @@ export interface GroupClass {
   tags: string[]
   scheduleInfo: string
   isActive: boolean
+  slots?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -32,6 +35,7 @@ export interface CreateGroupClassPayload {
   maxParticipants: number
   tags: string[]
   scheduleInfo: string
+  slots?: string[]
   isActive?: boolean
 }
 
@@ -54,6 +58,7 @@ function writeAll(classes: GroupClass[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(classes))
 }
 
+// generateId is no longer used for new classes as we use the shadow therapy ID.
 function generateId(): string {
   return `gc_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 }
@@ -73,10 +78,19 @@ export const groupClassService = {
   },
 
   create: async (payload: CreateGroupClassPayload): Promise<{ message: string; groupClass: GroupClass }> => {
-    await new Promise((r) => setTimeout(r, 80))
+    // Create shadow therapy in backend to generate a valid ObjectId and sync slots
+    const { therapy } = await therapyService.create({
+      name: payload.name,
+      time: payload.durationMinutes,
+      creditCost: payload.creditsRequired,
+      description: 'Shadow therapy for Group Class',
+      tags: ['__group_class__'],
+      slots: payload.slots || [],
+    })
+
     const now = new Date().toISOString()
     const newClass: GroupClass = {
-      id: generateId(),
+      id: therapy.id || generateId(),
       name: payload.name,
       description: payload.description,
       mode: payload.mode,
@@ -87,6 +101,7 @@ export const groupClassService = {
       tags: payload.tags,
       scheduleInfo: payload.scheduleInfo,
       isActive: payload.isActive ?? true,
+      slots: payload.slots || [],
       createdAt: now,
       updatedAt: now,
     }
@@ -97,23 +112,44 @@ export const groupClassService = {
   },
 
   update: async (id: string, payload: UpdateGroupClassPayload): Promise<{ message: string; groupClass: GroupClass }> => {
-    await new Promise((r) => setTimeout(r, 80))
     const all = readAll()
     const index = all.findIndex((c) => c.id === id)
     if (index === -1) throw new Error('Group class not found')
+    
     const updated: GroupClass = {
       ...all[index],
       ...payload,
-      id, // ensure id is not overwritten
+      id,
       updatedAt: new Date().toISOString(),
     }
+
+    if (!id.startsWith('gc_')) {
+      try {
+        await therapyService.update(id, {
+          name: updated.name,
+          time: updated.durationMinutes,
+          creditCost: updated.creditsRequired,
+          slots: updated.slots || [],
+          tags: ['__group_class__'],
+        })
+      } catch (e) {
+        console.warn('Failed to sync shadow therapy', e)
+      }
+    }
+
     all[index] = updated
     writeAll(all)
     return { message: 'Group class updated successfully', groupClass: updated }
   },
 
   delete: async (id: string): Promise<{ message: string }> => {
-    await new Promise((r) => setTimeout(r, 80))
+    if (!id.startsWith('gc_')) {
+      try {
+        await therapyService.delete(id)
+      } catch (e) {
+        console.warn('Failed to delete shadow therapy', e)
+      }
+    }
     const all = readAll()
     const filtered = all.filter((c) => c.id !== id)
     writeAll(filtered)
