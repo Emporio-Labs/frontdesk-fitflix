@@ -39,6 +39,11 @@ import {
   IconCoins,
   IconToggleRight,
   IconToggleLeft,
+  IconCalendarEvent,
+  IconRepeat,
+  IconCalendarTime,
+  IconAlertTriangle,
+  IconChevronDown,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import {
@@ -57,6 +62,149 @@ import { useSlots } from '@/hooks/use-slots'
 import type { TherapyCatalogItem } from '@/lib/services/therapy.service'
 import type { GroupClass, GroupClassMode } from '@/lib/services/group-class.service'
 import { slotService, type Slot } from '@/lib/services/slot.service'
+
+type ScheduleMode = 'one-time' | 'recurring'
+type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly'
+type RecurrenceLimit = 'end-date' | 'occurrences'
+
+interface GcSchedule {
+  mode: ScheduleMode
+  oneTimeDate: string
+  startTime: string
+  endTime: string
+  frequency: RecurrenceFrequency
+  daysOfWeek: number[]
+  limitMode: RecurrenceLimit
+  endDate: string
+  occurrences: number
+}
+
+const DEFAULT_SCHEDULE: GcSchedule = {
+  mode: 'recurring',
+  oneTimeDate: '',
+  startTime: '07:00',
+  endTime: '08:00',
+  frequency: 'weekly',
+  daysOfWeek: [1, 3, 5],
+  limitMode: 'occurrences',
+  endDate: '',
+  occurrences: 12,
+}
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(`${dateStr}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return dateStr
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function maxEndDate(): string {
+  const d = new Date()
+  d.setMonth(d.getMonth() + 3)
+  return d.toISOString().slice(0, 10)
+}
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function computeOccurrences(s: GcSchedule): Date[] {
+  const maxDate = new Date(maxEndDate() + 'T00:00:00')
+  const results: Date[] = []
+
+  if (s.mode === 'one-time') {
+    if (!s.oneTimeDate) return []
+    const d = new Date(`${s.oneTimeDate}T00:00:00`)
+    if (!Number.isNaN(d.getTime())) results.push(d)
+    return results
+  }
+
+  const absMax = s.limitMode === 'end-date'
+    ? (s.endDate ? new Date(`${s.endDate}T00:00:00`) : maxDate)
+    : maxDate
+  const capDate = absMax < maxDate ? absMax : maxDate
+  const maxOccurrences = s.limitMode === 'occurrences' ? Math.min(s.occurrences, 90) : 90
+
+  const cursor = new Date()
+  cursor.setHours(0, 0, 0, 0)
+
+  while (cursor <= capDate && results.length < maxOccurrences) {
+    const dayOfWeek = cursor.getDay()
+    const dayOfMonth = cursor.getDate()
+
+    if (s.frequency === 'daily') {
+      results.push(new Date(cursor))
+      cursor.setDate(cursor.getDate() + 1)
+    } else if (s.frequency === 'weekly') {
+      if (s.daysOfWeek.includes(dayOfWeek)) {
+        results.push(new Date(cursor))
+      }
+      cursor.setDate(cursor.getDate() + 1)
+    } else if (s.frequency === 'monthly') {
+      const targetDay = s.daysOfWeek.length > 0 ? s.daysOfWeek[0] : new Date().getDate()
+      if (dayOfMonth === targetDay) {
+        results.push(new Date(cursor))
+      }
+      cursor.setDate(cursor.getDate() + 1)
+    }
+  }
+  return results
+}
+
+function compileScheduleInfo(s: GcSchedule): string {
+  const timeRange = `${s.startTime} – ${s.endTime}`
+  if (s.mode === 'one-time') {
+    const dateLabel = s.oneTimeDate ? formatDate(s.oneTimeDate) : 'TBD'
+    return `One-Time: ${dateLabel} · ${timeRange}`
+  }
+  const occurrences = computeOccurrences(s)
+  const countLabel = occurrences.length > 0 ? `${occurrences.length} occurrence${occurrences.length !== 1 ? 's' : ''}` : 'no occurrences'
+  if (s.frequency === 'daily') {
+    const limitLabel = s.limitMode === 'end-date' && s.endDate ? `until ${formatDate(s.endDate)}` : `${s.occurrences} occurrence${s.occurrences !== 1 ? 's' : ''}`
+    return `Daily at ${timeRange} · ${limitLabel} (${countLabel})`
+  }
+  if (s.frequency === 'weekly') {
+    const days = s.daysOfWeek.slice().sort((a, b) => a - b).map(d => DAY_LABELS[d]).join(', ')
+    const limitLabel = s.limitMode === 'end-date' && s.endDate ? `until ${formatDate(s.endDate)}` : `${s.occurrences} occurrence${s.occurrences !== 1 ? 's' : ''}`
+    return `Weekly on ${days} at ${timeRange} · ${limitLabel} (${countLabel})`
+  }
+  const dayNum = s.daysOfWeek[0] ?? new Date().getDate()
+  const limitLabel = s.limitMode === 'end-date' && s.endDate ? `until ${formatDate(s.endDate)}` : `${s.occurrences} occurrence${s.occurrences !== 1 ? 's' : ''}`
+  return `Monthly on day ${dayNum} at ${timeRange} · ${limitLabel} (${countLabel})`
+}
+
+function parseTimeFromScheduleInfo(info: string): { start: string; end: string } | null {
+  const match = info.match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/)
+  if (!match) return null
+  return { start: match[1], end: match[2] }
+}
+
+function detectTrainerConflicts(
+  instructor: string,
+  schedule: GcSchedule,
+  allClasses: GroupClass[],
+  editingId?: string,
+): string[] {
+  if (!instructor.trim()) return []
+  const conflicts: string[] = []
+  const newStart = timeToMinutes(schedule.startTime)
+  const newEnd = timeToMinutes(schedule.endTime)
+  if (newStart === null || newEnd === null) return []
+  for (const gc of allClasses) {
+    if (gc.id === editingId || !gc.isActive || gc.instructor.trim().toLowerCase() !== instructor.trim().toLowerCase()) continue
+    const parsed = parseTimeFromScheduleInfo(gc.scheduleInfo)
+    if (!parsed) continue
+    const existStart = timeToMinutes(parsed.start)
+    const existEnd = timeToMinutes(parsed.end)
+    if (existStart === null || existEnd === null) continue
+    if (!(newEnd <= existStart || newStart >= existEnd)) {
+      conflicts.push(gc.name)
+    }
+  }
+  return conflicts
+}
 
 function formatSlotDate(rawDate?: string, isDaily = false) {
   if (isDaily || !rawDate) {
@@ -136,6 +284,8 @@ export default function TherapiesPage() {
     isActive: true,
   }
   const [gcForm, setGcForm] = useState(defaultGcForm)
+  const [gcSchedule, setGcSchedule] = useState<GcSchedule>(DEFAULT_SCHEDULE)
+  const [showPreview, setShowPreview] = useState(false)
 
   const {
     data: therapies = [],
@@ -381,6 +531,8 @@ export default function TherapiesPage() {
 
   const resetGcForm = () => {
     setGcForm(defaultGcForm)
+    setGcSchedule(DEFAULT_SCHEDULE)
+    setShowPreview(false)
     setSelectedSlotIds([])
     setSlotSearchTerm('')
     setManualSlotIds('')
@@ -408,6 +560,25 @@ export default function TherapiesPage() {
       scheduleInfo: gc.scheduleInfo,
       isActive: gc.isActive,
     })
+    const info = gc.scheduleInfo || ''
+    if (info.startsWith('One-Time:')) {
+      const timeMatch = info.match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/)
+      setGcSchedule({
+        ...DEFAULT_SCHEDULE,
+        mode: 'one-time',
+        startTime: timeMatch?.[1] ?? '07:00',
+        endTime: timeMatch?.[2] ?? '08:00',
+        oneTimeDate: '',
+      })
+    } else {
+      const timeMatch = info.match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/)
+      setGcSchedule({
+        ...DEFAULT_SCHEDULE,
+        startTime: timeMatch?.[1] ?? DEFAULT_SCHEDULE.startTime,
+        endTime: timeMatch?.[2] ?? DEFAULT_SCHEDULE.endTime,
+      })
+    }
+    setShowPreview(false)
     setSelectedSlotIds(gc.slots || [])
     setSlotSearchTerm('')
     setManualSlotIds('')
@@ -424,6 +595,39 @@ export default function TherapiesPage() {
     if (gcForm.creditsRequired <= 0) { toast.error('Credits required must be greater than 0'); return }
     if (gcForm.maxParticipants <= 0) { toast.error('Max participants must be greater than 0'); return }
 
+    if (gcSchedule.mode === 'one-time') {
+      if (!gcSchedule.oneTimeDate) { toast.error('Please select a class date'); return }
+      const st = timeToMinutes(gcSchedule.startTime)
+      const et = timeToMinutes(gcSchedule.endTime)
+      if (st === null || et === null) { toast.error('Please enter valid start and end times'); return }
+      if (st >= et) { toast.error('End time must be after start time'); return }
+    } else {
+      const st = timeToMinutes(gcSchedule.startTime)
+      const et = timeToMinutes(gcSchedule.endTime)
+      if (st === null || et === null) { toast.error('Please enter valid start and end times'); return }
+      if (st >= et) { toast.error('End time must be after start time'); return }
+      if (gcSchedule.frequency === 'weekly' && gcSchedule.daysOfWeek.length === 0) {
+        toast.error('Please select at least one day of the week'); return
+      }
+      if (gcSchedule.limitMode === 'end-date') {
+        if (!gcSchedule.endDate) { toast.error('Please set an end date for the recurring series'); return }
+        if (gcSchedule.endDate < todayStr()) { toast.error('End date must be in the future'); return }
+        if (gcSchedule.endDate > maxEndDate()) { toast.error('End date cannot exceed 3 months from today'); return }
+      } else {
+        if (!Number.isInteger(gcSchedule.occurrences) || gcSchedule.occurrences < 1) {
+          toast.error('Number of occurrences must be at least 1'); return
+        }
+      }
+    }
+
+    const compiledScheduleInfo = compileScheduleInfo(gcSchedule)
+
+    const conflicts = detectTrainerConflicts(gcForm.instructor, gcSchedule, groupClasses, editingGc?.id)
+    if (conflicts.length > 0) {
+      toast.error(`Trainer Scheduling Conflict! ${gcForm.instructor || 'This instructor'} is already teaching: ${conflicts.join(', ')} during these times.`)
+      return
+    }
+
     const mergedSlotIds = Array.from(new Set([...selectedSlotIds, ...parseCsvTags(manualSlotIds)]))
     if (mergedSlotIds.length === 0) {
       toast.error('At least one booking slot is required for the class. Use "Generate Slots" or select from the list.')
@@ -439,7 +643,7 @@ export default function TherapiesPage() {
       creditsRequired: gcForm.creditsRequired,
       maxParticipants: gcForm.maxParticipants,
       tags: parseCsvTags(gcForm.tags),
-      scheduleInfo: gcForm.scheduleInfo.trim(),
+      scheduleInfo: compiledScheduleInfo,
       slots: mergedSlotIds,
       isActive: gcForm.isActive,
     }
@@ -1103,6 +1307,249 @@ export default function TherapiesPage() {
                     onChange={(e) => setGcForm({ ...gcForm, scheduleInfo: e.target.value })}
                     placeholder="e.g. Mon, Wed, Fri — 7:00 AM"
                   />
+                </div>
+
+                {/* ═══════════════ SCHEDULING CONFIGURATION ═══════════════ */}
+                <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4 relative overflow-hidden">
+                  <div className="flex items-center gap-2 mb-2 border-b border-border/40 pb-3">
+                    <IconCalendarEvent className="h-4 w-4 text-primary" />
+                    <h4 className="font-semibold text-sm">Schedule Configuration</h4>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium">Schedule Mode</label>
+                    <div className="flex bg-muted/60 p-1 rounded-md max-w-fit">
+                      <button
+                        type="button"
+                        onClick={() => { setGcSchedule({ ...gcSchedule, mode: 'one-time' }); setShowPreview(true) }}
+                        className={`text-xs px-3 py-1.5 rounded-sm transition-colors ${gcSchedule.mode === 'one-time' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        One-Time Class
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setGcSchedule({ ...gcSchedule, mode: 'recurring' }); setShowPreview(true) }}
+                        className={`text-xs px-3 py-1.5 rounded-sm transition-colors ${gcSchedule.mode === 'recurring' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        Recurring Series
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {gcSchedule.mode === 'one-time' ? (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground mb-1 block">Class Date</label>
+                        <Input
+                          type="date"
+                          value={gcSchedule.oneTimeDate}
+                          min={todayStr()}
+                          onChange={(e) => { setGcSchedule({ ...gcSchedule, oneTimeDate: e.target.value }); setShowPreview(true) }}
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground mb-1 block">Recurrence</label>
+                        <Select
+                          value={gcSchedule.frequency}
+                          onValueChange={(val: RecurrenceFrequency) => { setGcSchedule({ ...gcSchedule, frequency: val }); setShowPreview(true) }}
+                        >
+                          <SelectTrigger className="bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="daily">Daily</SelectItem>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 items-end">
+                      <div className="w-full">
+                        <label className="text-sm font-medium text-muted-foreground mb-1 block">Time</label>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="time"
+                            value={gcSchedule.startTime}
+                            onChange={(e) => { setGcSchedule({ ...gcSchedule, startTime: e.target.value }); setShowPreview(true) }}
+                            className="bg-background px-2"
+                          />
+                          <span className="text-muted-foreground text-xs">-</span>
+                          <Input
+                            type="time"
+                            value={gcSchedule.endTime}
+                            onChange={(e) => { setGcSchedule({ ...gcSchedule, endTime: e.target.value }); setShowPreview(true) }}
+                            className="bg-background px-2"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {gcSchedule.mode === 'recurring' && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                      {gcSchedule.frequency === 'weekly' && (
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground mb-2 block">Days of the Week</label>
+                          <div className="flex flex-wrap gap-2">
+                            {DAY_LABELS.map((label, idx) => {
+                              const isSelected = gcSchedule.daysOfWeek.includes(idx)
+                              return (
+                                <button
+                                  key={label}
+                                  type="button"
+                                  onClick={() => {
+                                    const curr = new Set(gcSchedule.daysOfWeek)
+                                    if (curr.has(idx)) curr.delete(idx)
+                                    else curr.add(idx)
+                                    setGcSchedule({ ...gcSchedule, daysOfWeek: Array.from(curr).sort((a, b) => a - b) })
+                                    setShowPreview(true)
+                                  }}
+                                  className={`h-8 w-10 text-xs rounded-md border transition-all ${isSelected ? 'bg-primary border-primary text-primary-foreground font-medium shadow-sm' : 'bg-background hover:bg-muted text-muted-foreground'}`}
+                                >
+                                  {label.charAt(0)}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {gcSchedule.frequency === 'monthly' && (
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground mb-2 block">Day of the Month</label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={31}
+                            placeholder="e.g. 15"
+                            className="w-24 bg-background"
+                            value={gcSchedule.daysOfWeek[0] || ''}
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value, 10)
+                              if (!isNaN(v) && v >= 1 && v <= 31) {
+                                setGcSchedule({ ...gcSchedule, daysOfWeek: [v] })
+                                setShowPreview(true)
+                              } else {
+                                setGcSchedule({ ...gcSchedule, daysOfWeek: [] })
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      <div className="p-3 bg-background rounded-lg border flex flex-col gap-3">
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              className="accent-primary w-3.5 h-3.5"
+                              checked={gcSchedule.limitMode === 'occurrences'}
+                              onChange={() => { setGcSchedule({ ...gcSchedule, limitMode: 'occurrences' }); setShowPreview(true) }}
+                            />
+                            <span className="text-sm font-medium text-muted-foreground">Fixed amount</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              className="accent-primary w-3.5 h-3.5"
+                              checked={gcSchedule.limitMode === 'end-date'}
+                              onChange={() => { setGcSchedule({ ...gcSchedule, limitMode: 'end-date' }); setShowPreview(true) }}
+                            />
+                            <span className="text-sm font-medium text-muted-foreground">Until date</span>
+                          </label>
+                        </div>
+                        <div className="flex items-center pl-6">
+                          {gcSchedule.limitMode === 'occurrences' ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min={1}
+                                max={90}
+                                className="w-20 h-8"
+                                value={gcSchedule.occurrences}
+                                onChange={(e) => {
+                                  const v = parseInt(e.target.value, 10)
+                                  setGcSchedule({ ...gcSchedule, occurrences: isNaN(v) ? 1 : v })
+                                  setShowPreview(true)
+                                }}
+                              />
+                              <span className="text-xs text-muted-foreground">occurrences (max 90)</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="date"
+                                className="w-36 h-8"
+                                min={todayStr()}
+                                max={maxEndDate()}
+                                value={gcSchedule.endDate}
+                                onChange={(e) => { setGcSchedule({ ...gcSchedule, endDate: e.target.value }); setShowPreview(true) }}
+                              />
+                              <span className="text-xs text-muted-foreground">max 3 months</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {showPreview && (
+                    <div className="mt-2 space-y-3 animate-in fade-in duration-500">
+                      {(() => {
+                        const occurrences = computeOccurrences(gcSchedule)
+                        const conflicts = detectTrainerConflicts(gcForm.instructor, gcSchedule, groupClasses, editingGc?.id)
+                        return (
+                          <div className="space-y-3 bg-background border rounded-lg overflow-hidden">
+                            <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b">
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                <IconRepeat className="h-3.5 w-3.5" /> Schedule Preview
+                              </div>
+                              <Badge variant="outline" className="text-[10px] font-normal rounded-sm py-0 h-4">
+                                {occurrences.length} {occurrences.length === 1 ? 'class' : 'classes'}
+                              </Badge>
+                            </div>
+
+                            <div className="px-3 pb-3">
+                              {occurrences.length === 0 ? (
+                                <p className="text-sm text-muted-foreground py-2 text-center border border-dashed rounded-md bg-muted/20">
+                                  Select valid dates to see schedule
+                                </p>
+                              ) : (
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1 custom-scrollbar">
+                                    {occurrences.map((d, i) => (
+                                      <div key={i} className="text-[11px] bg-primary/10 text-primary px-1.5 py-0.5 rounded shadow-sm border border-primary/10 whitespace-nowrap">
+                                        {formatDate(d.toISOString().slice(0, 10))}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {conflicts.length > 0 && (
+                                    <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 text-red-600 rounded-md p-2 mt-2">
+                                      <IconAlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                                      <div className="text-xs leading-relaxed">
+                                        <p className="font-semibold mb-0.5">Trainer Scheduling Conflict!</p>
+                                        <p>
+                                          <span className="font-medium">{gcForm.instructor || 'This instructor'}</span> is already teaching: 
+                                          <span className="font-medium mx-1">{conflicts.join(', ')}</span> 
+                                          during these times.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+                  <div className="rounded-lg bg-muted/40 px-3 py-2">
+                    <p className="text-xs text-muted-foreground mb-0.5">Will be saved as:</p>
+                    <p className="text-xs font-mono text-foreground/80">{compileScheduleInfo(gcSchedule)}</p>
+                  </div>
                 </div>
 
                 {/* Tags */}
