@@ -167,7 +167,6 @@ export default function TherapiesPage() {
   const filteredItems = useMemo(
     () =>
       items.filter((item) => {
-        if (item.tags.some(t => t.toLowerCase() === '__group_class__')) return false
         const query = searchTerm.toLowerCase()
         return (
           item.name.toLowerCase().includes(query) ||
