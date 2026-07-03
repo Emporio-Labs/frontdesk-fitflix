@@ -22,15 +22,16 @@ import { useSlots } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
 import { BOOKING_STATUS } from '@/lib/services/booking.service'
+import { getDoctorDisplayName, getUserDisplayName } from '@/lib/populated'
 
 const STATUS_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6b7280']
 
 export default function DashboardPage() {
-  const { data: users = [], isLoading: usersLoading, refetch: refetchUsers } = useUsers()
-  const { data: bookings = [], isLoading: bookingsLoading, refetch: refetchBookings } = useBookings()
-  const { data: appointments = [], isLoading: apptLoading } = useAppointments()
-  const { data: doctors = [], isLoading: doctorsLoading } = useDoctors()
-  const { data: trainers = [], isLoading: trainersLoading } = useTrainers()
+  const { data: users = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useUsers()
+  const { data: bookings = [], isLoading: bookingsLoading, isError: bookingsError, refetch: refetchBookings } = useBookings()
+  const { data: appointments = [], isLoading: apptLoading, isError: apptError } = useAppointments()
+  const { data: doctors = [], isLoading: doctorsLoading, isError: doctorsError } = useDoctors()
+  const { data: trainers = [], isLoading: trainersLoading, isError: trainersError } = useTrainers()
   const { data: slots = [] } = useSlots()
   const { data: services = [] } = useServices()
   const { data: therapies = [] } = useTherapies()
@@ -81,11 +82,11 @@ export default function DashboardPage() {
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Operations</p>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <StatCard title="Members" icon={<IconUsers className="w-4 h-4 text-blue-500" />} value={users.length} sub="registered users" loading={usersLoading} href="/admin/users" />
-          <StatCard title="Doctors" icon={<IconStethoscope className="w-4 h-4 text-emerald-500" />} value={doctors.length} sub="on staff" loading={doctorsLoading} href="/admin/doctors" />
-          <StatCard title="Trainers" icon={<IconRun className="w-4 h-4 text-violet-500" />} value={trainers.length} sub="on staff" loading={trainersLoading} href="/admin/trainers" />
-          <StatCard title="Bookings" icon={<IconCalendarEvent className="w-4 h-4 text-amber-500" />} value={bookings.length} sub="total bookings" loading={bookingsLoading} href="/admin/bookings" />
-          <StatCard title="Appointments" icon={<IconCalendarStats className="w-4 h-4 text-rose-500" />} value={appointments.length} sub="total appointments" loading={apptLoading} href="/admin/appointments" />
+          <StatCard title="Members" icon={<IconUsers className="w-4 h-4 text-blue-500" />} value={users.length} sub="registered users" loading={usersLoading} error={usersError} href="/admin/users" />
+          <StatCard title="Doctors" icon={<IconStethoscope className="w-4 h-4 text-emerald-500" />} value={doctors.length} sub="on staff" loading={doctorsLoading} error={doctorsError} href="/admin/doctors" />
+          <StatCard title="Trainers" icon={<IconRun className="w-4 h-4 text-violet-500" />} value={trainers.length} sub="on staff" loading={trainersLoading} error={trainersError} href="/admin/trainers" />
+          <StatCard title="Bookings" icon={<IconCalendarEvent className="w-4 h-4 text-amber-500" />} value={bookings.length} sub="total bookings" loading={bookingsLoading} error={bookingsError} href="/admin/bookings" />
+          <StatCard title="Appointments" icon={<IconCalendarStats className="w-4 h-4 text-rose-500" />} value={appointments.length} sub="total appointments" loading={apptLoading} error={apptError} href="/admin/appointments" />
           <StatCard title="Open Slots" icon={<IconClock className="w-4 h-4 text-teal-500" />} value={availableSlots} sub={`across ${slots.length} slot windows`} loading={false} href="/admin/slots" />
         </div>
       </div>
@@ -104,6 +105,8 @@ export default function DashboardPage() {
               <div className="h-[220px] flex items-center justify-center">
                 <Skeleton className="w-full h-full" />
               </div>
+            ) : bookingsError ? (
+              <div className="h-[220px] flex items-center justify-center text-red-500 text-sm">Couldn&apos;t load bookings — try Refresh</div>
             ) : bookings.length === 0 ? (
               <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">No bookings yet</div>
             ) : (
@@ -137,6 +140,8 @@ export default function DashboardPage() {
           <CardContent>
             {bookingsLoading ? (
               <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
+            ) : bookingsError ? (
+              <p className="text-sm text-red-500 py-4 text-center">Couldn&apos;t load bookings — try Refresh</p>
             ) : recentBookings.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">No bookings yet</p>
             ) : (
@@ -175,6 +180,8 @@ export default function DashboardPage() {
           <CardContent>
             {apptLoading ? (
               <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
+            ) : apptError ? (
+              <p className="text-sm text-red-500 py-4 text-center">Couldn&apos;t load appointments — try Refresh</p>
             ) : recentAppointments.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">No appointments yet</p>
             ) : (
@@ -182,9 +189,9 @@ export default function DashboardPage() {
                 {recentAppointments.map((a) => (
                   <div key={a._id} className="flex items-center justify-between py-2 border-b last:border-0">
                     <div>
-                      <p className="text-sm font-mono">{a._id.slice(-10)}</p>
+                      <p className="text-sm font-medium">{getUserDisplayName(a.user)}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(a.appointmentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {getDoctorDisplayName(a.doctor)} · {new Date(a.appointmentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                     </div>
                     <StatusBadge status={a.status as number} map={BOOKING_STATUS} />
@@ -202,22 +209,22 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-2">
             <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/users"><IconUsers className="w-4 h-4 mr-2" />Add Member</Link>
+              <Link href="/admin/users?new=1"><IconUsers className="w-4 h-4 mr-2" />Add Member</Link>
             </Button>
             <Button asChild variant="outline" className="h-12 text-sm">
               <Link href="/admin/bookings"><IconCalendarEvent className="w-4 h-4 mr-2" />New Booking</Link>
             </Button>
             <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/appointments"><IconCalendarStats className="w-4 h-4 mr-2" />New Appointment</Link>
+              <Link href="/admin/appointments?new=1"><IconCalendarStats className="w-4 h-4 mr-2" />New Appointment</Link>
             </Button>
             <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/slots"><IconClock className="w-4 h-4 mr-2" />Create Slot</Link>
+              <Link href="/admin/slots?new=1"><IconClock className="w-4 h-4 mr-2" />Create Slot</Link>
             </Button>
             <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/doctors"><IconStethoscope className="w-4 h-4 mr-2" />Add Doctor</Link>
+              <Link href="/admin/doctors?new=1"><IconStethoscope className="w-4 h-4 mr-2" />Add Doctor</Link>
             </Button>
             <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/trainers"><IconRun className="w-4 h-4 mr-2" />Add Trainer</Link>
+              <Link href="/admin/trainers?new=1"><IconRun className="w-4 h-4 mr-2" />Add Trainer</Link>
             </Button>
           </CardContent>
         </Card>
@@ -229,13 +236,14 @@ export default function DashboardPage() {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCard({
-  title, icon, value, sub, loading, href,
+  title, icon, value, sub, loading, error, href,
 }: {
   title: string
   icon: React.ReactNode
   value: number
   sub: string
   loading: boolean
+  error?: boolean
   href: string
 }) {
   return (
@@ -246,8 +254,16 @@ function StatCard({
           {icon}
         </CardHeader>
         <CardContent>
-          {loading ? <Skeleton className="h-8 w-16 mb-1" /> : <div className="text-2xl font-bold">{value}</div>}
-          <p className="text-xs text-muted-foreground">{sub}</p>
+          {loading ? (
+            <Skeleton className="h-8 w-16 mb-1" />
+          ) : error ? (
+            <div className="text-2xl font-bold text-muted-foreground">—</div>
+          ) : (
+            <div className="text-2xl font-bold">{value}</div>
+          )}
+          <p className={`text-xs ${error ? 'text-red-500' : 'text-muted-foreground'}`}>
+            {error ? 'failed to load' : sub}
+          </p>
         </CardContent>
       </Card>
     </Link>

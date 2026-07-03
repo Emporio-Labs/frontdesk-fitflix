@@ -14,11 +14,13 @@ import {
 } from '@/components/ui/dialog'
 import { IconPlus, IconEdit, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { useTrainers, useCreateTrainer, useUpdateTrainer, useDeleteTrainer } from '@/hooks/use-trainers'
+import { useOpenNewParam } from '@/hooks/use-open-new-param'
 import { Trainer } from '@/lib/services/trainer.service'
 
 export default function TrainersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  useOpenNewParam(setIsDialogOpen)
   const [editingTrainer, setEditingTrainer] = useState<Trainer | null>(null)
   const [formData, setFormData] = useState({
     trainerName: '', email: '', phone: '', password: '',

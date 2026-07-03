@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -37,6 +37,7 @@ import {
 } from '@tabler/icons-react'
 import { CreateInvoiceSheet } from '@/components/invoices/create-invoice-sheet'
 import { useUsers } from '@/hooks/use-users'
+import { useAdmins } from '@/hooks/use-admins'
 import {
   CrmStatCard,
   FollowUpCard,
@@ -61,6 +62,16 @@ import KanbanColumn from './kanban-column'
 import KanbanCard from './kanban-card'
 
 export default function LeadsPage() {
+  // Persist the active tab in the URL so refresh keeps the user's context.
+  const [activeTab, setActiveTabState] = useState('board')
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab')
+    if (tab === 'reminders' || tab === 'analytics') setActiveTabState(tab)
+  }, [])
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab)
+    window.history.replaceState(null, '', `/admin/leads?tab=${tab}`)
+  }
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false)
   const [isInvoiceSheetOpen, setIsInvoiceSheetOpen] = useState(false)
@@ -87,6 +98,7 @@ export default function LeadsPage() {
   const addInteraction = useAddLeadInteraction()
   const contactAttempt = useRecordLeadContactAttempt()
   const { data: users = [] } = useUsers()
+  const { data: admins = [] } = useAdmins()
 
   const [formData, setFormData] = useState({
     name: '',
@@ -586,11 +598,23 @@ export default function LeadsPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Assigned Staff</label>
-                  <Input
+                  <select
                     value={formData.assignedStaffName}
                     onChange={(e) => setFormData({ ...formData, assignedStaffName: e.target.value })}
-                    placeholder="Staff member name"
-                  />
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">Unassigned</option>
+                    {admins.map((admin) => (
+                      <option key={admin._id} value={admin.adminName}>
+                        {admin.adminName}
+                      </option>
+                    ))}
+                    {/* Preserve a legacy free-text assignee not matching any account */}
+                    {formData.assignedStaffName &&
+                      !admins.some((admin) => admin.adminName === formData.assignedStaffName) && (
+                        <option value={formData.assignedStaffName}>{formData.assignedStaffName}</option>
+                      )}
+                  </select>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Status</label>
@@ -662,7 +686,7 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="board" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="board">Board</TabsTrigger>
           <TabsTrigger value="reminders">Reminders</TabsTrigger>

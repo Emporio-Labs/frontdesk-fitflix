@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Card,
   CardContent,
@@ -1373,12 +1373,18 @@ function ActiveUsersTab() {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 function NutritionDashboardContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const initialTab = searchParams.get('tab') ?? 'overview'
   const reviewUserIdFromUrl = searchParams.get('review')
-  const [activeTab, setActiveTab] = useState(() =>
+  const [activeTab, setActiveTabState] = useState(() =>
     reviewUserIdFromUrl ? 'bookings' : initialTab
   )
+  // Keep the active tab in the URL so refresh/back/share preserve context.
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab)
+    router.replace(`/admin/nutrition?tab=${tab}`, { scroll: false })
+  }
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignUserId, setAssignUserId] = useState<string | undefined>()
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)

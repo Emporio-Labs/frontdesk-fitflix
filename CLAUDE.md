@@ -56,7 +56,7 @@ Single axios instance in `lib/api-client.ts` — **import as `{ apiClient }`**.
 
 Request interceptor injects `Authorization: Bearer <hh_token>` on every request except `/auth/*`. Falls back to `Basic <hh_credentials>` if no Bearer token exists. `NEXT_PUBLIC_DEBUG_AUTH=1` logs all requests/responses to the console.
 
-There is **no token-refresh logic** — token expiry results in 401 errors surfaced as toast messages.
+The response interceptor handles token refresh: on 401/403 it attempts `POST /auth/refresh` (using `hh_refresh_token`) and retries once; an unrecoverable 401 clears the session and hard-redirects to `/login`. 403s keep the session and surface as page-level errors.
 
 ### Service layer
 
@@ -75,7 +75,7 @@ export const someService = {
 }
 ```
 
-**Exception:** `membership-plan.service.ts` uses a plain axios instance (no auth header) and hits **Next.js API routes** at `/api/membership-plans`, not the backend directly.
+`membership-plan.service.ts` follows the standard pattern (backend `/membership-plans` via `apiClient`), but normalises the backend shape (`name/price/creditsIncluded/active`) into the UI shape (`planName/totalPrice/benefits.credits/status`).
 
 ### React Query hooks
 
@@ -103,7 +103,6 @@ All query keys are centralised in `lib/query-keys.ts`. Default query client conf
 | Route | Behaviour |
 |---|---|
 | `app/api/leads/*` | Generic reverse proxy to backend via `app/api/leads/proxy.ts`. Forwards auth/cookie/x-* headers, strips hop-by-hop headers. |
-| `app/api/membership-plans/*` | **Local file-backed store** (`lib/server/membership-plans-store.ts` → `.data/membership-plans.json`). Not a backend proxy. |
 
 ### State management
 

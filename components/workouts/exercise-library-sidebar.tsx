@@ -14,26 +14,26 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { IconPlus, IconSearch, IconLock } from '@tabler/icons-react'
+import { toast } from 'sonner'
 import { useExercises } from '@/hooks/use-exercises'
 import { useWorkoutStore } from '@/stores/workout-store'
 import { MuscleGroupIcon } from '@/components/workouts/muscle-group-icon'
-import { MUSCLE_GROUPS, DIFFICULTIES } from '@/types/workout'
-import type { Exercise, MuscleGroup, Difficulty, ExerciseType, WorkoutSection } from '@/types/workout'
+import { MUSCLE_GROUPS, DIFFICULTIES, getExerciseSections } from '@/types/workout'
+import type { Exercise, MuscleGroup, Difficulty, WorkoutSection } from '@/types/workout'
 
-type CategoryTab = 'all' | 'workout' | 'stretching' | 'warmup'
+type CategoryTab = WorkoutSection | 'all'
 
-const CATEGORY_TABS: { label: string; value: CategoryTab; exerciseType?: ExerciseType }[] = [
+const CATEGORY_TABS: { label: string; value: CategoryTab }[] = [
   { label: 'All', value: 'all' },
-  { label: 'Workout', value: 'workout', exerciseType: 'Main' },
-  { label: 'Stretching', value: 'stretching', exerciseType: 'Stretching' },
-  { label: 'Warmup', value: 'warmup', exerciseType: 'Warmup' },
+  { label: 'Warm Up', value: 'warmup' },
+  { label: 'Workout', value: 'workout' },
+  { label: 'Stretching', value: 'stretching' },
 ]
 
-function sectionToCategory(section?: WorkoutSection): CategoryTab {
-  if (section === 'stretching') return 'stretching'
-  if (section === 'warmup') return 'warmup'
-  if (section === 'workout') return 'workout'
-  return 'all'
+const SECTION_LABELS: Record<WorkoutSection, string> = {
+  warmup: 'Warm Up',
+  workout: 'Workout',
+  stretching: 'Stretching',
 }
 
 export function ExerciseLibrarySidebar({
@@ -48,13 +48,13 @@ export function ExerciseLibrarySidebar({
   const [search, setSearch] = useState('')
   const [muscleFilter, setMuscleFilter] = useState<MuscleGroup | 'all'>('all')
   const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | 'all'>('all')
-  const [activeTab, setActiveTab] = useState<CategoryTab>(() => sectionToCategory(targetSection))
+  const [activeTab, setActiveTab] = useState<CategoryTab>(() => targetSection ?? 'all')
 
   const { addExerciseToDay, selectedDayIndex } = useWorkoutStore()
 
-  // Change A: sync activeTab whenever targetSection changes (sidebar stays mounted between opens)
+  // Sync activeTab whenever targetSection changes (sidebar stays mounted between opens)
   useEffect(() => {
-    setActiveTab(sectionToCategory(targetSection))
+    setActiveTab(targetSection ?? 'all')
   }, [targetSection])
 
   // Change D: reset search and filters when sidebar closes
@@ -66,41 +66,41 @@ export function ExerciseLibrarySidebar({
     }
   }, [open])
 
-  // Change B: lock to section type when opened from a specific section button
+  // Lock to the section's category when opened from a specific section button
   const locked = targetSection !== undefined
-  const activeTabDef = CATEGORY_TABS.find((t) => t.value === activeTab)
+  const activeSection: WorkoutSection | undefined =
+    targetSection ?? (activeTab !== 'all' ? activeTab : undefined)
 
   const { data, isLoading, isError } = useExercises({
     search: search || undefined,
     muscleGroup: muscleFilter !== 'all' ? muscleFilter : undefined,
     difficulty: difficultyFilter !== 'all' ? difficultyFilter : undefined,
-    exerciseType: activeTabDef?.exerciseType,
+    section: activeSection,
     limit: 50,
   })
 
-  const exercises = data?.exercises ?? []
+  // Client-side guard on top of the backend `section` filter, so a stale
+  // cached list can never insert an exercise into the wrong section
+  const exercises = (data?.exercises ?? []).filter(
+    (ex) => !activeSection || getExerciseSections(ex).includes(activeSection)
+  )
 
-  // Change C: auto-route to correct section based on exerciseType when no targetSection
   const handleAdd = (exercise: Exercise) => {
-    const section: WorkoutSection =
-      targetSection ??
-      (exercise.exerciseType === 'Warmup'
-        ? 'warmup'
-        : exercise.exerciseType === 'Stretching'
-        ? 'stretching'
-        : 'workout')
+    const allowed = getExerciseSections(exercise)
+    const section: WorkoutSection = targetSection ?? allowed[0]
+    if (!allowed.includes(section)) {
+      toast.error(
+        `"${exercise.name}" can't be added to ${SECTION_LABELS[section]} — it belongs to ${allowed
+          .map((s) => SECTION_LABELS[s])
+          .join(', ')}`
+      )
+      return
+    }
     addExerciseToDay(selectedDayIndex, exercise, section)
     onOpenChange(false)
   }
 
-  const sectionLabel =
-    targetSection === 'warmup'
-      ? 'Warmup'
-      : targetSection === 'stretching'
-      ? 'Stretching'
-      : targetSection === 'workout'
-      ? 'Workout'
-      : null
+  const sectionLabel = targetSection ? SECTION_LABELS[targetSection] : null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -126,7 +126,7 @@ export function ExerciseLibrarySidebar({
               <IconLock className="w-3 h-3 text-muted-foreground" />
               <span className="text-muted-foreground">
                 Adding to:{' '}
-                <span className="font-medium text-foreground capitalize">{targetSection}</span>
+                <span className="font-medium text-foreground">{sectionLabel}</span>
                 {' '}·{' '}
                 <span className="text-muted-foreground">Showing {sectionLabel} exercises only</span>
               </span>
@@ -230,7 +230,17 @@ function ExerciseRow({
         <MuscleGroupIcon group={exercise.muscleGroup} className="w-5 h-5" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{exercise.name}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="text-sm font-medium truncate">{exercise.name}</p>
+          {getExerciseSections(exercise).map((s) => (
+            <span
+              key={s}
+              className="text-[9px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground flex-shrink-0"
+            >
+              {SECTION_LABELS[s]}
+            </span>
+          ))}
+        </div>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[10px] text-muted-foreground">{exercise.muscleGroup}</span>
           {exercise.difficulty && (

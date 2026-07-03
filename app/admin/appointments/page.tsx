@@ -17,7 +17,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { IconPlus, IconTrash, IconRefresh } from '@tabler/icons-react'
+import { MemberCombobox } from '@/components/member-combobox'
 import { useAppointments, useCreateAppointment, useDeleteAppointment, useChangeAppointmentStatus } from '@/hooks/use-appointments'
+import { useOpenNewParam } from '@/hooks/use-open-new-param'
 import { useDoctors } from '@/hooks/use-doctors'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
@@ -58,6 +60,7 @@ function formatSlotWindowLabel(slot: {
 export default function AppointmentsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  useOpenNewParam(setIsDialogOpen)
   const [formData, setFormData] = useState({
     appointmentDate: '', userId: '', slotId: '', doctorId: '', serviceId: '', bypassCredits: false,
   })
@@ -181,26 +184,18 @@ export default function AppointmentsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">User ID</label>
+                  <label className="text-sm font-medium">Member</label>
                   {users.length > 0 ? (
-                    <Select onValueChange={(v) => setFormData({ ...formData, userId: v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a member" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user._id} value={user._id}>
-                            {user.username} ({user.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      placeholder="MongoDB ObjectId"
+                    <MemberCombobox
+                      members={users}
                       value={formData.userId}
-                      onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
+                      onChange={(v) => setFormData({ ...formData, userId: v })}
+                      placeholder="Select a member"
                     />
+                  ) : (
+                    <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+                      Couldn&apos;t load members — refresh and try again.
+                    </p>
                   )}
                 </div>
                 <div>
@@ -367,7 +362,7 @@ export default function AppointmentsPage() {
                           </Select>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => deleteAppointment.mutate(appt._id)} disabled={deleteAppointment.isPending}>
+                          <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm('Delete this appointment?')) deleteAppointment.mutate(appt._id) }} disabled={deleteAppointment.isPending}>
                             <IconTrash className="w-4 h-4" />
                           </Button>
                         </TableCell>

@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch'
 import { IconTrash, IconRefresh, IconCalendar } from '@tabler/icons-react'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { MemberCombobox } from '@/components/member-combobox'
 import { useBookings, useCreateBooking, useDeleteBooking, useChangeBookingStatus } from '@/hooks/use-bookings'
 import { useSlots } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
@@ -573,10 +574,10 @@ export default function BookingsPage() {
 
               <div className="p-3 border-l border-border space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Member</label>
-                <Select
-                  value={formData.userId || '__none__'}
-                  onValueChange={(value) => {
-                    const nextUserId = value === '__none__' ? '' : value
+                <MemberCombobox
+                  members={users}
+                  value={formData.userId}
+                  onChange={(nextUserId) => {
                     setFormData((prev) => ({
                       ...prev,
                       userId: nextUserId,
@@ -587,19 +588,8 @@ export default function BookingsPage() {
                     setTopUpMembershipId('')
                     setShowTopUp(false)
                   }}
-                >
-                  <SelectTrigger className="h-8 pl-0 pr-6 text-xs border-0 shadow-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none bg-transparent hover:bg-transparent [&>span]:truncate w-full">
-                    <SelectValue placeholder="Select member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Select member</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user._id} value={user._id}>
-                        {user.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  triggerClassName="h-8 px-0 text-xs border-0 shadow-none bg-transparent hover:bg-transparent focus-visible:ring-0"
+                />
               </div>
             </div>
 

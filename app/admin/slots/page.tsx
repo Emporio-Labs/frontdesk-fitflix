@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { IconPlus, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { useSlots, useCreateSlot, useDeleteSlot } from '@/hooks/use-slots'
+import { useOpenNewParam } from '@/hooks/use-open-new-param'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
 import { useBookings } from '@/hooks/use-bookings'
@@ -52,6 +53,7 @@ function formatSlotSchedule(date?: string, isDaily?: boolean) {
 
 export default function SlotsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  useOpenNewParam(setIsDialogOpen)
   const [formData, setFormData] = useState({ startTime: '', endTime: '', capacity: 1 })
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12
@@ -262,7 +264,7 @@ export default function SlotsPage() {
                             <TableCell className="text-right">
                               <Button
                                 size="sm" variant="outline" className="text-red-600"
-                                onClick={() => deleteSlot.mutate(slot._id)} disabled={deleteSlot.isPending}
+                                onClick={() => { if (confirm('Delete this slot?')) deleteSlot.mutate(slot._id) }} disabled={deleteSlot.isPending}
                               >
                                 <IconTrash className="w-4 h-4" />
                               </Button>

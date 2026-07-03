@@ -159,8 +159,10 @@ export default function SportsScientistPage() {
                                 <StatusBadge status={booked ? 'booked' : 'pending'} size="sm" />
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button asChild size="sm" variant="outline">
-                                  <Link href={`/admin/users/${user._id}`}>View User</Link>
+                                <Button asChild size="sm" variant={booked ? 'outline' : 'default'}>
+                                  <Link href={`/admin/users/${user._id}`}>
+                                    {booked ? 'View User' : 'Schedule Consult'}
+                                  </Link>
                                 </Button>
                               </TableCell>
                             </TableRow>

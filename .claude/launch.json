@@ -3,8 +3,9 @@
   "configurations": [
     {
       "name": "frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev"],
+      "autoPort": true,
       "port": 3001
     }
   ]

@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf } from '@tabler/icons-react'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
+import { useOpenNewParam } from '@/hooks/use-open-new-param'
 import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '@/hooks/use-admins'
 import { useMemberships } from '@/hooks/use-memberships'
 import { User, CreateUserPayload } from '@/lib/services/user.service'
@@ -54,6 +55,7 @@ export default function UsersPage() {
   // Member state
   const [memberSearch, setMemberSearch] = useState('')
   const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false)
+  useOpenNewParam(setIsMemberDialogOpen)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [memberForm, setMemberForm] = useState({
     username: '', email: '', phone: '', password: '',

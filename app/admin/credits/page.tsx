@@ -22,6 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IconRefresh } from '@tabler/icons-react'
+import { MemberCombobox } from '@/components/member-combobox'
 import { toast } from 'sonner'
 import { useUsers } from '@/hooks/use-users'
 import { useMemberships } from '@/hooks/use-memberships'
@@ -215,27 +216,16 @@ export default function CreditsPage() {
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <label className="text-sm font-medium">User</label>
-            <Select
-              value={selectedUserId || '__none__'}
-              onValueChange={(value) => {
-                const nextUserId = value === '__none__' ? '' : value
+            <MemberCombobox
+              members={users}
+              value={selectedUserId}
+              onChange={(nextUserId) => {
                 setSelectedUserId(nextUserId)
                 setTopUpMembershipId('')
                 setCurrentPage(1)
               }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a user" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Select a user</SelectItem>
-                {users.map((user) => (
-                  <SelectItem key={user._id} value={user._id}>
-                    {user.username} ({user.email})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select a user"
+            />
           </div>
 
           <div className="space-y-2">

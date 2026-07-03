@@ -42,12 +42,32 @@ export interface Exercise {
 export interface ExerciseFilters {
   muscleGroup?: MuscleGroup
   difficulty?: Difficulty
-  exerciseType?: ExerciseType
+  section?: WorkoutSection
   equipment?: string
   search?: string
   isSystem?: boolean
   page?: number
   limit?: number
+}
+
+// Central category resolution: backend stores sections in `sectionTypes`
+// (default ["workout"]); legacy `exerciseType` is mapped as a fallback.
+export function getExerciseSections(
+  exercise: Pick<Exercise, 'sectionTypes' | 'exerciseType'>
+): WorkoutSection[] {
+  if (exercise.sectionTypes && exercise.sectionTypes.length > 0) {
+    return exercise.sectionTypes
+  }
+  switch (exercise.exerciseType) {
+    case 'Warmup':
+      return ['warmup']
+    case 'Stretching':
+    case 'Cooldown':
+    case 'Mobility':
+      return ['stretching']
+    default:
+      return ['workout']
+  }
 }
 
 export interface PaginationInfo {
@@ -72,6 +92,7 @@ export interface CreateExercisePayload {
   commonMistakes?: string[]
   tips?: string[]
   caloriesPerSet?: number
+  sectionTypes?: WorkoutSection[]
   imageUrl?: string
 }
 
@@ -85,6 +106,7 @@ export interface UpdateExercisePayload {
   commonMistakes?: string[]
   tips?: string[]
   caloriesPerSet?: number
+  sectionTypes?: WorkoutSection[]
   imageUrl?: string
 }
 

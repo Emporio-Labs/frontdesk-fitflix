@@ -174,6 +174,11 @@ apiClient.interceptors.response.use(
         config.headers = { ...config.headers, Authorization: `Bearer ${newToken}` }
         return apiClient.request(config)
       }
+      // 403 = authenticated but not allowed (role/permission). Keep the session —
+      // the page surfaces the error. Only an unrecoverable 401 ends the session.
+      if (status === 403) {
+        return Promise.reject(error)
+      }
       // Refresh failed — clear session and redirect to login
       if (typeof window !== 'undefined' && !_isLoggingOut && window.location.pathname !== '/login') {
         _isLoggingOut = true
@@ -203,9 +208,11 @@ export function buildBasicAuth(email: string, password: string): string {
   return btoa(`${email}:${password}`)
 }
 
-export function storeCredentials(email: string, password: string) {
+// Deliberately does NOT persist the password: all API auth uses the Bearer
+// token, and front-desk machines are shared. Purges any legacy stored value.
+export function storeCredentials(email: string, _password: string) {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('hh_credentials', buildBasicAuth(email, password))
+    localStorage.removeItem('hh_credentials')
     localStorage.setItem('hh_email', email)
   }
 }

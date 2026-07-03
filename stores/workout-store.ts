@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { getExerciseSections } from '@/types/workout'
 import type {
   WorkoutPlan,
   WorkoutDay,
@@ -106,7 +107,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
           return { currentPlan: { ...s.currentPlan, days } }
         }),
 
-      addExerciseToDay: (dayIndex, exercise, section = 'workout') =>
+      addExerciseToDay: (dayIndex, exercise, section = getExerciseSections(exercise)[0]) =>
         set((s) => {
           const days = [...(s.currentPlan.days || [])]
           if (!days[dayIndex]) return s

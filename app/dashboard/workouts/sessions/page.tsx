@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +28,7 @@ import { workoutService } from '@/lib/services/workout.service'
 import type { WorkoutHistoryEntry } from '@/lib/services/workout.service'
 
 export default function SessionsPage() {
+  const router = useRouter()
   const [page, setPage] = useState(1)
   const limit = 20
 
@@ -202,7 +204,11 @@ export default function SessionsPage() {
                         : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-transparent'
 
                       return (
-                        <TableRow key={w.id}>
+                        <TableRow
+                          key={w.id}
+                          className="cursor-pointer"
+                          onClick={() => router.push(`/dashboard/workouts/session/${w.id}`)}
+                        >
                           <TableCell className="font-semibold text-sm">
                             {formatDate(w.date)}
                           </TableCell>

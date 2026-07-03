@@ -59,13 +59,18 @@ export default function LoginPage() {
         nutritionist: 'staff',
         user: 'sales', // restrict normal 'user' from accessing powerful dashboard reads if they shouldn't
       }
-      const mappedRole = roleMap[apiUser?.role] ?? 'clinic_admin'
+      // Unknown roles get the least-privileged UI role, never admin.
+      const mappedRole = roleMap[apiUser?.role] ?? 'sales'
+      // Return to the page the user was trying to reach (middleware sets ?from=).
+      // Only allow same-origin paths to avoid open redirects.
+      const from = new URLSearchParams(window.location.search).get('from')
+      const redirectTo = from && from.startsWith('/') && !from.startsWith('//') ? from : '/dashboard'
       login(email, password, {
         id: apiUser?.id ?? '',
         name: apiUser?.email ?? email,
         email: apiUser?.email ?? email,
         role: mappedRole,
-      })
+      }, redirectTo)
       toast.success('Welcome back!')
       // Redirect is handled inside login() via window.location.href
     } catch (err: any) {

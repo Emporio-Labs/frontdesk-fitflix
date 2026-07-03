@@ -34,7 +34,7 @@ export interface AuthContextType {
   isAuthenticated: boolean
   setRole: (role: UserRole) => void
   setUser: (user: AuthContextType['user']) => void
-  login: (email: string, password: string, userData: AuthContextType['user']) => void
+  login: (email: string, password: string, userData: AuthContextType['user'], redirectTo?: string) => void
   logout: () => void
 }
 
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = (email: string, password: string, userData: AuthContextType['user']) => {
+  const login = (email: string, password: string, userData: AuthContextType['user'], redirectTo?: string) => {
     storeCredentials(email, password)
     setAuthCookie()
     if (userData) {
@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(userData?.role ?? 'clinic_admin')
     // Hard redirect — ensures middleware sees the new cookie immediately
     if (typeof window !== 'undefined') {
-      window.location.href = '/dashboard'
+      window.location.href = redirectTo || '/dashboard'
     }
   }
 

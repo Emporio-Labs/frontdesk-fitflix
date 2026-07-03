@@ -14,11 +14,13 @@ import {
 } from '@/components/ui/dialog'
 import { IconPlus, IconEdit, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { useDoctors, useCreateDoctor, useUpdateDoctor, useDeleteDoctor } from '@/hooks/use-doctors'
+import { useOpenNewParam } from '@/hooks/use-open-new-param'
 import { Doctor } from '@/lib/services/doctor.service'
 
 export default function DoctorsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  useOpenNewParam(setIsDialogOpen)
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null)
   const [formData, setFormData] = useState({
     doctorName: '', email: '', phone: '', password: '',

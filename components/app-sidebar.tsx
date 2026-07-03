@@ -38,107 +38,61 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 
-const navMain = [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: IconDashboard,
-    },
-    {
-      title: "Users",
-      url: "/admin/users",
-      icon: IconUsers,
-    },
-    {
-      title: "Doctors",
-      url: "/admin/doctors",
-      icon: IconStethoscope,
-    },
-    {
-      title: "Trainers",
-      url: "/admin/trainers",
-      icon: IconRun,
-    },
-    {
-      title: "Sports Scientist",
-      url: "/admin/sports-scientist",
-      icon: IconActivity,
-    },
-    {
-      title: "Nutrition",
-      url: "/admin/nutrition",
-      icon: IconSalad,
-    },
-    {
-      title: "Workouts",
-      url: "/dashboard/workouts",
-      icon: IconBarbell,
-    },
-    {
-      title: "Memberships",
-      url: "/admin/memberships",
-      icon: IconHeartHandshake,
-    },
-    {
-      title: "Membership Plans",
-      url: "/admin/membership-plans",
-      icon: IconCards,
-    },
-    {
-      title: "Credits",
-      url: "/admin/credits",
-      icon: IconCreditCard,
-    },
-    {
-      title: "Services",
-      url: "/admin/therapies",
-      icon: IconListDetails,
-    },
-    {
-      title: "Bookings",
-      url: "/admin/bookings",
-      icon: IconCalendarEvent,
-    },
-    {
-      title: "Appointments",
-      url: "/admin/appointments",
-      icon: IconCalendarStats,
-    },
-    {
-      title: "Slots",
-      url: "/admin/slots",
-      icon: IconClock,
-    },
-    {
-      title: "DNA Testing",
-      url: "/admin/dna",
-      icon: IconDna,
-    },
-    {
-      title: "Reports",
-      url: "/admin/reports",
-      icon: IconReport,
-    },
-    {
-      title: "Leads",
-      url: "/admin/leads",
-      icon: IconTarget,
-    },
-    {
-      title: "Invoices",
-      url: "/admin/invoices",
-      icon: IconFileInvoice,
-    },
-    {
-      title: "Audit Logs",
-      url: "/admin/audit-logs",
-      icon: IconHistory,
-    },
-    {
-      title: "Settings",
-      url: "/admin/settings",
-      icon: IconSettings,
-    },
+const navGroups = [
+  {
+    items: [
+      { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      { title: "Users", url: "/admin/users", icon: IconUsers },
+      { title: "Doctors", url: "/admin/doctors", icon: IconStethoscope },
+      { title: "Trainers", url: "/admin/trainers", icon: IconRun },
+      { title: "Sports Scientist", url: "/admin/sports-scientist", icon: IconActivity },
+    ],
+  },
+  {
+    label: "Programs",
+    items: [
+      { title: "Nutrition", url: "/admin/nutrition", icon: IconSalad },
+      { title: "Workouts", url: "/dashboard/workouts", icon: IconBarbell },
+    ],
+  },
+  {
+    label: "Scheduling",
+    items: [
+      { title: "Services", url: "/admin/therapies", icon: IconListDetails },
+      { title: "Bookings", url: "/admin/bookings", icon: IconCalendarEvent },
+      { title: "Appointments", url: "/admin/appointments", icon: IconCalendarStats },
+      { title: "Slots", url: "/admin/slots", icon: IconClock },
+    ],
+  },
+  {
+    label: "Commerce",
+    items: [
+      { title: "Memberships", url: "/admin/memberships", icon: IconHeartHandshake },
+      { title: "Membership Plans", url: "/admin/membership-plans", icon: IconCards },
+      { title: "Credits", url: "/admin/credits", icon: IconCreditCard },
+      { title: "Invoices", url: "/admin/invoices", icon: IconFileInvoice },
+    ],
+  },
+  {
+    label: "Insights",
+    items: [
+      { title: "Leads", url: "/admin/leads", icon: IconTarget },
+      { title: "DNA Testing", url: "/admin/dna", icon: IconDna },
+      { title: "Reports", url: "/admin/reports", icon: IconReport },
+      { title: "Audit Logs", url: "/admin/audit-logs", icon: IconHistory },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { title: "Settings", url: "/admin/settings", icon: IconSettings },
+    ],
+  },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -173,7 +127,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain groups={navGroups} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={navUser} />
