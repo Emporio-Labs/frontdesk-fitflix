@@ -227,12 +227,12 @@ function ExerciseRow({
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors group">
       <div className="flex items-center justify-center w-9 h-9 rounded-md bg-muted flex-shrink-0">
-        <MuscleGroupIcon group={exercise.muscleGroup} className="w-5 h-5" />
+        <MuscleGroupIcon group={exercise.muscleGroups?.[0] || 'Chest'} className="w-5 h-5" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{exercise.name}</p>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-[10px] text-muted-foreground">{exercise.muscleGroup}</span>
+          <span className="text-[10px] text-muted-foreground">{exercise.muscleGroups?.join(', ')}</span>
           {exercise.difficulty && (
             <>
               <span className="text-muted-foreground">·</span>

@@ -22,7 +22,7 @@ export type PlanGoal =
 export interface Exercise {
   _id: string
   name: string
-  muscleGroup: MuscleGroup
+  muscleGroups: MuscleGroup[]
   targetedMuscles: string[]
   difficulty: Difficulty
   equipment: string
@@ -64,7 +64,7 @@ export interface ExerciseListResponse {
 
 export interface CreateExercisePayload {
   name: string
-  muscleGroup: MuscleGroup
+  muscleGroups: MuscleGroup[]
   targetedMuscles: string[]
   difficulty: Difficulty
   equipment?: string
@@ -77,7 +77,7 @@ export interface CreateExercisePayload {
 
 export interface UpdateExercisePayload {
   name?: string
-  muscleGroup?: MuscleGroup
+  muscleGroups?: MuscleGroup[]
   targetedMuscles?: string[]
   difficulty?: Difficulty
   equipment?: string
@@ -92,7 +92,7 @@ export interface UpdateExercisePayload {
 export interface WorkoutExercise {
   _id?: string
   exerciseId: string
-  exercise?: Pick<Exercise, 'name' | 'muscleGroup' | 'difficulty' | 'equipment' | 'caloriesPerSet' | 'exerciseType' | 'sectionTypes'>
+  exercise?: Pick<Exercise, 'name' | 'muscleGroups' | 'difficulty' | 'equipment' | 'caloriesPerSet' | 'exerciseType' | 'sectionTypes'>
   orderIndex: number
   targetSets: number
   targetReps: number

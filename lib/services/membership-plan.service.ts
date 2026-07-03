@@ -62,6 +62,7 @@ function parseNumber(value: unknown, fallback = 0) {
 }
 
 function normalizePlan(raw: any): MembershipPlan {
+<<<<<<< Updated upstream
   const benefits = raw?.benefits && typeof raw.benefits === 'object' ? raw.benefits : {}
   const rawStatus = String(raw?.status || 'active').toLowerCase()
   const status: MembershipPlanStatus = rawStatus === 'inactive' ? 'Inactive' : 'Active'
@@ -74,6 +75,35 @@ function normalizePlan(raw: any): MembershipPlan {
     planName: raw?.plan_name || raw?.planName || raw?.name || 'Custom',
     durationMonths,
     totalPrice,
+=======
+  const benefits: MembershipPlanBenefits =
+    raw?.benefits && typeof raw.benefits === 'object' ? { ...raw.benefits } : {}
+  if (benefits.credits === undefined && raw?.creditsIncluded !== undefined) {
+    benefits.credits = parseNumber(raw.creditsIncluded, 0)
+  }
+
+  const status: MembershipPlanStatus =
+    typeof raw?.active === 'boolean'
+      ? raw.active
+        ? 'Active'
+        : 'Inactive'
+      : String(raw?.status || 'active').toLowerCase() === 'inactive'
+        ? 'Inactive'
+        : 'Active'
+
+  const rawDurationDays = raw?.duration_days ?? raw?.durationDays
+  const durationDays = rawDurationDays !== undefined && rawDurationDays !== null
+    ? parseNumber(rawDurationDays, 0) || undefined
+    : undefined
+
+  return {
+    id: raw?._id || raw?.id || raw?.plan_id || '',
+    gymId: raw?.gymId || raw?.gym_id || '',
+    planName: raw?.name || raw?.planName || raw?.plan_name || 'Custom',
+    durationMonths: parseNumber(raw?.durationMonths ?? raw?.duration_months ?? raw?.duration, 1),
+    durationDays,
+    totalPrice: parseNumber(raw?.price ?? raw?.totalPrice ?? raw?.total_price, 0),
+>>>>>>> Stashed changes
     currency: String(raw?.currency || 'USD').toUpperCase(),
     status,
     features: Array.isArray(raw?.features) ? raw.features.filter(Boolean) : [],
@@ -83,6 +113,28 @@ function normalizePlan(raw: any): MembershipPlan {
   }
 }
 
+<<<<<<< Updated upstream
+=======
+function toBackendPayload(payload: UpdateMembershipPlanPayload) {
+  const body: Record<string, unknown> = {}
+  if (payload.planName !== undefined) body.name = payload.planName
+  if (payload.totalPrice !== undefined) body.price = payload.totalPrice
+  if (payload.currency !== undefined) body.currency = payload.currency
+  if (payload.durationMonths !== undefined) body.durationMonths = payload.durationMonths
+  if (payload.durationDays !== undefined) body.durationDays = payload.durationDays
+  if (payload.features !== undefined) body.features = payload.features
+  if (payload.gymId !== undefined) body.gymId = payload.gymId
+  if (payload.status !== undefined) body.active = payload.status !== 'Inactive'
+  if (payload.benefits !== undefined) {
+    body.benefits = payload.benefits
+    if (payload.benefits.credits !== undefined) {
+      body.creditsIncluded = parseNumber(payload.benefits.credits, 0)
+    }
+  }
+  return body
+}
+
+>>>>>>> Stashed changes
 export const membershipPlanService = {
   getAll: async (gymId: string): Promise<{ plans: MembershipPlan[] }> => {
     const { data } = await membershipPlanClient.get('/api/membership-plans', { params: { gym_id: gymId } })
@@ -101,6 +153,7 @@ export const membershipPlanService = {
   },
 
   create: async (payload: CreateMembershipPlanPayload): Promise<{ message: string; plan: MembershipPlan }> => {
+<<<<<<< Updated upstream
     const { data } = await membershipPlanClient.post('/api/membership-plans', {
       gym_id: payload.gymId,
       plan_name: payload.planName,
@@ -111,6 +164,9 @@ export const membershipPlanService = {
       benefits: payload.benefits,
       status: payload.status === 'Inactive' ? 'inactive' : 'active',
     })
+=======
+    const { data } = await apiClient.post('/membership-plans', toBackendPayload(payload))
+>>>>>>> Stashed changes
     return {
       message: data?.message || 'Membership plan created successfully',
       plan: normalizePlan(data?.plan || data),
@@ -118,6 +174,7 @@ export const membershipPlanService = {
   },
 
   update: async (id: string, payload: UpdateMembershipPlanPayload): Promise<{ message: string; plan: MembershipPlan }> => {
+<<<<<<< Updated upstream
     const { data } = await membershipPlanClient.put(`/api/membership-plans/${id}`, {
       plan_name: payload.planName,
       duration_months: payload.durationMonths,
@@ -127,6 +184,9 @@ export const membershipPlanService = {
       benefits: payload.benefits,
       status: payload.status ? (payload.status === 'Inactive' ? 'inactive' : 'active') : undefined,
     })
+=======
+    const { data } = await apiClient.patch(`/membership-plans/${id}`, toBackendPayload(payload))
+>>>>>>> Stashed changes
     return {
       message: data?.message || 'Membership plan updated successfully',
       plan: normalizePlan(data?.plan || data),
