@@ -14,6 +14,8 @@ export function useWorkoutPlans(filters?: {
   status?: string
   goal?: string
   difficulty?: string
+  isTemplate?: boolean
+  search?: string
 }) {
   return useQuery({
     queryKey: queryKeys.workoutPlans.list(filters),
@@ -81,6 +83,20 @@ export function useDeleteWorkoutPlan() {
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.error || 'Failed to delete workout plan')
+    },
+  })
+}
+
+export function useDuplicateWorkoutPlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => workoutPlanService.duplicate(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.workoutPlans.all() })
+      toast.success('Copy created — customize it freely')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || 'Failed to duplicate plan')
     },
   })
 }

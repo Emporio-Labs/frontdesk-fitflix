@@ -174,7 +174,8 @@ export interface WorkoutPlan {
   assignedUsers: string[]
   isTemplate: boolean
   templateCategory?: string
-  createdBy: string
+  // Plain ObjectId string, or populated `{ _id, name, email }` on list/detail responses
+  createdBy: string | { _id: string; name?: string; email?: string }
   createdAt: string
   updatedAt: string
 }

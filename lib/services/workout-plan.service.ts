@@ -82,6 +82,8 @@ export const workoutPlanService = {
       status?: string
       goal?: string
       difficulty?: string
+      isTemplate?: boolean
+      search?: string
     }
   ): Promise<WorkoutPlanListResponse> => {
     const params: Record<string, string | number> = {}
@@ -90,6 +92,8 @@ export const workoutPlanService = {
     if (filters?.status) params.status = filters.status
     if (filters?.goal) params.goal = filters.goal
     if (filters?.difficulty) params.difficulty = filters.difficulty
+    if (filters?.isTemplate !== undefined) params.isTemplate = String(filters.isTemplate)
+    if (filters?.search) params.search = filters.search
 
     const { data } = await apiClient.get('/workout-plans', { params })
     return data
@@ -112,6 +116,11 @@ export const workoutPlanService = {
 
   delete: async (id: string): Promise<{ message: string }> => {
     const { data } = await apiClient.delete(`/workout-plans/${id}`)
+    return data
+  },
+
+  duplicate: async (id: string): Promise<WorkoutPlan> => {
+    const { data } = await apiClient.post(`/workout-plans/${id}/duplicate`)
     return data
   },
 

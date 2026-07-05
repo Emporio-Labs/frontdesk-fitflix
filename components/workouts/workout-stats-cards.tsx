@@ -18,12 +18,16 @@ import { useWorkoutStats } from '@/hooks/use-workouts'
 
 export function WorkoutStatsCards() {
   const { data: plansData, isLoading: plansLoading } = useWorkoutPlans()
+  const { data: templatesData, isLoading: templatesLoading } = useWorkoutPlans({
+    isTemplate: true,
+    limit: 1,
+  })
   const { data: backendStats, isLoading: statsLoading } = useWorkoutStats()
 
   const plans = plansData?.plans ?? []
   const activePlans = plans.filter((p) => p.status === 'Active' || p.status === 'Published').length
   const draftPlans = plans.filter((p) => p.status === 'Draft').length
-  const templates = plans.filter((p) => p.isTemplate).length
+  const templates = templatesData?.pagination?.total ?? 0
   const assignedUsers = new Set(plans.flatMap((p) => p.assignedUsers)).size
   const totalExercises = plans.reduce(
     (sum, p) => sum + p.days.reduce((ds, d) => ds + d.exercises.length, 0),
@@ -93,7 +97,7 @@ export function WorkoutStatsCards() {
       sub: 'reusable plans',
       icon: <IconTemplate className="w-4 h-4 text-teal-500" />,
       href: '/dashboard/workouts/templates',
-      loading: plansLoading,
+      loading: templatesLoading,
     },
   ]
 

@@ -22,6 +22,7 @@ import {
   IconActivity,
   IconSalad,
   IconFileInvoice,
+  IconTemplate,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -58,6 +59,7 @@ const navGroups = [
     items: [
       { title: "Nutrition", url: "/admin/nutrition", icon: IconSalad },
       { title: "Workouts", url: "/dashboard/workouts", icon: IconBarbell },
+      { title: "Workout Templates", url: "/dashboard/workouts/templates", icon: IconTemplate },
     ],
   },
   {
