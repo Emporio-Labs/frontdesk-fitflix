@@ -40,7 +40,7 @@ export function useCreateWorkoutPlan() {
       toast.success('Workout plan created successfully')
     },
     onError: (err: any) => {
-      console.error('Create Plan Error:', err?.response?.data || err)
+      console.error('Create Plan Error:', err?.response?.status ?? '', err?.response?.data ?? err?.message ?? err)
       const details = err?.response?.data?.details
       const detailsMsg = Array.isArray(details)
         ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
@@ -62,7 +62,7 @@ export function useUpdateWorkoutPlan() {
       toast.success('Workout plan updated successfully')
     },
     onError: (err: any) => {
-      console.error('Update Plan Error:', err?.response?.data || err)
+      console.error('Update Plan Error:', err?.response?.status ?? '', err?.response?.data ?? err?.message ?? err)
       const details = err?.response?.data?.details
       const detailsMsg = Array.isArray(details)
         ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
@@ -117,7 +117,7 @@ export function useAssignWorkoutPlan() {
       toast.success('Users assigned to workout plan')
     },
     onError: (err: any) => {
-      console.error('Assign Users Error:', err?.response?.data || err)
+      console.error('Assign Users Error:', err?.response?.status ?? '', err?.response?.data ?? err?.message ?? err)
       const details = err?.response?.data?.details
       const detailsMsg = Array.isArray(details)
         ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')

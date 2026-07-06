@@ -22,6 +22,7 @@ import {
 } from '@/hooks/use-workout-plans'
 import { toast } from 'sonner'
 import type { WorkoutPlan } from '@/types/workout'
+import { normalizePlanGoal, normalizePlanStatus, normalizeSplitType } from '@/types/workout'
 import type { CreateWorkoutPlanPayload } from '@/lib/services/workout-plan.service'
 
 const isMongoId = (id?: string): boolean => !!id && /^[0-9a-f]{24}$/i.test(id)
@@ -32,9 +33,9 @@ function buildApiPayload(plan: Partial<WorkoutPlan>, statusOverride?: string): C
     description: plan.description ?? undefined,
     difficulty: plan.difficulty || 'Intermediate',
     duration: plan.duration || 4,
-    goal: plan.goal || 'Custom',
-    splitType: plan.splitType,
-    status: statusOverride ?? plan.status,
+    goal: normalizePlanGoal(plan.goal),
+    splitType: normalizeSplitType(plan.splitType),
+    status: normalizePlanStatus(statusOverride ?? plan.status),
     isTemplate: plan.isTemplate,
     templateCategory: plan.templateCategory ?? undefined,
     days: (plan.days || []).map((day) => ({

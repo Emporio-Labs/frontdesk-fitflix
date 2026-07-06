@@ -5,16 +5,13 @@ export type SessionStatus = 'Active' | 'Completed' | 'Abandoned'
 export type ExerciseType = 'Warmup' | 'Main' | 'Mobility' | 'Stretching' | 'Cooldown' | 'Cardio'
 export type WorkoutSection = 'warmup' | 'workout' | 'stretching'
 
-export type PlanStatus = 'Draft' | 'Published' | 'Active' | 'Paused' | 'Completed' | 'Archived'
-export type SplitType = 'FullBody' | 'UpperLower' | 'PushPull' | 'PushPullLegs' | 'BroSplit' | 'Custom'
+export type PlanStatus = 'Draft' | 'Active' | 'Paused' | 'Completed' | 'Archived'
+export type SplitType = 'FullBody' | 'UpperLower' | 'PushPull' | 'PushPullLegs' | 'Custom'
 export type PlanGoal =
-  | 'MuscleGain'
-  | 'Hypertrophy'
-  | 'WeightLoss'
   | 'Strength'
+  | 'Hypertrophy'
   | 'Endurance'
-  | 'Mobility'
-  | 'GeneralFitness'
+  | 'WeightLoss'
   | 'Maintenance'
   | 'Custom'
 
@@ -213,13 +210,10 @@ export const DIFFICULTIES: Difficulty[] = ['Beginner', 'Intermediate', 'Advanced
 export const EXERCISE_TYPES: ExerciseType[] = ['Warmup', 'Main', 'Mobility', 'Stretching', 'Cooldown', 'Cardio']
 export const WORKOUT_SECTIONS: WorkoutSection[] = ['warmup', 'workout', 'stretching']
 export const PLAN_GOALS: { value: PlanGoal; label: string }[] = [
-  { value: 'MuscleGain', label: 'Muscle Gain' },
-  { value: 'Hypertrophy', label: 'Hypertrophy' },
-  { value: 'WeightLoss', label: 'Weight Loss' },
+  { value: 'Hypertrophy', label: 'Muscle Gain (Hypertrophy)' },
   { value: 'Strength', label: 'Strength' },
+  { value: 'WeightLoss', label: 'Weight Loss' },
   { value: 'Endurance', label: 'Endurance' },
-  { value: 'Mobility', label: 'Mobility' },
-  { value: 'GeneralFitness', label: 'General Fitness' },
   { value: 'Maintenance', label: 'Maintenance' },
   { value: 'Custom', label: 'Custom' },
 ]
@@ -228,14 +222,37 @@ export const SPLIT_TYPES: { value: SplitType; label: string }[] = [
   { value: 'UpperLower', label: 'Upper / Lower' },
   { value: 'PushPull', label: 'Push / Pull' },
   { value: 'PushPullLegs', label: 'Push / Pull / Legs' },
-  { value: 'BroSplit', label: 'Bro Split' },
   { value: 'Custom', label: 'Custom' },
 ]
 export const PLAN_STATUSES: { value: PlanStatus; label: string }[] = [
   { value: 'Draft', label: 'Draft' },
-  { value: 'Published', label: 'Published' },
   { value: 'Active', label: 'Active' },
   { value: 'Paused', label: 'Paused' },
   { value: 'Completed', label: 'Completed' },
   { value: 'Archived', label: 'Archived' },
 ]
+
+// Drafts persisted to localStorage before the enums were aligned with the
+// backend may still carry values the API rejects — map them to valid ones.
+const LEGACY_GOAL_MAP: Record<string, PlanGoal> = {
+  MuscleGain: 'Hypertrophy',
+  Mobility: 'Custom',
+  GeneralFitness: 'Maintenance',
+}
+
+export function normalizePlanGoal(goal?: string): PlanGoal {
+  if (!goal) return 'Custom'
+  if (PLAN_GOALS.some((g) => g.value === goal)) return goal as PlanGoal
+  return LEGACY_GOAL_MAP[goal] ?? 'Custom'
+}
+
+export function normalizeSplitType(splitType?: string): SplitType | undefined {
+  if (!splitType) return undefined
+  return SPLIT_TYPES.some((s) => s.value === splitType) ? (splitType as SplitType) : 'Custom'
+}
+
+export function normalizePlanStatus(status?: string): PlanStatus | undefined {
+  if (!status) return undefined
+  if (PLAN_STATUSES.some((s) => s.value === status)) return status as PlanStatus
+  return status === 'Published' ? 'Active' : 'Draft'
+}

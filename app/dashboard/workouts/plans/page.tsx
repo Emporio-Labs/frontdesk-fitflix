@@ -104,7 +104,6 @@ function PlansContent() {
                   <SelectItem value="All">All Statuses</SelectItem>
                   <SelectItem value="Active">Active</SelectItem>
                   <SelectItem value="Draft">Draft</SelectItem>
-                  <SelectItem value="Published">Published</SelectItem>
                 </SelectContent>
               </Select>
             </div>
