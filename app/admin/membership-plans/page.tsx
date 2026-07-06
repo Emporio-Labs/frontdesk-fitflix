@@ -40,7 +40,9 @@ import { useMemberships } from '@/hooks/use-memberships'
 
 type FormState = {
   planName: string
+  durationUnit: 'months' | 'days'
   durationMonths: number | ''
+  durationDays: number | ''
   totalPrice: number | ''
   currency: string
   status: MembershipPlanStatus
@@ -56,7 +58,9 @@ type FormState = {
 function defaultFormState(): FormState {
   return {
     planName: '',
+    durationUnit: 'months',
     durationMonths: 1,
+    durationDays: 1,
     totalPrice: 0,
     currency: 'INR',
     status: 'Active',
@@ -123,9 +127,12 @@ export default function MembershipPlansPage() {
   const openEdit = (plan: MembershipPlan) => {
     setEditingPlan(plan)
     const normalizedCurrency = String(plan.currency || '').toUpperCase()
+    const hasDays = plan.durationDays !== undefined && plan.durationDays !== null && plan.durationDays > 0
     setForm({
       planName: plan.planName,
-      durationMonths: plan.durationMonths,
+      durationUnit: hasDays ? 'days' : 'months',
+      durationMonths: hasDays ? 1 : plan.durationMonths,
+      durationDays: hasDays ? plan.durationDays! : 1,
       totalPrice: plan.totalPrice,
       currency: normalizedCurrency === 'USD' ? 'USD' : 'INR',
       status: plan.status,
@@ -163,12 +170,17 @@ export default function MembershipPlansPage() {
 
   const onSave = async () => {
     const durationMonths = Number(form.durationMonths)
+    const durationDays = Number(form.durationDays)
     const totalPrice = Number(form.totalPrice)
+    const isMonths = form.durationUnit === 'months'
 
     if (!resolvedPlanName) {
       return
     }
-    if (!Number.isFinite(durationMonths) || durationMonths <= 0 || durationMonths > 12) {
+    if (isMonths && (!Number.isFinite(durationMonths) || durationMonths <= 0 || durationMonths > 12)) {
+      return
+    }
+    if (!isMonths && (!Number.isFinite(durationDays) || durationDays <= 0 || durationDays > 365)) {
       return
     }
     if (!Number.isFinite(totalPrice) || totalPrice <= 0) {
@@ -178,7 +190,8 @@ export default function MembershipPlansPage() {
     const payload = {
       gymId,
       planName: resolvedPlanName,
-      durationMonths,
+      durationMonths: isMonths ? durationMonths : Math.ceil(durationDays / 30),
+      durationDays: isMonths ? null : durationDays,
       totalPrice,
       currency: form.currency.trim().toUpperCase() || 'INR',
       status: form.status,
@@ -277,31 +290,73 @@ export default function MembershipPlansPage() {
 
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
-                  <label className="text-sm font-medium">Duration (months)</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={12}
-                    value={form.durationMonths}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      if (value === '') {
-                        setForm({ ...form, durationMonths: '' })
-                        return
-                      }
-                      const parsed = Number.parseInt(value, 10)
-                      if (Number.isNaN(parsed)) {
-                        return
-                      }
-                      setForm({ ...form, durationMonths: Math.min(12, Math.max(1, parsed)) })
-                    }}
-                    onBlur={() => {
-                      if (form.durationMonths === '') {
-                        setForm({ ...form, durationMonths: 1 })
-                      }
-                    }}
-                  />
+                  <label className="text-sm font-medium">Duration Unit</label>
+                  <select
+                    className="mt-1 w-full rounded-md border px-3 py-2"
+                    value={form.durationUnit}
+                    onChange={(e) =>
+                      setForm({ ...form, durationUnit: e.target.value as 'months' | 'days' })
+                    }
+                  >
+                    <option value="months">Months</option>
+                    <option value="days">Days</option>
+                  </select>
                 </div>
+                {form.durationUnit === 'months' ? (
+                  <div>
+                    <label className="text-sm font-medium">Duration (months)</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={form.durationMonths}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === '') {
+                          setForm({ ...form, durationMonths: '' })
+                          return
+                        }
+                        const parsed = Number.parseInt(value, 10)
+                        if (Number.isNaN(parsed)) {
+                          return
+                        }
+                        setForm({ ...form, durationMonths: Math.min(12, Math.max(1, parsed)) })
+                      }}
+                      onBlur={() => {
+                        if (form.durationMonths === '') {
+                          setForm({ ...form, durationMonths: 1 })
+                        }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-sm font-medium">Duration (days)</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={form.durationDays}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === '') {
+                          setForm({ ...form, durationDays: '' })
+                          return
+                        }
+                        const parsed = Number.parseInt(value, 10)
+                        if (Number.isNaN(parsed)) {
+                          return
+                        }
+                        setForm({ ...form, durationDays: Math.min(365, Math.max(1, parsed)) })
+                      }}
+                      onBlur={() => {
+                        if (form.durationDays === '') {
+                          setForm({ ...form, durationDays: 1 })
+                        }
+                      }}
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="text-sm font-medium">Total Price</label>
                   <Input
@@ -475,7 +530,12 @@ export default function MembershipPlansPage() {
                   <p className="text-2xl font-bold">
                     {formatPrice(form.totalPrice, form.currency)}
                   </p>
-                  <p className="text-sm text-muted-foreground">{form.durationMonths} month plan</p>
+                  <p className="text-sm text-muted-foreground">
+                    {form.durationUnit === 'days'
+                      ? `${form.durationDays} day${Number(form.durationDays) !== 1 ? 's' : ''} plan`
+                      : `${form.durationMonths} month${Number(form.durationMonths) !== 1 ? 's' : ''} plan`
+                    }
+                  </p>
                   <ul className="list-disc space-y-1 pl-4 text-sm">
                     {form.features.length === 0 && <li>No features added yet</li>}
                     {form.features.map((feature) => (
@@ -526,7 +586,12 @@ export default function MembershipPlansPage() {
                     <p className="text-2xl font-bold">
                       {formatPrice(viewingPlan.totalPrice, viewingPlan.currency)}
                     </p>
-                    <p className="text-sm text-muted-foreground">{viewingPlan.durationMonths} month plan</p>
+                    <p className="text-sm text-muted-foreground">
+                      {viewingPlan.durationDays && viewingPlan.durationDays > 0
+                        ? `${viewingPlan.durationDays} day${viewingPlan.durationDays !== 1 ? 's' : ''} plan`
+                        : `${viewingPlan.durationMonths} month${viewingPlan.durationMonths !== 1 ? 's' : ''} plan`
+                      }
+                    </p>
                     <ul className="list-disc space-y-1 pl-4 text-sm">
                       {viewingPlan.features.length === 0 && <li>No features added yet</li>}
                       {viewingPlan.features.map((feature) => (
@@ -598,7 +663,12 @@ export default function MembershipPlansPage() {
                     filteredPlans.map((plan) => (
                       <TableRow key={plan.id}>
                         <TableCell>{plan.planName}</TableCell>
-                        <TableCell>{plan.durationMonths} months</TableCell>
+                        <TableCell>
+                          {plan.durationDays && plan.durationDays > 0
+                            ? `${plan.durationDays} day${plan.durationDays !== 1 ? 's' : ''}`
+                            : `${plan.durationMonths} month${plan.durationMonths !== 1 ? 's' : ''}`
+                          }
+                        </TableCell>
                         <TableCell>
                           {formatPrice(plan.totalPrice, plan.currency)}
                         </TableCell>

@@ -46,6 +46,7 @@ export interface ExerciseFilters {
   equipment?: string
   search?: string
   isSystem?: boolean
+  section?: WorkoutSection
   page?: number
   limit?: number
 }
@@ -72,6 +73,7 @@ export interface CreateExercisePayload {
   commonMistakes?: string[]
   tips?: string[]
   caloriesPerSet?: number
+  sectionTypes?: WorkoutSection[]
   imageUrl?: string
 }
 
@@ -85,6 +87,7 @@ export interface UpdateExercisePayload {
   commonMistakes?: string[]
   tips?: string[]
   caloriesPerSet?: number
+  sectionTypes?: WorkoutSection[]
   imageUrl?: string
 }
 

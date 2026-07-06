@@ -59,6 +59,7 @@ import {
   WorkoutSection,
 } from '@/types/workout'
 import type { Exercise, CreateExercisePayload, UpdateExercisePayload } from '@/types/workout'
+import { ExerciseDetailsDialog } from '@/components/workouts/exercise-details-dialog'
 
 // ─── Section Meta ─────────────────────────────────────────────────────────────
 const SECTION_META: Record<
@@ -451,14 +452,19 @@ function ExerciseGridCard({
   exercise,
   onEdit,
   onDelete,
+  onView,
 }: {
   exercise: Exercise
   onEdit: (ex: Exercise) => void
   onDelete: (ex: Exercise) => void
+  onView: (ex: Exercise) => void
 }) {
   const sections = (exercise.sectionTypes ?? ['workout']) as WorkoutSection[]
   return (
-    <Card className="group flex flex-col hover:shadow-md transition-all">
+    <Card 
+      className="group flex flex-col hover:shadow-md transition-all cursor-pointer"
+      onClick={() => onView(exercise)}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-wrap gap-1.5">
@@ -507,7 +513,7 @@ function ExerciseGridCard({
               size="sm"
               variant="outline"
               className="flex-1 h-7 text-xs"
-              onClick={() => onEdit(exercise)}
+              onClick={(e) => { e.stopPropagation(); onEdit(exercise); }}
             >
               <IconEdit className="w-3 h-3 mr-1" />
               Edit
@@ -516,7 +522,7 @@ function ExerciseGridCard({
               size="sm"
               variant="outline"
               className="flex-1 h-7 text-xs text-destructive hover:text-destructive"
-              onClick={() => onDelete(exercise)}
+              onClick={(e) => { e.stopPropagation(); onDelete(exercise); }}
             >
               <IconTrash className="w-3 h-3 mr-1" />
               Delete
@@ -550,6 +556,7 @@ export default function ExercisesPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null)
+  const [viewingExercise, setViewingExercise] = useState<Exercise | null>(null)
 
   const deleteExercise = useDeleteExercise()
 
@@ -573,6 +580,10 @@ export default function ExercisesPage() {
   const openEdit = (ex: Exercise) => {
     setEditingExercise(ex)
     setDialogOpen(true)
+  }
+
+  const openView = (ex: Exercise) => {
+    setViewingExercise(ex)
   }
 
   const handleDelete = async (ex: Exercise) => {
@@ -790,6 +801,7 @@ export default function ExercisesPage() {
                     exercise={ex}
                     onEdit={openEdit}
                     onDelete={handleDelete}
+                    onView={openView}
                   />
                 ))}
               </div>
@@ -829,6 +841,12 @@ export default function ExercisesPage() {
           if (!v) setEditingExercise(null)
         }}
         editingExercise={editingExercise}
+      />
+
+      <ExerciseDetailsDialog
+        open={!!viewingExercise}
+        onOpenChange={(open) => !open && setViewingExercise(null)}
+        exercise={viewingExercise}
       />
     </div>
   )
