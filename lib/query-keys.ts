@@ -14,6 +14,8 @@ export const queryKeys = {
   trainers: {
     all: () => ['trainers'] as const,
     detail: (id: string) => ['trainers', id] as const,
+    publicAll: () => ['trainers', 'public'] as const,
+    publicDetail: (id: string) => ['trainers', 'public', id] as const,
   },
   slots: {
     all: () => ['slots'] as const,
