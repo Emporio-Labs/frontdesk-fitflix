@@ -46,6 +46,7 @@ import {
   IconChevronDown,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { intFromInput } from '@/lib/utils'
 import {
   useCreateTherapy,
   useDeleteTherapy,
@@ -251,8 +252,8 @@ export default function TherapiesPage() {
   const [editingItem, setEditingItem] = useState<TherapyCatalogItem | null>(null)
   const [formData, setFormData] = useState({
     name: '',
-    time: 60,
-    creditCost: 1,
+    time: '60',
+    creditCost: '1',
     description: '',
     tags: '',
   })
@@ -339,8 +340,8 @@ export default function TherapiesPage() {
   const resetForm = () => {
     setFormData({
       name: '',
-      time: 60,
-      creditCost: 1,
+      time: '60',
+      creditCost: '1',
       description: '',
       tags: '',
     })
@@ -365,8 +366,8 @@ export default function TherapiesPage() {
     setEditingItem(item)
     setFormData({
       name: item.name,
-      time: item.time,
-      creditCost: item.creditCost,
+      time: String(item.time),
+      creditCost: String(item.creditCost),
       description: item.description,
       tags: item.tags.join(', '),
     })
@@ -480,12 +481,14 @@ export default function TherapiesPage() {
       return
     }
 
-    if (!Number.isFinite(formData.time) || formData.time <= 0) {
+    const timeMinutes = Number.parseInt(formData.time, 10)
+    if (!Number.isFinite(timeMinutes) || timeMinutes <= 0) {
       toast.error('Please enter a valid duration greater than 0')
       return
     }
 
-    if (!Number.isFinite(formData.creditCost) || formData.creditCost <= 0) {
+    const creditCost = Number.parseInt(formData.creditCost, 10)
+    if (!Number.isFinite(creditCost) || creditCost <= 0) {
       toast.error('Please enter a valid credit cost greater than 0')
       return
     }
@@ -499,8 +502,8 @@ export default function TherapiesPage() {
 
     const payload = {
       name: formData.name.trim(),
-      time: formData.time,
-      creditCost: formData.creditCost,
+      time: timeMinutes,
+      creditCost: creditCost,
       description: formData.description.trim(),
       tags: parseCsvInput(formData.tags),
       slots: mergedSlotIds,
@@ -893,8 +896,12 @@ export default function TherapiesPage() {
                   <label className="text-sm font-medium">Time (minutes)</label>
                   <Input
                     type="number"
+                    min={1}
                     value={formData.time}
-                    onChange={(e) => setFormData({ ...formData, time: Number.parseInt(e.target.value, 10) || 0 })}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '')
+                      setFormData({ ...formData, time: digits.replace(/^0+(?=\d)/, '') })
+                    }}
                     placeholder="120"
                   />
                 </div>
@@ -904,9 +911,10 @@ export default function TherapiesPage() {
                     type="number"
                     min={1}
                     value={formData.creditCost}
-                    onChange={(e) =>
-                      setFormData({ ...formData, creditCost: Number.parseInt(e.target.value, 10) || 0 })
-                    }
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '')
+                      setFormData({ ...formData, creditCost: digits.replace(/^0+(?=\d)/, '') })
+                    }}
                     placeholder="2"
                   />
                 </div>
@@ -942,11 +950,11 @@ export default function TherapiesPage() {
                       <Input
                         type="number"
                         min={1}
-                        value={slotPlan.capacityPerHour}
+                        value={slotPlan.capacityPerHour || ''}
                         onChange={(e) =>
                           setSlotPlan({
                             ...slotPlan,
-                            capacityPerHour: Number.parseInt(e.target.value, 10) || 1,
+                            capacityPerHour: intFromInput(e),
                           })
                         }
                       />
@@ -1272,8 +1280,8 @@ export default function TherapiesPage() {
                     <Input
                       type="number"
                       min={1}
-                      value={gcForm.durationMinutes}
-                      onChange={(e) => setGcForm({ ...gcForm, durationMinutes: Number.parseInt(e.target.value, 10) || 0 })}
+                      value={gcForm.durationMinutes || ''}
+                      onChange={(e) => setGcForm({ ...gcForm, durationMinutes: intFromInput(e) })}
                       placeholder="60"
                     />
                   </div>
@@ -1282,8 +1290,8 @@ export default function TherapiesPage() {
                     <Input
                       type="number"
                       min={0}
-                      value={gcForm.creditsRequired}
-                      onChange={(e) => setGcForm({ ...gcForm, creditsRequired: Number.parseInt(e.target.value, 10) || 0 })}
+                      value={gcForm.creditsRequired || ''}
+                      onChange={(e) => setGcForm({ ...gcForm, creditsRequired: intFromInput(e) })}
                       placeholder="1"
                     />
                   </div>
@@ -1292,8 +1300,8 @@ export default function TherapiesPage() {
                     <Input
                       type="number"
                       min={1}
-                      value={gcForm.maxParticipants}
-                      onChange={(e) => setGcForm({ ...gcForm, maxParticipants: Number.parseInt(e.target.value, 10) || 0 })}
+                      value={gcForm.maxParticipants || ''}
+                      onChange={(e) => setGcForm({ ...gcForm, maxParticipants: intFromInput(e) })}
                       placeholder="20"
                     />
                   </div>
@@ -1427,8 +1435,8 @@ export default function TherapiesPage() {
                             className="w-24 bg-background"
                             value={gcSchedule.daysOfWeek[0] || ''}
                             onChange={(e) => {
-                              const v = parseInt(e.target.value, 10)
-                              if (!isNaN(v) && v >= 1 && v <= 31) {
+                              const v = intFromInput(e)
+                              if (v >= 1 && v <= 31) {
                                 setGcSchedule({ ...gcSchedule, daysOfWeek: [v] })
                                 setShowPreview(true)
                               } else {
@@ -1468,10 +1476,9 @@ export default function TherapiesPage() {
                                 min={1}
                                 max={90}
                                 className="w-20 h-8"
-                                value={gcSchedule.occurrences}
+                                value={gcSchedule.occurrences || ''}
                                 onChange={(e) => {
-                                  const v = parseInt(e.target.value, 10)
-                                  setGcSchedule({ ...gcSchedule, occurrences: isNaN(v) ? 1 : v })
+                                  setGcSchedule({ ...gcSchedule, occurrences: intFromInput(e) })
                                   setShowPreview(true)
                                 }}
                               />
@@ -1594,11 +1601,11 @@ export default function TherapiesPage() {
                       <Input
                         type="number"
                         min={1}
-                        value={slotPlan.capacityPerHour}
+                        value={slotPlan.capacityPerHour || ''}
                         onChange={(e) =>
                           setSlotPlan({
                             ...slotPlan,
-                            capacityPerHour: Number.parseInt(e.target.value, 10) || 1,
+                            capacityPerHour: intFromInput(e),
                           })
                         }
                       />

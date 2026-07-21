@@ -35,7 +35,7 @@ import { useUsers } from '@/hooks/use-users'
 import { useMemberships } from '@/hooks/use-memberships'
 import { useTopUpUserCredits, useUserCreditBalance } from '@/hooks/use-credits'
 import { BOOKING_STATUS, BookingStatusValue, Booking } from '@/lib/services/booking.service'
-import { cn, toUtcDateKey } from '@/lib/utils'
+import { cn, toUtcDateKey, intFromInput } from '@/lib/utils'
 import { toast } from 'sonner'
 
 type BookableMode = 'all' | 'services' | 'therapies' | 'group-classes'
@@ -809,15 +809,8 @@ export default function BookingsPage() {
                   <Input
                     type="number"
                     min={1}
-                    value={topUpAmount}
-                    onChange={(e) => {
-                      const parsed = Number.parseInt(e.target.value, 10)
-                      if (Number.isNaN(parsed)) {
-                        setTopUpAmount(1)
-                        return
-                      }
-                      setTopUpAmount(Math.max(1, parsed))
-                    }}
+                    value={topUpAmount || ''}
+                    onChange={(e) => setTopUpAmount(intFromInput(e))}
                   />
                 </div>
 

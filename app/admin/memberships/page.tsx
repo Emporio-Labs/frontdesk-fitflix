@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IconPlus, IconTrash, IconEye, IconRefresh, IconEdit } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { sanitizeDecimalInput } from '@/lib/utils'
 import { Membership, MembershipStatus } from '@/lib/services/membership.service'
 import { useMembershipPlans } from '@/hooks/use-membership-plans'
 import { useUsers } from '@/hooks/use-users'
@@ -131,13 +132,16 @@ function MembershipsPageContent() {
     return Number(Math.max(0, discounted).toFixed(2))
   }, [selectedPlan, selectedPlanBasePrice, normalizedDiscountPercent])
 
-  const selectedUser = useMemo(
-    () =>
-      users.find(
-        (user) => user._id === formData.userId || user.username === formData.userId || user.email === formData.userId
-      ),
-    [users, formData.userId]
-  )
+  const selectedUser = useMemo(() => {
+    const key = formData.userId.trim().toLowerCase()
+    if (!key) return undefined
+    return users.find(
+      (user) =>
+        user._id.toLowerCase() === key ||
+        user.username.toLowerCase() === key ||
+        user.email.toLowerCase() === key
+    )
+  }, [users, formData.userId])
 
   const getMembershipUsername = (membership: Membership) => {
     const membershipUserId = membership.userId.toLowerCase()
@@ -269,7 +273,12 @@ function MembershipsPageContent() {
 
   const handleSaveMembership = async () => {
     if (!formData.userId.trim() || !formData.startDate || !formData.endDate) {
-      toast.error('Username/email must be auto-filled from Assign Membership, plus start and end date are required')
+      toast.error('Member email, start date and end date are required')
+      return
+    }
+
+    if (!editingMembership && !selectedUser) {
+      toast.error('No registered member found with this email')
       return
     }
 
@@ -279,7 +288,7 @@ function MembershipsPageContent() {
     }
 
     const payload = {
-      userId: formData.userId.trim(),
+      userId: (selectedUser?._id || formData.userId).trim(),
       planId: selectedPlan.id,
       planName: selectedPlan.planName,
       creditsIncluded: selectedPlanCredits,
@@ -409,21 +418,24 @@ function MembershipsPageContent() {
                     <Input
                       value={selectedUser?.username || ''}
                       readOnly
-                      placeholder="Auto-filled from Assign Membership"
+                      placeholder="Auto-filled from email"
                     />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Email</label>
                     <Input
-                      value={selectedUser?.email || ''}
-                      readOnly
-                      placeholder="Auto-filled from Assign Membership"
+                      type="email"
+                      value={selectedUser?.email ?? formData.userId}
+                      onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
+                      placeholder="Type member email"
                     />
                   </div>
                 </div>
                 {!selectedUser && (
                   <p className="text-xs text-muted-foreground">
-                    Open this dialog from Users page using Assign Membership to auto-fill member details.
+                    {formData.userId.trim()
+                      ? 'No registered member found with this email yet.'
+                      : 'Type a registered member email, or open this dialog from the Users page via Assign Membership.'}
                   </p>
                 )}
                 <div className="grid grid-cols-2 gap-4">
@@ -487,7 +499,7 @@ function MembershipsPageContent() {
                       max={100}
                       value={formData.discountPercent}
                       onChange={(e) => {
-                        const value = e.target.value
+                        const value = sanitizeDecimalInput(e)
                         if (value === '') {
                           setFormData({ ...formData, discountPercent: '' })
                           return

@@ -18,7 +18,7 @@ import { useOpenNewParam } from '@/hooks/use-open-new-param'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
 import { useBookings } from '@/hooks/use-bookings'
-import { toUtcDateKey } from '@/lib/utils'
+import { toUtcDateKey, intFromInput } from '@/lib/utils'
 import { getUserDisplayName } from '@/lib/populated'
 import { toast } from 'sonner'
 
@@ -170,8 +170,8 @@ export default function SlotsPage() {
                   <Input
                     type="number"
                     min={1}
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: Number.parseInt(e.target.value, 10) || 1 })}
+                    value={formData.capacity || ''}
+                    onChange={(e) => setFormData({ ...formData, capacity: intFromInput(e) })}
                   />
                 </div>
                 <div className="flex gap-2 pt-2">

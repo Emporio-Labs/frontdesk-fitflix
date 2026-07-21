@@ -18,6 +18,7 @@ import { IconUsers } from '@tabler/icons-react'
 import { useWorkoutStore } from '@/stores/workout-store'
 import { DIFFICULTIES, PLAN_GOALS, SPLIT_TYPES } from '@/types/workout'
 import type { Difficulty, PlanGoal, SplitType, PlanStatus } from '@/types/workout'
+import { intFromInput } from '@/lib/utils'
 
 export function PlanConfigPanel({
   onOpenAssign,
@@ -76,8 +77,8 @@ export function PlanConfigPanel({
               type="number"
               min={1}
               max={52}
-              value={currentPlan.duration || 4}
-              onChange={(e) => setPlanField('duration', Number(e.target.value) || 1)}
+              value={currentPlan.duration || ''}
+              onChange={(e) => setPlanField('duration', intFromInput(e))}
               className="h-9 text-xs"
             />
           </div>

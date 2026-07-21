@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { IconGripVertical, IconTrash } from '@tabler/icons-react'
 import { MuscleGroupIcon } from '@/components/workouts/muscle-group-icon'
 import type { WorkoutExercise, MuscleGroup } from '@/types/workout'
+import { intFromInput } from '@/lib/utils'
 
 export function ExerciseCard({
   exercise,
@@ -121,8 +122,8 @@ function InlineInput({
       </span>
       <Input
         type="number"
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        value={value || ''}
+        onChange={(e) => onChange(intFromInput(e))}
         className="w-14 h-7 text-center text-xs px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />
     </div>

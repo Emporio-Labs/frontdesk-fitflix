@@ -22,6 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IconRefresh } from '@tabler/icons-react'
+import { intFromInput } from '@/lib/utils'
 import { MemberCombobox } from '@/components/member-combobox'
 import { toast } from 'sonner'
 import { useUsers } from '@/hooks/use-users'
@@ -371,15 +372,8 @@ export default function CreditsPage() {
             <Input
               type="number"
               min={1}
-              value={topUpAmount}
-              onChange={(e) => {
-                const parsed = Number.parseInt(e.target.value, 10)
-                if (Number.isNaN(parsed)) {
-                  setTopUpAmount(1)
-                  return
-                }
-                setTopUpAmount(Math.max(1, parsed))
-              }}
+              value={topUpAmount || ''}
+              onChange={(e) => setTopUpAmount(intFromInput(e))}
             />
           </div>
 

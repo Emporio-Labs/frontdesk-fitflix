@@ -36,6 +36,7 @@ import {
   useUpdateMembershipPlan,
 } from '@/hooks/use-membership-plans'
 import { toast } from 'sonner'
+import { sanitizeIntInput, sanitizeDecimalInput } from '@/lib/utils'
 import { useMemberships } from '@/hooks/use-memberships'
 
 type FormState = {
@@ -311,16 +312,12 @@ export default function MembershipPlansPage() {
                       max={12}
                       value={form.durationMonths}
                       onChange={(e) => {
-                        const value = e.target.value
+                        const value = sanitizeIntInput(e)
                         if (value === '') {
                           setForm({ ...form, durationMonths: '' })
                           return
                         }
-                        const parsed = Number.parseInt(value, 10)
-                        if (Number.isNaN(parsed)) {
-                          return
-                        }
-                        setForm({ ...form, durationMonths: Math.min(12, Math.max(1, parsed)) })
+                        setForm({ ...form, durationMonths: Math.min(12, Math.max(1, Number.parseInt(value, 10))) })
                       }}
                       onBlur={() => {
                         if (form.durationMonths === '') {
@@ -338,16 +335,12 @@ export default function MembershipPlansPage() {
                       max={365}
                       value={form.durationDays}
                       onChange={(e) => {
-                        const value = e.target.value
+                        const value = sanitizeIntInput(e)
                         if (value === '') {
                           setForm({ ...form, durationDays: '' })
                           return
                         }
-                        const parsed = Number.parseInt(value, 10)
-                        if (Number.isNaN(parsed)) {
-                          return
-                        }
-                        setForm({ ...form, durationDays: Math.min(365, Math.max(1, parsed)) })
+                        setForm({ ...form, durationDays: Math.min(365, Math.max(1, Number.parseInt(value, 10))) })
                       }}
                       onBlur={() => {
                         if (form.durationDays === '') {
@@ -365,7 +358,7 @@ export default function MembershipPlansPage() {
                     step="0.01"
                     value={form.totalPrice}
                     onChange={(e) => {
-                      const value = e.target.value
+                      const value = sanitizeDecimalInput(e)
                       setForm({ ...form, totalPrice: value === '' ? '' : Number.parseFloat(value) })
                     }}
                     onBlur={() => {
@@ -436,7 +429,7 @@ export default function MembershipPlansPage() {
                       min={0}
                       value={form.pauseDays}
                       onChange={(e) => {
-                        const value = e.target.value
+                        const value = sanitizeIntInput(e)
                         setForm({ ...form, pauseDays: value === '' ? '' : Number.parseInt(value, 10) })
                       }}
                       onBlur={() => {
@@ -453,7 +446,7 @@ export default function MembershipPlansPage() {
                       min={0}
                       value={form.trainerSessions}
                       onChange={(e) => {
-                        const value = e.target.value
+                        const value = sanitizeIntInput(e)
                         setForm({ ...form, trainerSessions: value === '' ? '' : Number.parseInt(value, 10) })
                       }}
                       onBlur={() => {
@@ -470,7 +463,7 @@ export default function MembershipPlansPage() {
                       min={0}
                       value={form.transferSessions}
                       onChange={(e) => {
-                        const value = e.target.value
+                        const value = sanitizeIntInput(e)
                         setForm({ ...form, transferSessions: value === '' ? '' : Number.parseInt(value, 10) })
                       }}
                       onBlur={() => {
@@ -487,7 +480,7 @@ export default function MembershipPlansPage() {
                       min={0}
                       value={form.credits}
                       onChange={(e) => {
-                        const value = e.target.value
+                        const value = sanitizeIntInput(e)
                         setForm({ ...form, credits: value === '' ? '' : Number.parseInt(value, 10) })
                       }}
                       onBlur={() => {
@@ -504,7 +497,7 @@ export default function MembershipPlansPage() {
                       min={0}
                       value={form.transferWindowDays}
                       onChange={(e) => {
-                        const value = e.target.value
+                        const value = sanitizeIntInput(e)
                         setForm({ ...form, transferWindowDays: value === '' ? '' : Number.parseInt(value, 10) })
                       }}
                       onBlur={() => {
