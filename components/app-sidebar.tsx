@@ -9,17 +9,14 @@ import {
   IconUsers,
   IconHeartHandshake,
   IconCalendarEvent,
-  IconCalendarStats,
   IconClock,
   IconDna,
   IconHistory,
   IconTarget,
-  IconStethoscope,
   IconRun,
   IconCards,
   IconCreditCard,
   IconBarbell,
-  IconActivity,
   IconSalad,
   IconFileInvoice,
 } from "@tabler/icons-react"
@@ -50,19 +47,9 @@ const navMain = [
       icon: IconUsers,
     },
     {
-      title: "Doctors",
-      url: "/admin/doctors",
-      icon: IconStethoscope,
-    },
-    {
       title: "Trainers",
       url: "/admin/trainers",
       icon: IconRun,
-    },
-    {
-      title: "Sports Scientist",
-      url: "/admin/sports-scientist",
-      icon: IconActivity,
     },
     {
       title: "Nutrition",
@@ -98,11 +85,6 @@ const navMain = [
       title: "Bookings",
       url: "/admin/bookings",
       icon: IconCalendarEvent,
-    },
-    {
-      title: "Appointments",
-      url: "/admin/appointments",
-      icon: IconCalendarStats,
     },
     {
       title: "Slots",

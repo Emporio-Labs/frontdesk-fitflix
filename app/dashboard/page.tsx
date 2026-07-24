@@ -9,14 +9,12 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 import {
-  IconUsers, IconStethoscope, IconRun, IconCalendarEvent,
-  IconCalendarStats, IconClock, IconTrendingUp, IconRefresh,
+  IconUsers, IconRun, IconCalendarEvent,
+  IconClock, IconTrendingUp, IconRefresh,
 } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { useUsers } from '@/hooks/use-users'
 import { useBookings } from '@/hooks/use-bookings'
-import { useAppointments } from '@/hooks/use-appointments'
-import { useDoctors } from '@/hooks/use-doctors'
 import { useTrainers } from '@/hooks/use-trainers'
 import { useSlots } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
@@ -28,8 +26,6 @@ const STATUS_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6b7280']
 export default function DashboardPage() {
   const { data: users = [], isLoading: usersLoading, refetch: refetchUsers } = useUsers()
   const { data: bookings = [], isLoading: bookingsLoading, refetch: refetchBookings } = useBookings()
-  const { data: appointments = [], isLoading: apptLoading } = useAppointments()
-  const { data: doctors = [], isLoading: doctorsLoading } = useDoctors()
   const { data: trainers = [], isLoading: trainersLoading } = useTrainers()
   const { data: slots = [] } = useSlots()
   const { data: services = [] } = useServices()
@@ -51,9 +47,6 @@ export default function DashboardPage() {
   }))
   const recentBookings = [...bookings]
     .sort((a, b) => new Date(b.createdAt || b.bookingDate).getTime() - new Date(a.createdAt || a.bookingDate).getTime())
-    .slice(0, 5)
-  const recentAppointments = [...appointments]
-    .sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime())
     .slice(0, 5)
   const availableSlots = slots.reduce((sum, slot) => sum + Math.max(slot.remainingCapacity, 0), 0)
 
@@ -80,12 +73,10 @@ export default function DashboardPage() {
       {/* ── Operational Stats ──────────────────────────────────────────────── */}
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Operations</p>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Members" icon={<IconUsers className="w-4 h-4 text-blue-500" />} value={users.length} sub="registered users" loading={usersLoading} href="/admin/users" />
-          <StatCard title="Doctors" icon={<IconStethoscope className="w-4 h-4 text-emerald-500" />} value={doctors.length} sub="on staff" loading={doctorsLoading} href="/admin/doctors" />
           <StatCard title="Trainers" icon={<IconRun className="w-4 h-4 text-violet-500" />} value={trainers.length} sub="on staff" loading={trainersLoading} href="/admin/trainers" />
           <StatCard title="Bookings" icon={<IconCalendarEvent className="w-4 h-4 text-amber-500" />} value={bookings.length} sub="total bookings" loading={bookingsLoading} href="/admin/bookings" />
-          <StatCard title="Appointments" icon={<IconCalendarStats className="w-4 h-4 text-rose-500" />} value={appointments.length} sub="total appointments" loading={apptLoading} href="/admin/appointments" />
           <StatCard title="Open Slots" icon={<IconClock className="w-4 h-4 text-teal-500" />} value={availableSlots} sub={`across ${slots.length} slot windows`} loading={false} href="/admin/slots" />
         </div>
       </div>
@@ -160,68 +151,27 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* ── Recent Appointments + Quick Actions ────────────────────────────── */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Recent Appointments</CardTitle>
-              <CardDescription>5 most recent doctor appointments</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/admin/appointments">View all →</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {apptLoading ? (
-              <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
-            ) : recentAppointments.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No appointments yet</p>
-            ) : (
-              <div className="space-y-2">
-                {recentAppointments.map((a) => (
-                  <div key={a._id} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <div>
-                      <p className="text-sm font-mono">{a._id.slice(-10)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(a.appointmentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    </div>
-                    <StatusBadge status={a.status as number} map={BOOKING_STATUS} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Jump to common tasks</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-2">
-            <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/users"><IconUsers className="w-4 h-4 mr-2" />Add Member</Link>
-            </Button>
-            <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/bookings"><IconCalendarEvent className="w-4 h-4 mr-2" />New Booking</Link>
-            </Button>
-            <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/appointments"><IconCalendarStats className="w-4 h-4 mr-2" />New Appointment</Link>
-            </Button>
-            <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/slots"><IconClock className="w-4 h-4 mr-2" />Create Slot</Link>
-            </Button>
-            <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/doctors"><IconStethoscope className="w-4 h-4 mr-2" />Add Doctor</Link>
-            </Button>
-            <Button asChild variant="outline" className="h-12 text-sm">
-              <Link href="/admin/trainers"><IconRun className="w-4 h-4 mr-2" />Add Trainer</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      {/* ── Quick Actions ───────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Jump to common tasks</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-2">
+          <Button asChild variant="outline" className="h-12 text-sm">
+            <Link href="/admin/users"><IconUsers className="w-4 h-4 mr-2" />Add Member</Link>
+          </Button>
+          <Button asChild variant="outline" className="h-12 text-sm">
+            <Link href="/admin/bookings"><IconCalendarEvent className="w-4 h-4 mr-2" />New Booking</Link>
+          </Button>
+          <Button asChild variant="outline" className="h-12 text-sm">
+            <Link href="/admin/slots"><IconClock className="w-4 h-4 mr-2" />Create Slot</Link>
+          </Button>
+          <Button asChild variant="outline" className="h-12 text-sm">
+            <Link href="/admin/trainers"><IconRun className="w-4 h-4 mr-2" />Add Trainer</Link>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

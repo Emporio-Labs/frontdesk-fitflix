@@ -7,7 +7,6 @@ export const ONBOARDING_STEP_ORDER: { key: OnboardingStep; label: string }[] = [
   { key: 'HEALTH_GOALS', label: 'Health Goals' },
   { key: 'CONSENT', label: 'Consent' },
   { key: 'REPORT_UPLOAD', label: 'Reports' },
-  { key: 'SPORTS_SCIENTIST_BOOKING', label: 'Sports Scientist' },
   { key: 'NUTRITIONIST_BOOKING', label: 'Nutritionist' },
   { key: 'COMPLETED', label: 'Completed' },
 ]
@@ -30,10 +29,7 @@ interface OnboardingTimelineProps {
 
 export function OnboardingTimeline({ currentStep, completedSteps = [] }: OnboardingTimelineProps) {
   const completedSet = new Set(completedSteps)
-  
-  const displaySteps = ONBOARDING_STEP_ORDER.filter(
-    (step) => step.key !== 'SPORTS_SCIENTIST_BOOKING'
-  )
+  const displaySteps = ONBOARDING_STEP_ORDER
 
   return (
     <div className="w-full overflow-x-auto">

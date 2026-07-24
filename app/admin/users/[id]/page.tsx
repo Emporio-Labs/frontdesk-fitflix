@@ -20,7 +20,6 @@ import {
   IconPhone,
   IconCheck,
   IconX,
-  IconStethoscope,
   IconSalad,
   IconEye,
   IconFileText,
@@ -234,7 +233,7 @@ export default function UserDetailPage() {
   const [consentOpen, setConsentOpen] = useState(false)
   const [reportsOpen, setReportsOpen] = useState(false)
   const [calOpen, setCalOpen] = useState(false)
-  const [calExpertType, setCalExpertType] = useState<'sports_scientist' | 'nutritionist' | null>(null)
+  const [calExpertType, setCalExpertType] = useState<'nutritionist' | null>(null)
 
   const { data: memberships, isLoading: membershipsLoading } = useMemberships()
   const { data: bookings, isLoading: bookingsLoading } = useBookings()
@@ -470,7 +469,7 @@ export default function UserDetailPage() {
             <CardHeader>
               <CardTitle>Bookings</CardTitle>
               <CardDescription>
-                Sports scientist, nutritionist, trainer, and consultation appointments.
+                Nutritionist and consultation appointments.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -660,15 +659,8 @@ export default function UserDetailPage() {
 
                     <div className="space-y-3">
                       <h4 className="text-sm font-medium">Onboarding Appointments</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-3">
                         {[
-                          {
-                            key: 'sports' as const,
-                            expertType: 'sports_scientist' as const,
-                            label: 'Sports Scientist',
-                            Icon: IconStethoscope,
-                            booked: !!summary?.sportsScientistBooked,
-                          },
                           {
                             key: 'nutrition' as const,
                             expertType: 'nutritionist' as const,
@@ -773,13 +765,13 @@ export default function UserDetailPage() {
               <DialogHeader className="pb-2">
                 <DialogTitle>Schedule Expert Appointment</DialogTitle>
                 <DialogDescription>
-                  Book a {calExpertType === 'sports_scientist' ? 'Sports Scientist' : 'Nutritionist'} slot on behalf of {user.username}.
+                  Book a Nutritionist slot on behalf of {user.username}.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex-1 w-full h-full min-h-[400px] overflow-hidden rounded-md border bg-card">
                 {calOpen && calExpertType && (
                   <iframe
-                    src={`https://cal.com/fitflix/${calExpertType === 'sports_scientist' ? 'sports-scientist' : 'nutritionist'}?email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.username)}&metadata[userId]=${userId}`}
+                    src={`https://cal.com/fitflix/nutritionist?email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.username)}&metadata[userId]=${userId}`}
                     width="100%"
                     height="100%"
                     className="border-0"
