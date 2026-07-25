@@ -51,7 +51,7 @@ export function ExerciseCard({
 
       <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted shrink-0">
         <MuscleGroupIcon
-          group={(exercise.exercise?.muscleGroup as MuscleGroup) ?? 'Chest'}
+          group={(exercise.exercise?.muscleGroups?.[0] as MuscleGroup) ?? 'Chest'}
           className="w-4 h-4"
         />
       </div>
@@ -61,7 +61,7 @@ export function ExerciseCard({
           {exercise.exercise?.name ?? 'Unknown Exercise'}
         </p>
         <p className="text-[10px] text-muted-foreground">
-          {exercise.exercise?.muscleGroup}
+          {exercise.exercise?.muscleGroups?.join(', ')}
           {exercise.exercise?.equipment ? ` · ${exercise.exercise.equipment}` : ''}
         </p>
       </div>

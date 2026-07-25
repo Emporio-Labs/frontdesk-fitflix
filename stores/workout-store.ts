@@ -115,7 +115,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
             exerciseId: exercise._id,
             exercise: {
               name: exercise.name,
-              muscleGroup: exercise.muscleGroup,
+              muscleGroups: exercise.muscleGroups,
               difficulty: exercise.difficulty,
               equipment: exercise.equipment,
               caloriesPerSet: exercise.caloriesPerSet,

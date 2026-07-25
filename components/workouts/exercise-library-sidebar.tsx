@@ -13,10 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { IconPlus, IconSearch, IconLock } from '@tabler/icons-react'
+import { IconPlus, IconSearch, IconLock, IconInfoCircle } from '@tabler/icons-react'
+import { toast } from 'sonner'
 import { useExercises } from '@/hooks/use-exercises'
 import { useWorkoutStore } from '@/stores/workout-store'
 import { MuscleGroupIcon } from '@/components/workouts/muscle-group-icon'
+import { ExerciseDetailsDialog } from '@/components/workouts/exercise-details-dialog'
 import { MUSCLE_GROUPS, DIFFICULTIES } from '@/types/workout'
 import type { Exercise, MuscleGroup, Difficulty, ExerciseType, WorkoutSection } from '@/types/workout'
 
@@ -51,6 +53,7 @@ export function ExerciseLibrarySidebar({
   const [activeTab, setActiveTab] = useState<CategoryTab>(() => sectionToCategory(targetSection))
 
   const { addExerciseToDay, selectedDayIndex } = useWorkoutStore()
+  const [viewingExercise, setViewingExercise] = useState<Exercise | null>(null)
 
   // Change A: sync activeTab whenever targetSection changes (sidebar stays mounted between opens)
   useEffect(() => {
@@ -201,7 +204,12 @@ export function ExerciseLibrarySidebar({
               </p>
             ) : (
               exercises.map((ex) => (
-                <ExerciseRow key={ex._id} exercise={ex} onAdd={handleAdd} />
+                <ExerciseRow 
+                  key={ex._id} 
+                  exercise={ex} 
+                  onAdd={handleAdd} 
+                  onView={(ex) => setViewingExercise(ex)}
+                />
               ))
             )}
           </div>
@@ -213,6 +221,12 @@ export function ExerciseLibrarySidebar({
           </div>
         )}
       </SheetContent>
+
+      <ExerciseDetailsDialog
+        open={!!viewingExercise}
+        onOpenChange={(open) => !open && setViewingExercise(null)}
+        exercise={viewingExercise}
+      />
     </Sheet>
   )
 }
@@ -220,19 +234,21 @@ export function ExerciseLibrarySidebar({
 function ExerciseRow({
   exercise,
   onAdd,
+  onView,
 }: {
   exercise: Exercise
   onAdd: (ex: Exercise) => void
+  onView: (ex: Exercise) => void
 }) {
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors group">
       <div className="flex items-center justify-center w-9 h-9 rounded-md bg-muted flex-shrink-0">
-        <MuscleGroupIcon group={exercise.muscleGroup} className="w-5 h-5" />
+        <MuscleGroupIcon group={exercise.muscleGroups?.[0] || 'Chest'} className="w-5 h-5" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{exercise.name}</p>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-[10px] text-muted-foreground">{exercise.muscleGroup}</span>
+          <span className="text-[10px] text-muted-foreground">{exercise.muscleGroups?.join(', ')}</span>
           {exercise.difficulty && (
             <>
               <span className="text-muted-foreground">·</span>
@@ -257,14 +273,24 @@ function ExerciseRow({
           )}
         </div>
       </div>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-        onClick={() => onAdd(exercise)}
-      >
-        <IconPlus className="w-4 h-4" />
-      </Button>
+      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7"
+          onClick={() => onView(exercise)}
+        >
+          <IconInfoCircle className="w-4 h-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7"
+          onClick={() => onAdd(exercise)}
+        >
+          <IconPlus className="w-4 h-4" />
+        </Button>
+      </div>
     </div>
   )
 }

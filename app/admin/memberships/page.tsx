@@ -214,7 +214,13 @@ function MembershipsPageContent() {
     }
 
     const end = new Date(start)
-    end.setMonth(end.getMonth() + selectedPlan.durationMonths)
+    if (selectedPlan.durationDays && selectedPlan.durationDays > 0) {
+      // Day-based plan: add exact days
+      end.setDate(end.getDate() + selectedPlan.durationDays)
+    } else {
+      // Month-based plan
+      end.setMonth(end.getMonth() + selectedPlan.durationMonths)
+    }
     const endDate = end.toISOString().slice(0, 10)
 
     if (formData.endDate !== endDate) {
@@ -442,7 +448,11 @@ function MembershipsPageContent() {
                         .filter((plan) => plan.status === 'Active' || plan.id === formData.planId)
                         .map((plan) => (
                           <option key={plan.id} value={plan.id}>
-                            {plan.planName} - {plan.durationMonths} month{plan.durationMonths > 1 ? 's' : ''}
+                            {plan.planName} -{' '}
+                            {plan.durationDays && plan.durationDays > 0
+                              ? `${plan.durationDays} day${plan.durationDays !== 1 ? 's' : ''}`
+                              : `${plan.durationMonths} month${plan.durationMonths !== 1 ? 's' : ''}`
+                            }
                             {plan.status === 'Inactive' ? ' (Inactive)' : ''}
                           </option>
                         ))}
@@ -454,6 +464,13 @@ function MembershipsPageContent() {
                       <div className="mt-1 space-y-1 text-muted-foreground">
                         <p>Original Price: {formatPrice(selectedPlanBasePrice, selectedPlan.currency)}</p>
                         <p>Credits: {selectedPlanCredits}</p>
+                        <p>
+                          Duration:{' '}
+                          {selectedPlan.durationDays && selectedPlan.durationDays > 0
+                            ? `${selectedPlan.durationDays} day${selectedPlan.durationDays !== 1 ? 's' : ''}`
+                            : `${selectedPlan.durationMonths} month${selectedPlan.durationMonths !== 1 ? 's' : ''}`
+                          }
+                        </p>
                         <p>Features: {selectedPlan.features.join(', ') || '-'}</p>
                       </div>
                     ) : (
@@ -521,7 +538,13 @@ function MembershipsPageContent() {
                     {selectedPlan ? (
                       <>
                         <p>Plan ID: {selectedPlan.id}</p>
-                        <p>Duration: {selectedPlan.durationMonths} months</p>
+                        <p>
+                          Duration:{' '}
+                          {selectedPlan.durationDays && selectedPlan.durationDays > 0
+                            ? `${selectedPlan.durationDays} day${selectedPlan.durationDays !== 1 ? 's' : ''}`
+                            : `${selectedPlan.durationMonths} month${selectedPlan.durationMonths !== 1 ? 's' : ''}`
+                          }
+                        </p>
                       </>
                     ) : (
                       <p>Plan ID will be attached once selected</p>
