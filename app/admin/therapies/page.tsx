@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   IconClock,
   IconDroplet,
@@ -246,6 +247,7 @@ function minutesToTime(value: number): string {
 }
 
 export default function TherapiesPage() {
+  const [activeTab, setActiveTab] = useState('therapies')
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<TherapyCatalogItem | null>(null)
@@ -755,109 +757,51 @@ export default function TherapiesPage() {
   )
 
   return (
-    <div className="flex-1 space-y-6 p-6 md:p-8">
-      {/* ── Hero Banner: rotating Therapies ↔ Group Classes ── */}
-      <style>{`
-        @keyframes slide-fade-in {
-          0%   { opacity: 1; }
-          42%  { opacity: 1; }
-          50%  { opacity: 0; }
-          92%  { opacity: 0; }
-          100% { opacity: 1; }
-        }
-        @keyframes slide-fade-out {
-          0%   { opacity: 0; }
-          42%  { opacity: 0; }
-          50%  { opacity: 1; }
-          92%  { opacity: 1; }
-          100% { opacity: 0; }
-        }
-      `}</style>
-      <div className="relative overflow-hidden rounded-xl shadow-lg" style={{ minHeight: '120px' }}>
-        {/* Slide 1 — Therapies */}
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-teal-500 via-cyan-500 to-emerald-500 text-white rounded-xl"
-          style={{ animation: 'slide-fade-in 10s ease-in-out infinite' }}
-        >
-          <div className="p-8">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div className="space-y-2">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/25">
-                  <IconDroplet className="h-6 w-6" />
-                </div>
-                <h2 className="text-4xl font-bold tracking-tight">Therapies</h2>
-                <p className="max-w-2xl text-sm text-cyan-50/95">
-                  Curate the therapy catalog, tune durations, and keep booking slots synchronized in one place.
-                </p>
-              </div>
-              <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
-                <div>
-                  <p className="text-xs text-cyan-50/90">Catalog</p>
-                  <p className="text-xl font-semibold">{items.length}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-cyan-50/90">Avg Time</p>
-                  <p className="text-xl font-semibold">{averageDuration}m</p>
-                </div>
-                <div>
-                  <p className="text-xs text-cyan-50/90">Slot Links</p>
-                  <p className="text-xl font-semibold">{totalSlotsReferenced}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Slide 2 — Group Classes */}
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-500 text-white rounded-xl"
-          style={{ animation: 'slide-fade-out 10s ease-in-out infinite' }}
-        >
-          <div className="p-8">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div className="space-y-2">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/25">
-                  <IconUsers className="h-6 w-6" />
-                </div>
-                <h2 className="text-4xl font-bold tracking-tight">Group Classes</h2>
-                <p className="max-w-2xl text-sm text-purple-50/95">
-                  Schedule and manage group sessions — online, in-person, or hybrid — with credit-based access.
-                </p>
-              </div>
-              <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
-                <div>
-                  <p className="text-xs text-purple-50/90">Classes</p>
-                  <p className="text-xl font-semibold">{groupClasses.length}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-purple-50/90">Active</p>
-                  <p className="text-xl font-semibold">{groupClasses.filter(gc => gc.isActive).length}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-purple-50/90">Modes</p>
-                  <p className="text-xl font-semibold">{new Set(groupClasses.map(gc => gc.mode)).size}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Invisible spacer to set the container height */}
-        <div className="invisible p-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="space-y-2">
-              <div className="h-12 w-12" />
-              <h2 className="text-4xl font-bold tracking-tight">Placeholder</h2>
-              <p className="max-w-2xl text-sm">Placeholder description to set height</p>
-            </div>
-            <div className="grid grid-cols-3 gap-3 p-4">
-              <div><p className="text-xs">x</p><p className="text-xl font-semibold">0</p></div>
-              <div><p className="text-xs">x</p><p className="text-xl font-semibold">0</p></div>
-              <div><p className="text-xs">x</p><p className="text-xl font-semibold">0</p></div>
-            </div>
-          </div>
-        </div>
+    <div className="flex-1 space-y-6 p-8 pt-6">
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Services</h2>
+        <p className="text-sm text-muted-foreground">
+          Manage therapies catalog and group classes scheduling
+        </p>
       </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="w-full flex-wrap h-auto">
+          <TabsTrigger value="therapies" className="text-sm px-4 py-2">Therapies</TabsTrigger>
+          <TabsTrigger value="group-classes" className="text-sm px-4 py-2">Group Classes</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="therapies" className="mt-6 space-y-6">
+          {/* Static Hero Banner: Therapies */}
+          <div className="relative overflow-hidden rounded-xl shadow-lg bg-gradient-to-br from-teal-500 via-cyan-500 to-emerald-500 text-white">
+            <div className="p-8">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div className="space-y-2">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/25">
+                    <IconDroplet className="h-6 w-6" />
+                  </div>
+                  <h2 className="text-4xl font-bold tracking-tight">Therapies</h2>
+                  <p className="max-w-2xl text-sm text-cyan-50/95">
+                    Curate the therapy catalog, tune durations, and keep booking slots synchronized in one place.
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
+                  <div>
+                    <p className="text-xs text-cyan-50/90">Catalog</p>
+                    <p className="text-xl font-semibold">{items.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-cyan-50/90">Avg Time</p>
+                    <p className="text-xl font-semibold">{averageDuration}m</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-cyan-50/90">Slot Links</p>
+                    <p className="text-xl font-semibold">{totalSlotsReferenced}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -1190,6 +1134,39 @@ export default function TherapiesPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="group-classes" className="mt-6 space-y-6">
+          {/* Static Hero Banner: Group Classes */}
+          <div className="relative overflow-hidden rounded-xl shadow-lg bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-500 text-white">
+            <div className="p-8">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div className="space-y-2">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/25">
+                    <IconUsers className="h-6 w-6" />
+                  </div>
+                  <h2 className="text-4xl font-bold tracking-tight">Group Classes</h2>
+                  <p className="max-w-2xl text-sm text-purple-50/95">
+                    Schedule and manage group sessions — online, in-person, or hybrid — with credit-based access.
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
+                  <div>
+                    <p className="text-xs text-purple-50/90">Classes</p>
+                    <p className="text-xl font-semibold">{groupClasses.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-purple-50/90">Active</p>
+                    <p className="text-xl font-semibold">{groupClasses.filter(gc => gc.isActive).length}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-purple-50/90">Modes</p>
+                    <p className="text-xl font-semibold">{new Set(groupClasses.map(gc => gc.mode)).size}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
       {/* ═══════════════ GROUP CLASSES WIDGET ═══════════════ */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1881,6 +1858,8 @@ export default function TherapiesPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

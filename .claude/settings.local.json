@@ -11,7 +11,11 @@
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(grep -E \"\\\\.\\(tsx?|service\\)$\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/admin/users)",
-      "Bash(findstr /n \"healthGoals\" \"C:\\\\Users\\\\Yeshwanth\\\\Yugaas\\\\github_clones\\\\frontdesk-fitflix\\\\components\\\\nutrition\\\\clinical-user-dialog.tsx\" \"C:\\\\Users\\\\Yeshwanth\\\\Yugaas\\\\github_clones\\\\frontdesk-fitflix\\\\components\\\\nutrition\\\\user-clinical-summary.tsx\")"
+      "Bash(findstr /n \"healthGoals\" \"C:\\\\Users\\\\Yeshwanth\\\\Yugaas\\\\github_clones\\\\frontdesk-fitflix\\\\components\\\\nutrition\\\\clinical-user-dialog.tsx\" \"C:\\\\Users\\\\Yeshwanth\\\\Yugaas\\\\github_clones\\\\frontdesk-fitflix\\\\components\\\\nutrition\\\\user-clinical-summary.tsx\")",
+      "Bash(cd \"/c/Users/sagun/OneDrive/Desktop/HH/fitflix_user_app/docs/github_issues\" 2>/dev/null && echo \"===LISTING===\" && ls -la && echo \"\" && echo \"===FILE COUNT===\" && ls -1 | wc -l)",
+      "Bash(python -)",
+      "Bash(sed -i 's/&rarr;/-\\\\&gt;/g' build_sprint_pdf.py)",
+      "Bash(python build_sprint_pdf.py)"
     ]
   }
 }
