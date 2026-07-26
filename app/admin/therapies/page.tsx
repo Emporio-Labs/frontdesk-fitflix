@@ -292,6 +292,29 @@ export default function TherapiesPage() {
   const [showPreview, setShowPreview] = useState(false)
   const [gcErrors, setGcErrors] = useState<Record<string, string>>({})
 
+  const isFieldChanged = (fieldName: keyof typeof gcForm) => {
+    if (!editingGc) return false
+    const currentValue = gcForm[fieldName]
+    const originalValue = editingGc[fieldName]
+    if (fieldName === 'tags') {
+      const currentTags = String(gcForm.tags).split(',').map((t) => t.trim()).filter(Boolean).sort().join(',')
+      const originalTags = (editingGc.tags || []).map((t) => t.trim()).filter(Boolean).sort().join(',')
+      return currentTags !== originalTags
+    }
+    return currentValue !== originalValue
+  }
+
+  const renderModifiedBadge = (fieldName: keyof typeof gcForm) => {
+    if (isFieldChanged(fieldName)) {
+      return (
+        <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950/20 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/50 ml-2 animate-pulse">
+          Modified
+        </span>
+      )
+    }
+    return null
+  }
+
   const {
     data: therapies = [],
     isLoading,
@@ -1219,7 +1242,10 @@ export default function TherapiesPage() {
               <div className="space-y-4">
                 {/* Name */}
                 <div>
-                  <label className="text-sm font-medium">Class Name <span className="text-red-500">*</span></label>
+                  <label className="text-sm font-medium">
+                    Class Name <span className="text-red-500">*</span>
+                    {renderModifiedBadge('name')}
+                  </label>
                   <Input
                     value={gcForm.name}
                     onChange={(e) => {
@@ -1227,7 +1253,10 @@ export default function TherapiesPage() {
                       if (gcErrors.name) setGcErrors({ ...gcErrors, name: '' })
                     }}
                     placeholder="Morning Yoga Flow"
-                    className={cn(gcErrors.name && "border-rose-500 focus-visible:ring-rose-500")}
+                    className={cn(
+                      gcErrors.name && "border-rose-500 focus-visible:ring-rose-500",
+                      isFieldChanged('name') && !gcErrors.name && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                    )}
                     disabled={isGcPending}
                   />
                   {gcErrors.name && (
@@ -1237,7 +1266,10 @@ export default function TherapiesPage() {
 
                 {/* Instructor */}
                 <div>
-                  <label className="text-sm font-medium">Instructor <span className="text-red-500">*</span></label>
+                  <label className="text-sm font-medium">
+                    Instructor <span className="text-red-500">*</span>
+                    {renderModifiedBadge('instructor')}
+                  </label>
                   <Input
                     value={gcForm.instructor}
                     onChange={(e) => {
@@ -1245,7 +1277,10 @@ export default function TherapiesPage() {
                       if (gcErrors.instructor) setGcErrors({ ...gcErrors, instructor: '' })
                     }}
                     placeholder="e.g. Coach Arjun"
-                    className={cn(gcErrors.instructor && "border-rose-500 focus-visible:ring-rose-500")}
+                    className={cn(
+                      gcErrors.instructor && "border-rose-500 focus-visible:ring-rose-500",
+                      isFieldChanged('instructor') && !gcErrors.instructor && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                    )}
                     disabled={isGcPending}
                   />
                   {gcErrors.instructor && (
@@ -1255,7 +1290,10 @@ export default function TherapiesPage() {
 
                 {/* Description */}
                 <div>
-                  <label className="text-sm font-medium">Description <span className="text-red-500">*</span></label>
+                  <label className="text-sm font-medium">
+                    Description <span className="text-red-500">*</span>
+                    {renderModifiedBadge('description')}
+                  </label>
                   <Textarea
                     value={gcForm.description}
                     onChange={(e) => {
@@ -1263,7 +1301,11 @@ export default function TherapiesPage() {
                       if (gcErrors.description) setGcErrors({ ...gcErrors, description: '' })
                     }}
                     placeholder="Describe what participants will experience in this class."
-                    className={cn("min-h-20 resize-none", gcErrors.description && "border-rose-500 focus-visible:ring-rose-500")}
+                    className={cn(
+                      "min-h-20 resize-none",
+                      gcErrors.description && "border-rose-500 focus-visible:ring-rose-500",
+                      isFieldChanged('description') && !gcErrors.description && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                    )}
                     disabled={isGcPending}
                   />
                   {gcErrors.description && (
@@ -1273,13 +1315,19 @@ export default function TherapiesPage() {
 
                 {/* Mode */}
                 <div>
-                  <label className="text-sm font-medium">Delivery Mode</label>
+                  <label className="text-sm font-medium">
+                    Delivery Mode
+                    {renderModifiedBadge('mode')}
+                  </label>
                   <Select
                     value={gcForm.mode}
                     onValueChange={(val) => setGcForm({ ...gcForm, mode: val as GroupClassMode })}
                     disabled={isGcPending}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className={cn(
+                      "w-full",
+                      isFieldChanged('mode') && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                    )}>
                       <SelectValue placeholder="Select mode" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1293,7 +1341,10 @@ export default function TherapiesPage() {
                 {/* Duration + Credits + Max Participants */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="text-sm font-medium">Duration (mins)</label>
+                    <label className="text-sm font-medium">
+                      Duration (mins)
+                      {renderModifiedBadge('durationMinutes')}
+                    </label>
                     <Input
                       type="number"
                       min={1}
@@ -1303,7 +1354,10 @@ export default function TherapiesPage() {
                         if (gcErrors.durationMinutes) setGcErrors({ ...gcErrors, durationMinutes: '' })
                       }}
                       placeholder="60"
-                      className={cn(gcErrors.durationMinutes && "border-rose-500 focus-visible:ring-rose-500")}
+                      className={cn(
+                        gcErrors.durationMinutes && "border-rose-500 focus-visible:ring-rose-500",
+                        isFieldChanged('durationMinutes') && !gcErrors.durationMinutes && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                      )}
                       disabled={isGcPending}
                     />
                     {gcErrors.durationMinutes && (
@@ -1311,7 +1365,10 @@ export default function TherapiesPage() {
                     )}
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Credits Required</label>
+                    <label className="text-sm font-medium">
+                      Credits Required
+                      {renderModifiedBadge('creditsRequired')}
+                    </label>
                     <Input
                       type="number"
                       min={0}
@@ -1321,7 +1378,10 @@ export default function TherapiesPage() {
                         if (gcErrors.creditsRequired) setGcErrors({ ...gcErrors, creditsRequired: '' })
                       }}
                       placeholder="1"
-                      className={cn(gcErrors.creditsRequired && "border-rose-500 focus-visible:ring-rose-500")}
+                      className={cn(
+                        gcErrors.creditsRequired && "border-rose-500 focus-visible:ring-rose-500",
+                        isFieldChanged('creditsRequired') && !gcErrors.creditsRequired && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                      )}
                       disabled={isGcPending}
                     />
                     {gcErrors.creditsRequired && (
@@ -1329,7 +1389,10 @@ export default function TherapiesPage() {
                     )}
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Max Participants</label>
+                    <label className="text-sm font-medium">
+                      Max Participants
+                      {renderModifiedBadge('maxParticipants')}
+                    </label>
                     <Input
                       type="number"
                       min={1}
@@ -1339,7 +1402,10 @@ export default function TherapiesPage() {
                         if (gcErrors.maxParticipants) setGcErrors({ ...gcErrors, maxParticipants: '' })
                       }}
                       placeholder="20"
-                      className={cn(gcErrors.maxParticipants && "border-rose-500 focus-visible:ring-rose-500")}
+                      className={cn(
+                        gcErrors.maxParticipants && "border-rose-500 focus-visible:ring-rose-500",
+                        isFieldChanged('maxParticipants') && !gcErrors.maxParticipants && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                      )}
                       disabled={isGcPending}
                     />
                     {gcErrors.maxParticipants && (
@@ -1350,11 +1416,17 @@ export default function TherapiesPage() {
 
                 {/* Schedule Info */}
                 <div>
-                  <label className="text-sm font-medium">Schedule / Timing Info</label>
+                  <label className="text-sm font-medium">
+                    Schedule / Timing Info
+                    {renderModifiedBadge('scheduleInfo')}
+                  </label>
                   <Input
                     value={gcForm.scheduleInfo}
                     onChange={(e) => setGcForm({ ...gcForm, scheduleInfo: e.target.value })}
                     placeholder="e.g. Mon, Wed, Fri — 7:00 AM"
+                    className={cn(
+                      isFieldChanged('scheduleInfo') && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                    )}
                     disabled={isGcPending}
                   />
                 </div>
@@ -1604,16 +1676,25 @@ export default function TherapiesPage() {
 
                 {/* Tags */}
                 <div>
-                  <label className="text-sm font-medium">Tags (comma separated)</label>
+                  <label className="text-sm font-medium">
+                    Tags (comma separated)
+                    {renderModifiedBadge('tags')}
+                  </label>
                   <Input
                     value={gcForm.tags}
                     onChange={(e) => setGcForm({ ...gcForm, tags: e.target.value })}
                     placeholder="yoga, morning, beginner"
+                    className={cn(
+                      isFieldChanged('tags') && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                    )}
                   />
                 </div>
 
                 {/* Active toggle */}
-                <div className="flex items-center gap-3 rounded-lg border border-dashed p-3">
+                <div className={cn(
+                  "flex items-center gap-3 rounded-lg border border-dashed p-3 transition-colors",
+                  isFieldChanged('isActive') && "border-amber-500 bg-amber-50/10 dark:bg-amber-500/5"
+                )}>
                   <button
                     type="button"
                     onClick={() => setGcForm({ ...gcForm, isActive: !gcForm.isActive })}
@@ -1625,6 +1706,7 @@ export default function TherapiesPage() {
                     <span className={gcForm.isActive ? 'font-medium text-teal-700 dark:text-teal-400' : 'text-muted-foreground'}>
                       {gcForm.isActive ? 'Active — visible for booking' : 'Inactive — hidden from booking'}
                     </span>
+                    {renderModifiedBadge('isActive')}
                   </button>
                 </div>
 
