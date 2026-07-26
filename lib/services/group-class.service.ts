@@ -41,13 +41,13 @@ function normalizeGroupClass(raw: any): GroupClass {
     name: raw?.name || '',
     description: raw?.description || '',
     mode: raw?.mode ?? 'offline',
-    instructor: raw?.instructor ?? '',
-    durationMinutes: Number(raw?.durationMinutes ?? 0),
-    creditsRequired: Number(raw?.creditsRequired ?? 1),
+    instructor: raw?.instructor ?? 'Staff',
+    durationMinutes: Number(raw?.durationMinutes ?? 60),
+    creditsRequired: Number(raw?.creditCost ?? raw?.creditsRequired ?? 1),
     maxParticipants: Number(raw?.maxParticipants ?? 20),
     tags: Array.isArray(raw?.tags) ? raw.tags : [],
-    scheduleInfo: raw?.scheduleInfo ?? '',
-    isActive: raw?.isActive ?? true,
+    scheduleInfo: raw?.scheduleInfo ?? 'Daily',
+    isActive: raw?.status ? (raw.status === 'ACTIVE') : (raw?.isActive ?? true),
     slots: Array.isArray(raw?.slots)
       ? raw.slots.map((s: any) => String(s?._id ?? s))
       : [],
@@ -58,37 +58,37 @@ function normalizeGroupClass(raw: any): GroupClass {
 
 export const groupClassService = {
   getAll: async (): Promise<{ groupClasses: GroupClass[] }> => {
-    const { data } = await apiClient.get('/group-classes')
-    const list: GroupClass[] = Array.isArray(data?.groupClasses)
-      ? data.groupClasses.map(normalizeGroupClass)
+    const { data } = await apiClient.get('/api/v1/admin/classes')
+    const list: GroupClass[] = Array.isArray(data?.classes || data?.groupClasses)
+      ? (data.classes || data.groupClasses).map(normalizeGroupClass)
       : []
     return { groupClasses: list }
   },
 
   getById: async (id: string): Promise<{ groupClass: GroupClass }> => {
-    const { data } = await apiClient.get(`/group-classes/${id}`)
-    return { groupClass: normalizeGroupClass(data?.groupClass ?? data) }
+    const { data } = await apiClient.get(`/api/v1/classes/${id}`)
+    return { groupClass: normalizeGroupClass(data?.class ?? data?.groupClass ?? data) }
   },
 
   create: async (
     payload: CreateGroupClassPayload,
   ): Promise<{ message: string; groupClass: GroupClass }> => {
-    const { data } = await apiClient.post('/group-classes', {
+    const { data } = await apiClient.post('/api/v1/admin/classes', {
       name: payload.name,
       description: payload.description,
+      status: payload.isActive === false ? 'INACTIVE' : 'ACTIVE',
+      creditCost: payload.creditsRequired,
       mode: payload.mode,
       instructor: payload.instructor,
       durationMinutes: payload.durationMinutes,
-      creditsRequired: payload.creditsRequired,
       maxParticipants: payload.maxParticipants,
       tags: payload.tags,
       scheduleInfo: payload.scheduleInfo,
       slots: payload.slots ?? [],
-      isActive: payload.isActive ?? true,
     })
     return {
       message: data?.message || 'Group class created successfully',
-      groupClass: normalizeGroupClass(data?.groupClass ?? data),
+      groupClass: normalizeGroupClass(data?.class ?? data?.groupClass ?? data),
     }
   },
 
@@ -96,15 +96,27 @@ export const groupClassService = {
     id: string,
     payload: UpdateGroupClassPayload,
   ): Promise<{ message: string; groupClass: GroupClass }> => {
-    const { data } = await apiClient.patch(`/group-classes/${id}`, payload)
+    const { data } = await apiClient.put(`/api/v1/admin/classes/${id}`, {
+      name: payload.name,
+      description: payload.description,
+      status: payload.isActive === false ? 'INACTIVE' : 'ACTIVE',
+      creditCost: payload.creditsRequired,
+      mode: payload.mode,
+      instructor: payload.instructor,
+      durationMinutes: payload.durationMinutes,
+      maxParticipants: payload.maxParticipants,
+      tags: payload.tags,
+      scheduleInfo: payload.scheduleInfo,
+      slots: payload.slots ?? [],
+    })
     return {
       message: data?.message || 'Group class updated successfully',
-      groupClass: normalizeGroupClass(data?.groupClass ?? data),
+      groupClass: normalizeGroupClass(data?.class ?? data?.groupClass ?? data),
     }
   },
 
   delete: async (id: string): Promise<{ message: string }> => {
-    const { data } = await apiClient.delete(`/group-classes/${id}`)
-    return { message: data?.message || 'Group class deleted successfully' }
+    const { data } = await apiClient.delete(`/api/v1/admin/classes/${id}`)
+    return { message: data?.message || 'Group class retired successfully' }
   },
 }

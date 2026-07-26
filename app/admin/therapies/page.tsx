@@ -45,7 +45,9 @@ import {
   IconCalendarTime,
   IconAlertTriangle,
   IconChevronDown,
+  IconLoader2,
 } from '@tabler/icons-react'
+import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   useCreateTherapy,
@@ -288,6 +290,7 @@ export default function TherapiesPage() {
   const [gcForm, setGcForm] = useState(defaultGcForm)
   const [gcSchedule, setGcSchedule] = useState<GcSchedule>(DEFAULT_SCHEDULE)
   const [showPreview, setShowPreview] = useState(false)
+  const [gcErrors, setGcErrors] = useState<Record<string, string>>({})
 
   const {
     data: therapies = [],
@@ -540,6 +543,7 @@ export default function TherapiesPage() {
     setManualSlotIds('')
     setShowManualSlotInput(false)
     setSlotPlan({ startTime: '09:00', endTime: '17:00', capacityPerHour: 1 })
+    setGcErrors({})
   }
 
   const openCreateGcDialog = () => {
@@ -549,6 +553,7 @@ export default function TherapiesPage() {
   }
 
   const openEditGcDialog = (gc: GroupClass) => {
+    setGcErrors({})
     setEditingGc(gc)
     setGcForm({
       name: gc.name,
@@ -590,12 +595,31 @@ export default function TherapiesPage() {
   }
 
   const handleSaveGc = async () => {
-    if (!gcForm.name.trim()) { toast.error('Class name is required'); return }
-    if (!gcForm.instructor.trim()) { toast.error('Instructor name is required'); return }
-    if (!gcForm.description.trim()) { toast.error('Description is required'); return }
-    if (gcForm.durationMinutes <= 0) { toast.error('Duration must be greater than 0'); return }
-    if (gcForm.creditsRequired <= 0) { toast.error('Credits required must be greater than 0'); return }
-    if (gcForm.maxParticipants <= 0) { toast.error('Max participants must be greater than 0'); return }
+    const errors: Record<string, string> = {}
+    if (!gcForm.name.trim()) {
+      errors.name = 'Class name is required'
+    }
+    if (!gcForm.instructor.trim()) {
+      errors.instructor = 'Instructor name is required'
+    }
+    if (!gcForm.description.trim()) {
+      errors.description = 'Description is required'
+    }
+    if (gcForm.durationMinutes <= 0) {
+      errors.durationMinutes = 'Duration must be greater than 0'
+    }
+    if (gcForm.creditsRequired < 1) {
+      errors.creditsRequired = 'Credits required must be at least 1 (positive integer)'
+    }
+    if (gcForm.maxParticipants <= 0) {
+      errors.maxParticipants = 'Max participants must be greater than 0'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setGcErrors(errors)
+      toast.error('Please fix the validation errors before saving')
+      return
+    }
 
     if (gcSchedule.mode === 'one-time') {
       if (!gcSchedule.oneTimeDate) { toast.error('Please select a class date'); return }
@@ -1198,9 +1222,17 @@ export default function TherapiesPage() {
                   <label className="text-sm font-medium">Class Name <span className="text-red-500">*</span></label>
                   <Input
                     value={gcForm.name}
-                    onChange={(e) => setGcForm({ ...gcForm, name: e.target.value })}
+                    onChange={(e) => {
+                      setGcForm({ ...gcForm, name: e.target.value })
+                      if (gcErrors.name) setGcErrors({ ...gcErrors, name: '' })
+                    }}
                     placeholder="Morning Yoga Flow"
+                    className={cn(gcErrors.name && "border-rose-500 focus-visible:ring-rose-500")}
+                    disabled={isGcPending}
                   />
+                  {gcErrors.name && (
+                    <p className="text-xs text-rose-500 mt-1">{gcErrors.name}</p>
+                  )}
                 </div>
 
                 {/* Instructor */}
@@ -1208,9 +1240,17 @@ export default function TherapiesPage() {
                   <label className="text-sm font-medium">Instructor <span className="text-red-500">*</span></label>
                   <Input
                     value={gcForm.instructor}
-                    onChange={(e) => setGcForm({ ...gcForm, instructor: e.target.value })}
+                    onChange={(e) => {
+                      setGcForm({ ...gcForm, instructor: e.target.value })
+                      if (gcErrors.instructor) setGcErrors({ ...gcErrors, instructor: '' })
+                    }}
                     placeholder="e.g. Coach Arjun"
+                    className={cn(gcErrors.instructor && "border-rose-500 focus-visible:ring-rose-500")}
+                    disabled={isGcPending}
                   />
+                  {gcErrors.instructor && (
+                    <p className="text-xs text-rose-500 mt-1">{gcErrors.instructor}</p>
+                  )}
                 </div>
 
                 {/* Description */}
@@ -1218,10 +1258,17 @@ export default function TherapiesPage() {
                   <label className="text-sm font-medium">Description <span className="text-red-500">*</span></label>
                   <Textarea
                     value={gcForm.description}
-                    onChange={(e) => setGcForm({ ...gcForm, description: e.target.value })}
+                    onChange={(e) => {
+                      setGcForm({ ...gcForm, description: e.target.value })
+                      if (gcErrors.description) setGcErrors({ ...gcErrors, description: '' })
+                    }}
                     placeholder="Describe what participants will experience in this class."
-                    className="min-h-20 resize-none"
+                    className={cn("min-h-20 resize-none", gcErrors.description && "border-rose-500 focus-visible:ring-rose-500")}
+                    disabled={isGcPending}
                   />
+                  {gcErrors.description && (
+                    <p className="text-xs text-rose-500 mt-1">{gcErrors.description}</p>
+                  )}
                 </div>
 
                 {/* Mode */}
@@ -1230,6 +1277,7 @@ export default function TherapiesPage() {
                   <Select
                     value={gcForm.mode}
                     onValueChange={(val) => setGcForm({ ...gcForm, mode: val as GroupClassMode })}
+                    disabled={isGcPending}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select mode" />
@@ -1250,9 +1298,17 @@ export default function TherapiesPage() {
                       type="number"
                       min={1}
                       value={gcForm.durationMinutes}
-                      onChange={(e) => setGcForm({ ...gcForm, durationMinutes: Number.parseInt(e.target.value, 10) || 0 })}
+                      onChange={(e) => {
+                        setGcForm({ ...gcForm, durationMinutes: Number.parseInt(e.target.value, 10) || 0 })
+                        if (gcErrors.durationMinutes) setGcErrors({ ...gcErrors, durationMinutes: '' })
+                      }}
                       placeholder="60"
+                      className={cn(gcErrors.durationMinutes && "border-rose-500 focus-visible:ring-rose-500")}
+                      disabled={isGcPending}
                     />
+                    {gcErrors.durationMinutes && (
+                      <p className="text-xs text-rose-500 mt-1">{gcErrors.durationMinutes}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Credits Required</label>
@@ -1260,9 +1316,17 @@ export default function TherapiesPage() {
                       type="number"
                       min={0}
                       value={gcForm.creditsRequired}
-                      onChange={(e) => setGcForm({ ...gcForm, creditsRequired: Number.parseInt(e.target.value, 10) || 0 })}
+                      onChange={(e) => {
+                        setGcForm({ ...gcForm, creditsRequired: Number.parseInt(e.target.value, 10) || 0 })
+                        if (gcErrors.creditsRequired) setGcErrors({ ...gcErrors, creditsRequired: '' })
+                      }}
                       placeholder="1"
+                      className={cn(gcErrors.creditsRequired && "border-rose-500 focus-visible:ring-rose-500")}
+                      disabled={isGcPending}
                     />
+                    {gcErrors.creditsRequired && (
+                      <p className="text-xs text-rose-500 mt-1">{gcErrors.creditsRequired}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium">Max Participants</label>
@@ -1270,9 +1334,17 @@ export default function TherapiesPage() {
                       type="number"
                       min={1}
                       value={gcForm.maxParticipants}
-                      onChange={(e) => setGcForm({ ...gcForm, maxParticipants: Number.parseInt(e.target.value, 10) || 0 })}
+                      onChange={(e) => {
+                        setGcForm({ ...gcForm, maxParticipants: Number.parseInt(e.target.value, 10) || 0 })
+                        if (gcErrors.maxParticipants) setGcErrors({ ...gcErrors, maxParticipants: '' })
+                      }}
                       placeholder="20"
+                      className={cn(gcErrors.maxParticipants && "border-rose-500 focus-visible:ring-rose-500")}
+                      disabled={isGcPending}
                     />
+                    {gcErrors.maxParticipants && (
+                      <p className="text-xs text-rose-500 mt-1">{gcErrors.maxParticipants}</p>
+                    )}
                   </div>
                 </div>
 
@@ -1283,6 +1355,7 @@ export default function TherapiesPage() {
                     value={gcForm.scheduleInfo}
                     onChange={(e) => setGcForm({ ...gcForm, scheduleInfo: e.target.value })}
                     placeholder="e.g. Mon, Wed, Fri — 7:00 AM"
+                    disabled={isGcPending}
                   />
                 </div>
 
@@ -1711,7 +1784,16 @@ export default function TherapiesPage() {
                     Cancel
                   </Button>
                   <Button onClick={handleSaveGc} disabled={isGcPending}>
-                    {isGcPending ? 'Saving...' : editingGc ? 'Save Changes' : 'Create Class'}
+                    {isGcPending ? (
+                      <span className="flex items-center gap-2">
+                        <IconLoader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </span>
+                    ) : editingGc ? (
+                      'Save Changes'
+                    ) : (
+                      'Create Class'
+                    )}
                   </Button>
                 </div>
               </div>
