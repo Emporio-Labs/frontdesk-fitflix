@@ -14,6 +14,7 @@ export interface GroupClass {
   tags: string[]
   scheduleInfo: string
   isActive: boolean
+  isPublished: boolean
   slots?: string[]
   locationAddress?: string
   streamRoomId?: string
@@ -34,6 +35,7 @@ export interface CreateGroupClassPayload {
   scheduleInfo: string
   slots?: string[]
   isActive?: boolean
+  isPublished?: boolean
   locationAddress?: string
   streamRoomId?: string
   enableWaitlist?: boolean
@@ -42,6 +44,7 @@ export interface CreateGroupClassPayload {
 export interface UpdateGroupClassPayload extends Partial<CreateGroupClassPayload> {}
 
 function normalizeGroupClass(raw: any): GroupClass {
+  const published = raw?.isPublished ?? (raw?.status ? raw.status === 'ACTIVE' : (raw?.isActive ?? true))
   return {
     id: raw?._id || raw?.id || '',
     name: raw?.name || '',
@@ -53,7 +56,8 @@ function normalizeGroupClass(raw: any): GroupClass {
     maxParticipants: Number(raw?.maxParticipants ?? 20),
     tags: Array.isArray(raw?.tags) ? raw.tags : [],
     scheduleInfo: raw?.scheduleInfo ?? 'Daily',
-    isActive: raw?.status ? (raw.status === 'ACTIVE') : (raw?.isActive ?? true),
+    isActive: published,
+    isPublished: published,
     slots: Array.isArray(raw?.slots)
       ? raw.slots.map((s: any) => String(s?._id ?? s))
       : [],
@@ -85,7 +89,8 @@ export const groupClassService = {
     const { data } = await apiClient.post('/api/v1/admin/classes', {
       name: payload.name,
       description: payload.description,
-      status: payload.isActive === false ? 'INACTIVE' : 'ACTIVE',
+      status: payload.isPublished === false || payload.isActive === false ? 'INACTIVE' : 'ACTIVE',
+      isPublished: payload.isPublished ?? payload.isActive ?? true,
       creditCost: payload.creditsRequired,
       mode: payload.mode,
       instructor: payload.instructor,
@@ -111,7 +116,8 @@ export const groupClassService = {
     const { data } = await apiClient.put(`/api/v1/admin/classes/${id}`, {
       name: payload.name,
       description: payload.description,
-      status: payload.isActive === false ? 'INACTIVE' : 'ACTIVE',
+      status: payload.isPublished === false || payload.isActive === false ? 'INACTIVE' : 'ACTIVE',
+      isPublished: payload.isPublished ?? payload.isActive ?? true,
       creditCost: payload.creditsRequired,
       mode: payload.mode,
       instructor: payload.instructor,
@@ -126,6 +132,20 @@ export const groupClassService = {
     })
     return {
       message: data?.message || 'Group class updated successfully',
+      groupClass: normalizeGroupClass(data?.class ?? data?.groupClass ?? data),
+    }
+  },
+
+  togglePublish: async (
+    id: string,
+    isPublished: boolean,
+  ): Promise<{ message: string; groupClass: GroupClass }> => {
+    const { data } = await apiClient.patch(`/api/v1/admin/classes/schedule/${id}/publish`, {
+      is_published: isPublished,
+      isPublished,
+    })
+    return {
+      message: data?.message || (isPublished ? 'Class published successfully' : 'Class unpublished'),
       groupClass: normalizeGroupClass(data?.class ?? data?.groupClass ?? data),
     }
   },

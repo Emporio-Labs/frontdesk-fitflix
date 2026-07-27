@@ -60,6 +60,7 @@ import {
   useCreateGroupClass,
   useUpdateGroupClass,
   useDeleteGroupClass,
+  useTogglePublishGroupClass,
 } from '@/hooks/use-group-classes'
 import { useSlots } from '@/hooks/use-slots'
 import type { TherapyCatalogItem } from '@/lib/services/therapy.service'
@@ -289,6 +290,7 @@ export default function TherapiesPage() {
     locationAddress: '',
     streamRoomId: '',
     enableWaitlist: false,
+    isPublished: true,
   }
   const [gcForm, setGcForm] = useState(defaultGcForm)
   const [gcSchedule, setGcSchedule] = useState<GcSchedule>(DEFAULT_SCHEDULE)
@@ -299,6 +301,9 @@ export default function TherapiesPage() {
   const [use12HourFormat, setUse12HourFormat] = useState(true)
   const [capacityConfirmOpen, setCapacityConfirmOpen] = useState(false)
   const [capacityWarnInfo, setCapacityWarnInfo] = useState<{ payload: any; maxBooked: number; gcSlots: Slot[] } | null>(null)
+  const [publishWarnOpen, setPublishWarnOpen] = useState(false)
+  const [pendingPublishGc, setPendingPublishGc] = useState<{ id: string; isPublished: boolean } | null>(null)
+  const [gcPublishFilter, setGcPublishFilter] = useState<'all' | 'published' | 'unpublished'>('all')
 
   const isFieldChanged = (fieldName: keyof typeof gcForm) => {
     if (!editingGc) return false
@@ -359,6 +364,25 @@ export default function TherapiesPage() {
   const createGroupClass = useCreateGroupClass()
   const updateGroupClass = useUpdateGroupClass()
   const deleteGroupClass = useDeleteGroupClass()
+  const togglePublishGroupClass = useTogglePublishGroupClass()
+
+  const handleTogglePublish = async (gc: GroupClass, targetStatus: boolean) => {
+    if (targetStatus) {
+      const gcSlots = slots.filter((slot) => gc.slots?.includes(slot._id))
+      const isIncomplete =
+        !gc.instructor.trim() ||
+        gc.instructor === 'Staff' ||
+        gc.maxParticipants <= 0 ||
+        gcSlots.length === 0
+
+      if (isIncomplete) {
+        setPendingPublishGc({ id: gc.id, isPublished: true })
+        setPublishWarnOpen(true)
+        return
+      }
+    }
+    await togglePublishGroupClass.mutateAsync({ id: gc.id, isPublished: targetStatus })
+  }
 
   const items = therapies
 
@@ -612,6 +636,7 @@ export default function TherapiesPage() {
       locationAddress: gc.locationAddress ?? '',
       streamRoomId: gc.streamRoomId ?? '',
       enableWaitlist: gc.enableWaitlist ?? false,
+      isPublished: gc.isPublished ?? gc.isActive ?? true,
     })
     const info = gc.scheduleInfo || ''
     if (info.startsWith('One-Time:')) {
@@ -787,17 +812,22 @@ export default function TherapiesPage() {
   const handleDeleteGc = (id: string) => deleteGroupClass.mutate(id)
 
   const filteredGroupClasses = useMemo(() => {
-    const activeClasses = groupClasses.filter((gc) => gc.isActive)
+    let list = groupClasses
+    if (gcPublishFilter === 'published') {
+      list = list.filter((gc) => gc.isPublished)
+    } else if (gcPublishFilter === 'unpublished') {
+      list = list.filter((gc) => !gc.isPublished)
+    }
     const q = gcSearchTerm.toLowerCase()
-    if (!q) return activeClasses
-    return activeClasses.filter(
+    if (!q) return list
+    return list.filter(
       (gc) =>
         gc.name.toLowerCase().includes(q) ||
         gc.instructor.toLowerCase().includes(q) ||
         gc.description.toLowerCase().includes(q) ||
         gc.tags.some((t) => t.toLowerCase().includes(q))
     )
-  }, [groupClasses, gcSearchTerm])
+  }, [groupClasses, gcSearchTerm, gcPublishFilter])
 
   const gcModeLabel: Record<GroupClassMode, string> = { online: 'Online', offline: 'In-Person', hybrid: 'Hybrid' }
   const gcModeIcon: Record<GroupClassMode, React.ReactElement> = {
@@ -1594,6 +1624,33 @@ export default function TherapiesPage() {
                   </div>
                 </div>
 
+                {/* Publish Status Toggle */}
+                <div className="flex items-center space-x-2.5 rounded-lg border p-3 bg-muted/20">
+                  <Checkbox
+                    id="isPublished"
+                    checked={gcForm.isPublished}
+                    onCheckedChange={(checked) => setGcForm({ ...gcForm, isPublished: !!checked })}
+                    disabled={isGcPending}
+                  />
+                  <div className="grid gap-1 leading-none">
+                    <label
+                      htmlFor="isPublished"
+                      className="text-xs font-semibold leading-none cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>Publish Immediately to Members</span>
+                      {gcForm.isPublished ? (
+                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-[10px] py-0 px-1.5 font-bold">Published</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-bold text-amber-600 border-amber-300">Unpublished</Badge>
+                      )}
+                      {renderModifiedBadge('isPublished')}
+                    </label>
+                    <p className="text-[11px] text-muted-foreground">
+                      Controls whether this class is visible and bookable for members in the app.
+                    </p>
+                  </div>
+                </div>
+
                 {/* Schedule Info */}
                 <div className="rounded-lg border bg-muted/40 p-3 space-y-2 text-xs">
                   <div className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Schedule / Timing Info (Auto-Compiled)</div>
@@ -2176,18 +2233,98 @@ export default function TherapiesPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Dialog open={publishWarnOpen} onOpenChange={setPublishWarnOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="text-amber-600 dark:text-amber-500 flex items-center gap-2">
+                  <IconAlertTriangle className="h-5 w-5" /> Incomplete Class Details Warning
+                </DialogTitle>
+                <DialogDescription className="pt-2 text-sm text-foreground">
+                  This class has incomplete details (unassigned trainer, zero capacity, or missing booking slots).
+                  <br /><br />
+                  Are you sure you want to publish this session to members now?
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setPublishWarnOpen(false)
+                    setPendingPublishGc(null)
+                  }}
+                  disabled={togglePublishGroupClass.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-medium"
+                  onClick={async () => {
+                    if (pendingPublishGc) {
+                      setPublishWarnOpen(false)
+                      await togglePublishGroupClass.mutateAsync(pendingPublishGc)
+                      setPendingPublishGc(null)
+                    }
+                  }}
+                  disabled={togglePublishGroupClass.isPending}
+                >
+                  Proceed & Publish
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
       {/* Search */}
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Input
-            placeholder="Search classes by name, instructor, or tags..."
-            value={gcSearchTerm}
-            onChange={(e) => setGcSearchTerm(e.target.value)}
-            className="max-w-sm"
-          />
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <Input
+              placeholder="Search classes by name, instructor, or tags..."
+              value={gcSearchTerm}
+              onChange={(e) => setGcSearchTerm(e.target.value)}
+              className="max-w-sm"
+            />
+            <div className="flex items-center space-x-1 rounded-xl border bg-muted/40 p-1 text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setGcPublishFilter('all')}
+                className={cn(
+                  "px-3 py-1 rounded-lg transition-colors cursor-pointer",
+                  gcPublishFilter === 'all'
+                    ? "bg-background text-foreground shadow-sm font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                All ({groupClasses.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGcPublishFilter('published')}
+                className={cn(
+                  "px-3 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5",
+                  gcPublishFilter === 'published'
+                    ? "bg-emerald-600 text-white shadow-sm font-semibold"
+                    : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/50"
+                )}
+              >
+                Published ({groupClasses.filter((g) => g.isPublished).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGcPublishFilter('unpublished')}
+                className={cn(
+                  "px-3 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5",
+                  gcPublishFilter === 'unpublished'
+                    ? "bg-amber-600 text-white shadow-sm font-semibold"
+                    : "text-amber-700 dark:text-amber-400 hover:bg-amber-100/50"
+                )}
+              >
+                Unpublished ({groupClasses.filter((g) => !g.isPublished).length})
+              </button>
+            </div>
+          </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
               <IconVideo className="h-3 w-3" /> Online
@@ -2249,11 +2386,32 @@ export default function TherapiesPage() {
                         }`}>
                           {gcModeIcon[gc.mode]}
                         </div>
-                        {!gc.isActive && (
-                          <Badge variant="outline" className="rounded-full text-xs text-muted-foreground">
-                            Inactive
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePublish(gc, !gc.isPublished)}
+                            disabled={togglePublishGroupClass.isPending}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all shadow-sm cursor-pointer border",
+                              gc.isPublished
+                                ? "bg-emerald-500/15 text-emerald-700 border-emerald-300 hover:bg-emerald-500/25 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                : "bg-amber-500/15 text-amber-800 border-amber-300 hover:bg-amber-500/25 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                            )}
+                            title={gc.isPublished ? "Click to unpublish class" : "Click to publish class"}
+                          >
+                            {gc.isPublished ? (
+                              <>
+                                <IconToggleRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                <span>Published</span>
+                              </>
+                            ) : (
+                              <>
+                                <IconToggleLeft className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                <span>Unpublished</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                       <h4 className="text-base font-semibold tracking-tight">{gc.name}</h4>
                       <p className="text-xs text-muted-foreground">by {gc.instructor}</p>
