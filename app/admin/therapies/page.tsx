@@ -291,6 +291,8 @@ export default function TherapiesPage() {
   const [gcSchedule, setGcSchedule] = useState<GcSchedule>(DEFAULT_SCHEDULE)
   const [showPreview, setShowPreview] = useState(false)
   const [gcErrors, setGcErrors] = useState<Record<string, string>>({})
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [classToDelete, setClassToDelete] = useState<string | null>(null)
 
   const isFieldChanged = (fieldName: keyof typeof gcForm) => {
     if (!editingGc) return false
@@ -711,9 +713,10 @@ export default function TherapiesPage() {
   const handleDeleteGc = (id: string) => deleteGroupClass.mutate(id)
 
   const filteredGroupClasses = useMemo(() => {
+    const activeClasses = groupClasses.filter((gc) => gc.isActive)
     const q = gcSearchTerm.toLowerCase()
-    if (!q) return groupClasses
-    return groupClasses.filter(
+    if (!q) return activeClasses
+    return activeClasses.filter(
       (gc) =>
         gc.name.toLowerCase().includes(q) ||
         gc.instructor.toLowerCase().includes(q) ||
@@ -1881,6 +1884,49 @@ export default function TherapiesPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Delete Group Class</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete this class? This will prevent any future bookings.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDeleteConfirmOpen(false)
+                    setClassToDelete(null)
+                  }}
+                  disabled={isGcPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    if (classToDelete) {
+                      await deleteGroupClass.mutateAsync(classToDelete)
+                      setDeleteConfirmOpen(false)
+                      setClassToDelete(null)
+                    }
+                  }}
+                  disabled={isGcPending}
+                >
+                  {isGcPending ? (
+                    <span className="flex items-center gap-2">
+                      <IconLoader2 className="h-4 w-4 animate-spin" />
+                      Deleting...
+                    </span>
+                  ) : (
+                    'Delete'
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -2008,7 +2054,10 @@ export default function TherapiesPage() {
                           size="sm"
                           variant="outline"
                           className="text-red-600 hover:text-red-700"
-                          onClick={() => handleDeleteGc(gc.id)}
+                          onClick={() => {
+                            setClassToDelete(gc.id)
+                            setDeleteConfirmOpen(true)
+                          }}
                           disabled={isGcPending}
                         >
                           <IconTrash className="mr-1 h-4 w-4" /> Delete
