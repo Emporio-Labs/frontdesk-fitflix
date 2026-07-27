@@ -15,6 +15,8 @@ export interface GroupClass {
   scheduleInfo: string
   isActive: boolean
   slots?: string[]
+  locationAddress?: string
+  streamRoomId?: string
   createdAt: string
   updatedAt: string
 }
@@ -31,6 +33,8 @@ export interface CreateGroupClassPayload {
   scheduleInfo: string
   slots?: string[]
   isActive?: boolean
+  locationAddress?: string
+  streamRoomId?: string
 }
 
 export interface UpdateGroupClassPayload extends Partial<CreateGroupClassPayload> {}
@@ -51,6 +55,8 @@ function normalizeGroupClass(raw: any): GroupClass {
     slots: Array.isArray(raw?.slots)
       ? raw.slots.map((s: any) => String(s?._id ?? s))
       : [],
+    locationAddress: raw?.locationAddress ?? '',
+    streamRoomId: raw?.streamRoomId ?? '',
     createdAt: raw?.createdAt ?? new Date().toISOString(),
     updatedAt: raw?.updatedAt ?? new Date().toISOString(),
   }
@@ -85,6 +91,8 @@ export const groupClassService = {
       tags: payload.tags,
       scheduleInfo: payload.scheduleInfo,
       slots: payload.slots ?? [],
+      locationAddress: payload.locationAddress,
+      streamRoomId: payload.streamRoomId,
     })
     return {
       message: data?.message || 'Group class created successfully',
@@ -108,6 +116,8 @@ export const groupClassService = {
       tags: payload.tags,
       scheduleInfo: payload.scheduleInfo,
       slots: payload.slots ?? [],
+      locationAddress: payload.locationAddress,
+      streamRoomId: payload.streamRoomId,
     })
     return {
       message: data?.message || 'Group class updated successfully',

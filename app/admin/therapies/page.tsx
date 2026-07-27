@@ -286,6 +286,8 @@ export default function TherapiesPage() {
     tags: '',
     scheduleInfo: '',
     isActive: true,
+    locationAddress: '',
+    streamRoomId: '',
   }
   const [gcForm, setGcForm] = useState(defaultGcForm)
   const [gcSchedule, setGcSchedule] = useState<GcSchedule>(DEFAULT_SCHEDULE)
@@ -293,6 +295,7 @@ export default function TherapiesPage() {
   const [gcErrors, setGcErrors] = useState<Record<string, string>>({})
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [classToDelete, setClassToDelete] = useState<string | null>(null)
+  const [use12HourFormat, setUse12HourFormat] = useState(true)
 
   const isFieldChanged = (fieldName: keyof typeof gcForm) => {
     if (!editingGc) return false
@@ -315,6 +318,18 @@ export default function TherapiesPage() {
       )
     }
     return null
+  }
+
+  const formatTimeTo12Hour = (time24: string): string => {
+    const [hoursRaw, minutesRaw] = time24.split(':')
+    let hours = parseInt(hoursRaw, 10)
+    const minutes = parseInt(minutesRaw, 10)
+    if (isNaN(hours) || isNaN(minutes)) return time24
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    hours = hours % 12
+    hours = hours ? hours : 12
+    const minutesStr = minutes < 10 ? '0' + minutes : minutes
+    return `${hours}:${minutesStr} ${ampm}`
   }
 
   const {
@@ -591,6 +606,8 @@ export default function TherapiesPage() {
       tags: gc.tags.join(', '),
       scheduleInfo: gc.scheduleInfo,
       isActive: gc.isActive,
+      locationAddress: gc.locationAddress ?? '',
+      streamRoomId: gc.streamRoomId ?? '',
     })
     const info = gc.scheduleInfo || ''
     if (info.startsWith('One-Time:')) {
@@ -639,6 +656,12 @@ export default function TherapiesPage() {
     if (gcForm.maxParticipants <= 0) {
       errors.maxParticipants = 'Max participants must be greater than 0'
     }
+    if ((gcForm.mode === 'offline' || gcForm.mode === 'hybrid') && !gcForm.locationAddress.trim()) {
+      errors.locationAddress = 'Location address is required'
+    }
+    if ((gcForm.mode === 'online' || gcForm.mode === 'hybrid') && !gcForm.streamRoomId) {
+      errors.streamRoomId = 'ZEGOCLOUD room template is required'
+    }
 
     if (Object.keys(errors).length > 0) {
       setGcErrors(errors)
@@ -648,10 +671,20 @@ export default function TherapiesPage() {
 
     if (gcSchedule.mode === 'one-time') {
       if (!gcSchedule.oneTimeDate) { toast.error('Please select a class date'); return }
+      if (gcSchedule.oneTimeDate < todayStr()) { toast.error('Class date must be today or in the future'); return }
+      
       const st = timeToMinutes(gcSchedule.startTime)
       const et = timeToMinutes(gcSchedule.endTime)
       if (st === null || et === null) { toast.error('Please enter valid start and end times'); return }
       if (st >= et) { toast.error('End time must be after start time'); return }
+
+      if (gcSchedule.oneTimeDate === todayStr()) {
+        const now = new Date()
+        const currentMinutes = now.getHours() * 60 + now.getMinutes()
+        if (st < currentMinutes) {
+          toast.error('Start time cannot be in the past'); return
+        }
+      }
     } else {
       const st = timeToMinutes(gcSchedule.startTime)
       const et = timeToMinutes(gcSchedule.endTime)
@@ -697,6 +730,8 @@ export default function TherapiesPage() {
       scheduleInfo: compiledScheduleInfo,
       slots: mergedSlotIds,
       isActive: gcForm.isActive,
+      locationAddress: gcForm.locationAddress,
+      streamRoomId: gcForm.streamRoomId,
     }
 
     if (editingGc) {
@@ -766,10 +801,30 @@ export default function TherapiesPage() {
   }, [slots])
 
   const filteredSlotOptions = useMemo(() => {
-    const query = slotSearchTerm.trim().toLowerCase()
-    if (!query) return slotOptions
+    let filtered = slotOptions.filter((slot) => {
+      if (!slot.isDaily && slot.date && slot.date < todayStr()) {
+        return false
+      }
+      return true
+    })
 
-    return slotOptions.filter((slot) => {
+    const genStart = timeToMinutes(slotPlan.startTime)
+    const genEnd = timeToMinutes(slotPlan.endTime)
+    if (genStart !== null && genEnd !== null) {
+      filtered = filtered.filter((slot) => {
+        const slotStart = timeToMinutes(slot.startTime)
+        const slotEnd = timeToMinutes(slot.endTime)
+        if (slotStart !== null && slotEnd !== null) {
+          return slotStart >= genStart && slotEnd <= genEnd
+        }
+        return true
+      })
+    }
+
+    const query = slotSearchTerm.trim().toLowerCase()
+    if (!query) return filtered
+
+    return filtered.filter((slot) => {
       const slotDate = formatSlotDate(slot.date, slot.isDaily).toLowerCase()
       return (
         slot.startTime.toLowerCase().includes(query) ||
@@ -778,7 +833,7 @@ export default function TherapiesPage() {
         slot._id.toLowerCase().includes(query)
       )
     })
-  }, [slotOptions, slotSearchTerm])
+  }, [slotOptions, slotSearchTerm, slotPlan.startTime, slotPlan.endTime])
 
   const knownSlotIds = useMemo(() => new Set(slotOptions.map((slot) => slot._id)), [slotOptions])
 
@@ -1341,6 +1396,65 @@ export default function TherapiesPage() {
                   </Select>
                 </div>
 
+                {/* Conditional Location / Virtual Room fields */}
+                {(gcForm.mode === 'offline' || gcForm.mode === 'hybrid') && (
+                  <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <label className="text-sm font-medium">
+                      Location Address <span className="text-red-500">*</span>
+                      {renderModifiedBadge('locationAddress')}
+                    </label>
+                    <Input
+                      value={gcForm.locationAddress}
+                      onChange={(e) => {
+                        setGcForm({ ...gcForm, locationAddress: e.target.value })
+                        if (gcErrors.locationAddress) setGcErrors({ ...gcErrors, locationAddress: '' })
+                      }}
+                      placeholder="e.g. Studio A, 3rd Floor, Fitflix Gym"
+                      className={cn(
+                        gcErrors.locationAddress && "border-rose-500 focus-visible:ring-rose-500",
+                        isFieldChanged('locationAddress') && !gcErrors.locationAddress && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                      )}
+                      disabled={isGcPending}
+                    />
+                    {gcErrors.locationAddress && (
+                      <p className="text-xs text-rose-500 mt-1">{gcErrors.locationAddress}</p>
+                    )}
+                  </div>
+                )}
+
+                {(gcForm.mode === 'online' || gcForm.mode === 'hybrid') && (
+                  <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <label className="text-sm font-medium">
+                      ZEGOCLOUD Room Template <span className="text-red-500">*</span>
+                      {renderModifiedBadge('streamRoomId')}
+                    </label>
+                    <Select
+                      value={gcForm.streamRoomId}
+                      onValueChange={(val) => {
+                        setGcForm({ ...gcForm, streamRoomId: val })
+                        if (gcErrors.streamRoomId) setGcErrors({ ...gcErrors, streamRoomId: '' })
+                      }}
+                      disabled={isGcPending}
+                    >
+                      <SelectTrigger className={cn(
+                        "w-full",
+                        gcErrors.streamRoomId && "border-rose-500 focus-visible:ring-rose-500",
+                        isFieldChanged('streamRoomId') && !gcErrors.streamRoomId && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                      )}>
+                        <SelectValue placeholder="Select stream room template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="interactive_class">Interactive Video Class (1-on-many)</SelectItem>
+                        <SelectItem value="large_event">Large Event Webcast (100+ members)</SelectItem>
+                        <SelectItem value="standard_meeting">Standard Video Meeting (Group)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {gcErrors.streamRoomId && (
+                      <p className="text-xs text-rose-500 mt-1">{gcErrors.streamRoomId}</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Duration + Credits + Max Participants */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
@@ -1418,20 +1532,40 @@ export default function TherapiesPage() {
                 </div>
 
                 {/* Schedule Info */}
-                <div>
-                  <label className="text-sm font-medium">
-                    Schedule / Timing Info
-                    {renderModifiedBadge('scheduleInfo')}
-                  </label>
-                  <Input
-                    value={gcForm.scheduleInfo}
-                    onChange={(e) => setGcForm({ ...gcForm, scheduleInfo: e.target.value })}
-                    placeholder="e.g. Mon, Wed, Fri — 7:00 AM"
-                    className={cn(
-                      isFieldChanged('scheduleInfo') && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                <div className="rounded-lg border bg-muted/40 p-3 space-y-2 text-xs">
+                  <div className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground">Schedule / Timing Info (Auto-Compiled)</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">Pattern</span>
+                      <span className="font-medium text-foreground">
+                        {gcSchedule.mode === 'one-time'
+                          ? `One-Time Class (${gcSchedule.oneTimeDate ? formatDate(gcSchedule.oneTimeDate) : 'Select Date'})`
+                          : `${gcSchedule.frequency.charAt(0).toUpperCase() + gcSchedule.frequency.slice(1)}${
+                              gcSchedule.frequency === 'weekly' && gcSchedule.daysOfWeek.length > 0
+                                ? ` on ${gcSchedule.daysOfWeek.map((d) => DAY_LABELS[d].slice(0, 3)).join(', ')}`
+                                : ''
+                            }`}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">Time Range</span>
+                      <span className="font-medium text-foreground">
+                        {use12HourFormat
+                          ? `${formatTimeTo12Hour(gcSchedule.startTime)} - ${formatTimeTo12Hour(gcSchedule.endTime)}`
+                          : `${gcSchedule.startTime} - ${gcSchedule.endTime}`}
+                      </span>
+                    </div>
+                    {gcSchedule.mode === 'recurring' && (
+                      <div className="col-span-2 border-t pt-1.5 mt-0.5">
+                        <span className="text-muted-foreground block text-[10px]">Limit / Duration</span>
+                        <span className="font-medium text-foreground">
+                          {gcSchedule.limitMode === 'occurrences'
+                            ? `${gcSchedule.occurrences} classes total`
+                            : `Until ${gcSchedule.endDate ? formatDate(gcSchedule.endDate) : 'future date'}`}
+                        </span>
+                      </div>
                     )}
-                    disabled={isGcPending}
-                  />
+                  </div>
                 </div>
 
                 {/* ═══════════════ SCHEDULING CONFIGURATION ═══════════════ */}
@@ -1783,11 +1917,23 @@ export default function TherapiesPage() {
                     Select which time windows this class can be booked in. At least one slot is required.
                   </p>
 
-                  <Input
-                    value={slotSearchTerm}
-                    onChange={(e) => setSlotSearchTerm(e.target.value)}
-                    placeholder="Filter slots by schedule, time, or ID"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      value={slotSearchTerm}
+                      onChange={(e) => setSlotSearchTerm(e.target.value)}
+                      placeholder="Filter slots by schedule, time, or ID"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUse12HourFormat(!use12HourFormat)}
+                      className="whitespace-nowrap px-3 text-xs h-9"
+                    >
+                      {use12HourFormat ? '12h Format' : '24h Format'}
+                    </Button>
+                  </div>
 
                   <div className="rounded-md border">
                     <ScrollArea className="h-44">
@@ -1805,8 +1951,8 @@ export default function TherapiesPage() {
                         ) : (
                           filteredSlotOptions.map((slot: Slot) => (
                             <label
-                              key={slot._id}
-                              className="flex cursor-pointer items-start gap-3 rounded-md border p-2 hover:bg-muted/40"
+                               key={slot._id}
+                               className="flex cursor-pointer items-start gap-3 rounded-md border p-2 hover:bg-muted/40"
                             >
                               <Checkbox
                                 checked={selectedSlotIds.includes(slot._id)}
@@ -1815,7 +1961,7 @@ export default function TherapiesPage() {
                               />
                               <div className="space-y-1">
                                 <p className="text-sm font-medium">
-                                  {formatSlotDate(slot.date, slot.isDaily)} - {slot.startTime} to {slot.endTime}
+                                  {formatSlotDate(slot.date, slot.isDaily)} - {use12HourFormat ? `${formatTimeTo12Hour(slot.startTime)} to ${formatTimeTo12Hour(slot.endTime)}` : `${slot.startTime} to ${slot.endTime}`}
                                 </p>
                                 <div className="flex items-center gap-2">
                                   <Badge variant={slot.remainingCapacity <= 0 ? 'destructive' : 'secondary'}>
