@@ -288,6 +288,7 @@ export default function TherapiesPage() {
     isActive: true,
     locationAddress: '',
     streamRoomId: '',
+    enableWaitlist: false,
   }
   const [gcForm, setGcForm] = useState(defaultGcForm)
   const [gcSchedule, setGcSchedule] = useState<GcSchedule>(DEFAULT_SCHEDULE)
@@ -296,6 +297,8 @@ export default function TherapiesPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [classToDelete, setClassToDelete] = useState<string | null>(null)
   const [use12HourFormat, setUse12HourFormat] = useState(true)
+  const [capacityConfirmOpen, setCapacityConfirmOpen] = useState(false)
+  const [capacityWarnInfo, setCapacityWarnInfo] = useState<{ payload: any; maxBooked: number; gcSlots: Slot[] } | null>(null)
 
   const isFieldChanged = (fieldName: keyof typeof gcForm) => {
     if (!editingGc) return false
@@ -608,6 +611,7 @@ export default function TherapiesPage() {
       isActive: gc.isActive,
       locationAddress: gc.locationAddress ?? '',
       streamRoomId: gc.streamRoomId ?? '',
+      enableWaitlist: gc.enableWaitlist ?? false,
     })
     const info = gc.scheduleInfo || ''
     if (info.startsWith('One-Time:')) {
@@ -634,6 +638,30 @@ export default function TherapiesPage() {
     setShowManualSlotInput(false)
     setSlotPlan({ startTime: '09:00', endTime: '17:00', capacityPerHour: 1 })
     setGcDialogOpen(true)
+  }
+
+  const executeSave = async (payload: any, gcSlotsToUpdate: Slot[]) => {
+    if (editingGc) {
+      if (gcSlotsToUpdate.length > 0) {
+        await Promise.all(
+          gcSlotsToUpdate.map((slot) => {
+            const confirmedBookings = slot.capacity - slot.remainingCapacity
+            const newRemaining = Math.max(0, payload.maxParticipants - confirmedBookings)
+            return slotService.update(slot._id, {
+              capacity: payload.maxParticipants,
+              remainingCapacity: newRemaining,
+            })
+          })
+        )
+      }
+      await updateGroupClass.mutateAsync({ id: editingGc.id, payload })
+    } else {
+      await createGroupClass.mutateAsync(payload)
+    }
+
+    setGcDialogOpen(false)
+    setEditingGc(null)
+    resetGcForm()
   }
 
   const handleSaveGc = async () => {
@@ -732,17 +760,28 @@ export default function TherapiesPage() {
       isActive: gcForm.isActive,
       locationAddress: gcForm.locationAddress,
       streamRoomId: gcForm.streamRoomId,
+      enableWaitlist: gcForm.enableWaitlist,
     }
 
     if (editingGc) {
-      await updateGroupClass.mutateAsync({ id: editingGc.id, payload })
-    } else {
-      await createGroupClass.mutateAsync(payload)
-    }
+      const gcSlots = slots.filter((slot) => editingGc.slots?.includes(slot._id))
+      const slotsWithMoreBookings = gcSlots.filter((slot) => {
+        const confirmedBookings = slot.capacity - slot.remainingCapacity
+        return gcForm.maxParticipants < confirmedBookings
+      })
 
-    setGcDialogOpen(false)
-    setEditingGc(null)
-    resetGcForm()
+      if (slotsWithMoreBookings.length > 0) {
+        const maxBooked = Math.max(
+          ...slotsWithMoreBookings.map((slot) => slot.capacity - slot.remainingCapacity)
+        )
+        setCapacityWarnInfo({ payload, maxBooked, gcSlots })
+        setCapacityConfirmOpen(true)
+        return
+      }
+      await executeSave(payload, gcSlots)
+    } else {
+      await executeSave(payload, [])
+    }
   }
 
   const handleDeleteGc = (id: string) => deleteGroupClass.mutate(id)
@@ -1507,7 +1546,7 @@ export default function TherapiesPage() {
                   </div>
                   <div>
                     <label className="text-sm font-medium">
-                      Max Participants
+                      Max Capacity (Seats)
                       {renderModifiedBadge('maxParticipants')}
                     </label>
                     <Input
@@ -1515,7 +1554,9 @@ export default function TherapiesPage() {
                       min={1}
                       value={gcForm.maxParticipants}
                       onChange={(e) => {
-                        setGcForm({ ...gcForm, maxParticipants: Number.parseInt(e.target.value, 10) || 0 })
+                        const val = Number.parseInt(e.target.value, 10) || 0
+                        setGcForm({ ...gcForm, maxParticipants: val })
+                        setSlotPlan((prev) => ({ ...prev, capacityPerHour: val }))
                         if (gcErrors.maxParticipants) setGcErrors({ ...gcErrors, maxParticipants: '' })
                       }}
                       placeholder="20"
@@ -1528,6 +1569,28 @@ export default function TherapiesPage() {
                     {gcErrors.maxParticipants && (
                       <p className="text-xs text-rose-500 mt-1">{gcErrors.maxParticipants}</p>
                     )}
+                  </div>
+                </div>
+
+                {/* Waitlist Toggle */}
+                <div className="flex items-center space-x-2.5 rounded-lg border p-3 bg-muted/20">
+                  <Checkbox
+                    id="enableWaitlist"
+                    checked={gcForm.enableWaitlist}
+                    onCheckedChange={(checked) => setGcForm({ ...gcForm, enableWaitlist: !!checked })}
+                    disabled={isGcPending}
+                  />
+                  <div className="grid gap-1 leading-none">
+                    <label
+                      htmlFor="enableWaitlist"
+                      className="text-xs font-semibold leading-none cursor-pointer"
+                    >
+                      Enable Waitlist Features
+                      {renderModifiedBadge('enableWaitlist')}
+                    </label>
+                    <p className="text-[11px] text-muted-foreground">
+                      Allow members to queue for waitlist if class capacity is reached.
+                    </p>
                   </div>
                 </div>
 
@@ -2073,6 +2136,46 @@ export default function TherapiesPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Dialog open={capacityConfirmOpen} onOpenChange={setCapacityConfirmOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="text-amber-600 dark:text-amber-500 flex items-center gap-2">
+                  <IconAlertTriangle className="h-5 w-5" /> Confirm Capacity Reduction
+                </DialogTitle>
+                <DialogDescription className="pt-2 text-sm text-foreground">
+                  You are reducing the max capacity to <strong>{capacityWarnInfo?.payload?.maxParticipants}</strong>, but some active sessions already have up to <strong>{capacityWarnInfo?.maxBooked}</strong> confirmed booking(s).
+                  <br /><br />
+                  Lowering capacity will limit new bookings for these sessions.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setCapacityConfirmOpen(false)
+                    setCapacityWarnInfo(null)
+                  }}
+                  disabled={isGcPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    if (capacityWarnInfo) {
+                      setCapacityConfirmOpen(false)
+                      await executeSave(capacityWarnInfo.payload, capacityWarnInfo.gcSlots)
+                      setCapacityWarnInfo(null)
+                    }
+                  }}
+                  disabled={isGcPending}
+                >
+                  Proceed & Save
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -2161,9 +2264,35 @@ export default function TherapiesPage() {
                         <span className="inline-flex items-center gap-1">
                           <IconCoins className="h-3.5 w-3.5" /> {gc.creditsRequired} credit{gc.creditsRequired !== 1 ? 's' : ''}
                         </span>
-                        <span className="inline-flex items-center gap-1">
-                          <IconUsers className="h-3.5 w-3.5" /> Max {gc.maxParticipants}
-                        </span>
+                        {(() => {
+                          const gcSlots = slots.filter((slot) => gc.slots?.includes(slot._id))
+                          const totalCap = gcSlots.reduce((sum, s) => sum + (s.capacity || 0), 0)
+                          const totalRem = gcSlots.reduce((sum, s) => sum + (s.remainingCapacity || 0), 0)
+                          const filled = totalCap - totalRem
+                          const isFull = totalCap > 0 && totalRem <= 0
+
+                          if (totalCap > 0) {
+                            return (
+                              <span className="inline-flex items-center gap-1">
+                                <IconUsers className="h-3.5 w-3.5 text-indigo-600" />
+                                {isFull ? (
+                                  <Badge variant="destructive" className="h-5 text-[10px] px-1.5 py-0 font-bold uppercase">
+                                    Full ({totalCap})
+                                  </Badge>
+                                ) : (
+                                  <span className="font-medium text-slate-700 dark:text-slate-200">
+                                    {filled} / {totalCap} filled
+                                  </span>
+                                )}
+                              </span>
+                            )
+                          }
+                          return (
+                            <span className="inline-flex items-center gap-1">
+                              <IconUsers className="h-3.5 w-3.5" /> 0 / {gc.maxParticipants} filled
+                            </span>
+                          )
+                        })()}
                       </div>
                     </div>
 

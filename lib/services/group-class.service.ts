@@ -17,6 +17,7 @@ export interface GroupClass {
   slots?: string[]
   locationAddress?: string
   streamRoomId?: string
+  enableWaitlist?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -35,6 +36,7 @@ export interface CreateGroupClassPayload {
   isActive?: boolean
   locationAddress?: string
   streamRoomId?: string
+  enableWaitlist?: boolean
 }
 
 export interface UpdateGroupClassPayload extends Partial<CreateGroupClassPayload> {}
@@ -57,6 +59,7 @@ function normalizeGroupClass(raw: any): GroupClass {
       : [],
     locationAddress: raw?.locationAddress ?? '',
     streamRoomId: raw?.streamRoomId ?? '',
+    enableWaitlist: Boolean(raw?.enableWaitlist),
     createdAt: raw?.createdAt ?? new Date().toISOString(),
     updatedAt: raw?.updatedAt ?? new Date().toISOString(),
   }
@@ -93,6 +96,7 @@ export const groupClassService = {
       slots: payload.slots ?? [],
       locationAddress: payload.locationAddress,
       streamRoomId: payload.streamRoomId,
+      enableWaitlist: payload.enableWaitlist,
     })
     return {
       message: data?.message || 'Group class created successfully',
@@ -118,6 +122,7 @@ export const groupClassService = {
       slots: payload.slots ?? [],
       locationAddress: payload.locationAddress,
       streamRoomId: payload.streamRoomId,
+      enableWaitlist: payload.enableWaitlist,
     })
     return {
       message: data?.message || 'Group class updated successfully',
