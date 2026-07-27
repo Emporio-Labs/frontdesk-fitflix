@@ -106,6 +106,15 @@ export const queryKeys = {
   dashboard: {
     metrics: () => ['dashboard', 'metrics'] as const,
   },
+  community: {
+    posts: (filters?: Record<string, any>) => ['community', 'posts', filters ?? {}] as const,
+    post: (id: string) => ['community', 'posts', id] as const,
+    comments: (postId: string) => ['community', 'posts', postId, 'comments'] as const,
+    versions: (postId: string) => ['community', 'posts', postId, 'versions'] as const,
+    reports: () => ['community', 'reports'] as const,
+    users: (filters?: Record<string, any>) => ['community', 'users', filters ?? {}] as const,
+    user: (id: string) => ['community', 'users', id] as const,
+  },
   nutrition: {
     all: () => ['nutrition'] as const,
     members: () => ['nutrition', 'members'] as const,

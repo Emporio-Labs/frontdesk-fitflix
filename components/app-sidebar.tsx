@@ -23,6 +23,7 @@ import {
   IconSalad,
   IconFileInvoice,
   IconTemplate,
+  IconMessages,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -85,6 +86,7 @@ const navGroups = [
     items: [
       { title: "Leads", url: "/admin/leads", icon: IconTarget },
       { title: "DNA Testing", url: "/admin/dna", icon: IconDna },
+      { title: "Community", url: "/admin/community", icon: IconMessages },
       { title: "Reports", url: "/admin/reports", icon: IconReport },
       { title: "Audit Logs", url: "/admin/audit-logs", icon: IconHistory },
     ],

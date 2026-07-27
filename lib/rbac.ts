@@ -42,6 +42,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'nutrition', action: 'update' },
     { resource: 'nutrition', action: 'delete' },
     { resource: 'audit_logs', action: 'read' },
+    { resource: 'community', action: 'read' },
+    { resource: 'community', action: 'update' },
     { resource: 'settings', action: 'read' },
     { resource: 'settings', action: 'update' },
   ],
@@ -68,6 +70,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'nutrition', action: 'update' },
     { resource: 'nutrition', action: 'delete' },
     { resource: 'audit_logs', action: 'read' },
+    { resource: 'community', action: 'read' },
+    { resource: 'community', action: 'update' },
     { resource: 'settings', action: 'read' },
   ],
   staff: [
