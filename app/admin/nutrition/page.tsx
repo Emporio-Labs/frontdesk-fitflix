@@ -37,6 +37,7 @@ import { MyNutritionDashboard } from '@/components/nutrition/my-nutrition-dashbo
 import { EditAssignedPlanModal } from '@/components/nutrition/edit-assigned-plan-modal'
 import { ClinicalUserDialog } from '@/components/nutrition/clinical-user-dialog'
 import { NutritionistAppointmentsTab } from '@/components/nutrition/nutritionist-appointments-tab'
+import { NutritionistAssignmentPanel } from '@/components/nutrition/nutritionist-assignment-panel'
 import {
   BookingStatusTabs,
   type BookingSegment,
@@ -1379,6 +1380,14 @@ function NutritionDashboardContent() {
   const [activeTab, setActiveTab] = useState(() =>
     reviewUserIdFromUrl ? 'bookings' : initialTab
   )
+  
+  const tabFromUrl = searchParams.get('tab')
+  useEffect(() => {
+    if (tabFromUrl) {
+      setActiveTab(tabFromUrl)
+    }
+  }, [tabFromUrl])
+
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignUserId, setAssignUserId] = useState<string | undefined>()
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
@@ -1418,6 +1427,7 @@ function NutritionDashboardContent() {
           <TabsTrigger value="diet-plans" className="text-sm px-4 py-2">Diet Plans</TabsTrigger>
           <TabsTrigger value="food-catalog" className="text-sm px-4 py-2">Food Catalog</TabsTrigger>
           <TabsTrigger value="appointments" className="text-sm px-4 py-2">Nutritionist Appointments</TabsTrigger>
+          <TabsTrigger value="assignments" className="text-sm px-4 py-2">Nutritionist Assignments</TabsTrigger>
           <TabsTrigger value="active-users" className="text-sm px-4 py-2">Active Users</TabsTrigger>
         </TabsList>
 
@@ -1464,6 +1474,10 @@ function NutritionDashboardContent() {
 
         <TabsContent value="appointments" className="mt-6">
           <NutritionistAppointmentsTab />
+        </TabsContent>
+
+        <TabsContent value="assignments" className="mt-6">
+          <NutritionistAssignmentPanel />
         </TabsContent>
 
         <TabsContent value="active-users" className="mt-6">

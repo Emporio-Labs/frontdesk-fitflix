@@ -47,6 +47,7 @@ const navGroups = [
     items: [
       { title: "Users", url: "/admin/users", icon: IconUsers },
       { title: "Trainers", url: "/admin/trainers", icon: IconRun },
+      { title: "Nutritionists", url: "/admin/nutritionists", icon: IconSalad },
     ],
   },
   {
