@@ -398,19 +398,22 @@ export default function BookingsPage() {
       return
     }
 
-    await topUpCredits.mutateAsync({
-      userId: formData.userId,
-      payload: {
-        amount: topUpAmount,
-        membershipId: topUpMembershipId || undefined,
-        reason: selectedItem
-          ? `Spot booking top-up for ${selectedItem.name}`
-          : 'Spot booking top-up',
-      },
-    })
-
-    setShowTopUp(false)
-    setTopUpAmount(1)
+    try {
+      await topUpCredits.mutateAsync({
+        userId: formData.userId,
+        payload: {
+          amount: topUpAmount,
+          membershipId: topUpMembershipId || undefined,
+          reason: selectedItem
+            ? `Spot booking top-up for ${selectedItem.name}`
+            : 'Spot booking top-up',
+        },
+      })
+      setShowTopUp(false)
+      setTopUpAmount(1)
+    } catch {
+      // Error is handled by mutation hooks
+    }
   }
 
   const handleCreate = async () => {

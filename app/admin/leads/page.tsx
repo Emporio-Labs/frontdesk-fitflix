@@ -217,42 +217,45 @@ export default function LeadsPage() {
 
     const mappedHeat = statusToHeat[formData.status]
 
-    if (editingLead) {
-      await updateLead.mutateAsync({
-        id: editingLead.id,
-        payload: {
+    try {
+      if (editingLead) {
+        await updateLead.mutateAsync({
+          id: editingLead.id,
+          payload: {
+            name: formData.name.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone.trim(),
+            source: formData.source.trim(),
+            status: formData.status,
+            temperature: mappedHeat,
+            tags: editingLead.tags,
+            notes: formData.notes.trim(),
+            interestedIn: formData.interestedIn.trim(),
+            assignedStaffName: formData.assignedStaffName.trim(),
+            followUpDate: formData.followUpDate ? new Date(formData.followUpDate).toISOString() : undefined,
+            expectedRevision: editingLead.revision,
+          },
+        })
+        setEditingLead(null)
+      } else {
+        await createLead.mutateAsync({
           name: formData.name.trim(),
           email: formData.email.trim(),
           phone: formData.phone.trim(),
           source: formData.source.trim(),
           status: formData.status,
           temperature: mappedHeat,
-          tags: editingLead.tags,
           notes: formData.notes.trim(),
           interestedIn: formData.interestedIn.trim(),
           assignedStaffName: formData.assignedStaffName.trim(),
           followUpDate: formData.followUpDate ? new Date(formData.followUpDate).toISOString() : undefined,
-          expectedRevision: editingLead.revision,
-        },
-      })
-      setEditingLead(null)
-    } else {
-      await createLead.mutateAsync({
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim(),
-        source: formData.source.trim(),
-        status: formData.status,
-        temperature: mappedHeat,
-        notes: formData.notes.trim(),
-        interestedIn: formData.interestedIn.trim(),
-        assignedStaffName: formData.assignedStaffName.trim(),
-        followUpDate: formData.followUpDate ? new Date(formData.followUpDate).toISOString() : undefined,
-      })
+        })
+      }
+      resetForm()
+      setIsAddDialogOpen(false)
+    } catch {
+      // Handled by React Query's onError toast
     }
-
-    resetForm()
-    setIsAddDialogOpen(false)
   }
 
   const handleEditLead = (lead: Lead) => {
@@ -312,12 +315,16 @@ export default function LeadsPage() {
         payload.password = convertFormData.password.trim()
       }
 
-      await convertLead.mutateAsync({
-        id: convertingLead.id,
-        payload,
-      })
-      setConvertingLead(null)
-      setIsConvertDialogOpen(false)
+      try {
+        await convertLead.mutateAsync({
+          id: convertingLead.id,
+          payload,
+        })
+        setConvertingLead(null)
+        setIsConvertDialogOpen(false)
+      } catch {
+        // Handled by React Query's onError toast
+      }
     }
   }
 
@@ -339,15 +346,19 @@ export default function LeadsPage() {
       return
     }
 
-    await updateLead.mutateAsync({
-      id: leadId,
-      payload: {
-        status: newStatus,
-        temperature: statusToHeat[newStatus],
-        tags: lead.tags,
-        expectedRevision: lead.revision,
-      },
-    })
+    try {
+      await updateLead.mutateAsync({
+        id: leadId,
+        payload: {
+          status: newStatus,
+          temperature: statusToHeat[newStatus],
+          tags: lead.tags,
+          expectedRevision: lead.revision,
+        },
+      })
+    } catch {
+      // Handled by React Query's onError toast
+    }
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -450,7 +461,11 @@ export default function LeadsPage() {
   const handleQuickAddNote = async (lead: Lead) => {
     const note = typeof window !== 'undefined' ? window.prompt(`Add a note for ${lead.name}`) : ''
     if (!note || !note.trim()) return
-    await addInteraction.mutateAsync({ id: lead.id, note: note.trim(), type: 'note' })
+    try {
+      await addInteraction.mutateAsync({ id: lead.id, note: note.trim(), type: 'note' })
+    } catch {
+      // Handled by React Query's onError toast
+    }
   }
 
   const resetForm = () => {

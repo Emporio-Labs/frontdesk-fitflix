@@ -182,17 +182,20 @@ export default function CreditsPage() {
       return
     }
 
-    await topUpCredits.mutateAsync({
-      userId: selectedUserId,
-      payload: {
-        membershipId: topUpMembershipId || undefined,
-        amount: topUpAmount,
-        reason: topUpReason.trim() || undefined,
-      },
-    })
-
-    setTopUpAmount(1)
-    setTopUpReason('')
+    try {
+      await topUpCredits.mutateAsync({
+        userId: selectedUserId,
+        payload: {
+          membershipId: topUpMembershipId || undefined,
+          amount: topUpAmount,
+          reason: topUpReason.trim() || undefined,
+        },
+      })
+      setTopUpAmount(1)
+      setTopUpReason('')
+    } catch {
+      // Error is handled by mutation hooks
+    }
   }
 
   return (

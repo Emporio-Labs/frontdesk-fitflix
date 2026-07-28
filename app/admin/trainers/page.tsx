@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -25,6 +26,8 @@ export default function TrainersPage() {
     trainerName: '', email: '', phone: '', password: '',
     description: '', specialitiesInput: '',
     imageUrl: '', keySentence: '', isActive: true,
+    profileImageFile: null as File | null,
+    imagePreviewUrl: '',
   })
 
   const { data: trainers = [], isLoading, isError, refetch } = useTrainers()
@@ -43,6 +46,8 @@ export default function TrainersPage() {
     setFormData({
       trainerName: '', email: '', phone: '', password: '', description: '', specialitiesInput: '',
       imageUrl: '', keySentence: '', isActive: true,
+      profileImageFile: null,
+      imagePreviewUrl: '',
     })
     setFormErrors({})
     setEditingTrainer(null)
@@ -57,6 +62,8 @@ export default function TrainersPage() {
       imageUrl: trainer.imageUrl || '',
       keySentence: trainer.keySentence || '',
       isActive: trainer.isActive !== false,
+      profileImageFile: null,
+      imagePreviewUrl: trainer.imageUrl || '',
     })
     setIsDialogOpen(true)
   }
@@ -64,6 +71,7 @@ export default function TrainersPage() {
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {}
     if (!formData.trainerName.trim()) errors.trainerName = 'Name is required'
+    if (!formData.specialitiesInput.trim()) errors.specialitiesInput = 'At least one specialisation is required'
     if (!editingTrainer && !formData.email.trim()) errors.email = 'Email is required'
     if (!editingTrainer && formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Invalid email format'
     
@@ -88,24 +96,34 @@ export default function TrainersPage() {
     const specialities = formData.specialitiesInput.split(',').map(s => s.trim()).filter(Boolean)
     const cleanPhone = formData.phone.replace(/[\s\-()]/g, '')
     
+    const payloadBase = {
+      trainerName: formData.trainerName,
+      description: formData.description,
+      specialities,
+      imageUrl: formData.profileImageFile ? undefined : formData.imageUrl || undefined,
+      keySentence: formData.keySentence || undefined,
+      isActive: formData.isActive,
+      profileImage: formData.profileImageFile ?? undefined,
+    }
+
     try {
       if (editingTrainer) {
         await updateTrainer.mutateAsync({
           id: editingTrainer._id,
-          payload: {
-            trainerName: formData.trainerName,
-            description: formData.description,
-            specialities,
-            imageUrl: formData.imageUrl,
-            keySentence: formData.keySentence,
-            isActive: formData.isActive,
-          },
+          payload: payloadBase,
         })
       } else {
         await createTrainer.mutateAsync({
-          trainerName: formData.trainerName, email: formData.email, phone: cleanPhone,
-          password: formData.password, description: formData.description, specialities,
-          imageUrl: formData.imageUrl, keySentence: formData.keySentence, isActive: formData.isActive,
+          trainerName: formData.trainerName,
+          email: formData.email,
+          phone: cleanPhone,
+          password: formData.password,
+          description: formData.description,
+          specialities,
+          imageUrl: formData.profileImageFile ? undefined : formData.imageUrl || undefined,
+          keySentence: formData.keySentence || undefined,
+          isActive: formData.isActive,
+          profileImage: formData.profileImageFile ?? undefined,
         })
       }
       setIsDialogOpen(false)
@@ -134,7 +152,7 @@ export default function TrainersPage() {
                 <IconPlus className="w-4 h-4 mr-2" /> Add Trainer
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[80vh] min-w-[28rem] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingTrainer ? 'Edit Trainer' : 'Add Trainer'}</DialogTitle>
               </DialogHeader>
@@ -165,16 +183,35 @@ export default function TrainersPage() {
                 )}
                 <div>
                   <label className="text-sm font-medium">Description</label>
-                  <Input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Specializes in HIIT and strength training" />
+                  <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Specializes in HIIT and strength training" className="min-h-[100px]" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Specialities (comma-separated)</label>
+                  <label className="text-sm font-medium">Specialities (comma-separated) *</label>
                   <Input value={formData.specialitiesInput} onChange={(e) => setFormData({ ...formData, specialitiesInput: e.target.value })} placeholder="HIIT, Yoga, Strength Training" />
+                  {formErrors.specialitiesInput && <p className="text-xs text-red-500 mt-1">{formErrors.specialitiesInput}</p>}
                 </div>
                 <div>
                   <label className="text-sm font-medium">Image URL</label>
-                  <Input value={formData.imageUrl} onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })} placeholder="https://images.unsplash.com/photo-..." />
+                  <Input value={formData.imageUrl} onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value, profileImageFile: null, imagePreviewUrl: e.target.value })} placeholder="https://images.unsplash.com/photo-..." />
                 </div>
+                <div>
+                  <label className="text-sm font-medium">Upload Profile Image</label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null
+                      const previewUrl = file ? URL.createObjectURL(file) : formData.imageUrl
+                      setFormData({ ...formData, profileImageFile: file, imagePreviewUrl: previewUrl ?? '' })
+                    }}
+                  />
+                </div>
+                {formData.imagePreviewUrl ? (
+                  <div className="rounded-md overflow-hidden border border-muted p-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={formData.imagePreviewUrl} alt="Trainer preview" className="h-32 w-full object-cover" />
+                  </div>
+                ) : null}
                 <div>
                   <label className="text-sm font-medium">Key Sentence</label>
                   <Input value={formData.keySentence} onChange={(e) => setFormData({ ...formData, keySentence: e.target.value })} placeholder="Dedicated to helping you reach your peak performance." />
@@ -222,13 +259,14 @@ export default function TrainersPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>Specialities</TableHead>
                     <TableHead>Public Status</TableHead>
+                    <TableHead>Bookings</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No trainers found</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No trainers found</TableCell></TableRow>
                   ) : (
                     filtered.map((trainer) => (
                       <TableRow key={trainer._id}>
@@ -259,10 +297,17 @@ export default function TrainersPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={trainer.isActive !== false ? "default" : "destructive"}>
-                            {trainer.isActive !== false ? "Active" : "Inactive"}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={trainer.isActive !== false ? "default" : "destructive"}>
+                              {trainer.isActive !== false ? "Active" : "Inactive"}
+                            </Badge>
+                            <Switch
+                              checked={trainer.isActive !== false}
+                              onCheckedChange={(checked) => updateTrainer.mutate({ id: trainer._id, payload: { isActive: checked } })}
+                            />
+                          </div>
                         </TableCell>
+                        <TableCell>{trainer.bookingVolume ?? 0}</TableCell>
                         <TableCell>{new Date(trainer.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">

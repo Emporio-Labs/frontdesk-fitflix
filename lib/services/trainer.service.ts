@@ -12,6 +12,7 @@ export interface Trainer {
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
+  bookingVolume?: number
 }
 
 export interface CreateTrainerPayload {
@@ -24,6 +25,7 @@ export interface CreateTrainerPayload {
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
+  profileImage?: File
 }
 
 export interface UpdateTrainerPayload {
@@ -33,6 +35,28 @@ export interface UpdateTrainerPayload {
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
+  profileImage?: File
+}
+
+function buildTrainerRequestBody(payload: CreateTrainerPayload | UpdateTrainerPayload) {
+  if (payload.profileImage instanceof File) {
+    const formData = new FormData()
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value === undefined || value === null) return
+      if (key === 'profileImage' && value instanceof File) {
+        formData.append('profileImage', value)
+        return
+      }
+      if (Array.isArray(value) || typeof value === 'object') {
+        formData.append(key, JSON.stringify(value))
+        return
+      }
+      formData.append(key, String(value))
+    })
+    return { body: formData, headers: undefined }
+  }
+
+  return { body: payload, headers: undefined }
 }
 
 export const trainerService = {
@@ -53,11 +77,13 @@ export const trainerService = {
     return data
   },
   create: async (payload: CreateTrainerPayload): Promise<{ message: string; trainer: Trainer }> => {
-    const { data } = await apiClient.post('/trainers', payload)
+    const { body, headers } = buildTrainerRequestBody(payload)
+    const { data } = await apiClient.post('/trainers', body, { headers })
     return data
   },
   update: async (id: string, payload: UpdateTrainerPayload): Promise<{ message: string; trainer: Trainer }> => {
-    const { data } = await apiClient.patch(`/trainers/${id}`, payload)
+    const { body, headers } = buildTrainerRequestBody(payload)
+    const { data } = await apiClient.patch(`/trainers/${id}`, body, { headers })
     return data
   },
   delete: async (id: string): Promise<{ message: string }> => {
