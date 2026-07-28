@@ -3,5 +3,5 @@
 import { redirect } from 'next/navigation'
 
 export default function NutritionistRedirect() {
-  redirect('/admin/nutrition')
+  redirect('/admin/nutritionists')
 }
