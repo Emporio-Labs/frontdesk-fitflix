@@ -64,4 +64,12 @@ export const trainerService = {
     const { data } = await apiClient.delete(`/trainers/${id}`)
     return data
   },
+  getMyMembers: async (): Promise<{ members: any[] }> => {
+    const { data } = await apiClient.get('/trainers/me/members')
+    return data
+  },
+  getMyMemberById: async (userId: string): Promise<{ member: any }> => {
+    const { data } = await apiClient.get(`/trainers/me/members/${userId}`)
+    return data
+  },
 }

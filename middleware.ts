@@ -10,6 +10,7 @@ export function middleware(request: NextRequest) {
 
   // Check for auth cookie (set on login, cleared on logout)
   const isAuthed = request.cookies.has('hh_authed')
+  const role = request.cookies.get('hh_role')?.value
 
   const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix))
   const isAuthRoute = AUTH_ROUTES.some((route) => pathname.startsWith(route))
@@ -21,9 +22,17 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // Trainer role restriction: Trainers land in /dashboard/workouts/members and cannot access /admin/*
+  if (isAuthed && role === 'trainer') {
+    if (pathname.startsWith('/admin') || pathname === '/dashboard') {
+      return NextResponse.redirect(new URL('/dashboard/workouts/members', request.url))
+    }
+  }
+
   // Authed, trying to access login → redirect to dashboard
   if (isAuthRoute && isAuthed) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    const target = role === 'trainer' ? '/dashboard/workouts/members' : '/dashboard'
+    return NextResponse.redirect(new URL(target, request.url))
   }
 
   return NextResponse.next()
