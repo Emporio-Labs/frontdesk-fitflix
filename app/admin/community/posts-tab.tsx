@@ -18,14 +18,15 @@ import {
 import {
   IconEye, IconPin, IconPinnedOff, IconTrash, IconRestore, IconRefresh, IconSpeakerphone,
   IconPaperclip, IconX, IconUpload, IconFile, IconFileTypePdf, IconVideo,
-  IconPhoto, IconLoader2,
+  IconPhoto, IconLoader2, IconMicrophone,
 } from '@tabler/icons-react'
 import { EmptyState } from '@/components/empty-state'
 import { SkeletonTable } from '@/components/skeleton-loader'
 import {
-  useAdminPosts, usePinPost, useUnpinPost, useDeletePost, useRestorePost, useCreateOfficial, useUploadFiles,
+  useAdminPosts, usePinPost, useUnpinPost, useDeletePost, useRestorePost, useCreateOfficial, useUploadFiles, useUploadVideo,
 } from '@/hooks/use-community'
-import { AdminPost, UploadedAttachment, UploadedImage } from '@/lib/services/community.service'
+import { AdminPost, UploadedAttachment, UploadedImage, UploadedVideo } from '@/lib/services/community.service'
+import { toast } from 'sonner'
 import { ModerationDialog } from './moderation-dialog'
 import { RoleBadge, VisibilityBadge, formatDateTime, truncate } from './shared'
 
@@ -43,6 +44,7 @@ function getFileIcon(mimeType: string) {
   if (mimeType.startsWith('image/')) return <IconPhoto className="w-4 h-4 text-blue-400" />
   if (mimeType === 'application/pdf') return <IconFileTypePdf className="w-4 h-4 text-red-400" />
   if (mimeType.startsWith('video/')) return <IconVideo className="w-4 h-4 text-purple-400" />
+  if (mimeType.startsWith('audio/')) return <IconMicrophone className="w-4 h-4 text-emerald-400" />
   return <IconFile className="w-4 h-4 text-muted-foreground" />
 }
 
@@ -55,6 +57,7 @@ const ACCEPTED_MIME = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'text/plain',
   'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm',
+  'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/flac', 'audio/x-m4a',
 ].join(',')
 
 // ── AttachmentPreview ──────────────────────────────────────────────────────────
@@ -67,18 +70,39 @@ function AttachmentPreview({
   onRemove: () => void
 }) {
   const isImage = attachment.type === 'image'
+  const isVideo = attachment.type === 'video'
+  const isAudio = attachment.mimeType?.startsWith('audio/')
   const imageAtt = isImage ? (attachment as UploadedImage) : null
 
   return (
     <div className="relative group flex-shrink-0">
       {isImage && imageAtt ? (
         <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-border bg-muted">
-          {/* Use thumbnailUrl if it's a full http URL, otherwise show a placeholder */}
           <div className="w-full h-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
             <IconPhoto className="w-6 h-6 text-blue-400" />
           </div>
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[9px] text-white px-1 py-0.5 truncate">
             {attachment.originalName}
+          </div>
+        </div>
+      ) : isVideo ? (
+        <div className="flex items-center gap-2.5 bg-purple-500/10 border border-purple-500/30 rounded-lg px-3 py-2.5 max-w-[220px]">
+          <div className="w-7 h-7 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+            <IconVideo className="w-4 h-4 text-purple-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-foreground truncate">{attachment.originalName}</p>
+            <p className="text-[10px] text-muted-foreground">{formatBytes(attachment.bytes)} · Video</p>
+          </div>
+        </div>
+      ) : isAudio ? (
+        <div className="flex items-center gap-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2.5 max-w-[220px]">
+          <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+            <IconMicrophone className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-foreground truncate">{attachment.originalName}</p>
+            <p className="text-[10px] text-muted-foreground">{formatBytes(attachment.bytes)} · Audio</p>
           </div>
         </div>
       ) : (
@@ -169,10 +193,11 @@ function DropZone({
             <IconPhoto className="w-4 h-4 text-blue-400/70" />
             <IconFileTypePdf className="w-4 h-4 text-red-400/70" />
             <IconVideo className="w-4 h-4 text-purple-400/70" />
+            <IconMicrophone className="w-4 h-4 text-emerald-400/70" />
           </div>
           <p className="text-xs text-center text-muted-foreground leading-relaxed">
-            <span className="font-medium text-foreground">Click or drag & drop</span> to attach files<br />
-            Images, PDFs, DOCX, videos — up to 50 MB each
+            <span className="font-medium text-foreground">Click or drag &amp; drop</span> to attach files<br />
+            Images, PDFs, DOCX, videos, audio — up to 50 MB each
           </p>
         </>
       )}
@@ -202,6 +227,7 @@ export function PostsTab() {
   const restorePost = useRestorePost()
   const createOfficial = useCreateOfficial()
   const uploadFiles = useUploadFiles()
+  const uploadVideo = useUploadVideo()
 
   const [deleting, setDeleting] = useState<AdminPost | null>(null)
   const [restoring, setRestoring] = useState<AdminPost | null>(null)
@@ -210,12 +236,36 @@ export function PostsTab() {
   const [officialVisibility, setOfficialVisibility] = useState('public')
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([])
 
+  const isUploading = uploadFiles.isPending || uploadVideo.isPending
+
   const handleFiles = async (files: File[]) => {
-    try {
-      const uploaded = await uploadFiles.mutateAsync(files)
-      setAttachments(prev => [...prev, ...uploaded])
-    } catch {
-      // error already toasted by hook
+    // Videos go straight to S3 via a presigned URL; everything else proxies
+    // through /media/files. Only one video per post (matches audio's cap).
+    const videoFiles = files.filter(f => f.type.startsWith('video/'))
+    const otherFiles = files.filter(f => !f.type.startsWith('video/'))
+
+    if (videoFiles.length > 0) {
+      const alreadyHasVideo = attachments.some(a => a.type === 'video')
+      if (alreadyHasVideo || videoFiles.length > 1) {
+        toast.error('Only one video is allowed per post')
+      }
+      if (!alreadyHasVideo) {
+        try {
+          const uploaded = await uploadVideo.mutateAsync(videoFiles[0])
+          setAttachments(prev => [...prev, uploaded])
+        } catch {
+          // error already toasted by hook
+        }
+      }
+    }
+
+    if (otherFiles.length > 0) {
+      try {
+        const uploaded = await uploadFiles.mutateAsync(otherFiles)
+        setAttachments(prev => [...prev, ...uploaded])
+      } catch {
+        // error already toasted by hook
+      }
     }
   }
 
@@ -232,10 +282,11 @@ export function PostsTab() {
   const publishOfficial = async () => {
     if (!officialBody.trim() && attachments.length === 0) return
 
-    // Split attachments into images and other files for the backend
+    // Split attachments into images, video and other files for the backend
     const images = attachments
       .filter(a => a.type === 'image')
       .map(a => ({ url: (a as UploadedImage).url, thumbnailUrl: (a as UploadedImage).thumbnailUrl }))
+    const video = attachments.find(a => a.type === 'video') as UploadedVideo | undefined
     const fileAttachments = attachments
       .filter(a => a.type === 'file')
       .map(a => ({ url: a.url, originalName: a.originalName, mimeType: a.mimeType }))
@@ -244,6 +295,7 @@ export function PostsTab() {
       body: officialBody.trim(),
       visibility: officialVisibility,
       images: images.length > 0 ? images : undefined,
+      video: video ? { s3Key: video.s3Key } : undefined,
       attachments: fileAttachments.length > 0 ? fileAttachments : undefined,
     })
     setOfficialOpen(false)
@@ -489,14 +541,14 @@ export function PostsTab() {
                 )}
               </label>
 
-              <DropZone onFiles={handleFiles} isUploading={uploadFiles.isPending} />
+              <DropZone onFiles={handleFiles} isUploading={isUploading} />
 
               {/* Attachment previews */}
               {attachments.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {attachments.map((att, i) => (
                     <AttachmentPreview
-                      key={`${att.url}-${i}`}
+                      key={`${att.originalName}-${i}`}
                       attachment={att}
                       onRemove={() => removeAttachment(i)}
                     />
@@ -532,7 +584,7 @@ export function PostsTab() {
                 disabled={
                   (!officialBody.trim() && attachments.length === 0) ||
                   createOfficial.isPending ||
-                  uploadFiles.isPending
+                  isUploading
                 }
               >
                 {createOfficial.isPending ? 'Publishing…' : 'Publish'}

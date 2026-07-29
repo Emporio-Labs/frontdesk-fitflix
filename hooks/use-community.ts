@@ -145,7 +145,7 @@ export function useRestorePost() {
 
 export function useCreateOfficial() {
   return useCommunityMutation(
-    (payload: { title?: string; body: string; description?: string; visibility: string; images?: any[]; attachments?: any[] }) =>
+    (payload: { title?: string; body: string; description?: string; visibility: string; images?: any[]; attachments?: any[]; video?: { s3Key: string } }) =>
       communityService.createOfficial(payload),
     'Official post published',
     'Failed to publish post'
@@ -160,6 +160,16 @@ export function useUploadFiles() {
     onError: (err: any) => {
       const msg = err?.response?.data?.error || err?.message || 'Upload failed'
       // Import toast lazily to avoid circular deps
+      import('sonner').then(({ toast }) => toast.error(msg))
+    },
+  })
+}
+
+export function useUploadVideo() {
+  return useMutation({
+    mutationFn: (file: File) => communityService.uploadVideo(file),
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error || err?.message || 'Video upload failed'
       import('sonner').then(({ toast }) => toast.error(msg))
     },
   })

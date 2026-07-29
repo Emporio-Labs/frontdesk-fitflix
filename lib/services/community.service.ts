@@ -24,7 +24,7 @@ export interface AdminPost {
   commentCount: number
   shareCount: number
   createdAt: string
-  media?: { id: string; url: string; position: number }[]
+  media?: { id: string; kind: string; url: string; position: number }[]
 }
 
 export interface AdminComment {
@@ -106,7 +106,16 @@ export interface UploadedFile {
   mimeType: string
 }
 
-export type UploadedAttachment = UploadedImage | UploadedFile
+/** Result of the direct-to-S3 video upload flow (presign + PUT). */
+export interface UploadedVideo {
+  type: 'video'
+  s3Key: string
+  bytes: number
+  originalName: string
+  mimeType: string
+}
+
+export type UploadedAttachment = UploadedImage | UploadedFile | UploadedVideo
 
 const B = '/community/admin'
 const stepUpHeader = (token?: string) =>
@@ -131,7 +140,7 @@ export const communityService = {
     return (data.images ?? []) as UploadedImage[]
   },
 
-  /** Upload any supported files (images, PDFs, DOCX, videos) to /community/media/files */
+  /** Upload any supported files (images, PDFs, DOCX) to /community/media/files */
   uploadFiles: async (files: File[]): Promise<UploadedAttachment[]> => {
     const form = new FormData()
     for (const f of files) form.append('files', f)
@@ -139,6 +148,39 @@ export const communityService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     return (data.files ?? []) as UploadedAttachment[]
+  },
+
+  /**
+   * Upload a video directly to S3: get a presigned PUT URL from the backend,
+   * then PUT the raw file straight to S3 (bypassing our server, unlike the
+   * other media types — videos are large enough that proxying them through
+   * the API is wasteful and slow). The presigned URL is single-use and
+   * already scoped to this exact key/content-type/size, so the PUT itself
+   * needs no auth header.
+   */
+  uploadVideo: async (file: File): Promise<UploadedVideo> => {
+    const { data: presign } = await apiClient.post('/community/media/video/presign', {
+      filename: file.name,
+      contentType: file.type,
+      contentLength: file.size,
+    })
+
+    const putRes = await fetch(presign.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    })
+    if (!putRes.ok) {
+      throw new Error(`Video upload to storage failed (${putRes.status})`)
+    }
+
+    return {
+      type: 'video',
+      s3Key: presign.s3Key,
+      bytes: file.size,
+      originalName: file.name,
+      mimeType: file.type,
+    }
   },
 
   // Posts
@@ -167,7 +209,7 @@ export const communityService = {
   },
   pinPost: async (id: string) => (await apiClient.post(`${B}/posts/${id}/pin`)).data,
   unpinPost: async (id: string) => (await apiClient.post(`${B}/posts/${id}/unpin`)).data,
-  createOfficial: async (payload: { title?: string; body: string; description?: string; visibility: string; images?: any[]; attachments?: any[] }) =>
+  createOfficial: async (payload: { title?: string; body: string; description?: string; visibility: string; images?: any[]; attachments?: any[]; video?: { s3Key: string } }) =>
     (await apiClient.post(`${B}/posts/official`, payload)).data,
 
   // Comments

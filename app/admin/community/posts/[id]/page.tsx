@@ -127,19 +127,51 @@ export default function CommunityPostDetailPage() {
 
               {(post.media?.length ?? 0) > 0 && (
                 <div className="flex flex-wrap gap-3">
-                  {post.media?.map((m) => (
-                    // Signed S3 URLs expire in 15 minutes, so next/image
-                    // optimisation would cache a dead URL — render directly.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={m.id}
-                      src={m.url}
-                      alt="Post attachment"
-                      className="h-40 w-40 object-cover rounded-lg border border-border/60"
-                    />
-                  ))}
+                  {post.media?.map((m) => {
+                    const kind = m.kind ?? 'image'
+
+                    if (kind === 'video') {
+                      return (
+                        <video
+                          key={m.id}
+                          src={m.url}
+                          controls
+                          className="h-48 max-w-full rounded-lg border border-border/60 bg-black"
+                          style={{ maxWidth: '100%' }}
+                        >
+                          Your browser does not support the video tag.
+                        </video>
+                      )
+                    }
+
+                    if (kind === 'audio') {
+                      return (
+                        <div
+                          key={m.id}
+                          className="w-full flex items-center gap-3 bg-muted/40 border border-border/60 rounded-lg px-4 py-3"
+                        >
+                          <span className="text-xs text-muted-foreground font-medium shrink-0">🎵 Audio</span>
+                          <audio controls className="flex-1 h-9" src={m.url}>
+                            Your browser does not support the audio tag.
+                          </audio>
+                        </div>
+                      )
+                    }
+
+                    // Default: image
+                    return (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={m.id}
+                        src={m.url}
+                        alt="Post attachment"
+                        className="h-40 w-40 object-cover rounded-lg border border-border/60"
+                      />
+                    )
+                  })}
                 </div>
               )}
+
 
               <div className="text-xs text-muted-foreground">
                 {post.likeCount} likes · {post.commentCount} comments · {post.shareCount} shares
