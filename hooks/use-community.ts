@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { communityService, ReportAction } from '@/lib/services/community.service'
+import { communityService, ReportAction, UploadedAttachment } from '@/lib/services/community.service'
 import { queryKeys } from '@/lib/query-keys'
 import { toast } from 'sonner'
 
@@ -119,7 +119,7 @@ export function useUnpinPost() {
 
 export function useEditPost() {
   return useCommunityMutation(
-    ({ id, ...payload }: { id: string; body?: string; visibility?: string; reason?: string }) =>
+    ({ id, ...payload }: { id: string; title?: string; body?: string; description?: string; visibility?: string; reason?: string }) =>
       communityService.editPost(id, payload),
     'Post updated',
     'Failed to update post'
@@ -145,10 +145,34 @@ export function useRestorePost() {
 
 export function useCreateOfficial() {
   return useCommunityMutation(
-    (payload: { body: string; visibility: string }) => communityService.createOfficial(payload),
+    (payload: { title?: string; body: string; description?: string; visibility: string; images?: any[]; attachments?: any[]; video?: { s3Key: string } }) =>
+      communityService.createOfficial(payload),
     'Official post published',
     'Failed to publish post'
   )
+}
+
+// ── Upload hooks ──────────────────────────────────────────────────────────────
+
+export function useUploadFiles() {
+  return useMutation({
+    mutationFn: (files: File[]) => communityService.uploadFiles(files),
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error || err?.message || 'Upload failed'
+      // Import toast lazily to avoid circular deps
+      import('sonner').then(({ toast }) => toast.error(msg))
+    },
+  })
+}
+
+export function useUploadVideo() {
+  return useMutation({
+    mutationFn: (file: File) => communityService.uploadVideo(file),
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error || err?.message || 'Video upload failed'
+      import('sonner').then(({ toast }) => toast.error(msg))
+    },
+  })
 }
 
 // ── Comment mutations ─────────────────────────────────────────────────────────

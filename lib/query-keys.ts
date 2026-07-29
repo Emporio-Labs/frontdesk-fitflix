@@ -14,6 +14,8 @@ export const queryKeys = {
   trainers: {
     all: () => ['trainers'] as const,
     detail: (id: string) => ['trainers', id] as const,
+    publicAll: () => ['trainers', 'public'] as const,
+    publicDetail: (id: string) => ['trainers', 'public', id] as const,
   },
   slots: {
     all: () => ['slots'] as const,
@@ -107,6 +109,7 @@ export const queryKeys = {
     metrics: () => ['dashboard', 'metrics'] as const,
   },
   community: {
+    all: () => ['community'] as const,
     posts: (filters?: Record<string, any>) => ['community', 'posts', filters ?? {}] as const,
     post: (id: string) => ['community', 'posts', id] as const,
     comments: (postId: string) => ['community', 'posts', postId, 'comments'] as const,

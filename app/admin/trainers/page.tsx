@@ -12,6 +12,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
+import { Switch } from '@/components/ui/switch'
 import { IconPlus, IconEdit, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { useTrainers, useCreateTrainer, useUpdateTrainer, useDeleteTrainer } from '@/hooks/use-trainers'
 import { useOpenNewParam } from '@/hooks/use-open-new-param'
@@ -25,6 +26,7 @@ export default function TrainersPage() {
   const [formData, setFormData] = useState({
     trainerName: '', email: '', phone: '', password: '',
     description: '', specialitiesInput: '',
+    imageUrl: '', keySentence: '', isActive: true,
   })
 
   const { data: trainers = [], isLoading, isError, refetch } = useTrainers()
@@ -40,7 +42,10 @@ export default function TrainersPage() {
   )
 
   const resetForm = () => {
-    setFormData({ trainerName: '', email: '', phone: '', password: '', description: '', specialitiesInput: '' })
+    setFormData({
+      trainerName: '', email: '', phone: '', password: '', description: '', specialitiesInput: '',
+      imageUrl: '', keySentence: '', isActive: true,
+    })
     setFormErrors({})
     setEditingTrainer(null)
   }
@@ -51,6 +56,9 @@ export default function TrainersPage() {
       trainerName: trainer.trainerName, email: trainer.email, phone: trainer.phone,
       password: '', description: trainer.description,
       specialitiesInput: trainer.specialities.join(', '),
+      imageUrl: trainer.imageUrl || '',
+      keySentence: trainer.keySentence || '',
+      isActive: trainer.isActive !== false,
     })
     setIsDialogOpen(true)
   }
@@ -86,12 +94,20 @@ export default function TrainersPage() {
       if (editingTrainer) {
         await updateTrainer.mutateAsync({
           id: editingTrainer._id,
-          payload: { trainerName: formData.trainerName, description: formData.description, specialities },
+          payload: {
+            trainerName: formData.trainerName,
+            description: formData.description,
+            specialities,
+            imageUrl: formData.imageUrl,
+            keySentence: formData.keySentence,
+            isActive: formData.isActive,
+          },
         })
       } else {
         await createTrainer.mutateAsync({
           trainerName: formData.trainerName, email: formData.email, phone: cleanPhone,
           password: formData.password, description: formData.description, specialities,
+          imageUrl: formData.imageUrl, keySentence: formData.keySentence, isActive: formData.isActive,
         })
       }
       setIsDialogOpen(false)
@@ -157,6 +173,21 @@ export default function TrainersPage() {
                   <label className="text-sm font-medium">Specialities (comma-separated)</label>
                   <Input value={formData.specialitiesInput} onChange={(e) => setFormData({ ...formData, specialitiesInput: e.target.value })} placeholder="HIIT, Yoga, Strength Training" />
                 </div>
+                <div>
+                  <label className="text-sm font-medium">Image URL</label>
+                  <Input value={formData.imageUrl} onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })} placeholder="https://images.unsplash.com/photo-..." />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Key Sentence</label>
+                  <Input value={formData.keySentence} onChange={(e) => setFormData({ ...formData, keySentence: e.target.value })} placeholder="Dedicated to helping you reach your peak performance." />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3 shadow-xs">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Active publicly</label>
+                    <p className="text-xs text-muted-foreground">Show this trainer on the public directory page.</p>
+                  </div>
+                  <Switch checked={formData.isActive} onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })} />
+                </div>
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm() }}>Cancel</Button>
                   <Button onClick={handleSubmit} disabled={isPending}>
@@ -189,20 +220,38 @@ export default function TrainersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead>Trainer</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Specialities</TableHead>
+                    <TableHead>Public Status</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No trainers found</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No trainers found</TableCell></TableRow>
                   ) : (
                     filtered.map((trainer) => (
                       <TableRow key={trainer._id}>
-                        <TableCell className="font-medium">{trainer.trainerName}</TableCell>
+                        <TableCell className="font-medium flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0 border">
+                            {trainer.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={trainer.imageUrl} alt={trainer.trainerName} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-sm font-bold text-muted-foreground">
+                                {trainer.trainerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium">{trainer.trainerName}</div>
+                            {trainer.keySentence && (
+                              <div className="text-xs text-muted-foreground max-w-[200px] truncate">{trainer.keySentence}</div>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{trainer.email}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
@@ -210,6 +259,11 @@ export default function TrainersPage() {
                               <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
                             ))}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={trainer.isActive !== false ? "default" : "destructive"}>
+                            {trainer.isActive !== false ? "Active" : "Inactive"}
+                          </Badge>
                         </TableCell>
                         <TableCell>{new Date(trainer.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right">

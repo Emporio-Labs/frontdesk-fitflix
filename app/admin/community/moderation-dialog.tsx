@@ -5,14 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { IconAlertTriangle, IconLock } from '@tabler/icons-react'
+import { IconAlertTriangle, IconLock, IconShieldCheck } from '@tabler/icons-react'
 import { useStepUp } from '@/hooks/use-community'
+import { toast } from 'sonner'
 
 export interface ModerationDialogResult {
   reason: string
@@ -23,20 +20,22 @@ interface ModerationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
-  description: string
+  description?: string
   confirmLabel: string
-  /** Destructive actions (delete, suspend, ban) must carry a non-empty reason —
-   *  the backend rejects a blank one with REASON_REQUIRED, so block it here too. */
   requireReason?: boolean
-  /** Re-authentication. Mirrors the endpoints the backend guards with requireStepUp. */
   requireStepUp?: boolean
   destructive?: boolean
   pending?: boolean
   /** Extra action-specific fields, rendered above the reason box. */
   children?: ReactNode
-  onConfirm: (result: ModerationDialogResult) => void | Promise<void>
+  onConfirm: (args: ModerationDialogResult) => Promise<void> | void
 }
 
+/**
+ * Reusable confirm dialog for moderation actions. Handles the optional
+ * "reason" text plus the step-up re-auth flow (password → short-TTL token)
+ * that the backend requires for destructive endpoints.
+ */
 export function ModerationDialog({
   open,
   onOpenChange,
@@ -52,96 +51,135 @@ export function ModerationDialog({
 }: ModerationDialogProps) {
   const [reason, setReason] = useState('')
   const [password, setPassword] = useState('')
+  const [stepUpToken, setStepUpToken] = useState('')
   const stepUp = useStepUp()
 
-  // The password never survives a closed dialog — front-desk machines are shared.
   useEffect(() => {
     if (!open) {
       setReason('')
       setPassword('')
+      setStepUpToken('')
     }
   }, [open])
 
-  const reasonMissing = requireReason && reason.trim().length === 0
-  const passwordMissing = requireStepUp && password.length === 0
-  const busy = pending || stepUp.isPending
+  const canConfirm =
+    (!requireReason || reason.trim().length > 0) &&
+    (!requireStepUp || stepUpToken.length > 0)
 
-  const handleConfirm = async () => {
-    if (reasonMissing || passwordMissing || busy) return
-
-    let stepUpToken = ''
-    if (requireStepUp) {
-      try {
-        const { stepUpToken: token } = await stepUp.mutateAsync(password)
-        stepUpToken = token
-      } catch {
-        // useStepUp already surfaced the failure; keep the dialog open so the
-        // operator can retry without losing the reason they typed.
-        return
-      }
+  const requestStepUp = async () => {
+    if (!password) return
+    try {
+      const { stepUpToken: token } = await stepUp.mutateAsync(password)
+      setStepUpToken(token)
+      setPassword('')
+      toast.success('Re-authenticated for the next 5 minutes')
+    } catch {
+      // toast already surfaced by the hook
     }
+  }
+
+  const submit = async () => {
+    if (!canConfirm) return
     await onConfirm({ reason: reason.trim(), stepUpToken })
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {destructive && <IconAlertTriangle className="w-4 h-4 text-destructive" />}
             {title}
           </DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
 
-        <div className="space-y-3 pt-1">
+        <div className="space-y-4 pt-1">
           {children}
 
-          <div>
-            <label className="text-sm font-medium">
-              Reason {requireReason ? '*' : <span className="text-muted-foreground">(optional)</span>}
-            </label>
-            <Textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Recorded in the moderation audit log."
-              rows={3}
-              className="mt-1"
-            />
-            {reasonMissing && (
-              <p className="text-xs text-destructive mt-1">A reason is required for this action.</p>
-            )}
-          </div>
-
-          {requireStepUp && (
+          {requireReason && (
             <div>
-              <label className="text-sm font-medium flex items-center gap-1.5">
-                <IconLock className="w-3.5 h-3.5" /> Confirm your password *
+              <label className="text-sm font-medium">
+                Reason <span className="text-destructive">*</span>
               </label>
-              <Input
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Your admin password"
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={3}
+                placeholder="Recorded in the moderation audit log."
                 className="mt-1"
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Destructive actions require re-authentication.
-              </p>
+            </div>
+          )}
+
+          {!requireReason && (
+            <div>
+              <label className="text-sm font-medium">
+                Reason <span className="text-muted-foreground">(optional)</span>
+              </label>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                placeholder="Recorded in the moderation audit log."
+                className="mt-1"
+              />
+            </div>
+          )}
+
+          {requireStepUp && (
+            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/30 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                {stepUpToken ? (
+                  <>
+                    <IconShieldCheck className="w-4 h-4 text-green-500" />
+                    <span>Re-authenticated for the next 5 minutes</span>
+                  </>
+                ) : (
+                  <>
+                    <IconLock className="w-4 h-4 text-muted-foreground" />
+                    <span>Confirm your admin password to continue</span>
+                  </>
+                )}
+              </div>
+              {!stepUpToken && (
+                <div className="flex gap-2">
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Admin password"
+                    autoComplete="current-password"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        requestStepUp()
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={requestStepUp}
+                    disabled={!password || stepUp.isPending}
+                  >
+                    {stepUp.isPending ? 'Verifying…' : 'Verify'}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
               Cancel
             </Button>
             <Button
               variant={destructive ? 'destructive' : 'default'}
-              onClick={handleConfirm}
-              disabled={reasonMissing || passwordMissing || busy}
+              onClick={submit}
+              disabled={!canConfirm || pending}
             >
-              {busy ? 'Working…' : confirmLabel}
+              {pending ? 'Working…' : confirmLabel}
             </Button>
           </div>
         </div>

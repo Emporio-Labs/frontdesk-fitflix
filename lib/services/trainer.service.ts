@@ -9,6 +9,9 @@ export interface Trainer {
   specialities: string[]
   createdAt: string
   updatedAt: string
+  imageUrl?: string
+  keySentence?: string
+  isActive?: boolean
 }
 
 export interface CreateTrainerPayload {
@@ -18,12 +21,18 @@ export interface CreateTrainerPayload {
   password: string
   description: string
   specialities: string[]
+  imageUrl?: string
+  keySentence?: string
+  isActive?: boolean
 }
 
 export interface UpdateTrainerPayload {
   trainerName?: string
   description?: string
   specialities?: string[]
+  imageUrl?: string
+  keySentence?: string
+  isActive?: boolean
 }
 
 export const trainerService = {
@@ -33,6 +42,14 @@ export const trainerService = {
   },
   getById: async (id: string): Promise<{ trainer: Trainer }> => {
     const { data } = await apiClient.get(`/trainers/${id}`)
+    return data
+  },
+  getPublicAll: async (): Promise<{ trainers: Trainer[] }> => {
+    const { data } = await apiClient.get('/trainers/public')
+    return data
+  },
+  getPublicById: async (id: string): Promise<{ trainer: Trainer }> => {
+    const { data } = await apiClient.get(`/trainers/public/${id}`)
     return data
   },
   create: async (payload: CreateTrainerPayload): Promise<{ message: string; trainer: Trainer }> => {

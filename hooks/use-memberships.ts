@@ -1,9 +1,12 @@
+import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   membershipService,
   CreateMembershipPayload,
   UpdateMembershipPayload,
+  buildRenewalReminders,
 } from '@/lib/services/membership.service'
+import { useUsers } from '@/hooks/use-users'
 import { queryKeys } from '@/lib/query-keys'
 import { toast } from 'sonner'
 
@@ -13,6 +16,28 @@ export function useMemberships() {
     queryFn: membershipService.getAll,
     select: (data) => data.memberships,
   })
+}
+
+/**
+ * Members whose membership expires in the current IST month, bucketed for
+ * renewal calls. Joins the memberships list with the users list client-side —
+ * no dedicated backend endpoint. `isLoading`/`isError` reflect either query.
+ */
+export function useRenewalReminders() {
+  const memberships = useMemberships()
+  const users = useUsers()
+
+  const data = useMemo(
+    () => buildRenewalReminders(memberships.data ?? [], users.data ?? []),
+    [memberships.data, users.data]
+  )
+
+  return {
+    data,
+    isLoading: memberships.isLoading || users.isLoading,
+    isError: memberships.isError || users.isError,
+    refetch: () => Promise.all([memberships.refetch(), users.refetch()]),
+  }
 }
 
 export function useMyMemberships() {

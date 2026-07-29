@@ -42,7 +42,9 @@ export default function CommunityPostDetailPage() {
   const deleteComment = useDeleteComment()
 
   const [editOpen, setEditOpen] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
   const [editBody, setEditBody] = useState('')
+  const [editDescription, setEditDescription] = useState('')
   const [editVisibility, setEditVisibility] = useState('public')
   const [editReason, setEditReason] = useState('')
   const [deletingPost, setDeletingPost] = useState(false)
@@ -51,7 +53,9 @@ export default function CommunityPostDetailPage() {
 
   const openEdit = () => {
     if (!post) return
+    setEditTitle(post.title ?? '')
     setEditBody(post.content)
+    setEditDescription(post.description ?? '')
     setEditVisibility(post.visibility)
     setEditReason('')
     setEditOpen(true)
@@ -60,7 +64,9 @@ export default function CommunityPostDetailPage() {
   const submitEdit = async () => {
     await editPost.mutateAsync({
       id: postId,
+      title: editTitle,
       body: editBody,
+      description: editDescription,
       visibility: editVisibility,
       reason: editReason.trim() || undefined,
     })
@@ -108,23 +114,64 @@ export default function CommunityPostDetailPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
+              {post.title && (
+                <p className="text-base font-bold text-foreground">{post.title}</p>
+              )}
               <p className="text-sm text-foreground whitespace-pre-wrap">{post.content || '—'}</p>
+              {post.description && (
+                <>
+                  <hr className="border-border/60" />
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{post.description}</p>
+                </>
+              )}
 
               {(post.media?.length ?? 0) > 0 && (
                 <div className="flex flex-wrap gap-3">
-                  {post.media?.map((m) => (
-                    // Signed S3 URLs expire in 15 minutes, so next/image
-                    // optimisation would cache a dead URL — render directly.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={m.id}
-                      src={m.url}
-                      alt="Post attachment"
-                      className="h-40 w-40 object-cover rounded-lg border border-border/60"
-                    />
-                  ))}
+                  {post.media?.map((m) => {
+                    const kind = m.kind ?? 'image'
+
+                    if (kind === 'video') {
+                      return (
+                        <video
+                          key={m.id}
+                          src={m.url}
+                          controls
+                          className="h-48 max-w-full rounded-lg border border-border/60 bg-black"
+                          style={{ maxWidth: '100%' }}
+                        >
+                          Your browser does not support the video tag.
+                        </video>
+                      )
+                    }
+
+                    if (kind === 'audio') {
+                      return (
+                        <div
+                          key={m.id}
+                          className="w-full flex items-center gap-3 bg-muted/40 border border-border/60 rounded-lg px-4 py-3"
+                        >
+                          <span className="text-xs text-muted-foreground font-medium shrink-0">🎵 Audio</span>
+                          <audio controls className="flex-1 h-9" src={m.url}>
+                            Your browser does not support the audio tag.
+                          </audio>
+                        </div>
+                      )
+                    }
+
+                    // Default: image
+                    return (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={m.id}
+                        src={m.url}
+                        alt="Post attachment"
+                        className="h-40 w-40 object-cover rounded-lg border border-border/60"
+                      />
+                    )
+                  })}
                 </div>
               )}
+
 
               <div className="text-xs text-muted-foreground">
                 {post.likeCount} likes · {post.commentCount} comments · {post.shareCount} shares
@@ -229,8 +276,16 @@ export default function CommunityPostDetailPage() {
           </DialogHeader>
           <div className="space-y-3 pt-1">
             <div>
+              <label className="text-sm font-medium">Title <span className="text-muted-foreground">(optional)</span></label>
+              <Textarea value={editTitle} onChange={(e) => setEditTitle(e.target.value)} rows={1} className="mt-1" maxLength={120} />
+            </div>
+            <div>
               <label className="text-sm font-medium">Content</label>
               <Textarea value={editBody} onChange={(e) => setEditBody(e.target.value)} rows={6} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Description <span className="text-muted-foreground">(optional, long-form)</span></label>
+              <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={4} className="mt-1" maxLength={5000} />
             </div>
             <div>
               <label className="text-sm font-medium">Visibility</label>
@@ -388,9 +443,19 @@ function HistoryViewer({ postId }: { postId: string }) {
                   <span className="text-xs text-muted-foreground">{formatDateTime(version.editedAt)}</span>
                   <span className="text-xs text-muted-foreground">· edited by {version.editedBy}</span>
                 </div>
+                {version.titleSnapshot && (
+                  <p className="text-xs font-semibold text-foreground">{version.titleSnapshot}</p>
+                )}
                 <p className="text-sm text-foreground whitespace-pre-wrap">
                   {version.contentSnapshot || '—'}
                 </p>
+                {version.descriptionSnapshot && (
+                  <>
+                    <hr className="border-border/40" />
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Description</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{version.descriptionSnapshot}</p>
+                  </>
+                )}
               </li>
             ))}
           </ol>

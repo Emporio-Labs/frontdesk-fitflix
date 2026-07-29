@@ -63,3 +63,20 @@ export function useDeleteTrainer() {
     },
   })
 }
+
+export function usePublicTrainers() {
+  return useQuery({
+    queryKey: queryKeys.trainers.publicAll(),
+    queryFn: trainerService.getPublicAll,
+    select: (data) => data.trainers,
+  })
+}
+
+export function usePublicTrainer(id: string) {
+  return useQuery({
+    queryKey: queryKeys.trainers.publicDetail(id),
+    queryFn: () => trainerService.getPublicById(id),
+    select: (data) => data.trainer,
+    enabled: !!id,
+  })
+}

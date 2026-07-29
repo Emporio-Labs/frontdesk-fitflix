@@ -10,7 +10,10 @@ export interface ModAuthor {
 export interface AdminPost {
   id: string
   author: ModAuthor
+  title: string
   content: string
+  /** Long-form description. Empty string when not set. */
+  description: string
   visibility: 'public' | 'members_only'
   status: string
   isOfficial: boolean
@@ -21,7 +24,7 @@ export interface AdminPost {
   commentCount: number
   shareCount: number
   createdAt: string
-  media?: { id: string; url: string; position: number }[]
+  media?: { id: string; kind: string; url: string; position: number }[]
 }
 
 export interface AdminComment {
@@ -39,7 +42,10 @@ export interface PostVersionRow {
   version: number
   editedBy: string
   editedAt: string
+  titleSnapshot: string
   contentSnapshot: string
+  /** Snapshot of description at this version. Empty string when not set. */
+  descriptionSnapshot: string
 }
 
 export interface ReportRow {
@@ -75,6 +81,42 @@ export interface AdminUserDetail {
 
 export type ReportAction = 'dismiss' | 'delete_content' | 'warn' | 'suspend' | 'ban'
 
+/** Returned by POST /community/media/images */
+export interface UploadedImage {
+  type: 'image'
+  url: string
+  thumbnailUrl: string
+  fullUrl: string
+  blurredUrl: string
+  position: number
+  width: number
+  height: number
+  bytes: number
+  originalName: string
+  mimeType: string
+}
+
+/** Returned by POST /community/media/files for non-image files */
+export interface UploadedFile {
+  type: 'file'
+  url: string
+  previewUrl: string
+  bytes: number
+  originalName: string
+  mimeType: string
+}
+
+/** Result of the direct-to-S3 video upload flow (presign + PUT). */
+export interface UploadedVideo {
+  type: 'video'
+  s3Key: string
+  bytes: number
+  originalName: string
+  mimeType: string
+}
+
+export type UploadedAttachment = UploadedImage | UploadedFile | UploadedVideo
+
 const B = '/community/admin'
 const stepUpHeader = (token?: string) =>
   token ? { headers: { 'X-Step-Up-Token': token } } : undefined
@@ -86,6 +128,61 @@ export const communityService = {
     return data
   },
 
+  // ── Media uploads ──────────────────────────────────────────────────────────
+
+  /** Upload one or more images (jpeg/png/webp) to /community/media/images */
+  uploadImages: async (files: File[]): Promise<UploadedImage[]> => {
+    const form = new FormData()
+    for (const f of files) form.append('images', f)
+    const { data } = await apiClient.post('/community/media/images', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return (data.images ?? []) as UploadedImage[]
+  },
+
+  /** Upload any supported files (images, PDFs, DOCX) to /community/media/files */
+  uploadFiles: async (files: File[]): Promise<UploadedAttachment[]> => {
+    const form = new FormData()
+    for (const f of files) form.append('files', f)
+    const { data } = await apiClient.post('/community/media/files', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return (data.files ?? []) as UploadedAttachment[]
+  },
+
+  /**
+   * Upload a video directly to S3: get a presigned PUT URL from the backend,
+   * then PUT the raw file straight to S3 (bypassing our server, unlike the
+   * other media types — videos are large enough that proxying them through
+   * the API is wasteful and slow). The presigned URL is single-use and
+   * already scoped to this exact key/content-type/size, so the PUT itself
+   * needs no auth header.
+   */
+  uploadVideo: async (file: File): Promise<UploadedVideo> => {
+    const { data: presign } = await apiClient.post('/community/media/video/presign', {
+      filename: file.name,
+      contentType: file.type,
+      contentLength: file.size,
+    })
+
+    const putRes = await fetch(presign.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    })
+    if (!putRes.ok) {
+      throw new Error(`Video upload to storage failed (${putRes.status})`)
+    }
+
+    return {
+      type: 'video',
+      s3Key: presign.s3Key,
+      bytes: file.size,
+      originalName: file.name,
+      mimeType: file.type,
+    }
+  },
+
   // Posts
   listPosts: async (params: Record<string, string> = {}) => {
     const { data } = await apiClient.get(`${B}/posts`, { params })
@@ -95,7 +192,7 @@ export const communityService = {
     const { data } = await apiClient.get(`${B}/posts/${id}`)
     return data.post as AdminPost
   },
-  editPost: async (id: string, payload: { body?: string; visibility?: string; reason?: string }) => {
+  editPost: async (id: string, payload: { title?: string; body?: string; description?: string; visibility?: string; reason?: string }) => {
     const { data } = await apiClient.patch(`${B}/posts/${id}`, payload)
     return data
   },
@@ -112,7 +209,7 @@ export const communityService = {
   },
   pinPost: async (id: string) => (await apiClient.post(`${B}/posts/${id}/pin`)).data,
   unpinPost: async (id: string) => (await apiClient.post(`${B}/posts/${id}/unpin`)).data,
-  createOfficial: async (payload: { body: string; visibility: string }) =>
+  createOfficial: async (payload: { title?: string; body: string; description?: string; visibility: string; images?: any[]; attachments?: any[]; video?: { s3Key: string } }) =>
     (await apiClient.post(`${B}/posts/official`, payload)).data,
 
   // Comments
