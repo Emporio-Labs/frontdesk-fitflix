@@ -28,17 +28,11 @@ import {
 import { AdminPost, UploadedAttachment, UploadedImage, UploadedVideo } from '@/lib/services/community.service'
 import { toast } from 'sonner'
 import { ModerationDialog } from './moderation-dialog'
-import { RoleBadge, VisibilityBadge, formatDateTime, truncate } from './shared'
+import { RoleBadge, VisibilityBadge, formatBytes, formatDateTime, truncate } from './shared'
 
 const ANY = 'any'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 function getFileIcon(mimeType: string) {
   if (mimeType.startsWith('image/')) return <IconPhoto className="w-4 h-4 text-blue-400" />

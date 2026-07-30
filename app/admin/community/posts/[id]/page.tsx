@@ -16,7 +16,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  IconArrowLeft, IconEdit, IconPin, IconPinnedOff, IconRestore, IconTrash,
+  IconArrowLeft, IconEdit, IconPaperclip, IconPin, IconPinnedOff, IconRestore, IconTrash,
 } from '@tabler/icons-react'
 import { EmptyState } from '@/components/empty-state'
 import {
@@ -25,7 +25,7 @@ import {
 } from '@/hooks/use-community'
 import { AdminComment } from '@/lib/services/community.service'
 import { ModerationDialog } from '../../moderation-dialog'
-import { RoleBadge, VisibilityBadge, formatDateTime } from '../../shared'
+import { RoleBadge, VisibilityBadge, formatBytes, formatDateTime } from '../../shared'
 
 export default function CommunityPostDetailPage() {
   const params = useParams()
@@ -155,6 +155,31 @@ export default function CommunityPostDetailPage() {
                             Your browser does not support the audio tag.
                           </audio>
                         </div>
+                      )
+                    }
+
+                    if (kind === 'file') {
+                      return (
+                        <a
+                          key={m.id}
+                          href={m.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={m.originalName ?? undefined}
+                          className="flex items-center gap-3 bg-muted/40 border border-border/60 rounded-lg px-4 py-3 hover:bg-muted/70 transition-colors"
+                        >
+                          <IconPaperclip className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-medium truncate">
+                              {m.originalName ?? 'Attachment'}
+                            </span>
+                            {typeof m.bytes === 'number' && (
+                              <span className="text-[11px] text-muted-foreground">
+                                {formatBytes(m.bytes)}
+                              </span>
+                            )}
+                          </div>
+                        </a>
                       )
                     }
 

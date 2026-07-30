@@ -24,7 +24,17 @@ export interface AdminPost {
   commentCount: number
   shareCount: number
   createdAt: string
-  media?: { id: string; kind: string; url: string; position: number }[]
+  media?: {
+    id: string
+    kind: string
+    url: string
+    position: number
+    /** Only set for kind 'file' — files have no preview, so the chip is
+     *  rendered from the original name and size. */
+    originalName?: string | null
+    mimeType?: string | null
+    bytes?: number | null
+  }[]
 }
 
 export interface AdminComment {
