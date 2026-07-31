@@ -280,6 +280,7 @@ export default function TherapiesPage() {
     name: '',
     description: '',
     mode: 'offline' as GroupClassMode,
+    sessionType: '' as 'group_class' | 'live_stream' | '',
     instructor: '',
     durationMinutes: 60,
     creditsRequired: 1,
@@ -291,6 +292,10 @@ export default function TherapiesPage() {
     streamRoomId: '',
     enableWaitlist: false,
     isPublished: true,
+    bookingWindowValue: 72,
+    bookingWindowUnit: 'hours' as 'hours' | 'days',
+    bookingCloseValue: '' as string | number,
+    bookingCloseUnit: 'minutes' as 'minutes' | 'hours' | 'days',
   }
   const [gcForm, setGcForm] = useState(defaultGcForm)
   const [gcSchedule, setGcSchedule] = useState<GcSchedule>(DEFAULT_SCHEDULE)
@@ -626,6 +631,7 @@ export default function TherapiesPage() {
       name: gc.name,
       description: gc.description,
       mode: gc.mode,
+      sessionType: gc.sessionType || '',
       instructor: gc.instructor,
       durationMinutes: gc.durationMinutes,
       creditsRequired: gc.creditsRequired,
@@ -637,6 +643,10 @@ export default function TherapiesPage() {
       streamRoomId: gc.streamRoomId ?? '',
       enableWaitlist: gc.enableWaitlist ?? false,
       isPublished: gc.isPublished ?? gc.isActive ?? true,
+      bookingWindowValue: (gc as any).bookingWindowValue ?? 72,
+      bookingWindowUnit: (gc as any).bookingWindowUnit ?? 'hours',
+      bookingCloseValue: (gc as any).bookingCloseValue ?? '',
+      bookingCloseUnit: (gc as any).bookingCloseUnit ?? 'minutes',
     })
     const info = gc.scheduleInfo || ''
     if (info.startsWith('One-Time:')) {
@@ -715,6 +725,9 @@ export default function TherapiesPage() {
     if ((gcForm.mode === 'online' || gcForm.mode === 'hybrid') && !gcForm.streamRoomId) {
       errors.streamRoomId = 'ZEGOCLOUD room template is required'
     }
+    if (gcForm.mode === 'online' && !gcForm.sessionType) {
+      errors.sessionType = 'Session Type is required when Online mode is selected'
+    }
 
     if (Object.keys(errors).length > 0) {
       setGcErrors(errors)
@@ -765,48 +778,51 @@ export default function TherapiesPage() {
       return
     }
 
-    const mergedSlotIds = Array.from(new Set([...selectedSlotIds, ...parseCsvTags(manualSlotIds)]))
-    if (mergedSlotIds.length === 0) {
-      toast.error('At least one booking slot is required for the class. Use "Generate Slots" or select from the list.')
-      return
-    }
+    const recurrenceRule = gcSchedule.mode === 'recurring'
+      ? (gcSchedule.frequency === 'daily' ? 'DAILY' : gcSchedule.frequency === 'weekly' ? 'WEEKLY' : 'MONTHLY')
+      : 'NONE'
+
+    const scheduleType = gcSchedule.mode === 'recurring'
+      ? (gcSchedule.frequency === 'daily' ? 'Daily Recurring' : gcSchedule.frequency === 'weekly' ? 'Weekly Recurring' : 'Monthly Recurring')
+      : 'Fixed Session'
+
+    const daysStr = gcSchedule.frequency === 'weekly' && gcSchedule.daysOfWeek.length > 0
+      ? gcSchedule.daysOfWeek.slice().sort((a, b) => a - b).map((d) => DAY_LABELS[d]).join(', ')
+      : ''
+
+    const schedulePattern = gcSchedule.mode === 'recurring'
+      ? (gcSchedule.frequency === 'weekly' && daysStr ? `Weekly on ${daysStr}` : (gcSchedule.frequency === 'daily' ? 'Daily' : 'Monthly'))
+      : undefined
 
     const payload = {
       name: gcForm.name.trim(),
       description: gcForm.description.trim(),
       mode: gcForm.mode,
+      deliveryType: gcForm.mode,
+      sessionType: gcForm.mode === 'online' ? gcForm.sessionType : '',
       instructor: gcForm.instructor.trim(),
       durationMinutes: gcForm.durationMinutes,
       creditsRequired: gcForm.creditsRequired,
       maxParticipants: gcForm.maxParticipants,
       tags: parseCsvTags(gcForm.tags),
       scheduleInfo: compiledScheduleInfo,
-      slots: mergedSlotIds,
+      recurrenceRule,
+      scheduleType,
+      schedulePattern,
+      daysOfWeek: gcSchedule.daysOfWeek,
+      slots: [],
       isActive: gcForm.isActive,
       locationAddress: gcForm.locationAddress,
       streamRoomId: gcForm.streamRoomId,
       enableWaitlist: gcForm.enableWaitlist,
+      bookingWindowValue: gcForm.bookingWindowValue,
+      bookingWindowUnit: gcForm.bookingWindowUnit,
+      bookingCloseValue: gcForm.bookingCloseValue === '' ? null : Number(gcForm.bookingCloseValue),
+      bookingCloseUnit: gcForm.bookingCloseValue === '' ? null : gcForm.bookingCloseUnit,
+      isPublished: gcForm.isPublished,
     }
 
-    if (editingGc) {
-      const gcSlots = slots.filter((slot) => editingGc.slots?.includes(slot._id))
-      const slotsWithMoreBookings = gcSlots.filter((slot) => {
-        const confirmedBookings = slot.capacity - slot.remainingCapacity
-        return gcForm.maxParticipants < confirmedBookings
-      })
-
-      if (slotsWithMoreBookings.length > 0) {
-        const maxBooked = Math.max(
-          ...slotsWithMoreBookings.map((slot) => slot.capacity - slot.remainingCapacity)
-        )
-        setCapacityWarnInfo({ payload, maxBooked, gcSlots })
-        setCapacityConfirmOpen(true)
-        return
-      }
-      await executeSave(payload, gcSlots)
-    } else {
-      await executeSave(payload, [])
-    }
+    await executeSave(payload, [])
   }
 
   const handleDeleteGc = (id: string) => deleteGroupClass.mutate(id)
@@ -1465,6 +1481,49 @@ export default function TherapiesPage() {
                   </Select>
                 </div>
 
+                {/* Session Type */}
+                {gcForm.mode === 'online' && (
+                  <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <label className="text-sm font-medium">
+                      Session Type <span className="text-red-500">*</span>
+                      {renderModifiedBadge('sessionType')}
+                    </label>
+                    <div className="flex items-center gap-6 mt-1.5 p-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="sessionType"
+                          className="accent-primary w-3.5 h-3.5 cursor-pointer"
+                          checked={gcForm.sessionType === 'group_class'}
+                          onChange={() => {
+                            setGcForm({ ...gcForm, sessionType: 'group_class' })
+                            if (gcErrors.sessionType) setGcErrors({ ...gcErrors, sessionType: '' })
+                          }}
+                          disabled={isGcPending}
+                        />
+                        <span className="text-sm font-medium text-foreground">Group Class</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="sessionType"
+                          className="accent-primary w-3.5 h-3.5 cursor-pointer"
+                          checked={gcForm.sessionType === 'live_stream'}
+                          onChange={() => {
+                            setGcForm({ ...gcForm, sessionType: 'live_stream' })
+                            if (gcErrors.sessionType) setGcErrors({ ...gcErrors, sessionType: '' })
+                          }}
+                          disabled={isGcPending}
+                        />
+                        <span className="text-sm font-medium text-foreground">Live Stream</span>
+                      </label>
+                    </div>
+                    {gcErrors.sessionType && (
+                      <p className="text-xs text-rose-500 mt-1">{gcErrors.sessionType}</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Conditional Location / Virtual Room fields */}
                 {(gcForm.mode === 'offline' || gcForm.mode === 'hybrid') && (
                   <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -1599,6 +1658,70 @@ export default function TherapiesPage() {
                     {gcErrors.maxParticipants && (
                       <p className="text-xs text-rose-500 mt-1">{gcErrors.maxParticipants}</p>
                     )}
+                  </div>
+                </div>
+
+                {/* Booking Window Configuration */}
+                <div className="grid grid-cols-2 gap-4 border rounded-lg p-3 bg-muted/20">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold block">
+                      Booking Opens
+                      {renderModifiedBadge('bookingWindowValue')}
+                    </label>
+                    <div className="flex gap-1.5">
+                      <Input
+                        type="number"
+                        min={1}
+                        className={cn(
+                          "h-8 text-xs w-20",
+                          isFieldChanged('bookingWindowValue') && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                        )}
+                        value={gcForm.bookingWindowValue}
+                        onChange={(e) => setGcForm({ ...gcForm, bookingWindowValue: parseInt(e.target.value) || 0 })}
+                        disabled={isGcPending}
+                      />
+                      <select
+                        className="h-8 text-xs border rounded bg-transparent px-2 dark:bg-zinc-950"
+                        value={gcForm.bookingWindowUnit}
+                        onChange={(e) => setGcForm({ ...gcForm, bookingWindowUnit: e.target.value as any })}
+                        disabled={isGcPending}
+                      >
+                        <option value="hours">Hours prior</option>
+                        <option value="days">Days prior</option>
+                      </select>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Default is 72 hours</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold block">
+                      Booking Closes
+                      {renderModifiedBadge('bookingCloseValue')}
+                    </label>
+                    <div className="flex gap-1.5">
+                      <Input
+                        type="number"
+                        min={0}
+                        className={cn(
+                          "h-8 text-xs w-20",
+                          isFieldChanged('bookingCloseValue') && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                        )}
+                        value={gcForm.bookingCloseValue}
+                        onChange={(e) => setGcForm({ ...gcForm, bookingCloseValue: e.target.value === '' ? '' : (parseInt(e.target.value, 10) || 0) })}
+                        disabled={isGcPending}
+                      />
+                      <select
+                        className="h-8 text-xs border rounded bg-transparent px-2 dark:bg-zinc-950"
+                        value={gcForm.bookingCloseUnit}
+                        onChange={(e) => setGcForm({ ...gcForm, bookingCloseUnit: e.target.value as any })}
+                        disabled={isGcPending}
+                      >
+                        <option value="minutes">Minutes prior</option>
+                        <option value="hours">Hours prior</option>
+                        <option value="days">Days prior</option>
+                      </select>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Default is 15 minutes</p>
                   </div>
                 </div>
 
@@ -1967,164 +2090,7 @@ export default function TherapiesPage() {
                   </button>
                 </div>
 
-                {/* Slot Generation & Selection for Group Classes */}
-                <div className="space-y-3 rounded-lg border border-dashed p-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Generate Hourly Slots For This Class</label>
-                    <Badge variant="outline" className="rounded-full">Hourly</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Daily recurring slots are created for each hour in this range.
-                  </p>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Capacity Per Hour</label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={slotPlan.capacityPerHour}
-                        onChange={(e) =>
-                          setSlotPlan({
-                            ...slotPlan,
-                            capacityPerHour: Number.parseInt(e.target.value, 10) || 1,
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">Start Hour</label>
-                      <Input
-                        type="time"
-                        step={3600}
-                        value={slotPlan.startTime}
-                        onChange={(e) => setSlotPlan({ ...slotPlan, startTime: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground">End Hour</label>
-                      <Input
-                        type="time"
-                        step={3600}
-                        value={slotPlan.endTime}
-                        onChange={(e) => setSlotPlan({ ...slotPlan, endTime: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleGenerateSlots}
-                    disabled={isGeneratingSlots}
-                  >
-                    {isGeneratingSlots ? 'Generating Slots...' : 'Generate Slots For This Class'}
-                  </Button>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">
-                      Booking Windows For This Class
-                      {!editingGc && <span className="ml-1 text-red-500">*</span>}
-                    </label>
-                    <Badge variant={selectedSlotIds.length === 0 ? 'destructive' : 'secondary'} className="rounded-full">
-                      {selectedSlotIds.length} linked
-                    </Badge>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    Select which time windows this class can be booked in. At least one slot is required.
-                  </p>
-
-                  <div className="flex gap-2">
-                    <Input
-                      value={slotSearchTerm}
-                      onChange={(e) => setSlotSearchTerm(e.target.value)}
-                      placeholder="Filter slots by schedule, time, or ID"
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setUse12HourFormat(!use12HourFormat)}
-                      className="whitespace-nowrap px-3 text-xs h-9"
-                    >
-                      {use12HourFormat ? '12h Format' : '24h Format'}
-                    </Button>
-                  </div>
-
-                  <div className="rounded-md border">
-                    <ScrollArea className="h-44">
-                      <div className="space-y-2 p-2">
-                        {isLoadingSlots ? (
-                          [...Array(4)].map((_, index) => (
-                            <Skeleton key={index} className="h-14 w-full" />
-                          ))
-                        ) : isSlotsError ? (
-                          <p className="p-2 text-sm text-red-500">
-                            Failed to load slots. You can still add IDs manually.
-                          </p>
-                        ) : filteredSlotOptions.length === 0 ? (
-                          <p className="p-2 text-sm text-muted-foreground">No slots match this filter.</p>
-                        ) : (
-                          filteredSlotOptions.map((slot: Slot) => (
-                            <label
-                               key={slot._id}
-                               className="flex cursor-pointer items-start gap-3 rounded-md border p-2 hover:bg-muted/40"
-                            >
-                              <Checkbox
-                                checked={selectedSlotIds.includes(slot._id)}
-                                onCheckedChange={() => toggleSlotSelection(slot._id)}
-                                className="mt-0.5"
-                              />
-                              <div className="space-y-1">
-                                <p className="text-sm font-medium">
-                                  {formatSlotDate(slot.date, slot.isDaily)} - {use12HourFormat ? `${formatTimeTo12Hour(slot.startTime)} to ${formatTimeTo12Hour(slot.endTime)}` : `${slot.startTime} to ${slot.endTime}`}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant={slot.remainingCapacity <= 0 ? 'destructive' : 'secondary'}>
-                                    {slot.remainingCapacity <= 0 ? 'Full' : `Open ${slot.remainingCapacity}/${slot.capacity}`}
-                                  </Badge>
-                                  <span className="text-xs text-muted-foreground">ID ...{slot._id.slice(-8)}</span>
-                                </div>
-                              </div>
-                            </label>
-                          ))
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      Use Generate Slots above for new windows, or link existing windows from this list.
-                    </p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowManualSlotInput((current) => !current)}
-                    >
-                      {showManualSlotInput ? 'Hide Advanced IDs' : 'Advanced: Manual IDs'}
-                    </Button>
-                  </div>
-
-                  {showManualSlotInput && (
-                    <Input
-                      value={manualSlotIds}
-                      onChange={(e) => setManualSlotIds(e.target.value)}
-                      placeholder="Advanced only: paste slot IDs separated by commas"
-                    />
-                  )}
-
-                  {missingSelectedSlotCount > 0 && (
-                    <p className="text-xs text-amber-600">
-                      {missingSelectedSlotCount} previously selected slot IDs are not in the current slot list and will still be saved.
-                    </p>
-                  )}
-                </div>
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
@@ -2460,6 +2426,11 @@ export default function TherapiesPage() {
                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${gcModeBadgeClass[gc.mode]}`}>
                           {gcModeIcon[gc.mode]} {gcModeLabel[gc.mode]}
                         </span>
+                        {gc.mode === 'online' && gc.sessionType && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">
+                            {gc.sessionType === 'group_class' ? 'Group Class' : 'Live Stream'}
+                          </span>
+                        )}
                         {gc.tags.map((tag) => (
                           <Badge key={tag} variant="secondary" className="rounded-full">{tag}</Badge>
                         ))}

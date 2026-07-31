@@ -7,18 +7,31 @@ export interface GroupClass {
   name: string
   description: string
   mode: GroupClassMode
+  deliveryType?: string
+  sessionType?: 'group_class' | 'live_stream' | ''
   instructor: string
+  // User account ID of the class host — used to determine ZEGOCLOUD
+  // host vs audience role (GCLS-24). Separate from the display-name string.
+  instructorUserId?: string | null
   durationMinutes: number
   creditsRequired: number
   maxParticipants: number
   tags: string[]
   scheduleInfo: string
+  recurrenceRule?: string
+  schedulePattern?: string
+  scheduleType?: string
+  daysOfWeek?: number[]
   isActive: boolean
   isPublished: boolean
   slots?: string[]
   locationAddress?: string
   streamRoomId?: string
   enableWaitlist?: boolean
+  bookingWindowValue?: number
+  bookingWindowUnit?: 'hours' | 'days'
+  bookingCloseValue?: number
+  bookingCloseUnit?: 'minutes' | 'hours' | 'days'
   createdAt: string
   updatedAt: string
 }
@@ -27,18 +40,28 @@ export interface CreateGroupClassPayload {
   name: string
   description: string
   mode: GroupClassMode
+  sessionType?: 'group_class' | 'live_stream' | ''
   instructor: string
+  instructorUserId?: string | null
   durationMinutes: number
   creditsRequired: number
   maxParticipants: number
   tags: string[]
   scheduleInfo: string
+  recurrenceRule?: string
+  schedulePattern?: string
+  scheduleType?: string
+  daysOfWeek?: number[]
   slots?: string[]
   isActive?: boolean
   isPublished?: boolean
   locationAddress?: string
   streamRoomId?: string
   enableWaitlist?: boolean
+  bookingWindowValue?: number
+  bookingWindowUnit?: 'hours' | 'days'
+  bookingCloseValue?: number
+  bookingCloseUnit?: 'minutes' | 'hours' | 'days'
 }
 
 export interface UpdateGroupClassPayload extends Partial<CreateGroupClassPayload> {}
@@ -49,13 +72,20 @@ function normalizeGroupClass(raw: any): GroupClass {
     id: raw?._id || raw?.id || '',
     name: raw?.name || '',
     description: raw?.description || '',
-    mode: raw?.mode ?? 'offline',
+    mode: raw?.mode ?? raw?.deliveryType ?? 'offline',
+    deliveryType: raw?.deliveryType ?? raw?.mode ?? 'offline',
+    sessionType: raw?.sessionType || '',
     instructor: raw?.instructor ?? 'Staff',
+    instructorUserId: raw?.instructorUserId ?? raw?.classId?.instructorUserId ?? null,
     durationMinutes: Number(raw?.durationMinutes ?? 60),
     creditsRequired: Number(raw?.creditCost ?? raw?.creditsRequired ?? 1),
     maxParticipants: Number(raw?.maxParticipants ?? 20),
     tags: Array.isArray(raw?.tags) ? raw.tags : [],
     scheduleInfo: raw?.scheduleInfo ?? 'Daily',
+    recurrenceRule: raw?.recurrenceRule || raw?.recurrence || undefined,
+    schedulePattern: raw?.schedulePattern || raw?.pattern || undefined,
+    scheduleType: raw?.scheduleType || undefined,
+    daysOfWeek: Array.isArray(raw?.daysOfWeek) ? raw.daysOfWeek : undefined,
     isActive: published,
     isPublished: published,
     slots: Array.isArray(raw?.slots)
@@ -64,6 +94,10 @@ function normalizeGroupClass(raw: any): GroupClass {
     locationAddress: raw?.locationAddress ?? '',
     streamRoomId: raw?.streamRoomId ?? '',
     enableWaitlist: Boolean(raw?.enableWaitlist),
+    bookingWindowValue: raw?.bookingWindowValue ?? 72,
+    bookingWindowUnit: raw?.bookingWindowUnit ?? 'hours',
+    bookingCloseValue: raw?.bookingCloseValue ?? 15,
+    bookingCloseUnit: raw?.bookingCloseUnit ?? 'minutes',
     createdAt: raw?.createdAt ?? new Date().toISOString(),
     updatedAt: raw?.updatedAt ?? new Date().toISOString(),
   }
@@ -93,15 +127,26 @@ export const groupClassService = {
       isPublished: payload.isPublished ?? payload.isActive ?? true,
       creditCost: payload.creditsRequired,
       mode: payload.mode,
+      deliveryType: payload.mode,
+      sessionType: payload.sessionType || '',
       instructor: payload.instructor,
+      instructorUserId: payload.instructorUserId ?? null,
       durationMinutes: payload.durationMinutes,
       maxParticipants: payload.maxParticipants,
       tags: payload.tags,
       scheduleInfo: payload.scheduleInfo,
+      recurrenceRule: payload.recurrenceRule,
+      schedulePattern: payload.schedulePattern,
+      scheduleType: payload.scheduleType,
+      daysOfWeek: payload.daysOfWeek,
       slots: payload.slots ?? [],
       locationAddress: payload.locationAddress,
       streamRoomId: payload.streamRoomId,
       enableWaitlist: payload.enableWaitlist,
+      bookingWindowValue: payload.bookingWindowValue,
+      bookingWindowUnit: payload.bookingWindowUnit,
+      bookingCloseValue: payload.bookingCloseValue,
+      bookingCloseUnit: payload.bookingCloseUnit,
     })
     return {
       message: data?.message || 'Group class created successfully',
@@ -120,15 +165,26 @@ export const groupClassService = {
       isPublished: payload.isPublished ?? payload.isActive ?? true,
       creditCost: payload.creditsRequired,
       mode: payload.mode,
+      deliveryType: payload.mode,
+      sessionType: payload.sessionType || '',
       instructor: payload.instructor,
+      instructorUserId: payload.instructorUserId ?? null,
       durationMinutes: payload.durationMinutes,
       maxParticipants: payload.maxParticipants,
       tags: payload.tags,
       scheduleInfo: payload.scheduleInfo,
+      recurrenceRule: payload.recurrenceRule,
+      schedulePattern: payload.schedulePattern,
+      scheduleType: payload.scheduleType,
+      daysOfWeek: payload.daysOfWeek,
       slots: payload.slots ?? [],
       locationAddress: payload.locationAddress,
       streamRoomId: payload.streamRoomId,
       enableWaitlist: payload.enableWaitlist,
+      bookingWindowValue: payload.bookingWindowValue,
+      bookingWindowUnit: payload.bookingWindowUnit,
+      bookingCloseValue: payload.bookingCloseValue,
+      bookingCloseUnit: payload.bookingCloseUnit,
     })
     return {
       message: data?.message || 'Group class updated successfully',
