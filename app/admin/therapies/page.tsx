@@ -724,7 +724,7 @@ export default function TherapiesPage() {
       errors.locationAddress = 'Location address is required'
     }
     if ((gcForm.mode === 'online' || gcForm.mode === 'hybrid') && !gcForm.streamRoomId) {
-      errors.streamRoomId = 'ZEGOCLOUD room template is required'
+      errors.streamRoomId = 'Session Layout Template is required'
     }
     if (gcForm.mode === 'online' && !gcForm.sessionType) {
       errors.sessionType = 'Session Type is required when Online mode is selected'
@@ -1554,10 +1554,18 @@ export default function TherapiesPage() {
 
                 {(gcForm.mode === 'online' || gcForm.mode === 'hybrid') && (
                   <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                    <label className="text-sm font-medium">
-                      ZEGOCLOUD Room Template <span className="text-red-500">*</span>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-sm font-medium">
+                        Session Layout Template <span className="text-red-500">*</span>
+                      </label>
+                      <span
+                        className="cursor-help text-xs text-muted-foreground underline decoration-dotted"
+                        title="The actual conference room is generated automatically per session."
+                      >
+                        (Auto-room generated)
+                      </span>
                       {renderModifiedBadge('streamRoomId')}
-                    </label>
+                    </div>
                     <Select
                       value={gcForm.streamRoomId}
                       onValueChange={(val) => {
@@ -1571,7 +1579,7 @@ export default function TherapiesPage() {
                         gcErrors.streamRoomId && "border-rose-500 focus-visible:ring-rose-500",
                         isFieldChanged('streamRoomId') && !gcErrors.streamRoomId && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
                       )}>
-                        <SelectValue placeholder="Select stream room template" />
+                        <SelectValue placeholder="Select session layout template" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="interactive_class">Interactive Video Class (1-on-many)</SelectItem>

@@ -135,4 +135,7 @@ export const queryKeys = {
     all: () => ['live-sessions'] as const,
     detail: (id: string) => ['live-sessions', id] as const,
   },
+  settings: {
+    conference: () => ['settings', 'conference'] as const,
+  },
 }
