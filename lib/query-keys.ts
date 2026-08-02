@@ -131,4 +131,8 @@ export const queryKeys = {
     assessment: (userId: string) =>
       ['nutrition', 'assessment', userId] as const,
   },
+  liveSessions: {
+    all: () => ['live-sessions'] as const,
+    detail: (id: string) => ['live-sessions', id] as const,
+  },
 }
