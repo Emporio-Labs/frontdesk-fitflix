@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   IconBroadcast,
   IconCalendarEvent,
@@ -20,6 +21,7 @@ import {
   IconCopy,
   IconPlayerPlay,
   IconRefresh,
+  IconUserCheck,
   IconUsers,
   IconVideo,
   IconWifi,
@@ -31,6 +33,7 @@ import { useLiveSessions } from '@/hooks/use-live-sessions'
 import { SessionTypeBadge } from '@/components/live-sessions/session-type-badge'
 import type { LiveSession } from '@/lib/services/live-session.service'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/use-auth'
 
 type StatusFilter = 'ALL' | 'SCHEDULED' | 'FULL' | 'COMPLETED' | 'CANCELLED'
 
@@ -100,10 +103,21 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
 
 export function LiveSessionsPanel() {
   const router = useRouter()
+  let authUser: any = null
+  let userRole: string = 'admin'
+  try {
+    const auth = useAuth()
+    authUser = auth.user
+    userRole = auth.role
+  } catch {
+    /* fallback if auth provider not present */
+  }
+
   const { data: sessions = [], isLoading, isError, refetch } = useLiveSessions()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
   const [selectedDate, setSelectedDate] = useState('')
+  const [mySessionsOnly, setMySessionsOnly] = useState(false)
 
   const filteredSessions = useMemo(() => {
     let list = sessions
@@ -117,6 +131,16 @@ export function LiveSessionsPanel() {
         return sDate === selectedDate
       })
     }
+    if (mySessionsOnly && authUser) {
+      list = list.filter((s: LiveSession) => {
+        const matchId = s.instructorUserId && s.instructorUserId === authUser.id
+        const matchName =
+          s.instructor &&
+          authUser.name &&
+          s.instructor.toLowerCase().trim() === authUser.name.toLowerCase().trim()
+        return matchId || matchName
+      })
+    }
     const q = searchTerm.toLowerCase()
     if (q) {
       list = list.filter(
@@ -127,7 +151,7 @@ export function LiveSessionsPanel() {
       )
     }
     return list
-  }, [sessions, statusFilter, selectedDate, searchTerm])
+  }, [sessions, statusFilter, selectedDate, mySessionsOnly, authUser, searchTerm])
 
   const stats = useMemo(() => {
     const total = sessions.length
@@ -212,11 +236,18 @@ export function LiveSessionsPanel() {
             className="max-w-sm"
           />
           <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs cursor-pointer border rounded-md px-2.5 py-2 bg-background hover:bg-muted/40 transition-colors">
+              <Checkbox
+                checked={mySessionsOnly}
+                onCheckedChange={(c) => setMySessionsOnly(Boolean(c))}
+              />
+              <span className="font-medium text-foreground">My Sessions</span>
+            </label>
             <Input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-[170px]"
+              className="w-[160px]"
             />
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
               <SelectTrigger className="w-[150px]">
@@ -230,7 +261,7 @@ export function LiveSessionsPanel() {
                 <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
             </Select>
-            {(searchTerm || statusFilter !== 'ALL' || selectedDate) && (
+            {(searchTerm || statusFilter !== 'ALL' || selectedDate || mySessionsOnly) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -238,6 +269,7 @@ export function LiveSessionsPanel() {
                   setSearchTerm('')
                   setStatusFilter('ALL')
                   setSelectedDate('')
+                  setMySessionsOnly(false)
                 }}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
@@ -284,13 +316,20 @@ export function LiveSessionsPanel() {
               {filteredSessions.map((session: LiveSession) => {
                 const timeStatus = getSessionTimeStatus(session)
                 const canStart = canStartSession(session)
+                const isAuthorized =
+                  !authUser ||
+                  userRole === 'admin' ||
+                  userRole === 'superadmin' ||
+                  (session.instructorUserId && session.instructorUserId === authUser.id) ||
+                  (session.instructor && authUser.name && session.instructor.toLowerCase().trim() === authUser.name.toLowerCase().trim())
+                const canLaunch = canStart && isAuthorized
 
                 return (
                   <div
                     key={session.id}
                     className={cn(
                       'flex flex-col gap-3 rounded-lg border p-4 transition-all hover:shadow-sm sm:flex-row sm:items-center sm:justify-between',
-                      canStart && 'border-emerald-200 bg-emerald-50/30 dark:border-emerald-800/50 dark:bg-emerald-950/10'
+                      canLaunch && 'border-emerald-200 bg-emerald-50/30 dark:border-emerald-800/50 dark:bg-emerald-950/10'
                     )}
                   >
                     {/* Left: Info */}
@@ -337,16 +376,17 @@ export function LiveSessionsPanel() {
                       <span className={cn('text-sm', timeStatus.color)}>{timeStatus.label}</span>
                       <Button
                         size="sm"
-                        disabled={!canStart}
+                        disabled={!canLaunch}
                         onClick={() => handleStartSession(session)}
                         className={cn(
-                          canStart
+                          canLaunch
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                             : ''
                         )}
+                        title={!isAuthorized ? `Assigned to ${session.instructor}` : undefined}
                       >
                         <IconPlayerPlay className="mr-1 h-4 w-4" />
-                        Start Session
+                        {!isAuthorized ? 'Assigned' : 'Start Session'}
                       </Button>
                     </div>
                   </div>
