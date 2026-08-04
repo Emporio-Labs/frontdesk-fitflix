@@ -13,8 +13,6 @@ export interface NutritionistBooking {
   appointmentDate?: string | null
   appointmentMode?: AppointmentMode
   meetingLink?: string | null
-  calBookingId?: string | null
-  calComBookingId?: string | null
   timeSlot?: string | null
   slotId?: string | null
   createdAt: string
@@ -35,7 +33,6 @@ function normalizeBooking(raw: any): NutritionistBooking {
   return {
     ...raw,
     appointmentDate: raw?.appointmentDate ?? raw?.date ?? null,
-    calBookingId: raw?.calBookingId ?? raw?.calComBookingId ?? null,
   }
 }
 
