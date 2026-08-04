@@ -37,6 +37,7 @@ import { MyNutritionDashboard } from '@/components/nutrition/my-nutrition-dashbo
 import { EditAssignedPlanModal } from '@/components/nutrition/edit-assigned-plan-modal'
 import { ClinicalUserDialog } from '@/components/nutrition/clinical-user-dialog'
 import { NutritionistAppointmentsTab } from '@/components/nutrition/nutritionist-appointments-tab'
+import { NutritionistCallModal } from '@/components/nutrition/nutritionist-call-modal'
 import {
   BookingStatusTabs,
   type BookingSegment,
@@ -59,6 +60,7 @@ import {
   IconExternalLink,
   IconCheck,
   IconCircleCheck,
+  IconVideo,
 } from '@tabler/icons-react'
 import {
   useNutritionMembers,
@@ -84,6 +86,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import type { NutritionDashboardMember, FoodItem, UserNutritionPlan } from '@/lib/types/nutrition'
 import { onboardingStepLabel, ONBOARDING_STEP_ORDER } from '@/components/onboarding-timeline'
 
@@ -92,6 +104,36 @@ import { onboardingStepLabel, ONBOARDING_STEP_ORDER } from '@/components/onboard
 function memberDisplayName(m?: NutritionDashboardMember['member']): string {
   if (!m) return 'Unknown User'
   return m.username || m.fullName || m.email || 'Unknown User'
+}
+
+function formatBookingTime(
+  apptDate?: string | null,
+  apptStart?: string | null,
+  createdAt?: string | null
+): { dateText: string; timeText: string } {
+  const target = apptDate || createdAt
+  if (!target) return { dateText: '—', timeText: 'Pending Slot' }
+
+  try {
+    const d = new Date(target)
+    if (isNaN(d.getTime())) return { dateText: '—', timeText: apptStart || 'Pending Slot' }
+
+    const dateText = d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+
+    const timeText = apptStart || d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+
+    return { dateText, timeText }
+  } catch {
+    return { dateText: '—', timeText: apptStart || 'Pending Slot' }
+  }
 }
 
 type RosterStatus = 'pending' | 'booked' | 'completed' | 'ignored'
@@ -249,20 +291,24 @@ function StatCard({
 
 function OverviewTab({
   members,
+  totalMembersCount,
   plans,
   membersLoading,
   plansLoading,
   todaysAppointments,
   onAssign,
   onSelectMember,
+  onJoinCall,
 }: {
   members: NutritionDashboardMember[]
+  totalMembersCount?: number
   plans: UserNutritionPlan[]
   membersLoading: boolean
   plansLoading: boolean
-  todaysAppointments: NutritionDashboardMember[]
+  todaysAppointments: (NutritionDashboardMember & { zegoRoomId?: string })[]
   onAssign: (userId?: string) => void
   onSelectMember: (userId: string) => void
+  onJoinCall?: (booking: any) => void
 }) {
   const activePlans = plans.filter((p) => p.status === 'Active').length
 
@@ -284,7 +330,7 @@ function OverviewTab({
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Total Members"
-          value={members.length}
+          value={totalMembersCount ?? members.length}
           loading={membersLoading}
           icon={IconUsers}
         />
@@ -340,9 +386,27 @@ function OverviewTab({
                       {m.bookingStatus && (
                         <StatusBadge status={m.bookingStatus} size="sm" />
                       )}
+                      {onJoinCall && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs"
+                          onClick={() =>
+                            onJoinCall({
+                              _id: m._id,
+                              userId: m.member,
+                              zegoRoomId: m.zegoRoomId || `nutri_session_${m._id}`,
+                              appointmentMode: 'ONLINE',
+                            })
+                          }
+                        >
+                          <IconVideo className="mr-1 h-3.5 w-3.5" />
+                          Join Call
+                        </Button>
+                      )}
                       <Link href={`/admin/nutrition/members/${m.member._id}`}>
-                        <Button variant="outline" size="sm">
-                          <IconEye className="mr-1 h-4 w-4" />
+                        <Button variant="outline" size="sm" className="h-8 text-xs">
+                          <IconEye className="mr-1 h-3.5 w-3.5" />
                           Open
                         </Button>
                       </Link>
@@ -473,6 +537,11 @@ function BookingsTab({
     initialReviewUserId ?? null
   )
   const [dialogOpen, setDialogOpen] = useState<boolean>(!!initialReviewUserId)
+  const [activeCallBooking, setActiveCallBooking] = useState<any | null>(null)
+  const [confirmCompleteBooking, setConfirmCompleteBooking] = useState<{
+    id: string
+    name: string
+  } | null>(null)
 
   const accept = useAcceptNutritionistBooking()
   const complete = useCompleteNutritionistBooking()
@@ -654,8 +723,9 @@ function BookingsTab({
                     <TableHead className="text-sm">Phone</TableHead>
                     <TableHead className="text-sm">Onboarding Step</TableHead>
                     <TableHead className="text-sm w-[160px]">Progress</TableHead>
+                    <TableHead className="text-sm">Scheduled Time</TableHead>
                     <TableHead className="text-sm">Nutritionist</TableHead>
-                    {segment !== 'pending' && <TableHead className="text-sm">Meeting Link</TableHead>}
+                    {segment !== 'pending' && <TableHead className="text-sm">Session Mode</TableHead>}
                     <TableHead className="text-right text-sm">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -695,6 +765,27 @@ function BookingsTab({
                             </span>
                           </div>
                         </TableCell>
+                        <TableCell className="text-sm">
+                          {(() => {
+                            const appt = user.expertAppointments?.find(
+                              (a) => a.expertType === 'nutritionist'
+                            )
+                            const { dateText, timeText } = formatBookingTime(
+                              appt?.appointmentDate,
+                              appt?.appointmentStart,
+                              appt?.createdAt || user.createdAt
+                            )
+                            if (dateText === '—' && timeText === 'Pending Slot') {
+                              return <span className="text-xs text-muted-foreground">—</span>
+                            }
+                            return (
+                              <div className="flex flex-col text-xs whitespace-nowrap">
+                                <span className="font-medium text-foreground">{dateText}</span>
+                                <span className="text-muted-foreground">{timeText}</span>
+                              </div>
+                            )
+                          })()}
+                        </TableCell>
                         <TableCell>
                           <StatusBadge status={statusLabel} size="sm" />
                         </TableCell>
@@ -704,18 +795,19 @@ function BookingsTab({
                               const appt = user.expertAppointments?.find(
                                 (a) => a.expertType === 'nutritionist'
                               )
-                              const displayLink = appt?.meetingLink || appt?.meetingUrl
-                              if (!displayLink) return <span className="text-muted-foreground">—</span>
+                              const mode = appt?.appointmentMode ?? 'ONLINE'
+                              if (mode === 'IN_PERSON') {
+                                return (
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    In-Person (Clinic)
+                                  </span>
+                                )
+                              }
                               return (
-                                <a
-                                  href={displayLink}
-                                  target="_blank"
-                                  rel="noreferrer noopener"
-                                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 font-semibold"
-                                >
-                                  <IconExternalLink className="h-3 w-3" />
-                                  Meeting Link
-                                </a>
+                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                  <IconVideo className="h-3.5 w-3.5 text-blue-500" />
+                                  Online (Ready)
+                                </span>
                               )
                             })()}
                           </TableCell>
@@ -723,9 +815,10 @@ function BookingsTab({
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             {(() => {
-                              const bookingId = user.expertAppointments?.find(
+                              const appt = user.expertAppointments?.find(
                                 (a) => a.expertType === 'nutritionist'
-                              )?._id || user._id
+                              )
+                              const bookingId = appt?._id || user._id
                               if (row.rosterStatus === 'pending' && bookingId) {
                                 return (
                                   <Button
@@ -741,19 +834,43 @@ function BookingsTab({
                                 )
                               }
                               if (row.rosterStatus === 'booked' && bookingId) {
+                                const zegoRoomId = appt?.zegoRoomId || `nutri_session_${bookingId}`
                                 return (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-green-600 border-green-600 hover:bg-green-50 dark:hover:bg-green-950"
-                                    onClick={() => complete.mutate(bookingId)}
-                                    disabled={complete.isPending && complete.variables === bookingId}
-                                  >
-                                    <IconCircleCheck className="mr-1 h-4 w-4" />
-                                    {complete.isPending && complete.variables === bookingId
-                                      ? 'Completing…'
-                                      : 'Complete Consultation'}
-                                  </Button>
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                                      onClick={() =>
+                                        setActiveCallBooking({
+                                          _id: bookingId,
+                                          userId: user,
+                                          zegoRoomId,
+                                          appointmentMode: appt?.appointmentMode || 'ONLINE',
+                                        })
+                                      }
+                                    >
+                                      <IconVideo className="mr-1 h-4 w-4" />
+                                      Join Call
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-green-600 border-green-600 hover:bg-green-50 dark:hover:bg-green-950"
+                                      onClick={() =>
+                                        setConfirmCompleteBooking({
+                                          id: bookingId,
+                                          name: user.username || user.email || 'this member',
+                                        })
+                                      }
+                                      disabled={complete.isPending && complete.variables === bookingId}
+                                    >
+                                      <IconCircleCheck className="mr-1 h-4 w-4" />
+                                      {complete.isPending && complete.variables === bookingId
+                                        ? 'Completing…'
+                                        : 'Complete Consultation'}
+                                    </Button>
+                                  </>
                                 )
                               }
                               return null
@@ -784,6 +901,54 @@ function BookingsTab({
         onOpenChange={handleDialogChange}
         onAssignExisting={(uid) => onAssign(uid)}
       />
+
+      <NutritionistCallModal
+        open={!!activeCallBooking}
+        onOpenChange={(open) => !open && setActiveCallBooking(null)}
+        booking={activeCallBooking}
+        onComplete={() => {
+          refetchUsers()
+          setActiveCallBooking(null)
+        }}
+      />
+
+      <AlertDialog
+        open={!!confirmCompleteBooking}
+        onOpenChange={(open) => {
+          if (!open && !complete.isPending) setConfirmCompleteBooking(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Complete Nutrition Consultation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to mark the consultation for{' '}
+              <span className="font-semibold text-foreground">
+                {confirmCompleteBooking?.name}
+              </span>{' '}
+              as completed? This will update the booking status to COMPLETED and update their onboarding record.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={complete.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={complete.isPending}
+              onClick={(e) => {
+                e.preventDefault()
+                if (!confirmCompleteBooking) return
+                complete.mutate(confirmCompleteBooking.id, {
+                  onSettled: () => setConfirmCompleteBooking(null),
+                })
+              }}
+            >
+              {complete.isPending ? 'Completing…' : 'Confirm Complete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -1385,16 +1550,55 @@ function NutritionDashboardContent() {
 
   const { data: members = [], isLoading: membersLoading } = useNutritionMembers()
   const { data: plans = [], isLoading: plansLoading } = useNutritionPlans()
+  const { data: users = [], isLoading: usersLoading } = useUsers()
 
   const canCreate = useCanAccess('nutrition', 'create')
   const canDelete = useCanAccess('nutrition', 'delete')
 
   const today = new Date().toISOString().slice(0, 10)
 
-  const todaysAppointments = useMemo(
-    () => members.filter((m) => (m.bookingDate ?? '').slice(0, 10) === today),
-    [members, today]
+  const totalMembersCount = useMemo(
+    () => Math.max(members.length, users.length),
+    [members.length, users.length]
   )
+
+  const [activeCallBooking, setActiveCallBooking] = useState<any | null>(null)
+
+  const todaysAppointments = useMemo(() => {
+    if (members.length > 0) {
+      const list = members.filter((m) => (m.bookingDate ?? '').slice(0, 10) === today)
+      if (list.length > 0) return list
+    }
+
+    return users
+      .filter((u) => {
+        const appt = u.expertAppointments?.find((a) => a.expertType === 'nutritionist')
+        return u.onboardingStatus?.nutritionistBooked || !!appt
+      })
+      .map(
+        (u) =>
+          ({
+            _id: u.expertAppointments?.find((a) => a.expertType === 'nutritionist')?._id || u._id,
+            member: {
+              _id: u._id,
+              username: u.username || 'Member',
+              email: u.email || '—',
+              phone: u.phone || '—',
+            },
+            bookingDate:
+              u.expertAppointments?.find((a) => a.expertType === 'nutritionist')
+                ?.appointmentDate || u.createdAt,
+            bookingStatus:
+              u.expertAppointments?.find((a) => a.expertType === 'nutritionist')
+                ?.bookingStatus || 'Confirmed',
+            onboardingStep:
+              u.onboardingStatus?.currentStep || 'NUTRITIONIST_BOOKING',
+            zegoRoomId:
+              u.expertAppointments?.find((a) => a.expertType === 'nutritionist')
+                ?.zegoRoomId || `nutri_session_${u._id}`,
+          }) as NutritionDashboardMember & { zegoRoomId?: string }
+      )
+  }, [members, users, today])
 
   const handleAssign = (userId?: string) => {
     setAssignUserId(userId)
@@ -1424,8 +1628,9 @@ function NutritionDashboardContent() {
         <TabsContent value="overview" className="mt-6">
           <OverviewTab
             members={members}
+            totalMembersCount={totalMembersCount}
             plans={plans}
-            membersLoading={membersLoading}
+            membersLoading={membersLoading || usersLoading}
             plansLoading={plansLoading}
             todaysAppointments={todaysAppointments}
             onAssign={handleAssign}
@@ -1433,6 +1638,7 @@ function NutritionDashboardContent() {
               setSelectedMemberId(userId)
               setActiveTab('my-nutrition')
             }}
+            onJoinCall={(booking) => setActiveCallBooking(booking)}
           />
         </TabsContent>
 
@@ -1470,6 +1676,12 @@ function NutritionDashboardContent() {
           <ActiveUsersTab />
         </TabsContent>
       </Tabs>
+
+      <NutritionistCallModal
+        open={!!activeCallBooking}
+        onOpenChange={(open) => !open && setActiveCallBooking(null)}
+        booking={activeCallBooking}
+      />
 
       <AssignPlanForm
         open={assignOpen}

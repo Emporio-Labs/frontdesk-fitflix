@@ -43,8 +43,9 @@ export interface ExpertAppointment {
   appointmentStart?: string | null
   meetingLink?: string | null
   meetingUrl?: string | null
-  calComBookingId?: string | null
-  calIdBookingId?: string | null
+  zegoRoomId?: string | null
+  appointmentMode?: string | null
+  assignedNutritionistName?: string | null
   createdAt?: string
   updatedAt?: string
 }
