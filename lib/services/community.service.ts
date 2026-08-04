@@ -175,9 +175,18 @@ export const communityService = {
       contentLength: file.size,
     })
 
+    // The backend presigns with ContentDisposition: inline and
+    // ServerSideEncryption: AES256, so S3's X-Amz-SignedHeaders is
+    // `content-disposition;content-length;host;x-amz-server-side-encryption`.
+    // Every signed header must be replayed verbatim or S3 answers
+    // 403 SignatureDoesNotMatch — Content-Type alone is not enough.
     const putRes = await fetch(presign.uploadUrl, {
       method: 'PUT',
-      headers: { 'Content-Type': file.type },
+      headers: {
+        'Content-Type': file.type,
+        'Content-Disposition': 'inline',
+        'x-amz-server-side-encryption': 'AES256',
+      },
       body: file,
     })
     if (!putRes.ok) {
