@@ -21,10 +21,14 @@ import {
   IconRefresh,
   IconClipboardText,
   IconVideo,
+  IconCheck,
+  IconX,
+  IconCopy,
 } from '@tabler/icons-react'
+import { toast } from 'sonner'
 import { useGroupClassBookings } from '@/hooks/use-group-class-bookings'
 import { useGroupClasses } from '@/hooks/use-group-classes'
-import { GroupClassBooking } from '@/lib/services/group-class-booking.service'
+import { GroupClassBooking, groupClassBookingService } from '@/lib/services/group-class-booking.service'
 import type { GroupClass } from '@/lib/services/group-class.service'
 import { VideoConferenceModal } from '@/components/video-conference/video-conference-modal'
 import { cn } from '@/lib/utils'
@@ -400,9 +404,27 @@ export default function GroupClassBookingsPanel({
                           <Badge className={cn('text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-full border', getStatusBadgeClass(booking.status))}>
                             {formatStatus(booking.status)}
                           </Badge>
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            ID: {booking._id.slice(-6).toUpperCase()}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              Ticket: {booking._id.slice(-6).toUpperCase()}
+                            </span>
+                            {booking.videoRoomId && (
+                              <button
+                                type="button"
+                                title="Click to copy full Room ID"
+                                className="text-[10px] bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-mono px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const roomIdToCopy = booking.videoRoomId || (typeof booking.sessionId === 'object' ? booking.sessionId?._id : booking.sessionId) || booking._id
+                                  navigator.clipboard.writeText(roomIdToCopy)
+                                  toast.success('Room ID copied to clipboard!')
+                                }}
+                              >
+                                <span>Room: {booking.videoRoomId.slice(-6).toUpperCase()}</span>
+                                <IconCopy className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <h4 className="text-base font-semibold tracking-tight text-foreground group-hover:text-primary transition-colors">
                           {booking.user?.username || 'Unknown Member'}
@@ -433,28 +455,52 @@ export default function GroupClassBookingsPanel({
                             </span>
                           </div>
 
-                          <Button
-                            size="sm"
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 mt-3 text-xs font-medium rounded-xl shadow-sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              const roomId =
-                                booking.sessionId?._id ||
-                                (typeof booking.sessionId === 'string' ? booking.sessionId : null) ||
-                                booking.classId?.zegoRoomId ||
-                                (typeof booking.classId === 'string' ? booking.classId : null) ||
-                                booking.classId?._id ||
-                                `room_${booking._id}`
-                              setCallModal({
-                                isOpen: true,
-                                roomID: roomId,
-                                sessionTitle: `${className} with ${booking.user?.username || 'Member'}`,
-                              })
-                            }}
-                          >
-                            <IconVideo className="h-3.5 w-3.5" />
-                            Host Video Room
-                          </Button>
+                          {/* Attendance Status Action Controls */}
+                          <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                            {booking.status === 'completed' || booking.status === 'attended' || booking.status === 'consumed' ? (
+                              <Badge className="bg-emerald-100 text-emerald-800 border-transparent text-[11px] font-medium py-1 px-3 w-full justify-center">
+                                <IconCheck className="mr-1 h-3.5 w-3.5" />
+                                {booking.stayDurationMinutes && booking.stayDurationMinutes > 0
+                                  ? `Member Joined (Stayed ${booking.stayDurationMinutes} mins)`
+                                  : 'Member Attended'}
+                              </Badge>
+                            ) : booking.status === 'noshow' || booking.status === 'no-show' || booking.status === 'unattended' ? (
+                              <Badge className="bg-gray-100 text-gray-800 border-transparent text-[11px] font-medium py-1 px-3 w-full justify-center">
+                                <IconX className="mr-1 h-3.5 w-3.5" /> Marked No-Show
+                              </Badge>
+                            ) : booking.status === 'cancelled' ? (
+                              <Badge className="bg-red-100 text-red-800 border-transparent text-[11px] font-medium py-1 px-3 w-full justify-center">
+                                Cancelled Booking
+                              </Badge>
+                            ) : (
+                              <div className="flex gap-2 w-full">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 text-xs font-medium h-8"
+                                  onClick={async (e) => {
+                                    e.stopPropagation()
+                                    await groupClassBookingService.updateStatus(booking._id, 'completed')
+                                    refetch()
+                                  }}
+                                >
+                                  <IconCheck className="mr-1 h-3.5 w-3.5" /> Attended
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 text-xs font-medium h-8"
+                                  onClick={async (e) => {
+                                    e.stopPropagation()
+                                    await groupClassBookingService.updateStatus(booking._id, 'noshow')
+                                    refetch()
+                                  }}
+                                >
+                                  <IconX className="mr-1 h-3.5 w-3.5" /> No-Show
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>

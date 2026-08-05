@@ -27,6 +27,8 @@ export interface GroupClass {
   slots?: string[]
   locationAddress?: string
   streamRoomId?: string
+  videoRoomId?: string
+  zegoRoomId?: string
   enableWaitlist?: boolean
   bookingWindowValue?: number
   bookingWindowUnit?: 'hours' | 'days'
@@ -93,6 +95,8 @@ function normalizeGroupClass(raw: any): GroupClass {
       : [],
     locationAddress: raw?.locationAddress ?? '',
     streamRoomId: raw?.streamRoomId ?? '',
+    videoRoomId: raw?.videoRoomId || raw?.zegoRoomId || raw?.videoConferenceId || (Array.isArray(raw?.slots) && raw.slots[0] ? String(raw.slots[0]?._id ?? raw.slots[0]) : raw?._id || raw?.id || ''),
+    zegoRoomId: raw?.videoRoomId || raw?.zegoRoomId || raw?.videoConferenceId || (Array.isArray(raw?.slots) && raw.slots[0] ? String(raw.slots[0]?._id ?? raw.slots[0]) : raw?._id || raw?.id || ''),
     enableWaitlist: Boolean(raw?.enableWaitlist),
     bookingWindowValue: raw?.bookingWindowValue ?? 72,
     bookingWindowUnit: raw?.bookingWindowUnit ?? 'hours',
@@ -105,11 +109,31 @@ function normalizeGroupClass(raw: any): GroupClass {
 
 export const groupClassService = {
   getAll: async (): Promise<{ groupClasses: GroupClass[] }> => {
-    const { data } = await apiClient.get('/api/v1/admin/classes')
-    const list: GroupClass[] = Array.isArray(data?.classes || data?.groupClasses)
-      ? (data.classes || data.groupClasses).map(normalizeGroupClass)
-      : []
-    return { groupClasses: list }
+    try {
+      const { data } = await apiClient.get('/api/v1/admin/classes')
+      const rawList = Array.isArray(data?.classes)
+        ? data.classes
+        : Array.isArray(data?.groupClasses)
+        ? data.groupClasses
+        : Array.isArray(data)
+        ? data
+        : []
+      return { groupClasses: rawList.map(normalizeGroupClass) }
+    } catch {
+      try {
+        const { data } = await apiClient.get('/api/v1/classes')
+        const rawList = Array.isArray(data?.classes)
+          ? data.classes
+          : Array.isArray(data?.groupClasses)
+          ? data.groupClasses
+          : Array.isArray(data)
+          ? data
+          : []
+        return { groupClasses: rawList.map(normalizeGroupClass) }
+      } catch {
+        return { groupClasses: [] }
+      }
+    }
   },
 
   getById: async (id: string): Promise<{ groupClass: GroupClass }> => {

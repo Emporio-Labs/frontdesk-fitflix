@@ -6,6 +6,11 @@ export interface GroupClassBooking {
   status: string
   creditCostSnapshot?: number
   creditsBypassed?: boolean
+  joinedAt?: string
+  leftAt?: string
+  stayDurationMinutes?: number
+  videoRoomId?: string
+  videoConferenceId?: string
   user: {
     _id: string
     username: string
@@ -58,6 +63,20 @@ export const groupClassBookingService = {
         return data
       } catch {
         const { data } = await apiClient.get('/bookings')
+        return data
+      }
+    }
+  },
+  updateStatus: async (id: string, status: string): Promise<any> => {
+    try {
+      const { data } = await apiClient.patch(`/api/v1/admin/bookings/${id}`, { status })
+      return data
+    } catch {
+      try {
+        const { data } = await apiClient.patch(`/api/v1/bookings/${id}/status`, { status })
+        return data
+      } catch {
+        const { data } = await apiClient.patch(`/api/v1/group-class-bookings/${id}`, { status })
         return data
       }
     }

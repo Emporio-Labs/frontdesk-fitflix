@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { VideoConferenceModal } from '@/components/video-conference/video-conference-modal'
 import {
   IconClock,
   IconDroplet,
@@ -35,6 +36,8 @@ import {
   IconTrash,
   IconUsers,
   IconVideo,
+  IconCopy,
+  IconCheck,
   IconMapPin,
   IconWorld,
   IconCoins,
@@ -67,8 +70,8 @@ import type { TherapyCatalogItem } from '@/lib/services/therapy.service'
 import type { GroupClass, GroupClassMode } from '@/lib/services/group-class.service'
 import { slotService, type Slot } from '@/lib/services/slot.service'
 import { LiveSessionsPanel } from '@/components/live-sessions/live-sessions-panel'
+import { useLiveSessions } from '@/hooks/use-live-sessions'
 import GroupClassBookingsPanel from './group-class-bookings-panel'
-import { VideoConferenceModal } from '@/components/video-conference/video-conference-modal'
 
 type ScheduleMode = 'one-time' | 'recurring'
 type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly'
@@ -377,6 +380,53 @@ export default function TherapiesPage() {
     isLoading: isLoadingGc,
     refetch: refetchGc,
   } = useGroupClasses()
+
+  // GCLS: "Host Session" on a class card must join the same ZEGOCLOUD room as the
+  // member's User App. The User App joins the per-occurrence ScheduledSession room
+  // (session.videoConferenceId), not the Class template id — so resolve the class's
+  // live/next scheduled session here instead of falling back to gc.id.
+  //
+  // getAll() returns ALL sessions (incl. past) sorted ascending, so we can't just
+  // take the first per class — that could be last week's occurrence, whose room the
+  // members booking THIS week never join. Pick the occurrence closest to "now":
+  // currently-live first, else the soonest upcoming, else the most recent past.
+  const { data: liveSessionsForHosting = [] } = useLiveSessions()
+  const nextSessionByClassId = useMemo(() => {
+    const sessionBounds = (s: (typeof liveSessionsForHosting)[number]) => {
+      const day = (s.sessionDate || '').split('T')[0]
+      const start = new Date(`${day}T${s.startTime || '00:00'}`).getTime()
+      const end = new Date(`${day}T${s.endTime || s.startTime || '23:59'}`).getTime()
+      return { start, end }
+    }
+    // Lower rank = better host candidate: 0 live now, 1 upcoming, 2 already ended.
+    const rankOf = (s: (typeof liveSessionsForHosting)[number], now: number) => {
+      const { start, end } = sessionBounds(s)
+      if (Number.isNaN(start)) return { rank: 3, distance: Infinity }
+      if (now >= start && now <= end) return { rank: 0, distance: 0 }
+      if (start > now) return { rank: 1, distance: start - now }
+      return { rank: 2, distance: now - end }
+    }
+    const now = Date.now()
+    const best = new Map<
+      string,
+      { session: (typeof liveSessionsForHosting)[number]; rank: number; distance: number }
+    >()
+    for (const s of liveSessionsForHosting) {
+      if (s.status === 'CANCELLED' || s.status === 'COMPLETED') continue
+      const { rank, distance } = rankOf(s, now)
+      const current = best.get(s.classId)
+      if (
+        !current ||
+        rank < current.rank ||
+        (rank === current.rank && distance < current.distance)
+      ) {
+        best.set(s.classId, { session: s, rank, distance })
+      }
+    }
+    const m = new Map<string, (typeof liveSessionsForHosting)[number]>()
+    best.forEach((v, k) => m.set(k, v.session))
+    return m
+  }, [liveSessionsForHosting])
 
   const createTherapy = useCreateTherapy()
   const updateTherapy = useUpdateTherapy()
@@ -2406,6 +2456,28 @@ export default function TherapiesPage() {
                       </div>
                       <h4 className="text-base font-semibold tracking-tight">{gc.name}</h4>
                       <p className="text-xs text-muted-foreground">by {gc.instructor}</p>
+
+                      {(gc.mode === 'online' || gc.mode === 'hybrid') && Boolean(nextSessionByClassId.get(gc.id)) && (
+                        <div className="mt-2 flex items-center gap-1.5 text-[11px] font-mono bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 rounded-lg w-fit text-indigo-700 dark:text-indigo-300">
+                          <span className="font-semibold">Room ID:</span>
+                          {/* Same id VideoConferenceModal joins on "Host Session" — the
+                              per-occurrence ScheduledSession id, matching the User App. */}
+                          <span className="truncate max-w-[140px]">{(nextSessionByClassId.get(gc.id)?.videoConferenceId || '').slice(-6).toUpperCase()}</span>
+                          <button
+                            type="button"
+                            className="ml-1 hover:text-indigo-900 dark:hover:text-white cursor-pointer"
+                            title="Copy Room ID"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const realRoomId = nextSessionByClassId.get(gc.id)?.videoConferenceId || ''
+                              navigator.clipboard.writeText(realRoomId)
+                              toast.success('Video Room ID copied to clipboard!')
+                            }}
+                          >
+                            <IconCopy className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <IconClock className="h-3.5 w-3.5" /> {gc.durationMinutes} mins
@@ -2476,6 +2548,33 @@ export default function TherapiesPage() {
 
                       {/* Actions */}
                       <div className="flex justify-end gap-2 flex-wrap">
+                        {(gc.mode === 'online' || gc.mode === 'hybrid') && (
+                          <Button
+                            size="sm"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
+                            onClick={() => {
+                              // Must join the same room as the member's User App: that's the
+                              // per-occurrence ScheduledSession id (session.videoConferenceId),
+                              // never the Class template id — joining gc.id would silently put
+                              // the host in an empty room the member can't reach.
+                              const matchedSession = nextSessionByClassId.get(gc.id)
+                              if (!matchedSession) {
+                                toast.error(
+                                  'No scheduled occurrence found for this class. Host from the Live Sessions tab, or schedule a session first.'
+                                )
+                                return
+                              }
+                              setVideoModal({
+                                isOpen: true,
+                                roomID: matchedSession.videoConferenceId,
+                                sessionTitle: `${gc.name} (Live Host)`,
+                                mode: matchedSession.sessionType === 'live_stream' ? 'LiveStreaming' : 'VideoConference',
+                              })
+                            }}
+                          >
+                            <IconVideo className="mr-1 h-3.5 w-3.5" /> Host Session
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
