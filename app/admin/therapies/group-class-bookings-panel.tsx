@@ -20,9 +20,13 @@ import {
   IconCoins,
   IconRefresh,
   IconClipboardText,
+  IconVideo,
 } from '@tabler/icons-react'
 import { useGroupClassBookings } from '@/hooks/use-group-class-bookings'
+import { useGroupClasses } from '@/hooks/use-group-classes'
 import { GroupClassBooking } from '@/lib/services/group-class-booking.service'
+import type { GroupClass } from '@/lib/services/group-class.service'
+import { VideoConferenceModal } from '@/components/video-conference/video-conference-modal'
 import { cn } from '@/lib/utils'
 
 // Status Badge styling helper
@@ -62,26 +66,82 @@ function getStatusBadgeClass(statusStr: string): string {
   return STATUS_COLORS[normalized] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
 }
 
-export default function GroupClassBookingsPanel() {
+interface GroupClassBookingsPanelProps {
+  selectedClassFilter?: { id: string; name: string } | null
+  onClearClassFilter?: () => void
+}
+
+export default function GroupClassBookingsPanel({
+  selectedClassFilter,
+  onClearClassFilter,
+}: GroupClassBookingsPanelProps = {}) {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [activeFilter, setActiveFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'No-Show'>('All')
+  const [selectedDate, setSelectedDate] = useState<string>('')
+  const [callModal, setCallModal] = useState<{ isOpen: boolean; roomID: string; sessionTitle: string }>({
+    isOpen: false,
+    roomID: '',
+    sessionTitle: '',
+  })
 
   const { data: bookings = [], isLoading, isError, refetch } = useGroupClassBookings()
+  const { data: groupClasses = [] } = useGroupClasses()
 
-  // Calculate statistics
+  // Booking responses often carry classId as an unpopulated reference (name missing),
+  // while the class catalog (already cached from the therapies page) has the real names.
+  // Resolve card titles by matching the booking's class ID against this catalog.
+  const classNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    groupClasses.forEach((c: GroupClass) => {
+      if (c.id) m.set(c.id, c.name)
+    })
+    return m
+  }, [groupClasses])
+
+  // Filter only Group Class & Live Session bookings (exclude physical clinic therapies)
+  const groupClassBookingsOnly = useMemo(() => {
+    const PHYSICAL_THERAPY_TERMS = [
+      'cold plunge', 'hbot', 'hyperbaric', 'cryotherapy', 'sauna',
+      'massage', 'iv drip', 'therapy', 'compression', 'steam', 'red light', 'recovery'
+    ]
+
+    return bookings.filter((b: GroupClassBooking) => {
+      const hasClassRef = Boolean(b.classId)
+      const hasSessionRef = Boolean(b.sessionId)
+      const serviceName = (b.service?.serviceName || '').toLowerCase()
+      const serviceType = (b.service?.serviceType || '').toLowerCase()
+
+      const isExplicitClass = serviceType.includes('group') || serviceType.includes('class') || serviceType.includes('live') || serviceType.includes('stream')
+      const isPhysicalTherapy = PHYSICAL_THERAPY_TERMS.some(term => serviceName.includes(term))
+
+      if (hasClassRef || hasSessionRef || isExplicitClass) return true
+      if (isPhysicalTherapy) return false
+
+      return serviceName.length > 0 && !isPhysicalTherapy
+    })
+  }, [bookings])
+
+  // Calculate statistics for Group Classes & Live Streams only
   const stats = useMemo(() => {
-    const total = bookings.length
-    const confirmed = bookings.filter(b => {
+    const total = groupClassBookingsOnly.length
+    const confirmed = groupClassBookingsOnly.filter(b => {
       const s = (b.status || '').toLowerCase().trim()
       return s === 'confirmed' || s === 'booked'
     }).length
-    const pending = bookings.filter(b => (b.status || '').toLowerCase().trim() === 'pending').length
+    const pending = groupClassBookingsOnly.filter(b => (b.status || '').toLowerCase().trim() === 'pending').length
     return { total, confirmed, pending }
-  }, [bookings])
+  }, [groupClassBookingsOnly])
 
   const filteredBookings = useMemo(() => {
-    return bookings.filter((b: GroupClassBooking) => {
+    return groupClassBookingsOnly.filter((b: GroupClassBooking) => {
+      // 0. Selected Class Filter match
+      if (selectedClassFilter) {
+        const matchesClassId = b.classId?._id === selectedClassFilter.id || (typeof b.classId === 'string' && b.classId === selectedClassFilter.id)
+        const matchesClassName = (b.classId?.name || b.service?.serviceName || '').toLowerCase() === selectedClassFilter.name.toLowerCase()
+        if (!matchesClassId && !matchesClassName) return false
+      }
+
       // 1. Search term match (Member Name, Email)
       const user = b.user || {}
       const username = (user.username || '').toLowerCase()
@@ -91,7 +151,18 @@ export default function GroupClassBookingsPanel() {
       const matchesSearch = username.includes(search) || email.includes(search)
       if (!matchesSearch) return false
 
-      // 2. Status filter match
+      // 2. Calendar Date filter match
+      if (selectedDate) {
+        const rawDate = b.sessionId?.sessionDate || b.slot?.date || b.bookingDate || b.createdAt
+        if (rawDate) {
+          const parsed = new Date(rawDate).toISOString().slice(0, 10)
+          if (parsed !== selectedDate) return false
+        } else {
+          return false
+        }
+      }
+
+      // 3. Status filter match
       if (activeFilter === 'All') return true
       
       const status = (b.status || '').toLowerCase().trim()
@@ -102,8 +173,12 @@ export default function GroupClassBookingsPanel() {
       if (activeFilter === 'No-Show') return status === 'noshow' || status === 'no-show' || status === 'unattended'
 
       return true
+    }).sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.bookingDate || a.sessionId?.sessionDate || 0).getTime()
+      const timeB = new Date(b.createdAt || b.bookingDate || b.sessionId?.sessionDate || 0).getTime()
+      return timeB - timeA
     })
-  }, [bookings, searchTerm, activeFilter])
+  }, [groupClassBookingsOnly, searchTerm, activeFilter, selectedDate, selectedClassFilter])
 
   const handleRowClick = (id: string) => {
     router.push(`/admin/bookings/${id}`)
@@ -156,6 +231,7 @@ export default function GroupClassBookingsPanel() {
       </div>
 
       {/* 2. Heading Section */}
+      {/* 2. Heading Section */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-xl font-semibold tracking-tight">Booking List</h3>
@@ -168,17 +244,67 @@ export default function GroupClassBookingsPanel() {
         </div>
       </div>
 
+      {/* 2.5 Active Class Filter Banner */}
+      {selectedClassFilter && (
+        <div className="flex items-center justify-between p-3.5 bg-indigo-50/90 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 rounded-2xl shadow-sm text-xs font-medium text-indigo-900 dark:text-indigo-200">
+          <div className="flex items-center gap-2.5">
+            <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-0.5 rounded-lg text-[11px]">
+              Active Class Filter
+            </Badge>
+            <span>
+              Showing registrations for: <strong className="font-semibold text-indigo-950 dark:text-indigo-100">{selectedClassFilter.name}</strong>
+            </span>
+          </div>
+          {onClearClassFilter && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearClassFilter}
+              className="h-7 px-2.5 text-xs text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-lg font-medium"
+            >
+              Clear Filter ✕
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* 3. Search & Filter Header Card */}
       <Card>
         <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
-          <div className="relative w-full md:max-w-sm">
-            <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search bookings by member name or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-9 text-xs"
-            />
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:max-w-xl">
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64">
+              <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search bookings..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 h-9 text-xs"
+              />
+            </div>
+
+            {/* Calendar Date Picker */}
+            <div className="flex items-center gap-1.5 w-full sm:w-auto">
+              <div className="relative w-full sm:w-auto">
+                <IconCalendarEvent className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="pl-9 h-9 text-xs w-full sm:w-40 font-medium"
+                />
+              </div>
+              {selectedDate && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setSelectedDate('')}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
           </div>
           
           {/* Status Filters */}
@@ -233,7 +359,7 @@ export default function GroupClassBookingsPanel() {
                 </Card>
               ) : (
                 filteredBookings.map((booking: GroupClassBooking) => {
-                  const dateVal = booking.sessionId?.sessionDate || booking.bookingDate
+                  const dateVal = booking.sessionId?.sessionDate || booking.slot?.date || booking.bookingDate
                   const dateFormatted = dateVal
                     ? new Date(dateVal).toLocaleDateString(undefined, {
                         month: 'short',
@@ -244,16 +370,28 @@ export default function GroupClassBookingsPanel() {
                   const timeRange =
                     booking.sessionId?.startTime && booking.sessionId?.endTime
                       ? `${booking.sessionId.startTime} - ${booking.sessionId.endTime}`
-                      : 'TBD'
+                      : booking.slot?.startTime && booking.slot?.endTime
+                      ? `${booking.slot.startTime} - ${booking.slot.endTime}`
+                      : 'Scheduled Time'
 
-                  const instructorName = booking.sessionId?.trainerId?.trainerName || '-'
-                  const className = booking.classId?.name || '-'
-                  const creditsCost = booking.creditCostSnapshot ?? booking.classId?.creditCost ?? 0
+                  const instructorName =
+                    booking.sessionId?.trainerId?.trainerName ||
+                    booking.classId?.instructor ||
+                    'Staff Instructor'
+                  const rawClassRef: any = booking.classId
+                  const classRefId = typeof rawClassRef === 'string' ? rawClassRef : rawClassRef?._id
+                  const className =
+                    booking.classId?.name ||
+                    (classRefId ? classNameById.get(classRefId) : undefined) ||
+                    booking.service?.serviceName ||
+                    'Group Class Session'
+                  const creditsCost =
+                    booking.creditCostSnapshot ?? booking.classId?.creditCost ?? booking.service?.creditCost ?? 0
 
                   return (
                     <Card
                       key={booking._id}
-                      className="overflow-hidden rounded-2xl border border-slate-200/85 hover:shadow-md transition-shadow cursor-pointer group"
+                      className="overflow-hidden rounded-2xl border border-slate-200/85 hover:shadow-md transition-shadow cursor-pointer group flex flex-col justify-between"
                       onClick={() => handleRowClick(booking._id)}
                     >
                       {/* Card Top Header */}
@@ -273,7 +411,7 @@ export default function GroupClassBookingsPanel() {
                       </div>
 
                       {/* Card Content body */}
-                      <CardContent className="space-y-3 p-4">
+                      <CardContent className="space-y-3 p-4 flex-1 flex flex-col justify-between">
                         <div className="space-y-1">
                           <div className="flex justify-between items-start gap-2">
                             <span className="text-sm font-semibold text-foreground/90">{className}</span>
@@ -284,14 +422,38 @@ export default function GroupClassBookingsPanel() {
                           <p className="text-xs text-muted-foreground font-medium text-slate-500">Instructor: {instructorName}</p>
                         </div>
 
-                        {/* Date & Time Footer */}
-                        <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1 font-medium">
-                            <IconCalendarEvent className="h-3.5 w-3.5" /> {dateFormatted}
-                          </span>
-                          <span className="flex items-center gap-1 font-medium">
-                            <IconClock className="h-3.5 w-3.5" /> {timeRange}
-                          </span>
+                        {/* Date & Time Footer & Action Button */}
+                        <div>
+                          <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1 font-medium">
+                              <IconCalendarEvent className="h-3.5 w-3.5" /> {dateFormatted}
+                            </span>
+                            <span className="flex items-center gap-1 font-medium">
+                              <IconClock className="h-3.5 w-3.5" /> {timeRange}
+                            </span>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 mt-3 text-xs font-medium rounded-xl shadow-sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const roomId =
+                                booking.sessionId?._id ||
+                                (typeof booking.sessionId === 'string' ? booking.sessionId : null) ||
+                                booking.classId?.zegoRoomId ||
+                                (typeof booking.classId === 'string' ? booking.classId : null) ||
+                                booking.classId?._id
+                              setCallModal({
+                                isOpen: true,
+                                roomID: roomId,
+                                sessionTitle: `${className} with ${booking.user?.username || 'Member'}`,
+                              })
+                            }}
+                          >
+                            <IconVideo className="h-3.5 w-3.5" />
+                            Host Video Room
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -302,6 +464,13 @@ export default function GroupClassBookingsPanel() {
           )}
         </CardContent>
       </Card>
+
+      <VideoConferenceModal
+        open={callModal.isOpen}
+        onOpenChange={(open) => setCallModal((prev) => ({ ...prev, isOpen: open }))}
+        roomID={callModal.roomID}
+        sessionTitle={callModal.sessionTitle}
+      />
     </div>
   )
 }

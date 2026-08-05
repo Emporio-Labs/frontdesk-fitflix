@@ -99,12 +99,16 @@ export function NutritionistCallModal({
 					throw new Error('ZEGOCLOUD credentials missing.')
 				}
 
+				const cleanRoomID = String(roomID || 'fitflix_video_room').replace(/[^a-zA-Z0-9_-]/g, '_')
+				const cleanStaffId = String(staffId || 'staff_host').replace(/[^a-zA-Z0-9_-]/g, '_')
+				const cleanStaffName = staffName.replace(/[^\w\s-]/gi, '') || 'FitFlix Host'
+
 				const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
 					appID,
 					appSign,
-					roomID,
-					staffId,
-					staffName,
+					cleanRoomID,
+					cleanStaffId,
+					cleanStaffName,
 				)
 
 				if (!mounted) return
@@ -115,7 +119,7 @@ export function NutritionistCallModal({
 				zp.joinRoom({
 					container: containerElement!,
 					scenario: {
-						mode: ZegoUIKitPrebuilt.OneONoneCall,
+						mode: ZegoUIKitPrebuilt.GroupCall,
 					},
 					showPreJoinView: false,
 					turnOnMicrophoneWhenJoining: false,
@@ -124,7 +128,7 @@ export function NutritionistCallModal({
 					showMyMicrophoneToggleButton: true,
 					showAudioVideoSettingsButton: true,
 					showScreenSharingButton: true,
-					showUserList: false,
+					showUserList: true,
 					onJoinRoom: () => {
 						if (mounted) setLoading(false)
 					},
@@ -230,7 +234,7 @@ export function NutritionistCallModal({
 						</div>
 						<div>
 							<DialogTitle className="text-white text-base font-semibold flex items-center gap-2">
-								1-on-1 Nutrition Consultation
+								{(booking as any)?.user?.username || (booking as any)?.className || 'Live Video Session'}
 								<Badge className="bg-emerald-600/20 text-emerald-300 border-emerald-500/40 text-xs">
 									LIVE
 								</Badge>

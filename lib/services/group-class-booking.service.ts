@@ -12,17 +12,31 @@ export interface GroupClassBooking {
     email: string
     phone?: string
   }
-  classId: {
+  classId?: {
     _id: string
-    name: string
-    creditCost: number
+    name?: string
+    instructor?: string
+    creditCost?: number
+    zegoRoomId?: string
   }
-  sessionId: {
+  service?: {
     _id: string
-    sessionDate: string
-    startTime: string
-    endTime: string
-    deliveryType: string
+    serviceName?: string
+    serviceType?: string
+    creditCost?: number
+  }
+  slot?: {
+    _id: string
+    date?: string
+    startTime?: string
+    endTime?: string
+  }
+  sessionId?: {
+    _id: string
+    sessionDate?: string
+    startTime?: string
+    endTime?: string
+    deliveryType?: string
     trainerId?: {
       _id: string
       trainerName: string
@@ -35,7 +49,17 @@ export interface GroupClassBooking {
 
 export const groupClassBookingService = {
   getAll: async (): Promise<{ bookings: GroupClassBooking[] }> => {
-    const { data } = await apiClient.get('/api/v1/admin/bookings')
-    return data
+    try {
+      const { data } = await apiClient.get('/api/v1/admin/bookings')
+      return data
+    } catch {
+      try {
+        const { data } = await apiClient.get('/api/v1/bookings')
+        return data
+      } catch {
+        const { data } = await apiClient.get('/bookings')
+        return data
+      }
+    }
   },
 }
