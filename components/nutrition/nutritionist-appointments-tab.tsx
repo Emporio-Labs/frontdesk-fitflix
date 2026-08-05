@@ -41,6 +41,7 @@ import type {
   NutritionistBookingStatus,
   AppointmentMode,
 } from '@/lib/services/nutritionist-booking.service'
+import { NutritionistCallModal } from './nutritionist-call-modal'
 
 type Tab = 'pending' | 'confirmed' | 'cancelled' | 'all'
 
@@ -99,38 +100,38 @@ function NutritionistStatusBadge({ status }: { status: NutritionistBookingStatus
 }
 
 function AppointmentModeCell({ booking }: { booking: NutritionistBooking }) {
-  const mode: AppointmentMode =
-    booking.appointmentMode ?? (booking.meetingLink ? 'ONLINE' : 'IN_PERSON')
+  const mode: AppointmentMode = booking.appointmentMode ?? 'ONLINE'
 
   if (mode === 'IN_PERSON') {
     return (
       <div className="flex items-start gap-1.5 text-sm">
         <IconMapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
         <div>
-          <div className="font-medium">Fitflix</div>
-          <div className="text-xs text-muted-foreground">Sainikpuri</div>
+          <div className="font-medium text-xs">Fitflix Clinic</div>
+          <div className="text-[11px] text-muted-foreground">Sainikpuri</div>
         </div>
       </div>
     )
   }
 
-  if (booking.meetingLink) {
-    return (
-      <a
-        href={booking.meetingLink}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
-      >
-        <IconVideo className="w-4 h-4" /> Join Meeting
-      </a>
-    )
-  }
+  const isReady = !!booking.zegoRoomId || String(booking.bookingStatus || '').toLowerCase() === 'confirmed'
 
   return (
-    <span className="text-xs italic text-muted-foreground">
-      Meeting link will be generated after approval
-    </span>
+    <div className="flex items-center gap-1.5 text-xs">
+      <IconVideo className="w-4 h-4 text-blue-500 shrink-0" />
+      <div>
+        <div className="font-medium">Online Session</div>
+        {isReady ? (
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+            Online (Ready)
+          </span>
+        ) : (
+          <span className="text-[10px] text-muted-foreground italic">
+            Pending Confirmation
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -166,6 +167,7 @@ export function NutritionistAppointmentsTab() {
   const [tab, setTab] = useState<Tab>('pending')
   const [search, setSearch] = useState('')
   const [confirmReject, setConfirmReject] = useState<NutritionistBooking | null>(null)
+  const [activeCallBooking, setActiveCallBooking] = useState<NutritionistBooking | null>(null)
 
   const { data: bookings = [], isLoading, isError, refetch } = useNutritionistBookings()
   const { data: slots = [] } = useSlots()
@@ -426,6 +428,17 @@ export function NutritionistAppointmentsTab() {
                                       </Button>
                                     </>
                                   )}
+                                  {(b.bookingStatus === 'Confirmed' || b.bookingStatus === 'Completed' || (b as any).status === 'ACCEPTED') &&
+                                    (b.appointmentMode ?? 'ONLINE') === 'ONLINE' && (
+                                      <Button
+                                        size="sm"
+                                        variant="default"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                                        onClick={() => setActiveCallBooking(b)}
+                                      >
+                                        <IconVideo className="w-4 h-4 mr-1" /> Join Call
+                                      </Button>
+                                  )}
                                   {userId && (
                                     <Button asChild size="sm" variant="outline">
                                       <Link href={`/admin/users/${userId}`}>View User</Link>
@@ -482,6 +495,16 @@ export function NutritionistAppointmentsTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <NutritionistCallModal
+        open={!!activeCallBooking}
+        onOpenChange={(open) => !open && setActiveCallBooking(null)}
+        booking={activeCallBooking}
+        onComplete={() => {
+          refetch()
+          setActiveCallBooking(null)
+        }}
+      />
     </div>
   )
 }

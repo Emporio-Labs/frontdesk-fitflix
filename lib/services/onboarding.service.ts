@@ -41,10 +41,13 @@ export interface ExpertAppointment {
   bookingStatus: ExpertAppointmentStatus
   appointmentDate?: string | null
   appointmentStart?: string | null
+  startTime?: string | null
+  endTime?: string | null
   meetingLink?: string | null
   meetingUrl?: string | null
-  calComBookingId?: string | null
-  calIdBookingId?: string | null
+  zegoRoomId?: string | null
+  appointmentMode?: string | null
+  assignedNutritionistName?: string | null
   createdAt?: string
   updatedAt?: string
 }

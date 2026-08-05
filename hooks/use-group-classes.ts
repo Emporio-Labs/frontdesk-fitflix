@@ -60,3 +60,23 @@ export function useDeleteGroupClass() {
     },
   })
 }
+
+export function useTogglePublishGroupClass() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, isPublished }: { id: string; isPublished: boolean }) =>
+      groupClassService.togglePublish(id, isPublished),
+    onSuccess: (data, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.groupClasses.all() })
+      if (variables.isPublished) {
+        toast.success(data.message || 'Class published successfully')
+      } else {
+        toast.info(data.message || 'Class unpublished (hidden from members)')
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to update publish status')
+    },
+  })
+}

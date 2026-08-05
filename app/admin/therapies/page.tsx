@@ -61,6 +61,7 @@ import {
 } from '@/hooks/use-group-classes'
 import { useSlots } from '@/hooks/use-slots'
 import GroupClassBookingsPanel from './group-class-bookings-panel'
+import { LiveSessionsPanel } from '@/components/live-sessions/live-sessions-panel'
 import type { TherapyCatalogItem } from '@/lib/services/therapy.service'
 import type { GroupClass, GroupClassMode } from '@/lib/services/group-class.service'
 import { slotService, type Slot } from '@/lib/services/slot.service'
@@ -771,6 +772,7 @@ export default function TherapiesPage() {
           <TabsTrigger value="therapies" className="text-sm px-4 py-2">Therapies</TabsTrigger>
           <TabsTrigger value="group-classes" className="text-sm px-4 py-2">Group Classes</TabsTrigger>
           <TabsTrigger value="group-class-bookings" className="text-sm px-4 py-2">Bookings</TabsTrigger>
+          <TabsTrigger value="live-sessions" className="text-sm px-4 py-2">Live Sessions</TabsTrigger>
         </TabsList>
 
         <TabsContent value="therapies" className="mt-6 space-y-6">
@@ -1862,6 +1864,10 @@ export default function TherapiesPage() {
 
         <TabsContent value="group-class-bookings" className="mt-6">
           <GroupClassBookingsPanel />
+        </TabsContent>
+
+        <TabsContent value="live-sessions" className="mt-6 space-y-6">
+          <LiveSessionsPanel />
         </TabsContent>
       </Tabs>
     </div>

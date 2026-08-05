@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { IconSettings, IconBell, IconLock, IconPalette } from '@tabler/icons-react'
+import { ConferenceSettingsCard } from '@/components/settings/conference-settings-card'
 
 export default function SettingsPage() {
   const [clinicName, setClinicName] = useState('Healing Heights Clinic')
@@ -102,6 +103,9 @@ export default function SettingsPage() {
           <Button onClick={handleSaveClinicInfo}>Save Changes</Button>
         </CardContent>
       </Card>
+
+      {/* Session Layout & Conference Configuration Defaults */}
+      <ConferenceSettingsCard />
 
       {/* Notification Settings */}
       <Card>

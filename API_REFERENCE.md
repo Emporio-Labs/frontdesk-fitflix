@@ -36,13 +36,12 @@ Single-source HTTP reference for the Fitflix Express + MongoDB backend that powe
 22. [Workout plans — `/workout-plans`](#workout-plans--workout-plans)
 23. [Leads — `/leads`](#leads--leads)
 24. [Webhook — `/webhook`](#webhook--webhook)
-25. [Cal ID webhook — `/webhooks/cal`](#cal-id-webhook--webhookscal)
-26. [Nutrition — `/nutrition`](#nutrition--nutrition)
-27. [Nutritionist bookings — `/nutritionist`](#nutritionist-bookings--nutritionist)
-28. [Notifications — `/notifications`](#notifications--notifications)
-29. [Internal — `/internal`](#internal--internal)
-30. [Health check — `/health`](#health-check--health)
-31. [Appendix A: Onboarding step order](#appendix-a-onboarding-step-order)
+25. [Nutrition — `/nutrition`](#nutrition--nutrition)
+26. [Nutritionist bookings — `/nutritionist`](#nutritionist-bookings--nutritionist)
+27. [Notifications — `/notifications`](#notifications--notifications)
+28. [Internal — `/internal`](#internal--internal)
+29. [Health check — `/health`](#health-check--health)
+30. [Appendix A: Onboarding step order](#appendix-a-onboarding-step-order)
 
 ---
 
@@ -58,7 +57,6 @@ Authorization: Bearer <token>
 - **Roles:** `user`, `admin`, `doctor`, `trainer`, `nutritionist`. The token's role determines which endpoints are accessible.
 - **Public endpoints** are explicitly labelled `Auth: Public`.
 - **Webhook endpoint** uses a shared-secret header (`X-Webhook-Secret`) instead of JWT.
-- **Cal ID webhook** uses `X-Cal-Signature-256` (HMAC) and requires the raw request body.
 - **Internal endpoints** use `X-Internal-Secret` (or `X-Webhook-Secret` as an alias) instead of JWT.
 
 Failed authentication returns `401 UNAUTHORIZED`. Insufficient role returns `403 FORBIDDEN`.
@@ -69,7 +67,6 @@ Failed authentication returns `401 UNAUTHORIZED`. Insufficient role returns `403
 
 - All bodies are JSON unless explicitly noted. Set `Content-Type: application/json`.
 - File uploads (for example `/onboarding/reports`) use `multipart/form-data`.
-- `/webhooks/cal` uses a raw body for signature verification.
 - Query parameters use standard URL encoding.
 - Path params noted as `:id` accept a 24-character MongoDB ObjectId. Anything else returns `400 BAD_REQUEST`.
 
@@ -2907,31 +2904,6 @@ curl "https://api.example.com/webhook/reports/user/5f1a2b3c4d5e6f7a8b9c0d1e" \
 ```
 
 **Success (200):** `{ "reports": [ /* filtered by user */ ] }`
-
----
-
-## Cal ID webhook — `/webhooks/cal`
-
-### POST /webhooks/cal
-
-Cal ID webhook receiver. Verifies the request signature using `X-Cal-Signature-256` against the raw request body.
-
-**Auth:** Signature header `X-Cal-Signature-256`
-
-```bash
-curl -X POST "https://api.example.com/webhooks/cal" \
-  -H "X-Cal-Signature-256: <hmac>" \
-  -H "Content-Type: application/json" \
-  -d '{ "triggerEvent": "BOOKING_CREATED", "payload": { "uid": "..." } }'
-```
-
-**Success (200)**
-
-```json
-{ "received": true }
-```
-
-**Errors:** 401 invalid signature, 400 invalid payload, 500 processing error.
 
 ---
 

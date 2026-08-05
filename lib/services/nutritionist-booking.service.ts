@@ -13,10 +13,12 @@ export interface NutritionistBooking {
   appointmentDate?: string | null
   appointmentMode?: AppointmentMode
   meetingLink?: string | null
-  calBookingId?: string | null
-  calComBookingId?: string | null
   timeSlot?: string | null
   slotId?: string | null
+  zegoRoomId?: string | null
+  assignedNutritionistId?: string | null
+  assignedNutritionistName?: string | null
+  meetingStatus?: string | null
   createdAt: string
   updatedAt?: string
 }
@@ -34,8 +36,12 @@ function normalizeBooking(raw: any): NutritionistBooking {
   if (!raw) return raw
   return {
     ...raw,
-    appointmentDate: raw?.appointmentDate ?? raw?.date ?? null,
-    calBookingId: raw?.calBookingId ?? raw?.calComBookingId ?? null,
+    bookingStatus: raw?.bookingStatus ?? (raw?.status === 'ACCEPTED' ? 'Confirmed' : raw?.status === 'REJECTED' ? 'Cancelled' : raw?.status === 'COMPLETED' ? 'Completed' : raw?.status ?? 'Pending'),
+    appointmentDate: raw?.appointmentDate ?? raw?.bookingDate ?? raw?.date ?? null,
+    zegoRoomId: raw?.zegoRoomId ?? null,
+    assignedNutritionistId: raw?.assignedNutritionistId ?? null,
+    assignedNutritionistName: raw?.assignedNutritionistName ?? null,
+    meetingStatus: raw?.meetingStatus ?? 'SCHEDULED',
   }
 }
 
