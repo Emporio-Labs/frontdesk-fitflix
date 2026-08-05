@@ -482,6 +482,22 @@ function ExerciseLoggingCard({
     })
   }
 
+  const isCompleted = workoutExercise.isCompleted === true
+
+  /**
+   * Tick the exercise off (or put it back) on the member's behalf.
+   *
+   * The member app treats this as the signal to advance its guided player, so
+   * completing here is what moves them on. Reversible on purpose: a mis-tap
+   * mid-session should not strand the member on the wrong exercise.
+   */
+  const handleToggleComplete = () => {
+    updateExerciseMutation.mutate({
+      workoutExerciseId: workoutExercise._id,
+      payload: { isCompleted: !isCompleted },
+    })
+  }
+
   const handleSaveTargets = () => {
     updateExerciseMutation.mutate(
       {
@@ -505,7 +521,17 @@ function ExerciseLoggingCard({
     <Card className="overflow-hidden border shadow-sm">
       <CardHeader className="p-4 pb-2 bg-muted/30 flex flex-row items-center justify-between">
         <div>
-          <CardTitle className="text-base font-bold">{exerciseName}</CardTitle>
+          <CardTitle className="text-base font-bold flex items-center gap-2">
+            <span className={isCompleted ? 'line-through text-muted-foreground' : ''}>
+              {exerciseName}
+            </span>
+            {isCompleted && (
+              <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
+                <IconCheck className="w-3 h-3" />
+                Done
+              </Badge>
+            )}
+          </CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
             Target: {workoutExercise.targetSets} sets × {workoutExercise.targetReps} reps
             {workoutExercise.targetWeightKg ? ` @ ${workoutExercise.targetWeightKg}kg` : ''}
@@ -698,6 +724,22 @@ function ExerciseLoggingCard({
         >
           <IconPlus className="w-5 h-5" />
           Log Set #{sets.length + 1}
+        </Button>
+
+        {/* Completing this is what advances the member's guided player. */}
+        <Button
+          size="lg"
+          variant={isCompleted ? 'outline' : 'default'}
+          className={`w-full h-12 text-base font-bold shadow flex items-center justify-center gap-2 rounded-xl ${
+            isCompleted
+              ? 'text-muted-foreground'
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+          }`}
+          onClick={handleToggleComplete}
+          disabled={updateExerciseMutation.isPending}
+        >
+          <IconCheck className="w-5 h-5" />
+          {isCompleted ? 'Mark Incomplete' : 'Complete & Move to Next'}
         </Button>
       </CardContent>
     </Card>

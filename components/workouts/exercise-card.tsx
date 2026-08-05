@@ -4,7 +4,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { IconGripVertical, IconTrash } from '@tabler/icons-react'
+import { IconAlertTriangle, IconGripVertical, IconTrash } from '@tabler/icons-react'
 import { MuscleGroupIcon } from '@/components/workouts/muscle-group-icon'
 import type { WorkoutExercise, MuscleGroup } from '@/types/workout'
 
@@ -19,6 +19,9 @@ export function ExerciseCard({
   onUpdate: (index: number, updates: Partial<WorkoutExercise>) => void
   onRemove: (index: number) => void
 }) {
+  // Either the backend flagged the reference as dangling, or populate() left no
+  // nested exercise at all — both mean the library row is gone.
+  const isMissing = exercise.exerciseMissing === true || !exercise.exercise
   const sortableId = `exercise-${exercise.orderIndex}`
   const {
     attributes,
@@ -49,20 +52,35 @@ export function ExerciseCard({
         <IconGripVertical className="w-4 h-4" />
       </button>
 
-      <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted shrink-0">
-        <MuscleGroupIcon
-          group={(exercise.exercise?.muscleGroups?.[0] as MuscleGroup) ?? 'Chest'}
-          className="w-4 h-4"
-        />
+      <div
+        className={`flex items-center justify-center w-8 h-8 rounded-md shrink-0 ${
+          isMissing ? 'bg-destructive/10' : 'bg-muted'
+        }`}
+      >
+        {isMissing ? (
+          <IconAlertTriangle className="w-4 h-4 text-destructive" />
+        ) : (
+          <MuscleGroupIcon
+            group={(exercise.exercise?.muscleGroup as MuscleGroup) ?? 'Chest'}
+            className="w-4 h-4"
+          />
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">
-          {exercise.exercise?.name ?? 'Unknown Exercise'}
+        <p
+          className={`text-sm font-medium truncate ${
+            isMissing ? 'text-destructive' : ''
+          }`}
+        >
+          {exercise.exercise?.name ?? 'Deleted exercise'}
         </p>
         <p className="text-[10px] text-muted-foreground">
-          {exercise.exercise?.muscleGroups?.join(', ')}
-          {exercise.exercise?.equipment ? ` · ${exercise.exercise.equipment}` : ''}
+          {isMissing
+            ? 'No longer in the library — remove it or pick a replacement'
+            : [exercise.exercise?.muscleGroup, exercise.exercise?.equipment]
+                .filter(Boolean)
+                .join(' · ')}
         </p>
       </div>
 

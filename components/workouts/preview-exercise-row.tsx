@@ -12,7 +12,7 @@ const MUSCLE_COLORS: Record<string, string> = {
 }
 
 export function PreviewExerciseRow({ exercise }: { exercise: WorkoutExercise }) {
-  const primaryMuscle = exercise.exercise?.muscleGroups?.[0] ?? ''
+  const primaryMuscle = exercise.exercise?.muscleGroup ?? ''
   const color = MUSCLE_COLORS[primaryMuscle as any] ?? 'bg-zinc-500'
 
   return (

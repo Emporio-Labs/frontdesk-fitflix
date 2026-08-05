@@ -198,6 +198,12 @@ function ExerciseFormDialog({
     if (!form.difficulty) { toast.error('Difficulty is required'); return }
     if (!form.sectionTypes.length) { toast.error('At least one section type is required'); return }
 
+    // FIXME(contract): this sends `muscleGroups: MuscleGroup[]`, but the backend
+    // `createExerciseBodySchema` requires a single `muscleGroup` enum and the
+    // Exercise schema stores one — so every save here 400s with
+    // VALIDATION_ERROR. Fixing it means deciding whether an exercise has one
+    // muscle group (drop this multi-select) or many (widen the backend schema
+    // and migrate existing rows); left as-is pending that call.
     const payload: CreateExercisePayload = {
       name: form.name.trim(),
       muscleGroups: form.muscleGroups,

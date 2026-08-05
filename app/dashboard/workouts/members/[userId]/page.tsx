@@ -40,6 +40,8 @@ interface PlanExerciseItem {
   exerciseId: string
   name: string
   muscleGroup: string
+  /** Backend flag: the referenced Exercise document no longer exists. */
+  exerciseMissing?: boolean
   section: string
   targetSets: number
   targetReps: number
@@ -156,8 +158,12 @@ export default function MemberSchedulePage() {
       assignment.userDays.forEach((day: PlanDayItem) => {
         daysMap[day.dayNumber] = (day.exercises || []).map((ex, idx) => ({
           exerciseId: ex.exerciseId,
+          // `name`/`muscleGroup` are not stored on the assignment — the backend
+          // re-joins against the Exercise collection on every read and
+          // synthesizes them, flagging rows whose target has been deleted.
           name: ex.name || 'Exercise',
           muscleGroup: ex.muscleGroup || 'FullBody',
+          exerciseMissing: ex.exerciseMissing === true,
           section: ex.section || 'workout',
           targetSets: ex.targetSets || 3,
           targetReps: ex.targetReps || 10,
@@ -228,7 +234,9 @@ export default function MemberSchedulePage() {
     const newItem: PlanExerciseItem = {
       exerciseId: exercise._id,
       name: exercise.name,
-      muscleGroup: Array.isArray(exercise.muscleGroups) ? exercise.muscleGroups.join(', ') : 'FullBody',
+      // The API sends a single `muscleGroup` enum value, not a `muscleGroups`
+      // array — the plural read here always fell through to 'FullBody'.
+      muscleGroup: exercise.muscleGroup || 'FullBody',
       section: 'workout',
       targetSets: 3,
       targetReps: 10,
@@ -254,9 +262,7 @@ export default function MemberSchedulePage() {
   const filteredExercises = allExercises.filter((e) => {
     const search = exerciseSearch.toLowerCase()
     const nameMatch = e.name.toLowerCase().includes(search)
-    const muscleMatch = Array.isArray(e.muscleGroups)
-      ? e.muscleGroups.some((mg) => mg.toLowerCase().includes(search))
-      : false
+    const muscleMatch = (e.muscleGroup ?? '').toLowerCase().includes(search)
     return nameMatch || muscleMatch
   })
 
@@ -478,9 +484,20 @@ export default function MemberSchedulePage() {
                               </Button>
                             </div>
                             <div>
-                              <p className="font-bold text-sm">{ex.name}</p>
-                              <Badge variant="secondary" className="text-[10px] mt-1">
-                                {ex.muscleGroup}
+                              <p
+                                className={`font-bold text-sm ${
+                                  ex.exerciseMissing ? 'text-destructive' : ''
+                                }`}
+                              >
+                                {ex.name}
+                              </p>
+                              <Badge
+                                variant={ex.exerciseMissing ? 'destructive' : 'secondary'}
+                                className="text-[10px] mt-1"
+                              >
+                                {ex.exerciseMissing
+                                  ? 'Removed from library — replace it'
+                                  : ex.muscleGroup}
                               </Badge>
                             </div>
                           </div>
@@ -582,7 +599,7 @@ export default function MemberSchedulePage() {
                   <p className="font-semibold text-sm">{ex.name}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="outline" className="text-[10px]">
-                      {Array.isArray(ex.muscleGroups) ? ex.muscleGroups.join(', ') : 'FullBody'}
+                      {ex.muscleGroup || 'FullBody'}
                     </Badge>
                     <span className="text-xs text-muted-foreground">Difficulty: {ex.difficulty || 'Intermediate'}</span>
                   </div>
