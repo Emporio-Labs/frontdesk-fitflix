@@ -41,6 +41,8 @@ export interface ExpertAppointment {
   bookingStatus: ExpertAppointmentStatus
   appointmentDate?: string | null
   appointmentStart?: string | null
+  startTime?: string | null
+  endTime?: string | null
   meetingLink?: string | null
   meetingUrl?: string | null
   zegoRoomId?: string | null

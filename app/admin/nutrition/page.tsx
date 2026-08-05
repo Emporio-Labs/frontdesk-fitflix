@@ -725,6 +725,7 @@ function BookingsTab({
                     <TableHead className="text-sm w-[160px]">Progress</TableHead>
                     <TableHead className="text-sm">Scheduled Time</TableHead>
                     <TableHead className="text-sm">Nutritionist</TableHead>
+                    <TableHead className="text-sm">Booked Slot</TableHead>
                     {segment !== 'pending' && <TableHead className="text-sm">Session Mode</TableHead>}
                     <TableHead className="text-right text-sm">Actions</TableHead>
                   </TableRow>
@@ -788,6 +789,31 @@ function BookingsTab({
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={statusLabel} size="sm" />
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {(() => {
+                            const appt = user.expertAppointments?.find(
+                              (a) => a.expertType === 'nutritionist'
+                            )
+                            const start = appt?.startTime ?? appt?.appointmentStart ?? null
+                            const end = appt?.endTime ?? null
+                            const dateText = appt?.appointmentDate
+                              ? formatBookingTime(appt.appointmentDate, null, null).dateText
+                              : '—'
+                            const slotText =
+                              start && end ? `${start} – ${end}` : start ?? null
+                            if (!slotText && dateText === '—') {
+                              return <span className="text-xs text-muted-foreground">—</span>
+                            }
+                            return (
+                              <div className="flex flex-col text-xs whitespace-nowrap">
+                                <span className="font-medium text-foreground">
+                                  {slotText ?? '—'}
+                                </span>
+                                <span className="text-muted-foreground">{dateText}</span>
+                              </div>
+                            )
+                          })()}
                         </TableCell>
                         {segment !== 'pending' && (
                           <TableCell className="text-sm">
