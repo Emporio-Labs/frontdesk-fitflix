@@ -27,3 +27,6 @@ yarn-error.log*
 next-env.d.ts
 # Archive
 archive_docs/
+
+# OS
+.DS_Store

@@ -652,7 +652,7 @@ export default function LeadsPage() {
                 Add Lead
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>{editingLead ? 'Edit Lead' : 'Add New Lead'}</DialogTitle>
                 <DialogDescription>
@@ -1641,7 +1641,7 @@ export default function LeadsPage() {
             {/* Convert Lead Dialog */}
             {convertingLead && (
               <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                   <DialogHeader>
                     <DialogTitle>Convert Lead to Member</DialogTitle>
                     <DialogDescription>

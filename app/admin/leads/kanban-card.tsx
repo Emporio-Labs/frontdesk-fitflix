@@ -144,7 +144,7 @@ export default function KanbanCard({
       </div>
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pb-2 border-b">
             <DialogTitle className="text-lg font-bold flex items-center justify-between gap-4">
               <span className="truncate">{lead.name}</span>
