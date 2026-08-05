@@ -72,4 +72,8 @@ export const trainerService = {
     const { data } = await apiClient.get(`/trainers/me/members/${userId}`)
     return data
   },
+  assignTrainerToUser: async (userId: string, trainerId: string | null): Promise<{ message: string; user: any }> => {
+    const { data } = await apiClient.patch(`/users/${userId}/assigned-trainer`, { trainerId })
+    return data
+  },
 }

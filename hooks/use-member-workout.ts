@@ -132,3 +132,55 @@ export function useDeleteMemberExercise(userId: string, sessionId: string) {
     },
   })
 }
+
+/**
+ * A member's session history, newest first.
+ *
+ * Read-only and unpolled — unlike the live session, history only changes when
+ * a workout ends, so there is nothing to gain from an interval here.
+ */
+export function useMemberWorkoutHistory(userId: string, limit = 30) {
+  return useQuery({
+    queryKey: ['trainer', 'member-workouts', userId, 'history', limit],
+    queryFn: () => trainerWorkoutService.getHistory(userId, { limit }),
+    enabled: !!userId,
+  })
+}
+
+export function useMemberWorkoutStats(userId: string) {
+  return useQuery({
+    queryKey: ['trainer', 'member-workouts', userId, 'stats'],
+    queryFn: () => trainerWorkoutService.getStats(userId),
+    enabled: !!userId,
+  })
+}
+
+/** Full detail for one past session. Only fetched once its row is expanded. */
+export function useMemberWorkoutSession(userId: string, sessionId: string | null) {
+  return useQuery({
+    queryKey: ['trainer', 'member-workouts', userId, 'session', sessionId],
+    queryFn: () => trainerWorkoutService.getSessionById(userId, sessionId!),
+    enabled: !!userId && !!sessionId,
+  })
+}
+
+export function useUpdateMemberExercise(userId: string, sessionId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      workoutExerciseId,
+      payload,
+    }: {
+      workoutExerciseId: string
+      payload: { isCompleted?: boolean; notes?: string; targetSets?: number; targetReps?: number; targetWeightKg?: number; section?: string }
+    }) => trainerWorkoutService.updateWorkoutExercise(userId, sessionId, workoutExerciseId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trainer', 'member-workouts', userId] })
+      toast.success('Exercise updated')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to update exercise')
+    },
+  })
+}
+

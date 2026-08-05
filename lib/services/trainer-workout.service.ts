@@ -53,9 +53,60 @@ export interface DetailedWorkoutSession {
   exercises: DetailedWorkoutExercise[]
 }
 
+/** One row of `GET .../workouts/me/history` — a summary, with no exercise or set data. */
+export interface WorkoutHistoryEntry {
+  id: string
+  date: string
+  status: 'Active' | 'Completed' | 'Cancelled'
+  startedAt: string
+  completedAt?: string | null
+  notes?: string | null
+  planId?: string | null
+  /** Seconds between startedAt and completedAt; 0 while a session is unfinished. */
+  duration: number
+}
+
+/**
+ * `GET .../workouts/me/stats`. Every figure is current-week or to-date — the
+ * endpoint returns no time series, so trends have to be derived from history.
+ */
+export interface WorkoutStats {
+  weeklyWorkouts: number
+  totalSetsThisWeek: number
+  caloriesBurnedWeek: number
+  consistencyScore: number
+  currentStreak: number
+  totalVolumeKg: number
+  personalRecords: unknown[]
+}
+
 export const trainerWorkoutService = {
   getActiveSession: async (userId: string): Promise<{ session: DetailedWorkoutSession | null; elapsedSeconds: number }> => {
     const { data } = await apiClient.get(`/trainers/me/members/${userId}/workouts/active`)
+    return data
+  },
+  /**
+   * Paginated session history, newest first. Admins reach this too: the mount
+   * is `buildWorkoutRouter(["trainer", "admin"], subjectIsMember)` and the
+   * roster ownership check only runs for `role === "trainer"`.
+   */
+  getHistory: async (
+    userId: string,
+    params?: { limit?: number; cursor?: string; from?: string; to?: string },
+  ): Promise<{ workouts: WorkoutHistoryEntry[]; nextCursor: string | null }> => {
+    const { data } = await apiClient.get(
+      `/trainers/me/members/${userId}/workouts/me/history`,
+      { params },
+    )
+    return data
+  },
+  getStats: async (userId: string): Promise<WorkoutStats> => {
+    const { data } = await apiClient.get(`/trainers/me/members/${userId}/workouts/me/stats`)
+    return data
+  },
+  /** Full session with exercises and sets — used to expand one row of the journey. */
+  getSessionById: async (userId: string, sessionId: string): Promise<DetailedWorkoutSession> => {
+    const { data } = await apiClient.get(`/trainers/me/members/${userId}/workouts/${sessionId}`)
     return data
   },
   getTodaySession: async (userId: string): Promise<DetailedWorkoutSession> => {
@@ -90,7 +141,7 @@ export const trainerWorkoutService = {
     userId: string,
     sessionId: string,
     workoutExerciseId: string,
-    payload: { isCompleted?: boolean; notes?: string; targetSets?: number; targetReps?: number; targetWeightKg?: number }
+    payload: { isCompleted?: boolean; notes?: string; targetSets?: number; targetReps?: number; targetWeightKg?: number; section?: string }
   ): Promise<DetailedWorkoutExercise> => {
     const { data } = await apiClient.patch(`/trainers/me/members/${userId}/workouts/${sessionId}/exercises/${workoutExerciseId}`, payload)
     return data
@@ -132,6 +183,14 @@ export const trainerWorkoutService = {
   },
   deleteSet: async (userId: string, sessionId: string, workoutExerciseId: string, setId: string): Promise<{ message: string }> => {
     const { data } = await apiClient.delete(`/trainers/me/members/${userId}/workouts/${sessionId}/exercises/${workoutExerciseId}/sets/${setId}`)
+    return data
+  },
+  getUserAssignment: async (userId: string): Promise<any> => {
+    const { data } = await apiClient.get(`/workout-plans/assignments/user/${userId}`)
+    return data
+  },
+  updateUserDayExercises: async (userId: string, dayNumber: number, payload: { exercises: any[] }): Promise<any> => {
+    const { data } = await apiClient.patch(`/workout-plans/assignments/user/${userId}/days/${dayNumber}`, payload)
     return data
   },
 }

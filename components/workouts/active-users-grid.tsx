@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconFlame } from '@tabler/icons-react'
+import { IconFlame, IconCalendar } from '@tabler/icons-react'
 import { useUsers } from '@/hooks/use-users'
 import { useMyMembers } from '@/hooks/use-my-members'
 import { useAuth } from '@/hooks/use-auth'
@@ -169,14 +169,20 @@ export function ActiveUsersGrid() {
                   </div>
                 </div>
 
-                {isTrainer && (
-                  <Button variant="secondary" size="sm" asChild className="w-full h-8 text-xs font-medium mt-1">
+                <div className="flex flex-col gap-1.5 mt-1">
+                  <Button variant="outline" size="sm" asChild className="w-full h-8 text-xs font-medium">
+                    <Link href={`/dashboard/workouts/members/${entry.userId}`}>
+                      <IconCalendar className="w-3.5 h-3.5 mr-1.5 text-primary" />
+                      View & Edit Schedule
+                    </Link>
+                  </Button>
+                  <Button variant="secondary" size="sm" asChild className="w-full h-8 text-xs font-medium">
                     <Link href={`/dashboard/workouts/members/${entry.userId}/live`}>
                       <IconFlame className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
                       Live Workout Session
                     </Link>
                   </Button>
-                )}
+                </div>
               </div>
             ))}
           </div>
