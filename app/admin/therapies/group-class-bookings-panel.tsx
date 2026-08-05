@@ -443,7 +443,8 @@ export default function GroupClassBookingsPanel({
                                 (typeof booking.sessionId === 'string' ? booking.sessionId : null) ||
                                 booking.classId?.zegoRoomId ||
                                 (typeof booking.classId === 'string' ? booking.classId : null) ||
-                                booking.classId?._id
+                                booking.classId?._id ||
+                                `room_${booking._id}`
                               setCallModal({
                                 isOpen: true,
                                 roomID: roomId,
