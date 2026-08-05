@@ -52,6 +52,10 @@ export const queryKeys = {
     all: () => ['group-classes'] as const,
     detail: (id: string) => ['group-classes', id] as const,
   },
+  groupClassBookings: {
+    all: () => ['group-class-bookings'] as const,
+    detail: (id: string) => ['group-class-bookings', id] as const,
+  },
   services: {
     all: () => ['services'] as const,
     detail: (id: string) => ['services', id] as const,
