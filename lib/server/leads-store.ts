@@ -58,8 +58,8 @@ interface LeadListOptions {
 
 interface CreateLeadInput {
   leadName: string
-  email: string
-  phone?: string
+  email?: string
+  phone: string
   source?: string
   interestedIn?: string
   notes?: string
@@ -242,6 +242,17 @@ export async function findDuplicateByPhone(phone: string): Promise<LeadRecord | 
 }
 
 export async function createLead(input: CreateLeadInput): Promise<{ lead?: LeadRecord; duplicate?: LeadRecord }> {
+  if (!input.leadName || !input.leadName.trim()) {
+    const err = new Error('Lead name is required') as Error & { code?: string }
+    err.code = 'INVALID_INPUT'
+    throw err
+  }
+  if (!input.phone || !input.phone.trim()) {
+    const err = new Error('Phone number is required') as Error & { code?: string }
+    err.code = 'INVALID_INPUT'
+    throw err
+  }
+
   const db = await readDb()
   const duplicate = input.phone ? await findDuplicateByPhone(input.phone) : undefined
   if (duplicate) {

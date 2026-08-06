@@ -53,8 +53,8 @@ export interface Lead {
 
 export interface CreateLeadPayload {
   name: string
-  email: string
-  phone?: string
+  email?: string
+  phone: string
   source?: string
   status?: LeadStatus
   interestedIn?: string
@@ -399,8 +399,8 @@ function toCreatePayload(payload: CreateLeadPayload) {
 
   return {
     leadName: payload.name,
-    email: payload.email,
-    ...(payload.phone ? { phone: payload.phone } : {}),
+    phone: payload.phone,
+    email: payload.email || '',
     ...(payload.source ? { source: payload.source } : {}),
     ...(payload.status ? { status: toApiStatus(payload.status) } : {}),
     ...(payload.interestedIn ? { interestedIn: payload.interestedIn } : {}),
@@ -420,7 +420,7 @@ function toUpdatePayload(payload: UpdateLeadPayload) {
 
   return {
     ...(payload.name !== undefined ? { leadName: payload.name } : {}),
-    ...(payload.email !== undefined ? { email: payload.email } : {}),
+    ...(payload.email !== undefined ? { email: payload.email || '' } : {}),
     ...(payload.phone !== undefined ? { phone: payload.phone } : {}),
     ...(payload.source !== undefined ? { source: payload.source } : {}),
     ...(payload.status !== undefined ? { status: toApiStatus(payload.status) } : {}),

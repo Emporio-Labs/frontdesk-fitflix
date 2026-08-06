@@ -47,8 +47,8 @@ export interface DNAFormData {
 
 export interface LeadFormData {
   name: string
-  email: string
-  phone?: string
+  email?: string
+  phone: string
   source: string
   status: 'new' | 'contacted' | 'qualified' | 'converted' | 'lost'
   notes?: string
