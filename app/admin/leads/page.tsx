@@ -201,8 +201,8 @@ export default function LeadsPage() {
   }
 
   const handleAddLead = async () => {
-    if (!formData.name.trim() || !formData.email.trim()) {
-      toast.error('Name and email are required')
+    if (!formData.name.trim()) {
+      toast.error('Name is required')
       return
     }
 
@@ -649,7 +649,9 @@ export default function LeadsPage() {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium">Name</label>
+                  <label className="text-sm font-medium">
+                    Name <span className="text-red-600">*</span>
+                  </label>
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -1651,7 +1653,9 @@ export default function LeadsPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Phone</label>
+                      <label className="text-sm font-medium">
+                        Phone <span className="text-red-600">*</span>
+                      </label>
                       <Input
                         value={convertFormData.phone}
                         onChange={(e) => setConvertFormData({ ...convertFormData, phone: e.target.value })}

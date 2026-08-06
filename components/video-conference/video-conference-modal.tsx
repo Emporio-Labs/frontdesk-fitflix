@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { IconVideo, IconX, IconMaximize, IconMinus } from '@tabler/icons-react'
+import { fetchZegoToken } from '@/lib/zego-token'
 
 interface VideoConferenceModalProps {
   open: boolean
@@ -83,25 +84,9 @@ export function VideoConferenceModal({
         const cleanStaffId = String(staffId || 'admin_host').replace(/[^a-zA-Z0-9_-]/g, '_')
         const cleanStaffName = staffName.replace(/[^\w\s-]/gi, '') || 'Admin Host'
 
-        // This ZEGO project requires Token authentication (AppSign logins are rejected
-        // with error 20014/50120), so fetch a server-minted token instead of using
-        // generateKitTokenForTest. See app/api/zego-token/route.ts.
-        const tokenRes = await fetch('/api/zego-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userID: cleanStaffId }),
-        })
-
-        if (!tokenRes.ok) {
-          const errBody = await tokenRes.json().catch(() => null)
-          throw new Error(errBody?.message || 'Failed to fetch ZEGOCLOUD token from server.')
-        }
-
-        const { token } = await tokenRes.json()
-
-        if (!token) {
-          throw new Error('ZEGOCLOUD token response was empty.')
-        }
+        // Server-minted token — see lib/zego-token.ts for why the client must
+        // never generate this itself.
+        const token = await fetchZegoToken(cleanStaffId)
 
         const kitToken = ZegoUIKitPrebuilt.generateKitTokenForProduction(
           appID,

@@ -20,6 +20,7 @@ import {
 	IconX,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { fetchZegoToken } from '@/lib/zego-token'
 import {
 	nutritionistBookingService,
 	type NutritionistBooking,
@@ -90,22 +91,22 @@ export function NutritionistCallModal({
 				setStaffDisplay(staffName)
 
 				const appID = Number(process.env.NEXT_PUBLIC_ZEGO_APP_ID || 857373493)
-				const appSign =
-					process.env.NEXT_PUBLIC_ZEGO_APP_SIGN ||
-					process.env.NEXT_PUBLIC_ZEGO_SERVER_SECRET ||
-					'f3c51658dee353e8c064b0aa1ddb19b85c3e83ee82663608e07a460ee7cb9206'
 
-				if (!appID || !appSign) {
-					throw new Error('ZEGOCLOUD credentials missing.')
+				if (!appID) {
+					throw new Error('ZEGOCLOUD AppID missing.')
 				}
 
 				const cleanRoomID = String(roomID || 'fitflix_video_room').replace(/[^a-zA-Z0-9_-]/g, '_')
 				const cleanStaffId = String(staffId || 'staff_host').replace(/[^a-zA-Z0-9_-]/g, '_')
 				const cleanStaffName = staffName.replace(/[^\w\s-]/gi, '') || 'FitFlix Host'
 
-				const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
+				// Server-minted token — see lib/zego-token.ts for why the client must
+				// never generate this itself.
+				const token = await fetchZegoToken(cleanStaffId)
+
+				const kitToken = ZegoUIKitPrebuilt.generateKitTokenForProduction(
 					appID,
-					appSign,
+					token,
 					cleanRoomID,
 					cleanStaffId,
 					cleanStaffName,

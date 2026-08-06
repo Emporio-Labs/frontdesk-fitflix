@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner'
 import { liveSessionService, type LiveSession } from '@/lib/services/live-session.service'
 import { apiClient } from '@/lib/api-client'
+import { fetchZegoToken } from '@/lib/zego-token'
 
 /**
  * GCLS-27: Full-screen Zego hosting page.
@@ -98,12 +99,11 @@ export default function LiveSessionPage() {
         const { ZegoUIKitPrebuilt } = await import('@zegocloud/zego-uikit-prebuilt')
 
         const appID = Number(process.env.NEXT_PUBLIC_ZEGO_APP_ID)
-        const appSign = process.env.NEXT_PUBLIC_ZEGO_APP_SIGN || ''
 
-        if (!appID || !appSign) {
+        if (!appID) {
           setZegoState({
             loading: false,
-            error: 'ZEGOCLOUD credentials not configured. Set NEXT_PUBLIC_ZEGO_APP_ID and NEXT_PUBLIC_ZEGO_APP_SIGN in .env.local',
+            error: 'ZEGOCLOUD is not configured. Set NEXT_PUBLIC_ZEGO_APP_ID (and ZEGO_SERVER_SECRET, server-side) in .env.local',
             joined: false,
           })
           return
@@ -122,9 +122,14 @@ export default function LiveSessionPage() {
         }
 
         const roomID = session.videoConferenceId
-        const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
+
+        // Server-minted token — see lib/zego-token.ts for why the client must
+        // never generate this itself.
+        const token = await fetchZegoToken(userId)
+
+        const kitToken = ZegoUIKitPrebuilt.generateKitTokenForProduction(
           appID,
-          appSign,
+          token,
           roomID,
           userId,
           userName,
