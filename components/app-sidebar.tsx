@@ -136,6 +136,11 @@ const navMain = [
       icon: IconMessage2,
     },
     {
+      title: "Attendance",
+      url: "/admin/attendance",
+      icon: IconCalendarStats,
+    },
+    {
       title: "Audit Logs",
       url: "/admin/audit-logs",
       icon: IconHistory,
