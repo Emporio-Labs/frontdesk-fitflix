@@ -231,7 +231,7 @@ export default function CreditsPage() {
                 <SelectItem value="__none__">Select a user</SelectItem>
                 {users.map((user) => (
                   <SelectItem key={user._id} value={user._id}>
-                    {user.username} ({user.email})
+                    {user.username}{user.email ? ` (${user.email})` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -285,7 +285,7 @@ export default function CreditsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Summary</CardTitle>
-            <CardDescription>{selectedUser.username} ({selectedUser.email})</CardDescription>
+            <CardDescription>{selectedUser.username}{selectedUser.email ? ` (${selectedUser.email})` : ''}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-3">
             <div className="rounded-md border p-4">

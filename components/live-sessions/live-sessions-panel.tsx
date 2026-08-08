@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   IconBroadcast,
   IconCalendarEvent,
@@ -119,7 +120,7 @@ function getSessionTimeStatus(session: LiveSession): { label: string; color: str
     return { label: 'Starting now', color: 'text-emerald-600 font-semibold animate-pulse' }
   }
   if (sessionEnd && now > sessionEnd) {
-    return { label: 'Running over', color: 'text-amber-600 font-semibold' }
+    return { label: 'Passed', color: 'text-muted-foreground' }
   }
   return { label: 'In progress', color: 'text-emerald-600' }
 }
@@ -147,8 +148,40 @@ export function LiveSessionsPanel() {
   const endSession = useEndSession()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
-  const [selectedDate, setSelectedDate] = useState('')
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [mySessionsOnly, setMySessionsOnly] = useState(false)
+  const [dateTab, setDateTab] = useState<'today' | 'tomorrow' | 'all' | 'custom'>('today')
+
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const tomorrowStr = useMemo(() => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    return tomorrow.toISOString().slice(0, 10)
+  }, [])
+
+  const handleTabChange = (val: string) => {
+    setDateTab(val as any)
+    if (val === 'today') {
+      setSelectedDate(todayStr)
+    } else if (val === 'tomorrow') {
+      setSelectedDate(tomorrowStr)
+    } else if (val === 'all') {
+      setSelectedDate('')
+    }
+  }
+
+  const handleDateChange = (val: string) => {
+    setSelectedDate(val)
+    if (val === todayStr) {
+      setDateTab('today')
+    } else if (val === tomorrowStr) {
+      setDateTab('tomorrow')
+    } else if (val === '') {
+      setDateTab('all')
+    } else {
+      setDateTab('custom')
+    }
+  }
 
   const filteredSessions = useMemo(() => {
     let list = sessions
@@ -160,6 +193,13 @@ export function LiveSessionsPanel() {
         if (!s.sessionDate) return false
         const sDate = s.sessionDate.includes('T') ? s.sessionDate.split('T')[0] : s.sessionDate
         return sDate === selectedDate
+      })
+    } else {
+      const todayStr = new Date().toISOString().slice(0, 10)
+      list = list.filter((s: LiveSession) => {
+        if (!s.sessionDate) return false
+        const sDate = s.sessionDate.includes('T') ? s.sessionDate.split('T')[0] : s.sessionDate
+        return sDate >= todayStr
       })
     }
     if (mySessionsOnly && authUser) {
@@ -185,14 +225,21 @@ export function LiveSessionsPanel() {
   }, [sessions, statusFilter, selectedDate, mySessionsOnly, authUser, searchTerm])
 
   const stats = useMemo(() => {
-    const total = sessions.length
-    const scheduled = sessions.filter((s: LiveSession) => s.status === 'SCHEDULED' || s.status === 'FULL').length
-    const live = sessions.filter((s: LiveSession) => {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const activePeriodSessions = sessions.filter((s: LiveSession) => {
+      if (!s.sessionDate) return false
+      const sDate = s.sessionDate.includes('T') ? s.sessionDate.split('T')[0] : s.sessionDate
+      return sDate >= todayStr
+    })
+
+    const total = activePeriodSessions.length
+    const scheduled = activePeriodSessions.filter((s: LiveSession) => s.status === 'SCHEDULED' || s.status === 'FULL').length
+    const live = activePeriodSessions.filter((s: LiveSession) => {
       if (s.status !== 'SCHEDULED' && s.status !== 'FULL') return false
       const sessionStart = resolveSessionStart(s)
       return sessionStart ? new Date() >= sessionStart : false
     }).length
-    const completed = sessions.filter((s: LiveSession) => s.status === 'COMPLETED').length
+    const completed = activePeriodSessions.filter((s: LiveSession) => s.status === 'COMPLETED').length
     return { total, scheduled, live, completed }
   }, [sessions])
 
@@ -255,6 +302,16 @@ export function LiveSessionsPanel() {
         </div>
       </div>
 
+      <div className="flex justify-start">
+        <Tabs value={dateTab} onValueChange={handleTabChange} className="w-[360px]">
+          <TabsList className="grid grid-cols-3">
+            <TabsTrigger value="today">Today</TabsTrigger>
+            <TabsTrigger value="tomorrow">Tomorrow</TabsTrigger>
+            <TabsTrigger value="all">All Upcoming</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Input
@@ -274,7 +331,7 @@ export function LiveSessionsPanel() {
             <Input
               type="date"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => handleDateChange(e.target.value)}
               className="w-[160px]"
             />
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
@@ -297,6 +354,7 @@ export function LiveSessionsPanel() {
                   setSearchTerm('')
                   setStatusFilter('ALL')
                   setSelectedDate('')
+                  setDateTab('all')
                   setMySessionsOnly(false)
                 }}
                 className="text-xs text-muted-foreground hover:text-foreground"

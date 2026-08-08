@@ -24,6 +24,7 @@ export interface GroupClass {
   daysOfWeek?: number[]
   isActive: boolean
   isPublished: boolean
+  isRetired: boolean
   slots?: string[]
   locationAddress?: string
   streamRoomId?: string
@@ -69,7 +70,8 @@ export interface CreateGroupClassPayload {
 export interface UpdateGroupClassPayload extends Partial<CreateGroupClassPayload> {}
 
 function normalizeGroupClass(raw: any): GroupClass {
-  const published = raw?.isPublished ?? (raw?.status ? raw.status === 'ACTIVE' : (raw?.isActive ?? true))
+  const isRetired = raw?.status === 'INACTIVE'
+  const published = isRetired ? false : (raw?.isPublished ?? (raw?.status ? raw.status === 'ACTIVE' : (raw?.isActive ?? true)))
   return {
     id: raw?._id || raw?.id || '',
     name: raw?.name || '',
@@ -88,8 +90,9 @@ function normalizeGroupClass(raw: any): GroupClass {
     schedulePattern: raw?.schedulePattern || raw?.pattern || undefined,
     scheduleType: raw?.scheduleType || undefined,
     daysOfWeek: Array.isArray(raw?.daysOfWeek) ? raw.daysOfWeek : undefined,
-    isActive: published,
-    isPublished: published,
+    isRetired,
+    isActive: isRetired ? false : published,
+    isPublished: isRetired ? false : published,
     slots: Array.isArray(raw?.slots)
       ? raw.slots.map((s: any) => String(s?._id ?? s))
       : [],

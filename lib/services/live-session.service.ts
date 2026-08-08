@@ -48,6 +48,22 @@ export interface EndSessionResult {
 
 function normalizeLiveSession(raw: any): LiveSession {
   const c = raw.classId || {}
+  
+  // Auto-resolve status to COMPLETED if the session end-time has passed
+  const now = new Date()
+  const sessionStart = new Date(raw.sessionDate)
+  if (raw.startTime) {
+    const [hours, minutes] = raw.startTime.split(':').map(Number)
+    sessionStart.setHours(hours, minutes, 0, 0)
+  }
+  const duration = c.durationMinutes || 60
+  const sessionEnd = new Date(sessionStart.getTime() + duration * 60 * 1000)
+  
+  let status = raw.status || 'SCHEDULED'
+  if (status === 'SCHEDULED' && now > sessionEnd) {
+    status = 'COMPLETED'
+  }
+
   return {
     id: raw._id,
     classId: c._id || '',
@@ -64,11 +80,11 @@ function normalizeLiveSession(raw: any): LiveSession {
     capacity: raw.capacity || 0,
     currentBookings: raw.currentBookings || 0,
     remainingCapacity: raw.remainingCapacity || 0,
-    status: raw.status || 'SCHEDULED',
+    status: status,
     streamRoomId: raw.streamRoomId || c.streamRoomId || '',
     videoConferenceId: raw.videoConferenceId || '',
     creditCost: c.creditCost || 0,
-    durationMinutes: c.durationMinutes || 0
+    durationMinutes: duration
   }
 }
 
