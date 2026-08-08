@@ -89,8 +89,9 @@ export default function GroupClassBookingsPanel({
   const [selectedBooking, setSelectedBooking] = useState<GroupClassBooking | null>(null)
   const [isCancelOpen, setIsCancelOpen] = useState(false)
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
-  const [callModal, setCallModal] = useState<{ isOpen: boolean; roomID: string; sessionTitle: string }>({
+  const [callModal, setCallModal] = useState<{ isOpen: boolean; sessionId: string; roomID: string; sessionTitle: string }>({
     isOpen: false,
+    sessionId: '',
     roomID: '',
     sessionTitle: '',
   })
@@ -532,6 +533,7 @@ export default function GroupClassBookingsPanel({
       <VideoConferenceModal
         open={callModal.isOpen}
         onOpenChange={(open) => setCallModal((prev) => ({ ...prev, isOpen: open }))}
+        sessionId={callModal.sessionId || ''}
         roomID={callModal.roomID}
         sessionTitle={callModal.sessionTitle}
       />

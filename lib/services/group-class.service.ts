@@ -9,6 +9,8 @@ export interface GroupClass {
   mode: GroupClassMode
   deliveryType?: string
   sessionType?: 'group_class' | 'live_stream' | ''
+  access?: 'members_only' | 'open_to_all'
+  bookingRequirement?: 'free' | 'credits_required'
   instructor: string
   // User account ID of the class host — used to determine ZEGOCLOUD
   // host vs audience role (GCLS-24). Separate from the display-name string.
@@ -44,6 +46,8 @@ export interface CreateGroupClassPayload {
   description: string
   mode: GroupClassMode
   sessionType?: 'group_class' | 'live_stream' | ''
+  access?: 'members_only' | 'open_to_all'
+  bookingRequirement?: 'free' | 'credits_required'
   instructor: string
   instructorUserId?: string | null
   durationMinutes: number
@@ -79,6 +83,8 @@ function normalizeGroupClass(raw: any): GroupClass {
     mode: raw?.mode ?? raw?.deliveryType ?? 'offline',
     deliveryType: raw?.deliveryType ?? raw?.mode ?? 'offline',
     sessionType: raw?.sessionType || '',
+    access: raw?.access || 'members_only',
+    bookingRequirement: raw?.bookingRequirement || (Number(raw?.creditCost ?? raw?.creditsRequired) === 0 ? 'free' : 'credits_required'),
     instructor: raw?.instructor ?? 'Staff',
     instructorUserId: raw?.instructorUserId ?? raw?.classId?.instructorUserId ?? null,
     durationMinutes: Number(raw?.durationMinutes ?? 60),
@@ -156,6 +162,8 @@ export const groupClassService = {
       mode: payload.mode,
       deliveryType: payload.mode,
       sessionType: payload.sessionType || '',
+      access: payload.access || 'members_only',
+      bookingRequirement: payload.bookingRequirement || (payload.creditsRequired === 0 ? 'free' : 'credits_required'),
       instructor: payload.instructor,
       instructorUserId: payload.instructorUserId ?? null,
       durationMinutes: payload.durationMinutes,
@@ -194,6 +202,8 @@ export const groupClassService = {
       mode: payload.mode,
       deliveryType: payload.mode,
       sessionType: payload.sessionType || '',
+      access: payload.access || 'members_only',
+      bookingRequirement: payload.bookingRequirement || (payload.creditsRequired === 0 ? 'free' : 'credits_required'),
       instructor: payload.instructor,
       instructorUserId: payload.instructorUserId ?? null,
       durationMinutes: payload.durationMinutes,

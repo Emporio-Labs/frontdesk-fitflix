@@ -16,9 +16,6 @@ import { liveSessionService } from '@/lib/services/live-session.service'
 interface VideoConferenceModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  // The ScheduledSession id — required to mint a room-bound, host-scoped
-  // token from the backend. `roomID` below is kept only as a display
-  // fallback/label; the room actually joined comes from the token response.
   sessionId: string
   roomID: string
   sessionTitle: string
@@ -37,12 +34,20 @@ export function VideoConferenceModal({
   const zegoRef = useRef<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [errorDetails, setErrorDetails] = useState<{
+    message: string
+    code?: string
+    startsAt?: string
+    endsAt?: string
+  } | null>(null)
   const [isMinimized, setIsMinimized] = useState(false)
   const [staffDisplay, setStaffDisplay] = useState<string>('Admin Host')
 
   useEffect(() => {
     if (!open) {
       setIsMinimized(false)
+      setError(null)
+      setErrorDetails(null)
       return
     }
 
@@ -54,12 +59,10 @@ export function VideoConferenceModal({
       try {
         setLoading(true)
         setError(null)
+        setErrorDetails(null)
 
         const { ZegoUIKitPrebuilt } = await import('@zegocloud/zego-uikit-prebuilt')
 
-        // Room-bound, host-scoped token, minted by the backend against this
-        // session's join window — replaces the old flow of guessing a staff
-        // id/name from localStorage and minting an unbound token client-side.
         const access = await liveSessionService.getToken(sessionId)
         if (!mounted) return
 
@@ -83,9 +86,6 @@ export function VideoConferenceModal({
           scenario: isLiveStream
             ? {
                 mode: ZegoUIKitPrebuilt.LiveStreaming,
-                // The SDK reads the role from scenario.config.role; both
-                // fields are required for LiveStreaming, and a missing
-                // liveStreamingMode fails setConfig() validation.
                 config: {
                   role: ZegoUIKitPrebuilt.Host,
                   liveStreamingMode: ZegoUIKitPrebuilt.LiveStreamingMode.InteractiveLiveStreaming,
@@ -101,8 +101,6 @@ export function VideoConferenceModal({
           showScreenSharingButton: !isLiveStream,
           showUserList: true,
           showLayoutButton: true,
-          // setConfig() hard-rejects showNonVideoUser === true under
-          // LiveStreaming (it forces the value to false itself anyway).
           showNonVideoUser: !isLiveStream,
           onJoinRoom: () => {
             if (mounted) setLoading(false)
@@ -110,9 +108,6 @@ export function VideoConferenceModal({
           onLeaveRoom: () => {
             // Session ended
           },
-          // A single token is capped at 2h server-side; a host running past
-          // the scheduled end time needs a fresh one re-minted against the
-          // still-open host window rather than getting disconnected.
           onTokenWillExpire: async () => {
             try {
               const renewed = await liveSessionService.getToken(sessionId)
@@ -123,12 +118,9 @@ export function VideoConferenceModal({
                 renewed.userId,
                 renewed.userName,
               )
-              // The bundled .d.ts claims renewToken() takes no arguments; the
-              // real runtime call takes the new kit token string.
               ;(zp as any).renewToken(renewedKitToken)
             } catch {
-              // Best-effort — if the class has genuinely ended, the token
-              // simply expires and Zego disconnects the room as normal.
+              // Best-effort
             }
           },
         } as any)
@@ -137,41 +129,42 @@ export function VideoConferenceModal({
       } catch (err: any) {
         console.error('ZEGOCLOUD Video Conference init error:', err)
         if (mounted) {
-          setError(
-            err?.response?.data?.message ||
-              err?.message ||
-              'Failed to connect to ZEGOCLOUD Video Conference suite.',
-          )
+          const resData = err?.response?.data
+          const apiMsg = resData?.message || resData?.error
+          const errMsg = apiMsg || err?.message || 'Failed to connect to ZEGOCLOUD Video Conference suite.'
+          setError(errMsg)
+          setErrorDetails({
+            message: errMsg,
+            code: resData?.code,
+            startsAt: resData?.startsAt,
+            endsAt: resData?.endsAt,
+          })
           setLoading(false)
         }
       }
     }
 
-    const timer = setTimeout(() => {
-      initVideoCall()
-    }, 100)
+    initVideoCall()
 
     return () => {
       mounted = false
-      clearTimeout(timer)
       if (zegoRef.current) {
         try {
           zegoRef.current.destroy()
         } catch {
-          /* ignore */
+          // ignore cleanup errors
         }
         zegoRef.current = null
       }
     }
-  }, [open, sessionId, containerElement, mode, sessionTitle])
+  }, [open, sessionId, containerElement, mode])
 
   const handleLeaveCall = () => {
-    setIsMinimized(false)
     if (zegoRef.current) {
       try {
         zegoRef.current.destroy()
       } catch {
-        /* ignore */
+        // ignore cleanup errors
       }
       zegoRef.current = null
     }
@@ -180,18 +173,14 @@ export function VideoConferenceModal({
 
   if (!open) return null
 
-  // Minimized Widget
   if (isMinimized) {
     return (
-      <div className="fixed bottom-6 right-6 z-[9999] bg-gray-900 border border-gray-800 rounded-2xl p-4 shadow-2xl flex items-center gap-4 text-white animate-in fade-in slide-in-from-bottom-5">
-        <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-          <div>
-            <p className="text-xs font-semibold text-gray-200">{sessionTitle || 'Live Video Session'}</p>
-            <p className="text-[10px] text-gray-400">Hosting as {staffDisplay}</p>
-          </div>
+      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-gray-900 border border-gray-700 text-white px-4 py-2.5 rounded-xl shadow-2xl animate-in slide-in-from-bottom-2 duration-200">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-semibold">{sessionTitle || 'Active Call'}</span>
         </div>
-        <div className="flex items-center gap-1.5 border-l border-gray-800 pl-3">
+        <div className="flex items-center gap-1.5 ml-2">
           <Button
             size="sm"
             variant="ghost"
@@ -203,7 +192,7 @@ export function VideoConferenceModal({
           <Button
             size="sm"
             variant="destructive"
-            className="h-7 text-xs bg-red-600/80 hover:bg-red-600 text-white px-2"
+            className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white px-2"
             onClick={handleLeaveCall}
           >
             <IconX className="w-3.5 h-3.5 mr-1" /> Leave
@@ -213,10 +202,9 @@ export function VideoConferenceModal({
     )
   }
 
-  // Full Modal Dialog
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[95vw] h-[85vh] p-0 overflow-hidden flex flex-col bg-gray-950 border-gray-800 [&>button:last-child]:hidden [&>button.absolute]:hidden">
+      <DialogContent className="max-w-5xl h-[85vh] p-0 overflow-hidden bg-black border-gray-800 flex flex-col">
         <DialogHeader className="px-4 py-3 bg-gray-900 border-b border-gray-800 flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600/20 text-indigo-400">
@@ -257,8 +245,44 @@ export function VideoConferenceModal({
 
         <div className="flex-1 relative bg-black">
           {error ? (
-            <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-red-400">
-              <p className="text-sm font-medium">{error}</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white bg-gray-950/95 gap-4">
+              <div className="rounded-full bg-indigo-500/10 p-4 border border-indigo-500/20 text-indigo-400">
+                <IconVideo className="w-10 h-10" />
+              </div>
+
+              {errorDetails?.code === 'NOT_OPEN_YET' || error.toLowerCase().includes('not open') ? (
+                <div className="space-y-2 max-w-md">
+                  <h3 className="text-lg font-semibold text-white">Session Hasn't Started Yet</h3>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    {errorDetails?.startsAt && errorDetails?.endsAt ? (
+                      <>
+                        This session is scheduled for{' '}
+                        <span className="font-semibold text-white">
+                          {new Date(errorDetails.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} –{' '}
+                          {new Date(errorDetails.endsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                        . You can join when the session starts.
+                      </>
+                    ) : (
+                      'This session is not open for joining yet. You can join when the session starts.'
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-w-md">
+                  <h3 className="text-base font-semibold text-rose-400">Unable to Join Session</h3>
+                  <p className="text-xs text-gray-400 leading-relaxed">{error}</p>
+                </div>
+              )}
+
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2 text-xs border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800 hover:text-white px-6"
+                onClick={() => onOpenChange(false)}
+              >
+                Close
+              </Button>
             </div>
           ) : (
             <div ref={setContainerElement} className="h-full w-full" />

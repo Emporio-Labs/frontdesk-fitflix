@@ -12,6 +12,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -255,6 +265,14 @@ function minutesToTime(value: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
+function calculateEndTime(startTime: string, durationMinutes: number): string {
+  const startMins = timeToMinutes(startTime)
+  if (startMins === null) return '10:00'
+  const dur = Math.max(1, Number(durationMinutes) || 60)
+  const totalEndMins = (startMins + dur) % (24 * 60)
+  return minutesToTime(totalEndMins)
+}
+
 export default function TherapiesPage() {
   const [activeTab, setActiveTab] = useState('therapies')
   const [selectedClassFilter, setSelectedClassFilter] = useState<{ id: string; name: string } | null>(null)
@@ -301,6 +319,8 @@ export default function TherapiesPage() {
     description: '',
     mode: 'offline' as GroupClassMode,
     sessionType: '' as 'group_class' | 'live_stream' | '',
+    access: 'members_only' as 'members_only' | 'open_to_all',
+    bookingRequirement: 'credits_required' as 'free' | 'credits_required',
     instructor: '',
     durationMinutes: 60,
     creditsRequired: 1,
@@ -329,6 +349,54 @@ export default function TherapiesPage() {
   const [publishWarnOpen, setPublishWarnOpen] = useState(false)
   const [pendingPublishGc, setPendingPublishGc] = useState<{ id: string; isPublished: boolean } | null>(null)
   const [gcPublishFilter, setGcPublishFilter] = useState<'all' | 'published' | 'unpublished' | 'retired'>('all')
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false)
+
+  const isFormDirty = () => {
+    if (editingGc) {
+      const anyFieldChanged = (Object.keys(defaultGcForm) as Array<keyof typeof defaultGcForm>).some((key) => isFieldChanged(key))
+      if (anyFieldChanged) return true
+
+      const currentScheduleInfo = compileScheduleInfo(gcSchedule)
+      return currentScheduleInfo !== (editingGc.scheduleInfo || '')
+    }
+
+    const isScheduleChanged =
+      gcSchedule.mode !== DEFAULT_SCHEDULE.mode ||
+      gcSchedule.frequency !== DEFAULT_SCHEDULE.frequency ||
+      gcSchedule.oneTimeDate !== DEFAULT_SCHEDULE.oneTimeDate ||
+      gcSchedule.startTime !== DEFAULT_SCHEDULE.startTime ||
+      gcSchedule.daysOfWeek.length > 0 ||
+      gcSchedule.occurrences !== DEFAULT_SCHEDULE.occurrences
+
+    return (
+      gcForm.name.trim() !== '' ||
+      gcForm.description.trim() !== '' ||
+      gcForm.instructor.trim() !== '' ||
+      gcForm.locationAddress.trim() !== '' ||
+      gcForm.streamRoomId !== '' ||
+      gcForm.tags.trim() !== '' ||
+      gcForm.creditsRequired !== 1 ||
+      gcForm.durationMinutes !== 60 ||
+      gcForm.maxParticipants !== 20 ||
+      gcForm.access !== 'members_only' ||
+      gcForm.bookingWindowValue !== 72 ||
+      gcForm.bookingCloseValue !== '' ||
+      isScheduleChanged
+    )
+  }
+
+  const handleGcDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      if (isFormDirty()) {
+        setDiscardConfirmOpen(true)
+      } else {
+        setGcDialogOpen(false)
+        resetGcForm()
+      }
+    } else {
+      setGcDialogOpen(true)
+    }
+  }
 
   const isFieldChanged = (fieldName: keyof typeof gcForm) => {
     if (!editingGc) return false
@@ -700,6 +768,8 @@ export default function TherapiesPage() {
       description: gc.description,
       mode: gc.mode,
       sessionType: gc.sessionType || '',
+      access: gc.access || 'members_only',
+      bookingRequirement: gc.bookingRequirement || (gc.creditsRequired === 0 ? 'free' : 'credits_required'),
       instructor: gc.instructor,
       durationMinutes: gc.durationMinutes,
       creditsRequired: gc.creditsRequired,
@@ -781,7 +851,8 @@ export default function TherapiesPage() {
     if (gcForm.durationMinutes <= 0) {
       errors.durationMinutes = 'Duration must be greater than 0'
     }
-    if (gcForm.creditsRequired < 1) {
+    const isFree = gcForm.access === 'open_to_all' && gcForm.bookingRequirement === 'free'
+    if (!isFree && gcForm.creditsRequired < 1) {
       errors.creditsRequired = 'Credits required must be at least 1 (positive integer)'
     }
     if (gcForm.maxParticipants <= 0) {
@@ -868,9 +939,11 @@ export default function TherapiesPage() {
       mode: gcForm.mode,
       deliveryType: gcForm.mode,
       sessionType: gcForm.mode === 'online' ? gcForm.sessionType : '',
+      access: gcForm.access,
+      bookingRequirement: gcForm.access === 'open_to_all' ? gcForm.bookingRequirement : 'credits_required',
       instructor: gcForm.instructor.trim(),
       durationMinutes: gcForm.durationMinutes,
-      creditsRequired: gcForm.creditsRequired,
+      creditsRequired: gcForm.access === 'open_to_all' && gcForm.bookingRequirement === 'free' ? 0 : gcForm.creditsRequired,
       maxParticipants: gcForm.maxParticipants,
       tags: parseCsvTags(gcForm.tags),
       scheduleInfo: compiledScheduleInfo,
@@ -1443,14 +1516,34 @@ export default function TherapiesPage() {
           <Button variant="outline" size="sm" onClick={() => refetchGc()}>
             <IconRefresh className="mr-1 h-4 w-4" /> Refresh
           </Button>
-          <Dialog open={gcDialogOpen} onOpenChange={setGcDialogOpen}>
+          <Dialog open={gcDialogOpen} onOpenChange={handleGcDialogOpenChange}>
             <DialogTrigger asChild>
               <Button onClick={openCreateGcDialog}>
                 <IconPlus className="mr-2 h-4 w-4" />
                 Add Group Class
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
+            <DialogContent
+              className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]"
+              onPointerDownOutside={(e) => {
+                if (isFormDirty()) {
+                  e.preventDefault()
+                  setDiscardConfirmOpen(true)
+                }
+              }}
+              onInteractOutside={(e) => {
+                if (isFormDirty()) {
+                  e.preventDefault()
+                  setDiscardConfirmOpen(true)
+                }
+              }}
+              onEscapeKeyDown={(e) => {
+                if (isFormDirty()) {
+                  e.preventDefault()
+                  setDiscardConfirmOpen(true)
+                }
+              }}
+            >
               <DialogHeader>
                 <DialogTitle>{editingGc ? 'Edit Group Class' : 'Create Group Class'}</DialogTitle>
                 <DialogDescription>
@@ -1599,7 +1692,80 @@ export default function TherapiesPage() {
                   </div>
                 )}
 
-                {/* Conditional Location / Virtual Room fields */}
+                {/* Access Control */}
+                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <label className="text-sm font-medium">
+                    Access
+                    {renderModifiedBadge('access')}
+                  </label>
+                  <div className="flex items-center gap-6 mt-1.5 p-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="access"
+                        className="accent-primary w-3.5 h-3.5 cursor-pointer"
+                        checked={gcForm.access === 'members_only'}
+                        onChange={() => {
+                          setGcForm({ ...gcForm, access: 'members_only', bookingRequirement: 'credits_required', creditsRequired: gcForm.creditsRequired || 1 })
+                        }}
+                        disabled={isGcPending}
+                      />
+                      <span className="text-sm font-medium text-foreground">Members Only</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="access"
+                        className="accent-primary w-3.5 h-3.5 cursor-pointer"
+                        checked={gcForm.access === 'open_to_all'}
+                        onChange={() => {
+                          setGcForm({ ...gcForm, access: 'open_to_all' })
+                        }}
+                        disabled={isGcPending}
+                      />
+                      <span className="text-sm font-medium text-foreground">Open to Everyone</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Booking Requirement (Conditionally shown when Open to Everyone) */}
+                {gcForm.access === 'open_to_all' && (
+                  <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <label className="text-sm font-medium">
+                      Booking Requirement
+                      {renderModifiedBadge('bookingRequirement')}
+                    </label>
+                    <div className="flex items-center gap-6 mt-1.5 p-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="bookingRequirement"
+                          className="accent-primary w-3.5 h-3.5 cursor-pointer"
+                          checked={gcForm.bookingRequirement === 'free'}
+                          onChange={() => {
+                            setGcForm({ ...gcForm, bookingRequirement: 'free', creditsRequired: 0 })
+                            if (gcErrors.creditsRequired) setGcErrors({ ...gcErrors, creditsRequired: '' })
+                          }}
+                          disabled={isGcPending}
+                        />
+                        <span className="text-sm font-medium text-foreground">Free</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="bookingRequirement"
+                          className="accent-primary w-3.5 h-3.5 cursor-pointer"
+                          checked={gcForm.bookingRequirement === 'credits_required'}
+                          onChange={() => {
+                            setGcForm({ ...gcForm, bookingRequirement: 'credits_required', creditsRequired: gcForm.creditsRequired || 1 })
+                          }}
+                          disabled={isGcPending}
+                        />
+                        <span className="text-sm font-medium text-foreground">Credits Required</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
                 {(gcForm.mode === 'offline' || gcForm.mode === 'hybrid') && (
                   <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
                     <label className="text-sm font-medium">
@@ -1678,7 +1844,12 @@ export default function TherapiesPage() {
                       min={1}
                       value={gcForm.durationMinutes}
                       onChange={(e) => {
-                        setGcForm({ ...gcForm, durationMinutes: Number.parseInt(e.target.value, 10) || 0 })
+                        const val = Number.parseInt(e.target.value, 10) || 0
+                        setGcForm({ ...gcForm, durationMinutes: val })
+                        setGcSchedule((prev) => ({
+                          ...prev,
+                          endTime: calculateEndTime(prev.startTime, val),
+                        }))
                         if (gcErrors.durationMinutes) setGcErrors({ ...gcErrors, durationMinutes: '' })
                       }}
                       placeholder="60"
@@ -1706,12 +1877,18 @@ export default function TherapiesPage() {
                         if (gcErrors.creditsRequired) setGcErrors({ ...gcErrors, creditsRequired: '' })
                       }}
                       placeholder="1"
+                      disabled={isGcPending || (gcForm.access === 'open_to_all' && gcForm.bookingRequirement === 'free')}
                       className={cn(
                         gcErrors.creditsRequired && "border-rose-500 focus-visible:ring-rose-500",
-                        isFieldChanged('creditsRequired') && !gcErrors.creditsRequired && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                        isFieldChanged('creditsRequired') && !gcErrors.creditsRequired && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500",
+                        gcForm.access === 'open_to_all' && gcForm.bookingRequirement === 'free' && "bg-muted text-muted-foreground"
                       )}
-                      disabled={isGcPending}
                     />
+                    {gcForm.access === 'open_to_all' && gcForm.bookingRequirement === 'free' && (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
+                        Free access — 0 credits debited
+                      </p>
+                    )}
                     {gcErrors.creditsRequired && (
                       <p className="text-xs text-rose-500 mt-1">{gcErrors.creditsRequired}</p>
                     )}
@@ -1958,15 +2135,24 @@ export default function TherapiesPage() {
                           <Input
                             type="time"
                             value={gcSchedule.startTime}
-                            onChange={(e) => { setGcSchedule({ ...gcSchedule, startTime: e.target.value }); setShowPreview(true) }}
+                            onChange={(e) => {
+                              const newStart = e.target.value
+                              setGcSchedule((prev) => ({
+                                ...prev,
+                                startTime: newStart,
+                                endTime: calculateEndTime(newStart, gcForm.durationMinutes),
+                              }))
+                            }}
                             className="bg-background px-2"
                           />
                           <span className="text-muted-foreground text-xs">-</span>
                           <Input
                             type="time"
                             value={gcSchedule.endTime}
-                            onChange={(e) => { setGcSchedule({ ...gcSchedule, endTime: e.target.value }); setShowPreview(true) }}
-                            className="bg-background px-2"
+                            readOnly
+                            disabled
+                            className="bg-muted text-muted-foreground px-2 cursor-not-allowed opacity-90"
+                            title="Auto-calculated from Start Time + Duration"
                           />
                         </div>
                       </div>
@@ -2080,57 +2266,6 @@ export default function TherapiesPage() {
                     </div>
                   )}
 
-                  {showPreview && (
-                    <div className="mt-2 space-y-3 animate-in fade-in duration-500">
-                      {(() => {
-                        const occurrences = computeOccurrences(gcSchedule)
-                        const conflicts = detectTrainerConflicts(gcForm.instructor, gcSchedule, groupClasses, editingGc?.id)
-                        return (
-                          <div className="space-y-3 bg-background border rounded-lg overflow-hidden">
-                            <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b">
-                              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                                <IconRepeat className="h-3.5 w-3.5" /> Schedule Preview
-                              </div>
-                              <Badge variant="outline" className="text-[10px] font-normal rounded-sm py-0 h-4">
-                                {occurrences.length} {occurrences.length === 1 ? 'class' : 'classes'}
-                              </Badge>
-                            </div>
-
-                            <div className="px-3 pb-3">
-                              {occurrences.length === 0 ? (
-                                <p className="text-sm text-muted-foreground py-2 text-center border border-dashed rounded-md bg-muted/20">
-                                  Select valid dates to see schedule
-                                </p>
-                              ) : (
-                                <div className="space-y-2">
-                                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1 custom-scrollbar">
-                                    {occurrences.map((d, i) => (
-                                      <div key={i} className="text-[11px] bg-primary/10 text-primary px-1.5 py-0.5 rounded shadow-sm border border-primary/10 whitespace-nowrap">
-                                        {formatDate(d.toISOString().slice(0, 10))}
-                                      </div>
-                                    ))}
-                                  </div>
-                                  {conflicts.length > 0 && (
-                                    <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 text-red-600 rounded-md p-2 mt-2">
-                                      <IconAlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                                      <div className="text-xs leading-relaxed">
-                                        <p className="font-semibold mb-0.5">Trainer Scheduling Conflict!</p>
-                                        <p>
-                                          <span className="font-medium">{gcForm.instructor || 'This instructor'}</span> is already teaching: 
-                                          <span className="font-medium mx-1">{conflicts.join(', ')}</span> 
-                                          during these times.
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })()}
-                    </div>
-                  )}
                   <div className="rounded-lg bg-muted/40 px-3 py-2">
                     <p className="text-xs text-muted-foreground mb-0.5">Will be saved as:</p>
                     <p className="text-xs font-mono text-foreground/80">{compileScheduleInfo(gcSchedule)}</p>
@@ -2179,7 +2314,15 @@ export default function TherapiesPage() {
                 <div className="flex gap-2 pt-2">
                   <Button
                     variant="outline"
-                    onClick={() => { setGcDialogOpen(false); setEditingGc(null); resetGcForm() }}
+                    onClick={() => {
+                      if (isFormDirty()) {
+                        setDiscardConfirmOpen(true)
+                      } else {
+                        setGcDialogOpen(false)
+                        setEditingGc(null)
+                        resetGcForm()
+                      }
+                    }}
                   >
                     Cancel
                   </Button>
@@ -2557,6 +2700,16 @@ export default function TherapiesPage() {
                             {gc.sessionType === 'group_class' ? 'Group Class' : 'Live Stream'}
                           </span>
                         )}
+                        {gc.access === 'open_to_all' && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                            Open to All
+                          </span>
+                        )}
+                        {gc.creditsRequired === 0 && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                            Free
+                          </span>
+                        )}
                         {gc.tags.map((tag) => (
                           <Badge key={tag} variant="secondary" className="rounded-full">{tag}</Badge>
                         ))}
@@ -2669,6 +2822,35 @@ export default function TherapiesPage() {
         sessionTitle={videoModal.sessionTitle}
         mode={videoModal.mode}
       />
+      {/* Unsaved Changes Confirmation Modal */}
+      <Dialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Discard Unsaved Changes?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to go back? Your entered information will be lost.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setDiscardConfirmOpen(false)}
+            >
+              Stay
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setDiscardConfirmOpen(false)
+                setGcDialogOpen(false)
+                resetGcForm()
+              }}
+            >
+              Discard
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
