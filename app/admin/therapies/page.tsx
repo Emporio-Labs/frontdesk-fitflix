@@ -285,11 +285,13 @@ export default function TherapiesPage() {
   const [gcSearchTerm, setGcSearchTerm] = useState('')
   const [videoModal, setVideoModal] = useState<{
     isOpen: boolean
+    sessionId: string
     roomID: string
     sessionTitle: string
     mode?: 'VideoConference' | 'LiveStreaming'
   }>({
     isOpen: false,
+    sessionId: '',
     roomID: '',
     sessionTitle: '',
     mode: 'VideoConference',
@@ -398,11 +400,12 @@ export default function TherapiesPage() {
       const end = new Date(`${day}T${s.endTime || s.startTime || '23:59'}`).getTime()
       return { start, end }
     }
-    // Lower rank = better host candidate: 0 live now, 1 upcoming, 2 already ended.
+    // Lower rank = better host candidate: 0 live/ready now (including 30 min pre-activation window), 1 upcoming, 2 already ended.
     const rankOf = (s: (typeof liveSessionsForHosting)[number], now: number) => {
       const { start, end } = sessionBounds(s)
+      const leadMs = 30 * 60 * 1000 // 30 minutes pre-activation lead time
       if (Number.isNaN(start)) return { rank: 3, distance: Infinity }
-      if (now >= start && now <= end) return { rank: 0, distance: 0 }
+      if (now >= start - leadMs && now <= end) return { rank: 0, distance: 0 }
       if (start > now) return { rank: 1, distance: start - now }
       return { rank: 2, distance: now - end }
     }
@@ -1796,7 +1799,7 @@ export default function TherapiesPage() {
                         <option value="days">Days prior</option>
                       </select>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">Default is 15 minutes</p>
+                    <p className="text-[10px] text-muted-foreground">Default is 15 minutes (Set to 0 to keep open until start time)</p>
                   </div>
                 </div>
 
@@ -2559,16 +2562,15 @@ export default function TherapiesPage() {
                               // the host in an empty room the member can't reach.
                               const matchedSession = nextSessionByClassId.get(gc.id)
                               if (!matchedSession) {
-                                toast.error(
-                                  'No scheduled occurrence found for this class. Host from the Live Sessions tab, or schedule a session first.'
-                                )
+                                toast.error('No scheduled session found to host — schedule an occurrence for this class first.')
                                 return
                               }
                               setVideoModal({
                                 isOpen: true,
-                                roomID: matchedSession.videoConferenceId,
+                                sessionId: matchedSession.id,
+                                roomID: matchedSession.videoConferenceId || '',
                                 sessionTitle: `${gc.name} (Live Host)`,
-                                mode: matchedSession.sessionType === 'live_stream' ? 'LiveStreaming' : 'VideoConference',
+                                mode: (matchedSession.sessionType || gc.sessionType) === 'live_stream' ? 'LiveStreaming' : 'VideoConference',
                               })
                             }}
                           >
@@ -2627,6 +2629,7 @@ export default function TherapiesPage() {
       <VideoConferenceModal
         open={videoModal.isOpen}
         onOpenChange={(open) => setVideoModal((prev) => ({ ...prev, isOpen: open }))}
+        sessionId={videoModal.sessionId}
         roomID={videoModal.roomID}
         sessionTitle={videoModal.sessionTitle}
         mode={videoModal.mode}

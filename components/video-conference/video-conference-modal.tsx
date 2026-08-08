@@ -11,11 +11,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { IconVideo, IconX, IconMaximize, IconMinus } from '@tabler/icons-react'
-import { fetchZegoToken } from '@/lib/zego-token'
+import { liveSessionService } from '@/lib/services/live-session.service'
 
 interface VideoConferenceModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  // The ScheduledSession id — required to mint a room-bound, host-scoped
+  // token from the backend. `roomID` below is kept only as a display
+  // fallback/label; the room actually joined comes from the token response.
+  sessionId: string
   roomID: string
   sessionTitle: string
   mode?: 'VideoConference' | 'LiveStreaming'
@@ -24,6 +28,7 @@ interface VideoConferenceModalProps {
 export function VideoConferenceModal({
   open,
   onOpenChange,
+  sessionId,
   roomID,
   sessionTitle,
   mode = 'VideoConference',
@@ -41,7 +46,7 @@ export function VideoConferenceModal({
       return
     }
 
-    if (!roomID || !containerElement) return
+    if (!sessionId || !containerElement) return
 
     let mounted = true
 
@@ -52,93 +57,91 @@ export function VideoConferenceModal({
 
         const { ZegoUIKitPrebuilt } = await import('@zegocloud/zego-uikit-prebuilt')
 
-        const userRaw = localStorage.getItem('hh_user')
-        let staffId = 'admin_host_' + Date.now()
-        let staffName = 'FitFlix Admin'
+        // Room-bound, host-scoped token, minted by the backend against this
+        // session's join window — replaces the old flow of guessing a staff
+        // id/name from localStorage and minting an unbound token client-side.
+        const access = await liveSessionService.getToken(sessionId)
+        if (!mounted) return
 
-        if (userRaw) {
-          try {
-            const parsed = JSON.parse(userRaw)
-            staffId = parsed._id || parsed.id || staffId
-            const rawName = parsed.name || parsed.username || parsed.fullName || ''
-            if (rawName && !rawName.includes('@')) {
-              staffName = rawName
-            } else if (rawName.includes('@')) {
-              const parts = rawName.split('@')[0]
-              const clean = parts.charAt(0).toUpperCase() + parts.slice(1)
-              staffName = `${clean} (Admin)`
-            }
-          } catch {
-            /* use defaults */
-          }
-        }
-        setStaffDisplay(staffName)
-
-        const appID = Number(process.env.NEXT_PUBLIC_ZEGO_APP_ID || 857373493)
-
-        if (!appID) {
-          throw new Error('ZEGOCLOUD AppID missing.')
-        }
-
-        const cleanRoomID = String(roomID || 'fitflix_class_room').replace(/[^a-zA-Z0-9_-]/g, '_')
-        const cleanStaffId = String(staffId || 'admin_host').replace(/[^a-zA-Z0-9_-]/g, '_')
-        const cleanStaffName = staffName.replace(/[^\w\s-]/gi, '') || 'Admin Host'
-
-        // Server-minted token — see lib/zego-token.ts for why the client must
-        // never generate this itself.
-        const token = await fetchZegoToken(cleanStaffId)
+        setStaffDisplay(access.userName)
 
         const kitToken = ZegoUIKitPrebuilt.generateKitTokenForProduction(
-          appID,
-          token,
-          cleanRoomID,
-          cleanStaffId,
-          cleanStaffName
+          access.appID,
+          access.token,
+          access.roomId,
+          access.userId,
+          access.userName,
         )
-
-        if (!mounted) return
 
         const zp = ZegoUIKitPrebuilt.create(kitToken)
         zegoRef.current = zp
 
-        const scenarioConfig =
-          mode === 'LiveStreaming'
-            ? {
-                mode: ZegoUIKitPrebuilt.LiveStreaming,
-                config: {
-                  role: ZegoUIKitPrebuilt.Host,
-                },
-              }
-            : {
-                mode: ZegoUIKitPrebuilt.VideoConference,
-              }
+        const isLiveStream = mode === 'LiveStreaming'
 
         zp.joinRoom({
           container: containerElement,
-          scenario: scenarioConfig,
+          scenario: isLiveStream
+            ? {
+                mode: ZegoUIKitPrebuilt.LiveStreaming,
+                // The SDK reads the role from scenario.config.role; both
+                // fields are required for LiveStreaming, and a missing
+                // liveStreamingMode fails setConfig() validation.
+                config: {
+                  role: ZegoUIKitPrebuilt.Host,
+                  liveStreamingMode: ZegoUIKitPrebuilt.LiveStreamingMode.InteractiveLiveStreaming,
+                },
+              }
+            : { mode: ZegoUIKitPrebuilt.VideoConference },
           showPreJoinView: false,
           turnOnMicrophoneWhenJoining: true,
           turnOnCameraWhenJoining: true,
           showMyCameraToggleButton: true,
           showMyMicrophoneToggleButton: true,
           showAudioVideoSettingsButton: true,
-          showScreenSharingButton: true,
+          showScreenSharingButton: !isLiveStream,
           showUserList: true,
           showLayoutButton: true,
-          showNonVideoUser: true,
+          // setConfig() hard-rejects showNonVideoUser === true under
+          // LiveStreaming (it forces the value to false itself anyway).
+          showNonVideoUser: !isLiveStream,
           onJoinRoom: () => {
             if (mounted) setLoading(false)
           },
           onLeaveRoom: () => {
             // Session ended
           },
-        })
+          // A single token is capped at 2h server-side; a host running past
+          // the scheduled end time needs a fresh one re-minted against the
+          // still-open host window rather than getting disconnected.
+          onTokenWillExpire: async () => {
+            try {
+              const renewed = await liveSessionService.getToken(sessionId)
+              const renewedKitToken = ZegoUIKitPrebuilt.generateKitTokenForProduction(
+                renewed.appID,
+                renewed.token,
+                renewed.roomId,
+                renewed.userId,
+                renewed.userName,
+              )
+              // The bundled .d.ts claims renewToken() takes no arguments; the
+              // real runtime call takes the new kit token string.
+              ;(zp as any).renewToken(renewedKitToken)
+            } catch {
+              // Best-effort — if the class has genuinely ended, the token
+              // simply expires and Zego disconnects the room as normal.
+            }
+          },
+        } as any)
 
         if (mounted) setLoading(false)
       } catch (err: any) {
         console.error('ZEGOCLOUD Video Conference init error:', err)
         if (mounted) {
-          setError(err?.message || 'Failed to connect to ZEGOCLOUD Video Conference suite.')
+          setError(
+            err?.response?.data?.message ||
+              err?.message ||
+              'Failed to connect to ZEGOCLOUD Video Conference suite.',
+          )
           setLoading(false)
         }
       }
@@ -160,7 +163,7 @@ export function VideoConferenceModal({
         zegoRef.current = null
       }
     }
-  }, [open, roomID, containerElement, mode, sessionTitle])
+  }, [open, sessionId, containerElement, mode, sessionTitle])
 
   const handleLeaveCall = () => {
     setIsMinimized(false)

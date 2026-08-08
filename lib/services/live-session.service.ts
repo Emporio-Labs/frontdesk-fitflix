@@ -10,6 +10,11 @@ export interface LiveSession {
   sessionDate: string
   startTime: string
   endTime: string
+  // Absolute instants computed server-side (Asia/Kolkata) — prefer these over
+  // sessionDate+startTime/endTime, which are wall-clock strings that drift by
+  // the timezone offset if reconstructed with the browser's local Date().
+  startsAtUtc: string | null
+  endsAtUtc: string | null
   deliveryType: string
   capacity: number
   currentBookings: number
@@ -19,6 +24,26 @@ export interface LiveSession {
   videoConferenceId: string
   creditCost: number
   durationMinutes: number
+}
+
+export interface ZegoSessionToken {
+  token: string
+  appID: number
+  roomId: string
+  userId: string
+  userName: string
+  role: 'host' | 'member'
+  expiresAt: string
+  roomOpensAt: string
+  sessionEndsAt: string
+  windowClosesAt: string
+}
+
+export interface EndSessionResult {
+  message: string
+  attendanceMarked: number
+  kicked: string[]
+  kickErrors: Array<{ userIds: string[]; message: string }>
 }
 
 function normalizeLiveSession(raw: any): LiveSession {
@@ -33,6 +58,8 @@ function normalizeLiveSession(raw: any): LiveSession {
     sessionDate: raw.sessionDate,
     startTime: raw.startTime,
     endTime: raw.endTime,
+    startsAtUtc: raw.startsAtUtc || null,
+    endsAtUtc: raw.endsAtUtc || null,
     deliveryType: raw.deliveryType || '',
     capacity: raw.capacity || 0,
     currentBookings: raw.currentBookings || 0,
@@ -71,8 +98,19 @@ export const liveSessionService = {
     return { sessions }
   },
 
-  async endSession(id: string) {
-    const res = await apiClient.patch(`/api/v1/admin/classes/schedule/${id}`, { status: 'COMPLETED' })
+  // Room-bound, role-scoped, time-windowed — replaces the old client-side
+  // generateKitTokenForTest/local /api/zego-token mint, neither of which
+  // checked who was asking or which room they were allowed into.
+  async getToken(sessionId: string): Promise<ZegoSessionToken> {
+    const res = await apiClient.post(`/api/v1/zego/sessions/${sessionId}/token`)
+    return res.data
+  },
+
+  // Ending a session now has side effects (attendance backfill, best-effort
+  // Zego kick) that a blind status PATCH doesn't perform — the backend
+  // rejects `PATCH .../schedule/:id { status: 'COMPLETED' }` for this reason.
+  async endSession(id: string): Promise<EndSessionResult> {
+    const res = await apiClient.post(`/api/v1/zego/sessions/${id}/end`)
     return res.data
   }
 }

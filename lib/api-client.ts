@@ -164,7 +164,10 @@ apiClient.interceptors.response.use(
     const alreadyRetried = (config as any).__retried
 
     const status = error?.response?.status
-    if ((status === 401 || status === 403) && !isAuthEndpoint && !alreadyRetried) {
+    // Only 401 means "your token is invalid/expired" — a 403 can be a legitimate
+    // business-rule denial (e.g. join window not open yet) that has nothing to
+    // do with auth, and must not force-logout the user or swallow the message.
+    if (status === 401 && !isAuthEndpoint && !alreadyRetried) {
       const newToken = await tryRefreshToken()
       if (newToken) {
         ;(config as any).__retried = true

@@ -22,8 +22,6 @@ import {
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { liveSessionService, type LiveSession } from '@/lib/services/live-session.service'
-import { apiClient } from '@/lib/api-client'
-import { fetchZegoToken } from '@/lib/zego-token'
 
 /**
  * GCLS-27: Full-screen Zego hosting page.
@@ -91,6 +89,8 @@ export default function LiveSessionPage() {
   useEffect(() => {
     if (!session || !containerRef.current) return
 
+    let cancelled = false
+
     const initZego = async () => {
       try {
         setZegoState({ loading: true, error: null, joined: false })
@@ -98,41 +98,18 @@ export default function LiveSessionPage() {
         // Dynamic import — SSR-safe
         const { ZegoUIKitPrebuilt } = await import('@zegocloud/zego-uikit-prebuilt')
 
-        const appID = Number(process.env.NEXT_PUBLIC_ZEGO_APP_ID)
-
-        if (!appID) {
-          setZegoState({
-            loading: false,
-            error: 'ZEGOCLOUD is not configured. Set NEXT_PUBLIC_ZEGO_APP_ID (and ZEGO_SERVER_SECRET, server-side) in .env.local',
-            joined: false,
-          })
-          return
-        }
-
-        // Get current user info from localStorage
-        const userRaw = localStorage.getItem('hh_user')
-        let userId = 'admin_' + Date.now()
-        let userName = 'Instructor'
-        if (userRaw) {
-          try {
-            const parsed = JSON.parse(userRaw)
-            userId = parsed._id || parsed.id || userId
-            userName = parsed.name || parsed.firstName || 'Instructor'
-          } catch { /* use defaults */ }
-        }
-
-        const roomID = session.videoConferenceId
-
-        // Server-minted token — see lib/zego-token.ts for why the client must
-        // never generate this itself.
-        const token = await fetchZegoToken(userId)
+        // Room-bound, role-scoped, time-windowed — the backend derives
+        // appID/roomId/userId/userName/role itself rather than trusting
+        // whatever this page happened to have in localStorage, and refuses
+        // to issue one outside this host's join window.
+        const access = await liveSessionService.getToken(session.id)
 
         const kitToken = ZegoUIKitPrebuilt.generateKitTokenForProduction(
-          appID,
-          token,
-          roomID,
-          userId,
-          userName,
+          access.appID,
+          access.token,
+          access.roomId,
+          access.userId,
+          access.userName,
         )
 
         const zp = ZegoUIKitPrebuilt.create(kitToken)
@@ -142,15 +119,18 @@ export default function LiveSessionPage() {
 
         zp.joinRoom({
           container: containerRef.current!,
-          scenario: {
-            mode: isLiveStream
-              ? ZegoUIKitPrebuilt.LiveStreaming
-              : ZegoUIKitPrebuilt.VideoConference,
-          },
-          // For live streaming, the instructor is the host
-          ...(isLiveStream && {
-            role: (ZegoUIKitPrebuilt as any).Host,
-          }),
+          scenario: isLiveStream
+            ? {
+                mode: ZegoUIKitPrebuilt.LiveStreaming,
+                // The SDK reads the role from scenario.config.role; both
+                // fields are required for LiveStreaming, and a missing
+                // liveStreamingMode fails setConfig() validation.
+                config: {
+                  role: (ZegoUIKitPrebuilt as any).Host,
+                  liveStreamingMode: ZegoUIKitPrebuilt.LiveStreamingMode.InteractiveLiveStreaming,
+                },
+              }
+            : { mode: ZegoUIKitPrebuilt.VideoConference },
           turnOnMicrophoneWhenJoining: true,
           turnOnCameraWhenJoining: true,
           showMyCameraToggleButton: true,
@@ -161,17 +141,49 @@ export default function LiveSessionPage() {
           showUserList: true,
           maxUsers: session.capacity || 50,
           onJoinRoom: () => {
+            if (cancelled) return
             setZegoState({ loading: false, error: null, joined: true })
           },
           onLeaveRoom: () => {
+            if (cancelled) return
             setZegoState((prev) => ({ ...prev, joined: false }))
           },
-        })
+          // A single token is capped at 2h server-side, but a host must be
+          // able to run past the scheduled end time — this is the half of
+          // that requirement that keeps the *call* alive past a token's own
+          // expiry, re-minting against the (still-open, host-only) window.
+          onTokenWillExpire: async () => {
+            try {
+              const renewed = await liveSessionService.getToken(session.id)
+              const renewedKitToken = ZegoUIKitPrebuilt.generateKitTokenForProduction(
+                renewed.appID,
+                renewed.token,
+                renewed.roomId,
+                renewed.userId,
+                renewed.userName,
+              )
+              // The published .d.ts for this SDK version claims renewToken()
+              // takes no arguments, but the real runtime call takes the new
+              // kit token string — the type declaration here is simply wrong.
+              ;(zp as any).renewToken(renewedKitToken)
+            } catch (err: any) {
+              toast.error(
+                err?.response?.data?.message ||
+                  err?.message ||
+                  'Could not renew session — the class may have ended.',
+              )
+            }
+          },
+        } as any)
       } catch (err: any) {
+        if (cancelled) return
         console.error('Zego init error:', err)
         setZegoState({
           loading: false,
-          error: err?.message || 'Failed to initialize video. Make sure @zegocloud/zego-uikit-prebuilt is installed.',
+          error:
+            err?.response?.data?.message ||
+            err?.message ||
+            'Failed to initialize video. Make sure @zegocloud/zego-uikit-prebuilt is installed.',
           joined: false,
         })
       }
@@ -180,6 +192,7 @@ export default function LiveSessionPage() {
     initZego()
 
     return () => {
+      cancelled = true
       if (zegoRef.current) {
         try {
           zegoRef.current.destroy()
@@ -194,8 +207,14 @@ export default function LiveSessionPage() {
     if (!session) return
     setEnding(true)
     try {
-      await liveSessionService.endSession(session.id)
-      toast.success('Session ended successfully. Status updated to COMPLETED.')
+      const result = await liveSessionService.endSession(session.id)
+      if (result.kickErrors?.length) {
+        toast.warning(
+          `Session ended, but ${result.kickErrors.length} participant(s) may still be connected — they'll be dropped once their token expires.`,
+        )
+      } else {
+        toast.success('Session ended successfully. Status updated to COMPLETED.')
+      }
 
       // Destroy Zego instance
       if (zegoRef.current) {
