@@ -326,7 +326,7 @@ export default function TherapiesPage() {
   const [capacityWarnInfo, setCapacityWarnInfo] = useState<{ payload: any; maxBooked: number; gcSlots: Slot[] } | null>(null)
   const [publishWarnOpen, setPublishWarnOpen] = useState(false)
   const [pendingPublishGc, setPendingPublishGc] = useState<{ id: string; isPublished: boolean } | null>(null)
-  const [gcPublishFilter, setGcPublishFilter] = useState<'all' | 'published' | 'unpublished'>('all')
+  const [gcPublishFilter, setGcPublishFilter] = useState<'all' | 'published' | 'unpublished' | 'retired'>('all')
 
   const isFieldChanged = (fieldName: keyof typeof gcForm) => {
     if (!editingGc) return false
@@ -894,10 +894,15 @@ export default function TherapiesPage() {
 
   const filteredGroupClasses = useMemo(() => {
     let list = groupClasses
-    if (gcPublishFilter === 'published') {
-      list = list.filter((gc) => gc.isPublished)
-    } else if (gcPublishFilter === 'unpublished') {
-      list = list.filter((gc) => !gc.isPublished)
+    if (gcPublishFilter === 'retired') {
+      list = list.filter((gc) => gc.isRetired)
+    } else {
+      list = list.filter((gc) => !gc.isRetired)
+      if (gcPublishFilter === 'published') {
+        list = list.filter((gc) => gc.isPublished)
+      } else if (gcPublishFilter === 'unpublished') {
+        list = list.filter((gc) => !gc.isPublished)
+      }
     }
     const q = gcSearchTerm.toLowerCase()
     if (!q) return list
@@ -1410,15 +1415,15 @@ export default function TherapiesPage() {
                 <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
                   <div>
                     <p className="text-xs text-purple-50/90">Classes</p>
-                    <p className="text-xl font-semibold">{groupClasses.length}</p>
+                    <p className="text-xl font-semibold">{groupClasses.filter(gc => !gc.isRetired).length}</p>
                   </div>
                   <div>
                     <p className="text-xs text-purple-50/90">Active</p>
-                    <p className="text-xl font-semibold">{groupClasses.filter(gc => gc.isActive).length}</p>
+                    <p className="text-xl font-semibold">{groupClasses.filter(gc => !gc.isRetired && gc.isActive).length}</p>
                   </div>
                   <div>
                     <p className="text-xs text-purple-50/90">Modes</p>
-                    <p className="text-xl font-semibold">{new Set(groupClasses.map(gc => gc.mode)).size}</p>
+                    <p className="text-xl font-semibold">{new Set(groupClasses.filter(gc => !gc.isRetired).map(gc => gc.mode)).size}</p>
                   </div>
                 </div>
               </div>
@@ -2338,7 +2343,7 @@ export default function TherapiesPage() {
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                All ({groupClasses.length})
+                All ({groupClasses.filter((g) => !g.isRetired).length})
               </button>
               <button
                 type="button"
@@ -2350,7 +2355,7 @@ export default function TherapiesPage() {
                     : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/50"
                 )}
               >
-                Published ({groupClasses.filter((g) => g.isPublished).length})
+                Published ({groupClasses.filter((g) => !g.isRetired && g.isPublished).length})
               </button>
               <button
                 type="button"
@@ -2362,7 +2367,19 @@ export default function TherapiesPage() {
                     : "text-amber-700 dark:text-amber-400 hover:bg-amber-100/50"
                 )}
               >
-                Unpublished ({groupClasses.filter((g) => !g.isPublished).length})
+                Unpublished ({groupClasses.filter((g) => !g.isRetired && !g.isPublished).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGcPublishFilter('retired')}
+                className={cn(
+                  "px-3 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5",
+                  gcPublishFilter === 'retired'
+                    ? "bg-slate-600 text-white shadow-sm font-semibold"
+                    : "text-slate-700 dark:text-slate-400 hover:bg-slate-100/50"
+                )}
+              >
+                Retired ({groupClasses.filter((g) => g.isRetired).length})
               </button>
             </div>
           </div>
@@ -2428,30 +2445,39 @@ export default function TherapiesPage() {
                           {gcModeIcon[gc.mode]}
                         </div>
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleTogglePublish(gc, !gc.isPublished)}
-                            disabled={togglePublishGroupClass.isPending}
-                            className={cn(
-                              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all shadow-sm cursor-pointer border",
-                              gc.isPublished
-                                ? "bg-emerald-500/15 text-emerald-700 border-emerald-300 hover:bg-emerald-500/25 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                                : "bg-amber-500/15 text-amber-800 border-amber-300 hover:bg-amber-500/25 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
-                            )}
-                            title={gc.isPublished ? "Click to unpublish class" : "Click to publish class"}
-                          >
-                            {gc.isPublished ? (
-                              <>
-                                <IconToggleRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                                <span>Published</span>
-                              </>
-                            ) : (
-                              <>
-                                <IconToggleLeft className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                                <span>Unpublished</span>
-                              </>
-                            )}
-                          </button>
+                          {gc.isRetired ? (
+                            <div
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-slate-500/15 text-slate-700 border-slate-300 dark:bg-slate-950/40 dark:text-slate-300 dark:border-slate-800"
+                            >
+                              <IconAlertTriangle className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                              <span>Retired</span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePublish(gc, !gc.isPublished)}
+                              disabled={togglePublishGroupClass.isPending || isGcPending}
+                              className={cn(
+                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all shadow-sm cursor-pointer border",
+                                gc.isPublished
+                                  ? "bg-emerald-500/15 text-emerald-700 border-emerald-300 hover:bg-emerald-500/25 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                  : "bg-amber-500/15 text-amber-800 border-amber-300 hover:bg-amber-500/25 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                              )}
+                              title={gc.isPublished ? "Click to unpublish class" : "Click to publish class"}
+                            >
+                              {gc.isPublished ? (
+                                <>
+                                  <IconToggleRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                  <span>Published</span>
+                                </>
+                              ) : (
+                                <>
+                                  <IconToggleLeft className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                  <span>Unpublished</span>
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                       </div>
                       <h4 className="text-base font-semibold tracking-tight">{gc.name}</h4>
@@ -2552,6 +2578,7 @@ export default function TherapiesPage() {
                           <Button
                             size="sm"
                             className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
+                            disabled={gc.isRetired || isGcPending}
                             onClick={() => {
                               // Must join the same room as the member's User App: that's the
                               // per-occurrence ScheduledSession id (session.videoConferenceId),
@@ -2579,6 +2606,7 @@ export default function TherapiesPage() {
                           size="sm"
                           variant="outline"
                           className="text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-xs font-medium"
+                          disabled={isGcPending}
                           onClick={() => {
                             setSelectedClassFilter({ id: gc.id, name: gc.name })
                             setActiveTab('group-class-bookings')
@@ -2586,21 +2614,28 @@ export default function TherapiesPage() {
                         >
                           <IconUsers className="mr-1 h-3.5 w-3.5" /> View Bookings
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => openEditGcDialog(gc)}>
-                          <IconEdit className="mr-1 h-4 w-4" /> Edit
-                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => {
-                            setClassToDelete(gc.id)
-                            setDeleteConfirmOpen(true)
-                          }}
-                          disabled={isGcPending}
+                          onClick={() => openEditGcDialog(gc)}
+                          disabled={gc.isRetired || isGcPending}
                         >
-                          <IconTrash className="mr-1 h-4 w-4" /> Delete
+                          <IconEdit className="mr-1 h-4 w-4" /> Edit
                         </Button>
+                        {!gc.isRetired && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => {
+                              setClassToDelete(gc.id)
+                              setDeleteConfirmOpen(true)
+                            }}
+                            disabled={isGcPending}
+                          >
+                            <IconTrash className="mr-1 h-4 w-4" /> Delete
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
