@@ -67,6 +67,16 @@ function toParams(input?: Record<string, unknown>): Record<string, string> {
 }
 
 export const gymVisitService = {
+  qrCheckIn: async (
+    token: string,
+  ): Promise<{ message: string; visit: GymVisit }> => {
+    const { data } = await apiClient.post('/gym-visits/qr-check-in', { token })
+    return {
+      message: data?.message || 'Member checked in',
+      visit: data?.visit as GymVisit,
+    }
+  },
+
   checkIn: async (
     payload: CheckInPayload,
   ): Promise<{ message: string; visit: GymVisit }> => {

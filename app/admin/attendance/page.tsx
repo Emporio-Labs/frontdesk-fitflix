@@ -32,6 +32,7 @@ import {
   IconSearch,
 } from '@tabler/icons-react'
 import { useUsers } from '@/hooks/use-users'
+import { QrScannerDialog } from '@/components/attendance/qr-scanner-dialog'
 import {
   useCheckIn,
   useCheckOut,
@@ -128,6 +129,7 @@ export default function AttendancePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <QrScannerDialog />
           <div className="flex rounded-md border">
             {RANGE_OPTIONS.map((opt) => (
               <button

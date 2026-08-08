@@ -67,6 +67,29 @@ export function useCheckIn() {
   })
 }
 
+export function useQrCheckIn() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (token: string) => gymVisitService.qrCheckIn(token),
+    onSuccess: (data) => {
+      invalidateAll(qc)
+      toast.success(data.message)
+    },
+    onError: (err: any) => {
+      const code = err?.response?.data?.code
+      if (code === 'INVALID_QR') {
+        toast.error('QR code expired — ask the member to refresh it')
+        return
+      }
+      if (code === 'NO_ACTIVE_MEMBERSHIP') {
+        toast.error('Member has no active membership')
+        return
+      }
+      toast.error(extractApiError(err, 'Check-in failed'))
+    },
+  })
+}
+
 export function useCheckOut() {
   const qc = useQueryClient()
   return useMutation({
