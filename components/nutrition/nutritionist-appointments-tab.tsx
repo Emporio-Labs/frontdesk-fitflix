@@ -93,6 +93,14 @@ function NutritionistStatusBadge({ status }: { status: NutritionistBookingStatus
       label: 'COMPLETED',
       cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-transparent',
     },
+    expired: {
+      label: 'EXPIRED',
+      cls: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border-transparent',
+    },
+    reschedulerequired: {
+      label: 'AWAITING RESCHEDULE',
+      cls: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-transparent',
+    },
   }
   const statusKey = String(status || '').toLowerCase()
   const match = map[statusKey] || map.pending

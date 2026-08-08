@@ -157,41 +157,43 @@ function deriveNutritionRosterStatus(
   const nutritionistAppointment = user.expertAppointments?.find(
     (appointment) => appointment.expertType === 'nutritionist'
   )
-  const bookingStatus = normalizeRosterStatus(
-    nutritionistAppointment?.bookingStatus ??
-      (user.onboardingStatus?.nutritionistBooked ? 'confirmed' : undefined)
-  )
-  const onboardingStep = normalizeRosterStatus(
-    user.onboardingStatus?.currentStep ??
-      (nutritionistAppointment ? 'NUTRITIONIST_BOOKING' : undefined)
-  )
+
+  // When an actual NutritionistBooking exists (backend lookup filled it in),
+  // its status is the single source of truth. Historical onboarding flags
+  // (nutritionistBooked/onboardingCompleted) go stale the moment a returning
+  // user files a NEW pending request — routing off them dumps live PENDING
+  // requests into the Booked tab, hiding them from admins who need to accept.
+  if (nutritionistAppointment) {
+    const status = normalizeRosterStatus(nutritionistAppointment.bookingStatus)
+    if (status === 'completed') return 'completed'
+    if (status === 'confirmed' || status === 'booked') return 'booked'
+    if (status === 'cancelled' || status === 'rejected' || status === 'expired') {
+      return 'ignored'
+    }
+    // 'pending' / 'requested' / 'reschedulerequired' / anything else non-terminal
+    // → still needs admin action (either accept, or wait for user to pick a new
+    // time on RescheduleRequired rows before the next accept attempt).
+    return 'pending'
+  }
 
   const onboardingCompleted =
     user.onboardingStatus?.onboardingCompleted === true ||
     user.onboarded === true
 
-  // Completed = onboarding done AND there's at least one active nutrition plan,
-  // OR the booking was explicitly marked completed
+  // No live appointment record — fall back to onboarding flags to place the
+  // user somewhere sensible.
   if (onboardingCompleted && hasActivePlan) return 'completed'
-  if (bookingStatus === 'completed') return 'completed'
-
-  const booked =
-    bookingStatus === 'booked' ||
-    bookingStatus === 'confirmed' ||
-    bookingStatus === '0' ||
-    bookingStatus === '1' ||
+  if (
     onboardingCompleted ||
     user.onboardingStatus?.nutritionistBooked === true
+  ) {
+    return 'booked'
+  }
 
-  if (booked) return 'booked'
-
-  const cancelled = bookingStatus === 'cancelled' || bookingStatus === '2'
-  if (cancelled) return 'ignored'
-
+  const onboardingStep = normalizeRosterStatus(
+    user.onboardingStatus?.currentStep
+  )
   const pending =
-    bookingStatus === 'pending' ||
-    bookingStatus === 'requested' ||
-    bookingStatus === '' ||
     onboardingStep === 'nutritionist_booking' ||
     user.onboardingStatus?.completedSteps?.includes('NUTRITIONIST_BOOKING') === true
 

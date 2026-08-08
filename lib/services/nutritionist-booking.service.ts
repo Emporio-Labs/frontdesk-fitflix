@@ -3,7 +3,13 @@ import type { PopulatedUserRef } from '@/lib/populated'
 
 export type AppointmentMode = 'IN_PERSON' | 'ONLINE'
 
-export type NutritionistBookingStatus = 'Pending' | 'Confirmed' | 'Cancelled' | 'Completed'
+export type NutritionistBookingStatus =
+  | 'Pending'
+  | 'Confirmed'
+  | 'Cancelled'
+  | 'Completed'
+  | 'Expired'
+  | 'RescheduleRequired'
 
 export interface NutritionistBooking {
   _id: string
@@ -36,7 +42,19 @@ function normalizeBooking(raw: any): NutritionistBooking {
   if (!raw) return raw
   return {
     ...raw,
-    bookingStatus: raw?.bookingStatus ?? (raw?.status === 'ACCEPTED' ? 'Confirmed' : raw?.status === 'REJECTED' ? 'Cancelled' : raw?.status === 'COMPLETED' ? 'Completed' : raw?.status ?? 'Pending'),
+    bookingStatus:
+      raw?.bookingStatus ??
+      (raw?.status === 'ACCEPTED'
+        ? 'Confirmed'
+        : raw?.status === 'REJECTED'
+          ? 'Cancelled'
+          : raw?.status === 'COMPLETED'
+            ? 'Completed'
+            : raw?.status === 'EXPIRED'
+              ? 'Expired'
+              : raw?.status === 'RESCHEDULE_REQUIRED'
+                ? 'RescheduleRequired'
+                : raw?.status ?? 'Pending'),
     appointmentDate: raw?.appointmentDate ?? raw?.bookingDate ?? raw?.date ?? null,
     zegoRoomId: raw?.zegoRoomId ?? null,
     assignedNutritionistId: raw?.assignedNutritionistId ?? null,
