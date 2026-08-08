@@ -30,7 +30,7 @@ import {
 } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { useLiveSessions } from '@/hooks/use-live-sessions'
+import { useLiveSessions, useEndSession } from '@/hooks/use-live-sessions'
 import { SessionTypeBadge } from '@/components/live-sessions/session-type-badge'
 import type { LiveSession } from '@/lib/services/live-session.service'
 import { useRouter } from 'next/navigation'
@@ -54,33 +54,60 @@ function formatTimeRange(start: string, end: string): string {
   return `${start} – ${end}`
 }
 
+// `startsAtUtc`/`endsAtUtc` are computed server-side in the business timezone;
+// reconstructing from sessionDate + "HH:mm" with the browser's local Date()
+// drifts by whatever offset separates the browser from the gym (5h30m for a
+// US/UK browser against an IST gym) — prefer the absolute instant whenever
+// the backend has provided one.
+function resolveSessionStart(session: LiveSession): Date | null {
+  if (session.startsAtUtc) {
+    const d = new Date(session.startsAtUtc)
+    if (!Number.isNaN(d.getTime())) return d
+  }
+  const sessionStart = new Date(session.sessionDate)
+  const [hours, minutes] = session.startTime.split(':').map(Number)
+  if (Number.isNaN(sessionStart.getTime()) || Number.isNaN(hours) || Number.isNaN(minutes)) return null
+  sessionStart.setHours(hours, minutes, 0, 0)
+  return sessionStart
+}
+
+function resolveSessionEnd(session: LiveSession): Date | null {
+  if (session.endsAtUtc) {
+    const d = new Date(session.endsAtUtc)
+    if (!Number.isNaN(d.getTime())) return d
+  }
+  const sessionEnd = new Date(session.sessionDate)
+  const [hours, minutes] = session.endTime.split(':').map(Number)
+  if (Number.isNaN(sessionEnd.getTime()) || Number.isNaN(hours) || Number.isNaN(minutes)) return null
+  sessionEnd.setHours(hours, minutes, 0, 0)
+  return sessionEnd
+}
+
+// The backend's actual join window is the authority (30 min lead, no fixed
+// upper bound while the host keeps re-minting past the scheduled end) — this
+// only needs to be loose enough not to hide the Start button prematurely.
+// Closing happens on status, not the clock: COMPLETED/CANCELLED, not "too late".
 function canStartSession(session: LiveSession): boolean {
   if (session.status !== 'SCHEDULED' && session.status !== 'FULL') return false
 
-  const now = new Date()
-  const sessionStart = new Date(session.sessionDate)
-  const [hours, minutes] = session.startTime.split(':').map(Number)
-  sessionStart.setHours(hours, minutes, 0, 0)
+  const sessionStart = resolveSessionStart(session)
+  if (!sessionStart) return false
 
-  // Allow starting 15 minutes before the session
-  const earliestStart = new Date(sessionStart.getTime() - 15 * 60 * 1000)
-  // Allow starting up to 2 hours after session start (in case of delays)
-  const latestStart = new Date(sessionStart.getTime() + 2 * 60 * 60 * 1000)
-
-  return now >= earliestStart && now <= latestStart
+  const earliestStart = new Date(sessionStart.getTime() - 30 * 60 * 1000)
+  return new Date() >= earliestStart
 }
 
 function getSessionTimeStatus(session: LiveSession): { label: string; color: string } {
-  const now = new Date()
-  const sessionStart = new Date(session.sessionDate)
-  const [hours, minutes] = session.startTime.split(':').map(Number)
-  sessionStart.setHours(hours, minutes, 0, 0)
-
-  const diffMs = sessionStart.getTime() - now.getTime()
-  const diffMins = Math.round(diffMs / 60000)
-
   if (session.status === 'COMPLETED') return { label: 'Completed', color: 'text-gray-500' }
   if (session.status === 'CANCELLED') return { label: 'Cancelled', color: 'text-red-500' }
+
+  const sessionStart = resolveSessionStart(session)
+  const sessionEnd = resolveSessionEnd(session)
+  if (!sessionStart) return { label: session.status, color: 'text-muted-foreground' }
+
+  const now = new Date()
+  const diffMs = sessionStart.getTime() - now.getTime()
+  const diffMins = Math.round(diffMs / 60000)
 
   if (diffMins > 60) {
     const diffHours = Math.round(diffMins / 60)
@@ -92,8 +119,7 @@ function getSessionTimeStatus(session: LiveSession): { label: string; color: str
   if (diffMins > -15) {
     return { label: 'Starting now', color: 'text-emerald-600 font-semibold animate-pulse' }
   }
-  const sessionEnd = new Date(sessionStart.getTime() + (session.durationMinutes || 60) * 60 * 1000)
-  if (now > sessionEnd) {
+  if (sessionEnd && now > sessionEnd) {
     return { label: 'Passed', color: 'text-muted-foreground' }
   }
   return { label: 'In progress', color: 'text-emerald-600' }
@@ -119,6 +145,7 @@ export function LiveSessionsPanel() {
   }
 
   const { data: sessions = [], isLoading, isError, refetch } = useLiveSessions()
+  const endSession = useEndSession()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -209,11 +236,8 @@ export function LiveSessionsPanel() {
     const scheduled = activePeriodSessions.filter((s: LiveSession) => s.status === 'SCHEDULED' || s.status === 'FULL').length
     const live = activePeriodSessions.filter((s: LiveSession) => {
       if (s.status !== 'SCHEDULED' && s.status !== 'FULL') return false
-      const now = new Date()
-      const sessionStart = new Date(s.sessionDate)
-      const [h, m] = s.startTime.split(':').map(Number)
-      sessionStart.setHours(h, m, 0, 0)
-      return now >= sessionStart
+      const sessionStart = resolveSessionStart(s)
+      return sessionStart ? new Date() >= sessionStart : false
     }).length
     const completed = activePeriodSessions.filter((s: LiveSession) => s.status === 'COMPLETED').length
     return { total, scheduled, live, completed }
@@ -436,20 +460,38 @@ export function LiveSessionsPanel() {
                     {/* Right: Actions */}
                     <div className="flex items-center gap-3 sm:flex-col sm:items-end">
                       <span className={cn('text-sm', timeStatus.color)}>{timeStatus.label}</span>
-                      <Button
-                        size="sm"
-                        disabled={!canLaunch}
-                        onClick={() => handleStartSession(session)}
-                        className={cn(
-                          canLaunch
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                            : ''
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          disabled={!canLaunch}
+                          onClick={() => handleStartSession(session)}
+                          className={cn(
+                            canLaunch
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              : ''
+                          )}
+                          title={!isAuthorized ? `Assigned to ${session.instructor}` : undefined}
+                        >
+                          <IconPlayerPlay className="mr-1 h-4 w-4" />
+                          {!isAuthorized ? 'Assigned' : 'Start Session'}
+                        </Button>
+                        {isAuthorized && (session.status === 'SCHEDULED' || session.status === 'FULL') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={endSession.isPending}
+                            className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:hover:bg-red-950/30"
+                            title="End this class for everyone — for a host who closed their hosting tab without ending it"
+                            onClick={() => {
+                              if (!window.confirm(`End "${session.className}" for everyone? This can't be undone.`)) return
+                              endSession.mutate(session.id)
+                            }}
+                          >
+                            <IconX className="mr-1 h-4 w-4" />
+                            End
+                          </Button>
                         )}
-                        title={!isAuthorized ? `Assigned to ${session.instructor}` : undefined}
-                      >
-                        <IconPlayerPlay className="mr-1 h-4 w-4" />
-                        {!isAuthorized ? 'Assigned' : 'Start Session'}
-                      </Button>
+                      </div>
                     </div>
                   </div>
                 )
