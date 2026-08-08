@@ -83,18 +83,32 @@ function resolveSessionEnd(session: LiveSession): Date | null {
   return sessionEnd
 }
 
-// The backend's actual join window is the authority (30 min lead, no fixed
-// upper bound while the host keeps re-minting past the scheduled end) — this
-// only needs to be loose enough not to hide the Start button prematurely.
-// Closing happens on status, not the clock: COMPLETED/CANCELLED, not "too late".
+// The backend's actual join window is the authority (30 min lead, closing at
+// end + SESSION_ROOM_EXPIRY_MINUTES) — this only needs to be loose enough not
+// to hide the Start button prematurely, or leave it showing once the room the
+// button would open has already been torn down.
+//
+// The upper bound used to be entirely status-based (SCHEDULED/FULL only,
+// no clock check) on the theory that the host re-mints past the scheduled end
+// indefinitely — that stopped being true once the lifecycle sweep started
+// expiring rooms at end + grace, so `roomExpiresAt` is now checked directly.
 function canStartSession(session: LiveSession): boolean {
   if (session.status !== 'SCHEDULED' && session.status !== 'FULL') return false
+  if (session.roomStatus === 'EXPIRED') return false
 
   const sessionStart = resolveSessionStart(session)
   if (!sessionStart) return false
 
   const earliestStart = new Date(sessionStart.getTime() - 30 * 60 * 1000)
-  return new Date() >= earliestStart
+  const now = new Date()
+  if (now < earliestStart) return false
+
+  if (session.roomExpiresAt) {
+    const expiresAt = new Date(session.roomExpiresAt)
+    if (!Number.isNaN(expiresAt.getTime()) && now >= expiresAt) return false
+  }
+
+  return true
 }
 
 function getSessionTimeStatus(session: LiveSession): { label: string; color: string } {
@@ -130,6 +144,16 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   FULL: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   COMPLETED: 'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400',
   CANCELLED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+}
+
+// Room lifecycle is separate from session status — a SCHEDULED session sits
+// PENDING until the (start - lead) sweep stamps it READY, and can reach
+// EXPIRED (room torn down) independently of whether a human ever clicked End.
+// Surfacing it is the fastest way for staff to spot a stalled lifecycle tick.
+const ROOM_STATUS_BADGE_STYLES: Record<string, string> = {
+  PENDING: 'bg-gray-100 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400',
+  READY: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  EXPIRED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
 }
 
 export function LiveSessionsPanel() {
@@ -426,6 +450,20 @@ export function LiveSessionsPanel() {
                         <Badge className={cn('text-xs', STATUS_BADGE_STYLES[session.status] || '')}>
                           {session.status}
                         </Badge>
+                        {session.deliveryType !== 'OFFLINE' && session.roomStatus && (
+                          <Badge
+                            variant="outline"
+                            className={cn('text-xs', ROOM_STATUS_BADGE_STYLES[session.roomStatus] || '')}
+                            title="Room lifecycle: PENDING (not yet provisioned) / READY (joinable) / EXPIRED (torn down)"
+                          >
+                            Room: {session.roomStatus}
+                          </Badge>
+                        )}
+                        {session.hostLiveAt && (
+                          <Badge className="bg-red-600 text-white text-xs animate-pulse" title="Host is live in the room">
+                            LIVE
+                          </Badge>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">

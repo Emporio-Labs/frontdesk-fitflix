@@ -104,6 +104,9 @@ export function VideoConferenceModal({
           showNonVideoUser: !isLiveStream,
           onJoinRoom: () => {
             if (mounted) setLoading(false)
+            liveSessionService.reportHostPresence(sessionId).catch((err) => {
+              console.error('Failed to report host presence:', err)
+            })
           },
           onLeaveRoom: () => {
             // Session ended

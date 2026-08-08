@@ -136,7 +136,7 @@ function formatBookingTime(
   }
 }
 
-type RosterStatus = 'pending' | 'booked' | 'completed' | 'ignored'
+type RosterStatus = 'pending' | 'reschedule' | 'booked' | 'completed' | 'ignored'
 
 interface NutritionRosterRow {
   user: User
@@ -167,12 +167,13 @@ function deriveNutritionRosterStatus(
     const status = normalizeRosterStatus(nutritionistAppointment.bookingStatus)
     if (status === 'completed') return 'completed'
     if (status === 'confirmed' || status === 'booked') return 'booked'
+    if (status === 'reschedulerequired' || status === 'reschedule_required') {
+      return 'reschedule'
+    }
     if (status === 'cancelled' || status === 'rejected' || status === 'expired') {
       return 'ignored'
     }
-    // 'pending' / 'requested' / 'reschedulerequired' / anything else non-terminal
-    // → still needs admin action (either accept, or wait for user to pick a new
-    // time on RescheduleRequired rows before the next accept attempt).
+    // 'pending' / 'requested' → needs admin accept action.
     return 'pending'
   }
 
@@ -180,24 +181,11 @@ function deriveNutritionRosterStatus(
     user.onboardingStatus?.onboardingCompleted === true ||
     user.onboarded === true
 
-  // No live appointment record — fall back to onboarding flags to place the
-  // user somewhere sensible.
+  // No live appointment record in nutritionistbookings — do not mark as booked
+  // or pending if no real NutritionistBooking document exists.
   if (onboardingCompleted && hasActivePlan) return 'completed'
-  if (
-    onboardingCompleted ||
-    user.onboardingStatus?.nutritionistBooked === true
-  ) {
-    return 'booked'
-  }
 
-  const onboardingStep = normalizeRosterStatus(
-    user.onboardingStatus?.currentStep
-  )
-  const pending =
-    onboardingStep === 'nutritionist_booking' ||
-    user.onboardingStatus?.completedSteps?.includes('NUTRITIONIST_BOOKING') === true
-
-  return pending ? 'pending' : 'ignored'
+  return 'ignored'
 }
 
 function toNutritionRosterRow(
@@ -212,9 +200,7 @@ function toNutritionRosterRow(
     onboardingStep:
       user.onboardingStatus?.currentStep ??
       (nutritionistAppointment ? 'NUTRITIONIST_BOOKING' : undefined),
-    bookingStatus:
-      nutritionistAppointment?.bookingStatus ??
-      (user.onboardingStatus?.nutritionistBooked ? 'Confirmed' : undefined),
+    bookingStatus: nutritionistAppointment?.bookingStatus ?? undefined,
     bookingDate: nutritionistAppointment?.appointmentDate ?? undefined,
     rosterStatus: deriveNutritionRosterStatus(user, hasActivePlan),
   }
@@ -583,9 +569,10 @@ function BookingsTab({
   )
 
   const counts = useMemo(() => {
-    const acc = { all: rows.length, pending: 0, booked: 0, completed: 0 }
+    const acc = { all: rows.length, pending: 0, reschedule: 0, booked: 0, completed: 0 }
     for (const r of rows) {
       if (r.rosterStatus === 'pending') acc.pending++
+      else if (r.rosterStatus === 'reschedule') acc.reschedule++
       else if (r.rosterStatus === 'booked') acc.booked++
       else if (r.rosterStatus === 'completed') acc.completed++
     }
@@ -614,6 +601,8 @@ function BookingsTab({
       ? 'No members have booked the nutritionist yet.'
       : segment === 'pending'
       ? 'No members are pending the nutritionist step.'
+      : segment === 'reschedule'
+      ? 'No members currently require rescheduling.'
       : segment === 'completed'
       ? 'No members have completed the nutritionist workflow yet.'
       : 'No members found.'
@@ -646,7 +635,7 @@ function BookingsTab({
         </CardHeader>
         <CardContent className="space-y-4 px-4 pb-4 pt-0">
           {/* Summary cards */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <SummaryCard
               label="Total Members"
               value={counts.all}
@@ -656,7 +645,13 @@ function BookingsTab({
             <SummaryCard
               label="Pending"
               value={counts.pending}
-              helper="awaiting nutrition workflow"
+              helper="awaiting admin accept"
+              loading={usersLoading}
+            />
+            <SummaryCard
+              label="Reschedule"
+              value={counts.reschedule}
+              helper="awaiting user slot pick"
               loading={usersLoading}
             />
             <SummaryCard
@@ -747,6 +742,8 @@ function BookingsTab({
                         ? 'completed'
                         : row.rosterStatus === 'booked'
                         ? 'booked'
+                        : row.rosterStatus === 'reschedule'
+                        ? 'reschedule_required'
                         : 'pending'
                     return (
                       <TableRow key={user._id}>
@@ -846,13 +843,37 @@ function BookingsTab({
                               const appt = user.expertAppointments?.find(
                                 (a) => a.expertType === 'nutritionist'
                               )
-                              const bookingId = appt?._id || user._id
+                              const bookingId = appt?._id
+                              const rawDate = appt?.appointmentDate
+                              const rawEnd = appt?.endTime || appt?.appointmentStart
+                              let isPast = false
+                              if (rawDate) {
+                                const d = new Date(rawDate)
+                                if (!Number.isNaN(d.getTime())) {
+                                  if (rawEnd && rawEnd.includes(':')) {
+                                    const [h, m] = rawEnd.split(':').map(Number)
+                                    d.setHours(h, m, 0, 0)
+                                  } else {
+                                    d.setHours(23, 59, 59, 999)
+                                  }
+                                  isPast = d < new Date()
+                                }
+                              }
+
+                              if (row.rosterStatus === 'reschedule') {
+                                return (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 dark:bg-amber-950/50 dark:text-amber-300 px-2.5 py-1 rounded-md border border-amber-200 dark:border-amber-800">
+                                    Awaiting User Reschedule
+                                  </span>
+                                )
+                              }
                               if (row.rosterStatus === 'pending' && bookingId) {
                                 return (
                                   <Button
                                     size="sm"
                                     onClick={() => accept.mutate(bookingId)}
                                     disabled={accept.isPending && accept.variables === bookingId}
+                                    title={isPast ? "Appointment date has passed — accepting will prompt member to reschedule" : undefined}
                                   >
                                     <IconCheck className="mr-1 h-4 w-4" />
                                     {accept.isPending && accept.variables === bookingId
@@ -868,7 +889,13 @@ function BookingsTab({
                                     <Button
                                       size="sm"
                                       variant="default"
-                                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                                      disabled={isPast}
+                                      className={
+                                        isPast
+                                          ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                                      }
+                                      title={isPast ? "Appointment date has passed" : "Join Video Call"}
                                       onClick={() =>
                                         setActiveCallBooking({
                                           _id: bookingId,

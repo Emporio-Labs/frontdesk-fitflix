@@ -117,6 +117,16 @@ export function NutritionistCallModal({
 				const zp = ZegoUIKitPrebuilt.create(kitToken)
 				zegoRef.current = zp
 
+				if (booking?._id) {
+					apiClient
+						.post(`/api/v1/zego/sessions/${booking._id}/host-presence`, {})
+						.catch(() => {
+							apiClient
+								.post(`/zego/sessions/${booking._id}/host-presence`, {})
+								.catch((err) => console.error('Host presence report error:', err))
+						})
+				}
+
 				zp.joinRoom({
 					container: containerElement!,
 					scenario: {
@@ -132,6 +142,15 @@ export function NutritionistCallModal({
 					showUserList: true,
 					onJoinRoom: () => {
 						if (mounted) setLoading(false)
+						if (booking?._id) {
+							apiClient
+								.post(`/api/v1/zego/sessions/${booking._id}/host-presence`, {})
+								.catch(() => {
+									apiClient
+										.post(`/zego/sessions/${booking._id}/host-presence`, {})
+										.catch((err) => console.error('Host presence report error:', err))
+								})
+						}
 					},
 					onLeaveRoom: () => {
 						// Session ended locally

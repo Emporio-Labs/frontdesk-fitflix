@@ -20,10 +20,16 @@ export interface LiveSession {
   currentBookings: number
   remainingCapacity: number
   status: 'SCHEDULED' | 'FULL' | 'CANCELLED' | 'COMPLETED'
+  // Room lifecycle, distinct from `status`: a session can be SCHEDULED with
+  // roomStatus READY (room provisioned, nobody's ended the class yet) or
+  // COMPLETED with roomStatus EXPIRED (the T+30 sweep tore it down).
+  roomStatus: 'PENDING' | 'READY' | 'EXPIRED' | null
+  roomExpiresAt: string | null
   streamRoomId: string
   videoConferenceId: string
   creditCost: number
   durationMinutes: number
+  hostLiveAt: string | null
 }
 
 export interface ZegoSessionToken {
@@ -48,21 +54,14 @@ export interface EndSessionResult {
 
 function normalizeLiveSession(raw: any): LiveSession {
   const c = raw.classId || {}
-  
-  // Auto-resolve status to COMPLETED if the session end-time has passed
-  const now = new Date()
-  const sessionStart = new Date(raw.sessionDate)
-  if (raw.startTime) {
-    const [hours, minutes] = raw.startTime.split(':').map(Number)
-    sessionStart.setHours(hours, minutes, 0, 0)
-  }
   const duration = c.durationMinutes || 60
-  const sessionEnd = new Date(sessionStart.getTime() + duration * 60 * 1000)
-  
-  let status = raw.status || 'SCHEDULED'
-  if (status === 'SCHEDULED' && now > sessionEnd) {
-    status = 'COMPLETED'
-  }
+
+  // `status` now comes from the server as-is: the lifecycle sweep flips
+  // SCHEDULED -> COMPLETED itself at (end + SESSION_ROOM_EXPIRY_MINUTES), so
+  // guessing it client-side off a locally-reconstructed end time is no longer
+  // needed — and was wrong by up to the expiry grace while the host was
+  // legitimately still running over.
+  const status = raw.status || 'SCHEDULED'
 
   return {
     id: raw._id,
@@ -81,10 +80,13 @@ function normalizeLiveSession(raw: any): LiveSession {
     currentBookings: raw.currentBookings || 0,
     remainingCapacity: raw.remainingCapacity || 0,
     status: status,
+    roomStatus: raw.roomStatus || null,
+    roomExpiresAt: raw.roomExpiresAt || null,
     streamRoomId: raw.streamRoomId || c.streamRoomId || '',
     videoConferenceId: raw.videoConferenceId || '',
     creditCost: c.creditCost || 0,
-    durationMinutes: duration
+    durationMinutes: duration,
+    hostLiveAt: raw.hostLiveAt || null,
   }
 }
 
@@ -119,6 +121,12 @@ export const liveSessionService = {
   // checked who was asking or which room they were allowed into.
   async getToken(sessionId: string): Promise<ZegoSessionToken> {
     const res = await apiClient.post(`/api/v1/zego/sessions/${sessionId}/token`)
+    return res.data
+  },
+
+  // Host-only heartbeat: called when host client successfully joins Zego room
+  async reportHostPresence(sessionId: string): Promise<{ hostLiveAt: string }> {
+    const res = await apiClient.post(`/api/v1/zego/sessions/${sessionId}/host-presence`)
     return res.data
   },
 

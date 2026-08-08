@@ -61,6 +61,14 @@ const statusConfig: Record<string, StatusStyle> = {
     badge: 'bg-amber-50/60 text-amber-700 border-amber-200/50 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20',
     dot: 'bg-amber-500',
   },
+  reschedule_required: {
+    badge: 'bg-orange-50/60 text-orange-700 border-orange-200/50 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20',
+    dot: 'bg-orange-500',
+  },
+  reschedulerequired: {
+    badge: 'bg-orange-50/60 text-orange-700 border-orange-200/50 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20',
+    dot: 'bg-orange-500',
+  },
   paused: {
     badge: 'bg-orange-50/60 text-orange-700 border-orange-200/50 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20',
     dot: 'bg-orange-500',

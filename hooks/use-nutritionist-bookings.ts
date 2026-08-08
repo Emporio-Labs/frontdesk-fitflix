@@ -22,7 +22,16 @@ export function useAcceptNutritionistBooking() {
       toast.success(data.message || 'Booking accepted')
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to accept booking')
+      const resData = err?.response?.data
+      const msg = resData?.error || resData?.message || err?.message || 'Failed to accept booking'
+      if (err?.response?.status === 409 || resData?.code?.includes('SLOT')) {
+        toast.warning(msg, { duration: 5000 })
+        qc.invalidateQueries({ queryKey: queryKeys.nutritionistBookings.all() })
+        qc.invalidateQueries({ queryKey: queryKeys.users.all() })
+        qc.invalidateQueries({ queryKey: queryKeys.onboarding.all() })
+      } else {
+        toast.error(msg)
+      }
     },
   })
 }

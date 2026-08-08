@@ -143,6 +143,9 @@ export default function LiveSessionPage() {
           onJoinRoom: () => {
             if (cancelled) return
             setZegoState({ loading: false, error: null, joined: true })
+            liveSessionService.reportHostPresence(session.id).catch((err) => {
+              console.error('Failed to report host presence:', err)
+            })
           },
           onLeaveRoom: () => {
             if (cancelled) return
