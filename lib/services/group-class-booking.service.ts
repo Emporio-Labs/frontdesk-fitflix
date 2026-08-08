@@ -67,6 +67,48 @@ export const groupClassBookingService = {
       }
     }
   },
+  getById: async (id: string): Promise<{ booking: GroupClassBooking }> => {
+    try {
+      const { data } = await apiClient.get(`/api/v1/admin/bookings/${id}`)
+      return data
+    } catch {
+      try {
+        const { data } = await apiClient.get(`/api/v1/bookings/${id}`)
+        return data
+      } catch {
+        const { data } = await apiClient.get(`/bookings/${id}`)
+        return data
+      }
+    }
+  },
+  cancel: async (id: string, payload: { adminOverride?: boolean; reason?: string }): Promise<any> => {
+    try {
+      const { data } = await apiClient.post(`/bookings/${id}/cancel`, payload)
+      return data
+    } catch {
+      try {
+        const { data } = await apiClient.post(`/api/v1/admin/bookings/${id}/cancel`, payload)
+        return data
+      } catch {
+        const { data } = await apiClient.post(`/api/v1/bookings/${id}/cancel`, payload)
+        return data
+      }
+    }
+  },
+  reschedule: async (id: string, payload: { sessionId?: string; bookingDate?: string; startTime?: string; endTime?: string; reason?: string }): Promise<any> => {
+    try {
+      const { data } = await apiClient.patch(`/bookings/${id}`, payload)
+      return data
+    } catch {
+      try {
+        const { data } = await apiClient.patch(`/api/v1/admin/bookings/${id}`, payload)
+        return data
+      } catch {
+        const { data } = await apiClient.patch(`/api/v1/bookings/${id}`, payload)
+        return data
+      }
+    }
+  },
   updateStatus: async (id: string, status: string): Promise<any> => {
     try {
       const { data } = await apiClient.patch(`/api/v1/admin/bookings/${id}`, { status })

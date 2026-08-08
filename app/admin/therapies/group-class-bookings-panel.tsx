@@ -31,6 +31,9 @@ import { useGroupClasses } from '@/hooks/use-group-classes'
 import { GroupClassBooking, groupClassBookingService } from '@/lib/services/group-class-booking.service'
 import type { GroupClass } from '@/lib/services/group-class.service'
 import { VideoConferenceModal } from '@/components/video-conference/video-conference-modal'
+import { BookingDetailsDialog } from '@/components/bookings/booking-details-dialog'
+import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog'
+import { RescheduleBookingDialog } from '@/components/bookings/reschedule-booking-dialog'
 import { cn } from '@/lib/utils'
 
 // Status Badge styling helper
@@ -83,6 +86,9 @@ export default function GroupClassBookingsPanel({
   const [searchTerm, setSearchTerm] = useState('')
   const [activeFilter, setActiveFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'No-Show'>('All')
   const [selectedDate, setSelectedDate] = useState<string>('')
+  const [selectedBooking, setSelectedBooking] = useState<GroupClassBooking | null>(null)
+  const [isCancelOpen, setIsCancelOpen] = useState(false)
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
   const [callModal, setCallModal] = useState<{ isOpen: boolean; roomID: string; sessionTitle: string }>({
     isOpen: false,
     roomID: '',
@@ -184,8 +190,8 @@ export default function GroupClassBookingsPanel({
     })
   }, [groupClassBookingsOnly, searchTerm, activeFilter, selectedDate, selectedClassFilter])
 
-  const handleRowClick = (id: string) => {
-    router.push(`/admin/bookings/${id}`)
+  const handleRowClick = (booking: GroupClassBooking) => {
+    setSelectedBooking(booking)
   }
 
   const handleRefresh = () => {
@@ -392,11 +398,22 @@ export default function GroupClassBookingsPanel({
                   const creditsCost =
                     booking.creditCostSnapshot ?? booking.classId?.creditCost ?? booking.service?.creditCost ?? 0
 
+                  const statusNormalized = (booking.status || '').toLowerCase().trim()
+                  const isCompletedOrAttended =
+                    statusNormalized === 'completed' ||
+                    statusNormalized === 'attended' ||
+                    statusNormalized === 'consumed'
+                  const isNoShow =
+                    statusNormalized === 'noshow' ||
+                    statusNormalized === 'no-show' ||
+                    statusNormalized === 'unattended'
+                  const isCancelled = statusNormalized === 'cancelled'
+
                   return (
                     <Card
                       key={booking._id}
                       className="overflow-hidden rounded-2xl border border-slate-200/85 hover:shadow-md transition-shadow cursor-pointer group flex flex-col justify-between"
-                      onClick={() => handleRowClick(booking._id)}
+                      onClick={() => handleRowClick(booking)}
                     >
                       {/* Card Top Header */}
                       <div className="bg-gradient-to-r from-indigo-500/15 to-blue-500/10 p-4">
@@ -457,18 +474,18 @@ export default function GroupClassBookingsPanel({
 
                           {/* Attendance Status Action Controls */}
                           <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                            {booking.status === 'completed' || booking.status === 'attended' || booking.status === 'consumed' ? (
+                            {isCompletedOrAttended ? (
                               <Badge className="bg-emerald-100 text-emerald-800 border-transparent text-[11px] font-medium py-1 px-3 w-full justify-center">
                                 <IconCheck className="mr-1 h-3.5 w-3.5" />
                                 {booking.stayDurationMinutes && booking.stayDurationMinutes > 0
-                                  ? `Member Joined (Stayed ${booking.stayDurationMinutes} mins)`
-                                  : 'Member Attended'}
+                                  ? `Attended (${booking.stayDurationMinutes} min${booking.stayDurationMinutes !== 1 ? 's' : ''})`
+                                  : 'Attended'}
                               </Badge>
-                            ) : booking.status === 'noshow' || booking.status === 'no-show' || booking.status === 'unattended' ? (
+                            ) : isNoShow ? (
                               <Badge className="bg-gray-100 text-gray-800 border-transparent text-[11px] font-medium py-1 px-3 w-full justify-center">
                                 <IconX className="mr-1 h-3.5 w-3.5" /> Marked No-Show
                               </Badge>
-                            ) : booking.status === 'cancelled' ? (
+                            ) : isCancelled ? (
                               <Badge className="bg-red-100 text-red-800 border-transparent text-[11px] font-medium py-1 px-3 w-full justify-center">
                                 Cancelled Booking
                               </Badge>
@@ -518,6 +535,111 @@ export default function GroupClassBookingsPanel({
         roomID={callModal.roomID}
         sessionTitle={callModal.sessionTitle}
       />
+
+      {/* Booking Details Modal */}
+      <BookingDetailsDialog
+        isOpen={Boolean(selectedBooking) && !isCancelOpen && !isRescheduleOpen}
+        onClose={() => setSelectedBooking(null)}
+        booking={selectedBooking}
+        classNameDisplay={
+          selectedBooking
+            ? selectedBooking.classId?.name ||
+              (selectedBooking.classId
+                ? classNameById.get(
+                    typeof selectedBooking.classId === 'string'
+                      ? selectedBooking.classId
+                      : selectedBooking.classId._id
+                  )
+                : undefined) ||
+              selectedBooking.service?.serviceName
+            : undefined
+        }
+        onCancelClick={() => setIsCancelOpen(true)}
+        onRescheduleClick={() => setIsRescheduleOpen(true)}
+      />
+
+      {/* Cancellation Confirmation Dialog */}
+      {selectedBooking && (
+        <CancelBookingDialog
+          isOpen={isCancelOpen}
+          onClose={() => {
+            setIsCancelOpen(false)
+            setSelectedBooking(null)
+          }}
+          bookingId={selectedBooking._id}
+          creditsCost={
+            selectedBooking.creditCostSnapshot ??
+            selectedBooking.classId?.creditCost ??
+            selectedBooking.service?.creditCost ??
+            0
+          }
+          memberName={selectedBooking.user?.username || 'Member'}
+          className={
+            selectedBooking.classId?.name ||
+            (selectedBooking.classId
+              ? classNameById.get(
+                  typeof selectedBooking.classId === 'string'
+                    ? selectedBooking.classId
+                    : selectedBooking.classId._id
+                )
+              : undefined) ||
+            selectedBooking.service?.serviceName ||
+            'Group Class'
+          }
+          onSuccess={() => {
+            refetch()
+            setSelectedBooking(null)
+          }}
+        />
+      )}
+
+      {/* Reschedule Dialog */}
+      {selectedBooking && (
+        <RescheduleBookingDialog
+          isOpen={isRescheduleOpen}
+          onClose={() => {
+            setIsRescheduleOpen(false)
+            setSelectedBooking(null)
+          }}
+          bookingId={selectedBooking._id}
+          classId={
+            typeof selectedBooking.classId === 'string'
+              ? selectedBooking.classId
+              : selectedBooking.classId?._id
+          }
+          className={
+            selectedBooking.classId?.name ||
+            (selectedBooking.classId
+              ? classNameById.get(
+                  typeof selectedBooking.classId === 'string'
+                    ? selectedBooking.classId
+                    : selectedBooking.classId._id
+                )
+              : undefined) ||
+            selectedBooking.service?.serviceName ||
+            'Group Class'
+          }
+          currentSessionId={
+            typeof selectedBooking.sessionId === 'object'
+              ? selectedBooking.sessionId?._id
+              : selectedBooking.sessionId
+          }
+          currentDate={
+            selectedBooking.sessionId?.sessionDate ||
+            selectedBooking.slot?.date ||
+            selectedBooking.bookingDate
+          }
+          currentTime={
+            selectedBooking.sessionId?.startTime && selectedBooking.sessionId?.endTime
+              ? `${selectedBooking.sessionId.startTime} – ${selectedBooking.sessionId.endTime}`
+              : undefined
+          }
+          onSuccess={() => {
+            refetch()
+            setSelectedBooking(null)
+          }}
+        />
+      )}
     </div>
   )
 }
