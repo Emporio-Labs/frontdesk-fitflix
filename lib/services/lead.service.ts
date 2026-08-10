@@ -53,8 +53,8 @@ export interface Lead {
 
 export interface CreateLeadPayload {
   name: string
-  email: string
-  phone?: string
+  email?: string
+  phone: string
   source?: string
   status?: LeadStatus
   interestedIn?: string
@@ -191,10 +191,13 @@ function normalizeLead(raw: any): Lead {
   const followUpSource = raw?.followUpDate ?? raw?.followUp ?? raw?.followupDate ?? raw?.follow_up_date
   const stageHistory = normalizeStageHistory(raw?.stageHistory)
 
+  const rawEmail = String(raw?.email || '')
+  const email = rawEmail.startsWith('noemail-') && rawEmail.endsWith('@fitflix.in') ? '' : rawEmail
+
   return {
     id: String(raw?._id || raw?.id || ''),
     name: String(raw?.leadName || raw?.name || ''),
-    email: String(raw?.email || ''),
+    email,
     phone: String(raw?.phone || ''),
     source: String(raw?.source || 'other'),
     status,
@@ -397,10 +400,15 @@ function toCreatePayload(payload: CreateLeadPayload) {
     ? { followUpDate: payload.followUpDate, followUp: payload.followUpDate }
     : {}
 
+  const cleanPhone = (payload.phone || '').replace(/\D/g, '') || String(Date.now())
+  const validEmail = payload.email && payload.email.trim()
+    ? payload.email.trim()
+    : `noemail-${cleanPhone}@fitflix.in`
+
   return {
     leadName: payload.name,
-    email: payload.email,
-    ...(payload.phone ? { phone: payload.phone } : {}),
+    phone: payload.phone,
+    email: validEmail,
     ...(payload.source ? { source: payload.source } : {}),
     ...(payload.status ? { status: toApiStatus(payload.status) } : {}),
     ...(payload.interestedIn ? { interestedIn: payload.interestedIn } : {}),
@@ -418,9 +426,13 @@ function toUpdatePayload(payload: UpdateLeadPayload) {
     ? { followUpDate: payload.followUpDate, followUp: payload.followUpDate }
     : {}
 
+  const emailPayload = payload.email !== undefined
+    ? (payload.email.trim() || (payload.phone ? `noemail-${payload.phone.replace(/\D/g, '')}@fitflix.in` : undefined))
+    : undefined
+
   return {
     ...(payload.name !== undefined ? { leadName: payload.name } : {}),
-    ...(payload.email !== undefined ? { email: payload.email } : {}),
+    ...(emailPayload !== undefined ? { email: emailPayload } : {}),
     ...(payload.phone !== undefined ? { phone: payload.phone } : {}),
     ...(payload.source !== undefined ? { source: payload.source } : {}),
     ...(payload.status !== undefined ? { status: toApiStatus(payload.status) } : {}),
