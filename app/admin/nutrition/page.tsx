@@ -136,7 +136,13 @@ function formatBookingTime(
   }
 }
 
-type RosterStatus = 'pending' | 'reschedule' | 'booked' | 'completed' | 'ignored'
+type RosterStatus =
+  | 'pending'
+  | 'reschedule'
+  | 'booked'
+  | 'completed'
+  | 'expired'
+  | 'ignored'
 
 interface NutritionRosterRow {
   user: User
@@ -170,7 +176,8 @@ function deriveNutritionRosterStatus(
     if (status === 'reschedulerequired' || status === 'reschedule_required') {
       return 'reschedule'
     }
-    if (status === 'cancelled' || status === 'rejected' || status === 'expired') {
+    if (status === 'expired') return 'expired'
+    if (status === 'cancelled' || status === 'rejected') {
       return 'ignored'
     }
     // 'pending' / 'requested' → needs admin accept action.
@@ -374,24 +381,25 @@ function OverviewTab({
                       {m.bookingStatus && (
                         <StatusBadge status={m.bookingStatus} size="sm" />
                       )}
-                      {onJoinCall && (
-                        <Button
-                          size="sm"
-                          variant="default"
-                          className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs"
-                          onClick={() =>
-                            onJoinCall({
-                              _id: m._id,
-                              userId: m.member,
-                              zegoRoomId: m.zegoRoomId || `nutri_session_${m._id}`,
-                              appointmentMode: 'ONLINE',
-                            })
-                          }
-                        >
-                          <IconVideo className="mr-1 h-3.5 w-3.5" />
-                          Join Call
-                        </Button>
-                      )}
+                      {onJoinCall &&
+                        normalizeRosterStatus(m.bookingStatus) === 'confirmed' && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs"
+                            onClick={() =>
+                              onJoinCall({
+                                _id: m._id,
+                                userId: m.member,
+                                zegoRoomId: m.zegoRoomId || `nutri_session_${m._id}`,
+                                appointmentMode: 'ONLINE',
+                              })
+                            }
+                          >
+                            <IconVideo className="mr-1 h-3.5 w-3.5" />
+                            Join Call
+                          </Button>
+                        )}
                       <Link href={`/admin/nutrition/members/${m.member._id}`}>
                         <Button variant="outline" size="sm" className="h-8 text-xs">
                           <IconEye className="mr-1 h-3.5 w-3.5" />
@@ -569,12 +577,20 @@ function BookingsTab({
   )
 
   const counts = useMemo(() => {
-    const acc = { all: rows.length, pending: 0, reschedule: 0, booked: 0, completed: 0 }
+    const acc = {
+      all: rows.length,
+      pending: 0,
+      reschedule: 0,
+      booked: 0,
+      completed: 0,
+      expired: 0,
+    }
     for (const r of rows) {
       if (r.rosterStatus === 'pending') acc.pending++
       else if (r.rosterStatus === 'reschedule') acc.reschedule++
       else if (r.rosterStatus === 'booked') acc.booked++
       else if (r.rosterStatus === 'completed') acc.completed++
+      else if (r.rosterStatus === 'expired') acc.expired++
     }
     return acc
   }, [rows])
@@ -605,6 +621,8 @@ function BookingsTab({
       ? 'No members currently require rescheduling.'
       : segment === 'completed'
       ? 'No members have completed the nutritionist workflow yet.'
+      : segment === 'expired'
+      ? 'No missed or expired consultations.'
       : 'No members found.'
 
   const handleReview = (userId: string) => {
@@ -635,7 +653,7 @@ function BookingsTab({
         </CardHeader>
         <CardContent className="space-y-4 px-4 pb-4 pt-0">
           {/* Summary cards */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
             <SummaryCard
               label="Total Members"
               value={counts.all}
@@ -657,13 +675,19 @@ function BookingsTab({
             <SummaryCard
               label="Booked"
               value={counts.booked}
-              helper="appointments scheduled"
+              helper="live — not yet held"
               loading={usersLoading}
             />
             <SummaryCard
               label="Completed"
               value={counts.completed}
-              helper="onboarded & plan assigned"
+              helper="consultation held"
+              loading={usersLoading}
+            />
+            <SummaryCard
+              label="Expired"
+              value={counts.expired}
+              helper="booked — call missed"
               loading={usersLoading}
             />
           </div>
@@ -744,6 +768,8 @@ function BookingsTab({
                         ? 'booked'
                         : row.rosterStatus === 'reschedule'
                         ? 'reschedule_required'
+                        : row.rosterStatus === 'expired'
+                        ? 'expired'
                         : 'pending'
                     return (
                       <TableRow key={user._id}>
@@ -864,6 +890,13 @@ function BookingsTab({
                                 return (
                                   <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 dark:bg-amber-950/50 dark:text-amber-300 px-2.5 py-1 rounded-md border border-amber-200 dark:border-amber-800">
                                     Awaiting User Reschedule
+                                  </span>
+                                )
+                              }
+                              if (row.rosterStatus === 'expired') {
+                                return (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-700 bg-rose-50 dark:bg-rose-950/50 dark:text-rose-300 px-2.5 py-1 rounded-md border border-rose-200 dark:border-rose-800">
+                                    Missed — No-show
                                   </span>
                                 )
                               }
@@ -1620,15 +1653,29 @@ function NutritionDashboardContent() {
   const [activeCallBooking, setActiveCallBooking] = useState<any | null>(null)
 
   const todaysAppointments = useMemo(() => {
+    // Only a live (still-actionable) booking belongs on "Today's Consultations" —
+    // Expired/Cancelled/RescheduleRequired rows are historical, not something to
+    // show up for today, and must never carry a Join Call button.
+    const isLiveStatus = (status?: string | null) => {
+      const s = normalizeRosterStatus(status)
+      return s === 'pending' || s === 'confirmed' || s === 'booked'
+    }
+
     if (members.length > 0) {
-      const list = members.filter((m) => (m.bookingDate ?? '').slice(0, 10) === today)
+      const list = members.filter(
+        (m) => (m.bookingDate ?? '').slice(0, 10) === today && isLiveStatus(m.bookingStatus)
+      )
       if (list.length > 0) return list
     }
 
     return users
       .filter((u) => {
         const appt = u.expertAppointments?.find((a) => a.expertType === 'nutritionist')
-        return u.onboardingStatus?.nutritionistBooked || !!appt
+        return (
+          !!appt &&
+          (appt.appointmentDate ?? '').slice(0, 10) === today &&
+          isLiveStatus(appt.bookingStatus)
+        )
       })
       .map(
         (u) =>
@@ -1645,7 +1692,7 @@ function NutritionDashboardContent() {
                 ?.appointmentDate || u.createdAt,
             bookingStatus:
               u.expertAppointments?.find((a) => a.expertType === 'nutritionist')
-                ?.bookingStatus || 'Confirmed',
+                ?.bookingStatus,
             onboardingStep:
               u.onboardingStatus?.currentStep || 'NUTRITIONIST_BOOKING',
             zegoRoomId:

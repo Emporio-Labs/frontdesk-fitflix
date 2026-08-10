@@ -1,6 +1,12 @@
 'use client'
 
-export type BookingSegment = 'all' | 'pending' | 'reschedule' | 'booked' | 'completed'
+export type BookingSegment =
+  | 'all'
+  | 'pending'
+  | 'reschedule'
+  | 'booked'
+  | 'completed'
+  | 'expired'
 
 interface BookingStatusTabsProps {
   value: BookingSegment
@@ -14,6 +20,7 @@ const SEGMENTS: { key: BookingSegment; label: string }[] = [
   { key: 'reschedule', label: 'Reschedule Required' },
   { key: 'booked', label: 'Booked' },
   { key: 'completed', label: 'Completed' },
+  { key: 'expired', label: 'Expired' },
 ]
 
 export function BookingStatusTabs({
