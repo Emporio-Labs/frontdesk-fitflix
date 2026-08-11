@@ -81,3 +81,17 @@ export function useCheckOut() {
     },
   })
 }
+
+export function useDeleteGymVisit() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => gymVisitService.delete(id),
+    onSuccess: (data) => {
+      invalidateAll(qc)
+      toast.success(data.message)
+    },
+    onError: (err: any) => {
+      toast.error(extractApiError(err, 'Failed to delete visit'))
+    },
+  })
+}
