@@ -31,10 +31,14 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    /** Skip rendering the dim overlay — used to keep a dialog mounted but
+     * visually "minimized" without blocking the page behind it. */
+    hideOverlay?: boolean
+  }
+>(({ className, children, hideOverlay, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay />
+    {!hideOverlay && <DialogOverlay />}
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
