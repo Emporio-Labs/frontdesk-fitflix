@@ -59,6 +59,7 @@ import {
   useUpdateLead,
 } from '@/hooks/use-leads'
 import { Lead, LeadStatus, LeadTemperature } from '@/lib/services/lead.service'
+import { validateEmail, validatePhoneNumber } from '@/lib/schemas'
 import KanbanColumn from './kanban-column'
 import KanbanCard from './kanban-card'
 
@@ -201,8 +202,24 @@ export default function LeadsPage() {
   }
 
   const handleAddLead = async () => {
-    if (!formData.name.trim() || !formData.email.trim()) {
-      toast.error('Name and email are required')
+    if (!formData.name.trim()) {
+      toast.error('Name is required')
+      return
+    }
+
+    if (!formData.phone.trim()) {
+      toast.error('Phone number is required')
+      return
+    }
+
+    if (!validatePhoneNumber(formData.phone)) {
+      toast.error('Please enter a valid phone number (at least 10 digits)')
+      return
+    }
+
+    const trimmedEmail = formData.email.trim()
+    if (trimmedEmail && !validateEmail(trimmedEmail)) {
+      toast.error('Please enter a valid email address')
       return
     }
 
@@ -640,7 +657,7 @@ export default function LeadsPage() {
                 Add Lead
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>{editingLead ? 'Edit Lead' : 'Add New Lead'}</DialogTitle>
                 <DialogDescription>
@@ -649,7 +666,9 @@ export default function LeadsPage() {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium">Name</label>
+                  <label className="text-sm font-medium">
+                    Name <span className="text-red-600">*</span>
+                  </label>
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -666,7 +685,9 @@ export default function LeadsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Phone</label>
+                  <label className="text-sm font-medium">
+                    Phone <span className="text-red-600">*</span>
+                  </label>
                   <Input
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -1617,7 +1638,7 @@ export default function LeadsPage() {
             {/* Convert Lead Dialog */}
             {convertingLead && (
               <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                   <DialogHeader>
                     <DialogTitle>Convert Lead to Member</DialogTitle>
                     <DialogDescription>
@@ -1651,7 +1672,9 @@ export default function LeadsPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Phone</label>
+                      <label className="text-sm font-medium">
+                        Phone <span className="text-red-600">*</span>
+                      </label>
                       <Input
                         value={convertFormData.phone}
                         onChange={(e) => setConvertFormData({ ...convertFormData, phone: e.target.value })}

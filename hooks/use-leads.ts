@@ -100,9 +100,44 @@ export function useCreateLead() {
       toast.success(data.message || 'Lead created successfully')
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to create lead')
+      toast.error(extractLeadErrorMessage(err, 'Failed to create lead'))
     },
   })
+}
+
+function extractLeadErrorMessage(err: any, fallback: string): string {
+  const data = err?.response?.data
+  if (typeof console !== 'undefined') {
+    try {
+      console.error(
+        '[lead-error]',
+        'status=', err?.response?.status,
+        'request=', JSON.stringify(err?.config?.data),
+        'response=', JSON.stringify(data),
+      )
+    } catch {
+      console.error('[lead-error]', err?.response?.status, data)
+    }
+  }
+  const base = data?.error || data?.message || fallback
+
+  const fieldMessages: string[] = []
+  if (Array.isArray(data?.details)) {
+    for (const issue of data.details) {
+      if (!issue || typeof issue !== 'object') continue
+      const path = Array.isArray(issue.path) ? issue.path.join('.') : ''
+      if (typeof issue.message === 'string') {
+        fieldMessages.push(path ? `${path}: ${issue.message}` : issue.message)
+      }
+    }
+  } else if (data?.details && typeof data.details === 'object') {
+    for (const [key, value] of Object.entries(data.details)) {
+      if (key === 'debug') continue
+      if (typeof value === 'string') fieldMessages.push(`${key}: ${value}`)
+    }
+  }
+
+  return fieldMessages.length ? `${base} — ${fieldMessages.join('; ')}` : base
 }
 
 export function useUpdateLead() {
@@ -155,7 +190,7 @@ export function useUpdateLead() {
       if (ctx?.prev) {
         qc.setQueryData(queryKeys.leads.all(), ctx.prev)
       }
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to update lead')
+      toast.error(extractLeadErrorMessage(err, 'Failed to update lead'))
     },
   })
 }

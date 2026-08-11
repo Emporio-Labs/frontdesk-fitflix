@@ -22,6 +22,7 @@ import {
   IconActivity,
   IconSalad,
   IconFileInvoice,
+  IconMessage2,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -128,6 +129,11 @@ const navMain = [
       title: "Invoices",
       url: "/admin/invoices",
       icon: IconFileInvoice,
+    },
+    {
+      title: "Community",
+      url: "/admin/community",
+      icon: IconMessage2,
     },
     {
       title: "Audit Logs",
