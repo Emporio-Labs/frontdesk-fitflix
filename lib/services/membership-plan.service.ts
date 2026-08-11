@@ -1,9 +1,12 @@
-import { apiClient } from '@/lib/api-client'
+import axios from 'axios'
 
-// Membership plans are served by the backend (`/membership-plans`), which is
-// the same store the mobile/user apps read. Backend model fields:
-// { _id, name, description, price, currency, creditsIncluded, features,
-//   active, gymId, durationMonths, benefits, createdAt, updatedAt }
+// Membership plans are served by in-app Next.js API routes.
+const membershipPlanClient = axios.create({
+  baseURL: '',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
 
 export type MembershipPlanStatus = 'Active' | 'Inactive'
 

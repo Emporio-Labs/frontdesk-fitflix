@@ -292,15 +292,18 @@ function MembershipsPageContent() {
       notes: formData.notes,
     }
 
-    if (editingMembership) {
-      await updateMembership.mutateAsync({ id: editingMembership.id, payload })
-    } else {
-      await createMembership.mutateAsync(payload)
+    try {
+      if (editingMembership) {
+        await updateMembership.mutateAsync({ id: editingMembership.id, payload })
+      } else {
+        await createMembership.mutateAsync(payload)
+      }
+      resetForm()
+      setEditingMembership(null)
+      setIsAddDialogOpen(false)
+    } catch (error) {
+      // Handled by React Query's onError toast
     }
-
-    resetForm()
-    setEditingMembership(null)
-    setIsAddDialogOpen(false)
   }
 
   const handleEditMembership = (membership: Membership) => {

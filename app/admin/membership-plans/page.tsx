@@ -205,21 +205,28 @@ export default function MembershipPlansPage() {
       },
     }
 
-    if (editingPlan) {
-      await updatePlan.mutateAsync({ id: editingPlan.id, payload })
-    } else {
-      await createPlan.mutateAsync(payload)
+    try {
+      if (editingPlan) {
+        await updatePlan.mutateAsync({ id: editingPlan.id, payload })
+      } else {
+        await createPlan.mutateAsync(payload)
+      }
+      setIsDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      // Handled by React Query's onError toast
     }
-
-    setIsDialogOpen(false)
-    resetForm()
   }
 
   const onToggleStatus = async (plan: MembershipPlan, checked: boolean) => {
-    await updatePlan.mutateAsync({
-      id: plan.id,
-      payload: { status: checked ? 'Active' : 'Inactive' },
-    })
+    try {
+      await updatePlan.mutateAsync({
+        id: plan.id,
+        payload: { status: checked ? 'Active' : 'Inactive' },
+      })
+    } catch (error) {
+      // Handled by React Query's onError toast
+    }
   }
 
   const onDelete = async (plan: MembershipPlan) => {

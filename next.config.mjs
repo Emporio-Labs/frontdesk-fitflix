@@ -25,7 +25,7 @@ const nextConfig = {
             // Adjust connect-src and img-src as external API domains are confirmed
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-eval needed for Next.js dev; tighten in prod
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com", // unsafe-eval needed for Next.js dev; tighten in prod
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
