@@ -8,6 +8,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { IconVideo, IconX, IconMaximize, IconMinus } from '@tabler/icons-react'
@@ -47,6 +57,7 @@ export function VideoConferenceModal({
     endsAt?: string
   } | null>(null)
   const [isMinimized, setIsMinimized] = useState(false)
+  const [showMinimizeConfirm, setShowMinimizeConfirm] = useState(false)
   const [staffDisplay, setStaffDisplay] = useState<string>('Admin Host')
 
   const clearSettleResizeTimer = useCallback(() => {
@@ -93,6 +104,7 @@ export function VideoConferenceModal({
     if (!open) {
       destroyZego()
       setIsMinimized(false)
+      setShowMinimizeConfirm(false)
       setError(null)
       setErrorDetails(null)
       return
@@ -222,7 +234,18 @@ export function VideoConferenceModal({
 
   const handleLeaveCall = () => {
     destroyZego()
+    setShowMinimizeConfirm(false)
+    setIsMinimized(false)
     onOpenChange(false)
+  }
+
+  const handleMinimizeConfirm = () => {
+    setShowMinimizeConfirm(false)
+    setIsMinimized(true)
+  }
+
+  const handleStayInMeeting = () => {
+    setShowMinimizeConfirm(false)
   }
 
   if (!open) return null
@@ -259,20 +282,67 @@ export function VideoConferenceModal({
         </div>
       )}
 
+      {/* Confirmation modal shown when user attempts an outside click or escape */}
+      <AlertDialog open={showMinimizeConfirm} onOpenChange={setShowMinimizeConfirm}>
+        <AlertDialogContent className="z-[60] bg-gray-900 border-gray-800 text-white max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white text-base">
+              Do you want to minimize the meeting?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-gray-400">
+              Minimizing keeps your ZEGOCLOUD video/audio session active in the background while allowing you to navigate Frontdesk.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 gap-2">
+            <AlertDialogCancel
+              onClick={handleStayInMeeting}
+              className="bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-700 text-xs h-9"
+            >
+              Stay in Meeting
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleMinimizeConfirm}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9"
+            >
+              Minimize Meeting
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Stays mounted (off-screen, no overlay) while minimized so the
           ZEGOCLOUD session — video, audio, chat history — keeps running in
           the background instead of being torn down and rejoined. */}
-      <Dialog open={open} onOpenChange={onOpenChange} modal={!isMinimized}>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && open && !isMinimized) {
+            setShowMinimizeConfirm(true)
+            return
+          }
+          onOpenChange(nextOpen)
+        }}
+        modal={!isMinimized}
+      >
         <DialogContent
           hideOverlay={isMinimized}
           onEscapeKeyDown={(e) => {
-            if (isMinimized) e.preventDefault()
+            e.preventDefault()
+            if (!isMinimized) {
+              setShowMinimizeConfirm(true)
+            }
           }}
           onPointerDownOutside={(e) => {
-            if (isMinimized) e.preventDefault()
+            e.preventDefault()
+            if (!isMinimized) {
+              setShowMinimizeConfirm(true)
+            }
           }}
           onInteractOutside={(e) => {
-            if (isMinimized) e.preventDefault()
+            e.preventDefault()
+            if (!isMinimized) {
+              setShowMinimizeConfirm(true)
+            }
           }}
           className={cn(
             // ZEGOCLOUD's desktop room is fixed-chrome (64px room header +
@@ -373,3 +443,4 @@ export function VideoConferenceModal({
     </>
   )
 }
+
