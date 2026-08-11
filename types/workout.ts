@@ -22,7 +22,18 @@ export type PlanGoal =
 export interface Exercise {
   _id: string
   name: string
+  /**
+   * What the API actually returns. The backend `Exercise` schema stores a
+   * single `muscleGroup` enum value and `createExerciseBodySchema` requires it.
+   */
   muscleGroup: MuscleGroup
+  /**
+   * @deprecated Never present on the wire. The exercise library form still
+   * builds and submits this, which the backend validator rejects — see the
+   * note in app/dashboard/workouts/exercises/page.tsx. Kept only so that page
+   * keeps compiling until the single-vs-multi decision is made.
+   */
+  muscleGroups?: MuscleGroup[]
   targetedMuscles: string[]
   difficulty: Difficulty
   equipment: string
@@ -46,6 +57,7 @@ export interface ExerciseFilters {
   equipment?: string
   search?: string
   isSystem?: boolean
+  section?: WorkoutSection
   page?: number
   limit?: number
 }
@@ -64,7 +76,7 @@ export interface ExerciseListResponse {
 
 export interface CreateExercisePayload {
   name: string
-  muscleGroup: MuscleGroup
+  muscleGroups: MuscleGroup[]
   targetedMuscles: string[]
   difficulty: Difficulty
   equipment?: string
@@ -72,12 +84,13 @@ export interface CreateExercisePayload {
   commonMistakes?: string[]
   tips?: string[]
   caloriesPerSet?: number
+  sectionTypes?: WorkoutSection[]
   imageUrl?: string
 }
 
 export interface UpdateExercisePayload {
   name?: string
-  muscleGroup?: MuscleGroup
+  muscleGroups?: MuscleGroup[]
   targetedMuscles?: string[]
   difficulty?: Difficulty
   equipment?: string
@@ -85,6 +98,7 @@ export interface UpdateExercisePayload {
   commonMistakes?: string[]
   tips?: string[]
   caloriesPerSet?: number
+  sectionTypes?: WorkoutSection[]
   imageUrl?: string
 }
 
@@ -92,7 +106,20 @@ export interface UpdateExercisePayload {
 export interface WorkoutExercise {
   _id?: string
   exerciseId: string
-  exercise?: Pick<Exercise, 'name' | 'muscleGroup' | 'difficulty' | 'equipment' | 'caloriesPerSet' | 'exerciseType' | 'sectionTypes'>
+  // The nested shape the plan/session controllers build. Note `muscleGroup` is
+  // singular here: the backend Exercise schema stores one enum value, and the
+  // plural `muscleGroups` on the `Exercise` interface above does not exist on
+  // the wire. Reading the plural here silently yielded undefined.
+  exercise?: {
+    name: string
+    muscleGroup?: MuscleGroup
+    difficulty?: Difficulty
+    equipment?: string
+    caloriesPerSet?: number
+    sectionTypes?: WorkoutSection[]
+  }
+  /** Set when the referenced Exercise document no longer exists. */
+  exerciseMissing?: boolean
   orderIndex: number
   targetSets: number
   targetReps: number

@@ -19,6 +19,8 @@ import { Calendar } from '@/components/ui/calendar'
 import { Label } from '@/components/ui/label'
 import { IconSearch, IconCalendar, IconLoader2 } from '@tabler/icons-react'
 import { useUsers } from '@/hooks/use-users'
+import { useMyMembers } from '@/hooks/use-my-members'
+import { useAuth } from '@/hooks/use-auth'
 import { useWorkoutStore } from '@/stores/workout-store'
 import { useAssignWorkoutPlan } from '@/hooks/use-workout-plans'
 import { cn } from '@/lib/utils'
@@ -38,7 +40,14 @@ export function AssignUsersDialog({
 }) {
   const [search, setSearch] = useState('')
   const [calendarOpen, setCalendarOpen] = useState(false)
-  const { data: users = [], isLoading } = useUsers()
+  const { user: currentUser } = useAuth()
+  const isTrainer = currentUser?.role === 'trainer'
+  const { data: allUsers = [], isLoading: allUsersLoading } = useUsers()
+  const { data: myMembers = [], isLoading: myMembersLoading } = useMyMembers()
+
+  const userList = isTrainer ? myMembers : allUsers
+  const isLoading = isTrainer ? myMembersLoading : allUsersLoading
+
   const {
     assignedUserIds,
     toggleUserAssignment,
@@ -48,10 +57,10 @@ export function AssignUsersDialog({
   } = useWorkoutStore()
   const assignMutation = useAssignWorkoutPlan()
 
-  const filtered = users.filter((u: any) => {
+  const filtered = userList.filter((u: any) => {
     const term = search.toLowerCase()
     return (
-      (u.username || '').toLowerCase().includes(term) ||
+      (u.username || u.name || '').toLowerCase().includes(term) ||
       (u.email || '').toLowerCase().includes(term)
     )
   })

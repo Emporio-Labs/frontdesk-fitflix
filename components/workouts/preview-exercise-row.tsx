@@ -12,13 +12,14 @@ const MUSCLE_COLORS: Record<string, string> = {
 }
 
 export function PreviewExerciseRow({ exercise }: { exercise: WorkoutExercise }) {
-  const color = MUSCLE_COLORS[exercise.exercise?.muscleGroup ?? ''] ?? 'bg-zinc-500'
+  const primaryMuscle = exercise.exercise?.muscleGroup ?? ''
+  const color = MUSCLE_COLORS[primaryMuscle as any] ?? 'bg-zinc-500'
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5">
       <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center shrink-0`}>
         <span className="text-white text-[10px] font-bold">
-          {(exercise.exercise?.muscleGroup ?? '?')[0]}
+          {(primaryMuscle ?? '?')[0]}
         </span>
       </div>
       <div className="flex-1 min-w-0">

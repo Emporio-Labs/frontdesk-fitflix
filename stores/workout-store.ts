@@ -119,7 +119,6 @@ export const useWorkoutStore = create<WorkoutStore>()(
               difficulty: exercise.difficulty,
               equipment: exercise.equipment,
               caloriesPerSet: exercise.caloriesPerSet,
-              exerciseType: exercise.exerciseType,
               sectionTypes: exercise.sectionTypes,
             },
             section,

@@ -80,3 +80,20 @@ export function usePublicTrainer(id: string) {
     enabled: !!id,
   })
 }
+
+export function useAssignTrainerToUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, trainerId }: { userId: string; trainerId: string | null }) =>
+      trainerService.assignTrainerToUser(userId, trainerId),
+    onSuccess: (data, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.users.detail(variables.userId) })
+      qc.invalidateQueries({ queryKey: queryKeys.users.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.trainers.all() })
+      toast.success(data.message || 'Assigned trainer updated')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to assign trainer')
+    },
+  })
+}

@@ -8,11 +8,14 @@ import { storeCredentials, clearCredentials, clearToken, getStoredCredentials, g
 // Note: this is a presence-only indicator cookie, NOT the auth token.
 // The real token lives in localStorage (see lib/api-client.ts).
 // SameSite=Strict prevents CSRF. Secure is added when on HTTPS.
-function setAuthCookie() {
+function setAuthCookie(role?: string) {
   if (typeof document !== 'undefined') {
     const isSecure = window.location.protocol === 'https:'
     const secureFlag = isSecure ? '; Secure' : ''
     document.cookie = `hh_authed=1; path=/; max-age=86400; SameSite=Strict${secureFlag}`
+    if (role) {
+      document.cookie = `hh_role=${role}; path=/; max-age=86400; SameSite=Strict${secureFlag}`
+    }
   }
 }
 function clearAuthCookie() {
@@ -20,6 +23,7 @@ function clearAuthCookie() {
     const isSecure = window.location.protocol === 'https:'
     const secureFlag = isSecure ? '; Secure' : ''
     document.cookie = `hh_authed=; path=/; max-age=0; SameSite=Strict${secureFlag}`
+    document.cookie = `hh_role=; path=/; max-age=0; SameSite=Strict${secureFlag}`
   }
 }
 
@@ -55,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(parsedUser)
         setRole(parsedUser.role)
         // Reinstate auth cookie so middleware allows access on refresh
-        setAuthCookie()
+        setAuthCookie(parsedUser.role)
       } catch (_) {
         clearCredentials()
         clearAuthCookie()
@@ -76,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = (email: string, password: string, userData: AuthContextType['user']) => {
     storeCredentials(email, password)
-    setAuthCookie()
+    setAuthCookie(userData?.role)
     if (userData) {
       localStorage.setItem('hh_user', JSON.stringify(userData))
     }
@@ -84,7 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(userData?.role ?? 'clinic_admin')
     // Hard redirect — ensures middleware sees the new cookie immediately
     if (typeof window !== 'undefined') {
-      window.location.href = '/dashboard'
+      const target = userData?.role === 'trainer' ? '/dashboard/workouts/members' : '/dashboard'
+      window.location.href = target
     }
   }
 

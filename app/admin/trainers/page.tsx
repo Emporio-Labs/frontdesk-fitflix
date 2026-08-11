@@ -33,10 +33,10 @@ export default function TrainersPage() {
   const deleteTrainer = useDeleteTrainer()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  const filtered = trainers.filter(
+  const filtered = (trainers || []).filter(
     (t) =>
-      t.trainerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.email.toLowerCase().includes(searchTerm.toLowerCase())
+      (t.trainerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (t.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const resetForm = () => {
@@ -51,9 +51,9 @@ export default function TrainersPage() {
   const handleOpenEdit = (trainer: Trainer) => {
     setEditingTrainer(trainer)
     setFormData({
-      trainerName: trainer.trainerName, email: trainer.email, phone: trainer.phone,
-      password: '', description: trainer.description,
-      specialitiesInput: trainer.specialities.join(', '),
+      trainerName: trainer.trainerName || '', email: trainer.email || '', phone: trainer.phone || '',
+      password: '', description: trainer.description || '',
+      specialitiesInput: (trainer.specialities || []).join(', '),
       imageUrl: trainer.imageUrl || '',
       keySentence: trainer.keySentence || '',
       isActive: trainer.isActive !== false,
@@ -230,48 +230,51 @@ export default function TrainersPage() {
                   {filtered.length === 0 ? (
                     <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No trainers found</TableCell></TableRow>
                   ) : (
-                    filtered.map((trainer) => (
-                      <TableRow key={trainer._id}>
-                        <TableCell className="font-medium flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0 border">
-                            {trainer.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={trainer.imageUrl} alt={trainer.trainerName} className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-sm font-bold text-muted-foreground">
-                                {trainer.trainerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-medium">{trainer.trainerName}</div>
-                            {trainer.keySentence && (
-                              <div className="text-xs text-muted-foreground max-w-[200px] truncate">{trainer.keySentence}</div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{trainer.email}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {trainer.specialities.map((s) => (
-                              <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={trainer.isActive !== false ? "default" : "destructive"}>
-                            {trainer.isActive !== false ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{new Date(trainer.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleOpenEdit(trainer)}><IconEdit className="w-4 h-4" /></Button>
-                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${trainer.trainerName}?`)) deleteTrainer.mutate(trainer._id) }} disabled={deleteTrainer.isPending}><IconTrash className="w-4 h-4" /></Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    filtered.map((trainer, index) => {
+                      const trainerKey = trainer._id || (trainer as any).id || `trainer-${index}`
+                      return (
+                        <TableRow key={trainerKey}>
+                          <TableCell className="font-medium flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0 border">
+                              {trainer.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={trainer.imageUrl} alt={trainer.trainerName || 'Trainer'} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-sm font-bold text-muted-foreground">
+                                  {(trainer.trainerName || 'T').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-medium">{trainer.trainerName}</div>
+                              {trainer.keySentence && (
+                                <div className="text-xs text-muted-foreground max-w-[200px] truncate">{trainer.keySentence}</div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{trainer.email}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {(trainer.specialities || []).map((s, idx) => (
+                                <Badge key={`${trainerKey}-spec-${s}-${idx}`} variant="secondary" className="text-xs">{s}</Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={trainer.isActive !== false ? "default" : "destructive"}>
+                              {trainer.isActive !== false ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{trainer.createdAt ? new Date(trainer.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button size="sm" variant="outline" onClick={() => handleOpenEdit(trainer)}><IconEdit className="w-4 h-4" /></Button>
+                              <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${trainer.trainerName}?`)) deleteTrainer.mutate(trainerKey) }} disabled={deleteTrainer.isPending}><IconTrash className="w-4 h-4" /></Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
                   )}
                 </TableBody>
               </Table>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { IconPlus } from '@tabler/icons-react'
+import { IconPlus, IconActivity, IconUsers } from '@tabler/icons-react'
 import { WorkoutStatsCards } from '@/components/workouts/workout-stats-cards'
 import { WorkoutCompletionChart } from '@/components/workouts/workout-completion-chart'
 import { EngagementChart } from '@/components/workouts/engagement-chart'
@@ -19,12 +19,26 @@ export default function WorkoutsPage() {
             Create, manage, and assign workout plans to members
           </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/workouts/create">
-            <IconPlus className="w-4 h-4 mr-2" />
-            Create Plan
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/workouts/exercises">
+              <IconActivity className="w-4 h-4 mr-2" />
+              Exercise Library
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/workouts/members">
+              <IconUsers className="w-4 h-4 mr-2" />
+              Member Roster
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/dashboard/workouts/create">
+              <IconPlus className="w-4 h-4 mr-2" />
+              Create Plan
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <WorkoutStatsCards />

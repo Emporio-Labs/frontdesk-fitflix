@@ -147,6 +147,29 @@ const navMain = [
     },
 ]
 
+const navTrainer = [
+  {
+    title: "My Members",
+    url: "/dashboard/workouts/members",
+    icon: IconUsers,
+  },
+  {
+    title: "Workout Plans",
+    url: "/dashboard/workouts/plans",
+    icon: IconBarbell,
+  },
+  {
+    title: "Exercise Library",
+    url: "/dashboard/workouts/exercises",
+    icon: IconActivity,
+  },
+  {
+    title: "Live Sessions",
+    url: "/dashboard/workouts/sessions",
+    icon: IconClock,
+  },
+]
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth()
 
@@ -155,6 +178,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     email: user?.email ?? '',
     avatar: '/placeholder-user.jpg',
   }
+
+  const items = user?.role === 'trainer' ? navTrainer : navMain
+  const brandHref = user?.role === 'trainer' ? '/dashboard/workouts/members' : '/dashboard'
 
   return (
     <Sidebar collapsible="none" {...props}>
@@ -165,7 +191,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1 !h-auto"
             >
-              <a href="/dashboard" className="flex items-center gap-2">
+              <a href={brandHref} className="flex items-center gap-2">
                 <Image
                   src="/fitflix_logo.png"
                   alt="Fitflix Logo"
@@ -180,7 +206,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain items={items} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={navUser} />
