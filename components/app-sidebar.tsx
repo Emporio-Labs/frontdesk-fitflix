@@ -9,6 +9,7 @@ import {
   IconUsers,
   IconHeartHandshake,
   IconCalendarEvent,
+  IconCalendarStats,
   IconClock,
   IconDna,
   IconHistory,
@@ -64,6 +65,7 @@ const navGroups = [
       { title: "Services", url: "/admin/therapies", icon: IconListDetails },
       { title: "Bookings", url: "/admin/bookings", icon: IconCalendarEvent },
       { title: "Slots", url: "/admin/slots", icon: IconClock },
+      { title: "Attendance", url: "/admin/attendance", icon: IconCalendarStats },
     ],
   },
   {
