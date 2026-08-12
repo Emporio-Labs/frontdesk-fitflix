@@ -136,7 +136,6 @@ function deriveOnboardingState(user: User): OnboardingState {
     status?.healthGoalsCompleted ||
     status?.consentCompleted ||
     status?.reportsUploaded ||
-    status?.sportsScientistBooked ||
     status?.nutritionistBooked
   ) {
     return 'in_progress'

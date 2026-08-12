@@ -6,7 +6,6 @@ export type OnboardingStep =
   | 'HEALTH_GOALS'
   | 'CONSENT'
   | 'REPORT_UPLOAD'
-  | 'SPORTS_SCIENTIST_BOOKING'
   | 'NUTRITIONIST_BOOKING'
   | 'COMPLETED'
 
@@ -17,7 +16,6 @@ export interface UserOnboardingSummary {
   healthGoalsCompleted: boolean
   consentCompleted: boolean
   reportsUploaded: boolean
-  sportsScientistBooked: boolean
   nutritionistBooked: boolean
   onboardingCompleted: boolean
 }

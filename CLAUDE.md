@@ -159,10 +159,10 @@ The backend onboarding workflow engine is integrated into the admin dashboard as
 - `lib/services/user.service.ts` — added `OnboardingStep` union type, `UserOnboardingSummary` interface, and optional `onboarded?: boolean` / `onboardingStatus?: UserOnboardingSummary` fields on `User`.
 - `lib/query-keys.ts` — added `onboarding.all()` and `onboarding.byUser(userId)`.
 - `app/admin/users/page.tsx` — `deriveOnboardingState(user)` helper + "Onboarding" column in the Members table (between Joined and Membership).
-- `app/admin/users/[id]/page.tsx` — three new cards appended after the Bookings card: **Onboarding Progress** (step flags + embedded timeline), **Onboarding Reports** (table of name/type/uploadedAt from `GET /onboarding/status`), **Onboarding Appointments** (Sports Scientist + Nutritionist rows with status badge and date).
+- `app/admin/users/[id]/page.tsx` — three new cards appended after the Bookings card: **Onboarding Progress** (step flags + embedded timeline), **Onboarding Reports** (table of name/type/uploadedAt from `GET /onboarding/status`), **Onboarding Appointments** (Nutritionist row with status badge and date).
 
 **Onboarding step order** (enforced by backend):
-`HEALTH_MARKERS → HEALTH_GOALS → CONSENT → REPORT_UPLOAD → SPORTS_SCIENTIST_BOOKING → NUTRITIONIST_BOOKING → COMPLETED`
+`HEALTH_MARKERS → HEALTH_GOALS → CONSENT → REPORT_UPLOAD → NUTRITIONIST_BOOKING → COMPLETED`
 
 **Data sources:**
 - Table column: derived from `user.onboarded` / `user.onboardingStatus` (already in `GET /users` response).
