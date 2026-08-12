@@ -19,7 +19,9 @@ import { useTrainers } from '@/hooks/use-trainers'
 import { useSlots } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
+import { useGroupClasses } from '@/hooks/use-group-classes'
 import { BOOKING_STATUS } from '@/lib/services/booking.service'
+import { getBookingServiceName } from '@/lib/populated'
 
 const STATUS_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6b7280']
 
@@ -30,6 +32,7 @@ export default function DashboardPage() {
   const { data: slots = [] } = useSlots()
   const { data: services = [] } = useServices()
   const { data: therapies = [] } = useTherapies()
+  const { data: groupClasses = [] } = useGroupClasses()
 
   const itemNameById = useMemo(
     () =>
@@ -38,6 +41,11 @@ export default function DashboardPage() {
         ...therapies.map((therapy) => [therapy.id, therapy.name] as const),
       ]),
     [services, therapies]
+  )
+
+  const classNameById = useMemo(
+    () => new Map(groupClasses.map((c) => [c.id, c.name] as const)),
+    [groupClasses]
   )
 
   // ── Operational computed ──────────────────────────────────────────────────────
@@ -136,7 +144,7 @@ export default function DashboardPage() {
                   <div key={b._id} className="flex items-center justify-between py-2 border-b last:border-0">
                     <div>
                       <p className="text-sm font-medium">
-                        {b.service?.serviceName || itemNameById.get(b.service?._id ?? '') || 'Unknown Service'}
+                        {getBookingServiceName(b, classNameById, itemNameById, 'Unknown Service')}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(b.bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}

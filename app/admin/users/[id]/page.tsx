@@ -146,8 +146,9 @@ interface BookingRow {
   _id: string
   bookingDate: string
   status: BookingStatusValue
-  service?: PopulatedServiceRef
-  slot?: PopulatedSlotRef
+  service?: PopulatedServiceRef | null
+  slot?: PopulatedSlotRef | null
+  classId?: any
 }
 
 function BookingsTable({

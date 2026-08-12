@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,22 +10,113 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Switch } from '@/components/ui/switch'
-import { IconPlus, IconEdit, IconTrash, IconRefresh } from '@tabler/icons-react'
+import { IconPlus, IconEdit, IconTrash, IconRefresh, IconEye, IconEyeOff } from '@tabler/icons-react'
 import { useTrainers, useCreateTrainer, useUpdateTrainer, useDeleteTrainer } from '@/hooks/use-trainers'
 import { Trainer } from '@/lib/services/trainer.service'
+
+const TRAINER_DRAFT_KEY = 'add_trainer_form_draft'
+
+type TrainerFormState = {
+  trainerName: string
+  email: string
+  phone: string
+  password: string
+  description: string
+  specialitiesInput: string
+  imageUrl: string
+  keySentence: string
+  isActive: boolean
+}
+
+function defaultTrainerForm(): TrainerFormState {
+  return {
+    trainerName: '',
+    email: '',
+    phone: '',
+    password: '',
+    description: '',
+    specialitiesInput: '',
+    imageUrl: '',
+    keySentence: '',
+    isActive: true,
+  }
+}
+
+function saveTrainerDraft(data: TrainerFormState) {
+  try {
+    sessionStorage.setItem(TRAINER_DRAFT_KEY, JSON.stringify(data))
+  } catch (e) {}
+}
+
+function loadTrainerDraft(): TrainerFormState | null {
+  try {
+    const item = sessionStorage.getItem(TRAINER_DRAFT_KEY)
+    return item ? JSON.parse(item) : null
+  } catch (e) {
+    return null
+  }
+}
+
+function clearTrainerDraft() {
+  try {
+    sessionStorage.removeItem(TRAINER_DRAFT_KEY)
+  } catch (e) {}
+}
 
 export default function TrainersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTrainer, setEditingTrainer] = useState<Trainer | null>(null)
-  const [formData, setFormData] = useState({
-    trainerName: '', email: '', phone: '', password: '',
-    description: '', specialitiesInput: '',
-    imageUrl: '', keySentence: '', isActive: true,
-  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false)
+  const [formData, setFormData] = useState<TrainerFormState>(defaultTrainerForm())
+
+  // Auto-persist form draft to sessionStorage while filling in Create mode
+  useEffect(() => {
+    if (isDialogOpen && !editingTrainer) {
+      saveTrainerDraft(formData)
+    }
+  }, [formData, isDialogOpen, editingTrainer])
+
+  const isTrainerFormDirty = useMemo(() => {
+    if (editingTrainer) {
+      return (
+        formData.trainerName !== (editingTrainer.trainerName || '') ||
+        formData.email !== (editingTrainer.email || '') ||
+        formData.phone !== (editingTrainer.phone || '') ||
+        formData.password !== '' ||
+        formData.description !== (editingTrainer.description || '') ||
+        formData.specialitiesInput !== (editingTrainer.specialities?.join(', ') || '') ||
+        formData.imageUrl !== (editingTrainer.imageUrl || '') ||
+        formData.keySentence !== (editingTrainer.keySentence || '') ||
+        formData.isActive !== (editingTrainer.isActive !== false)
+      )
+    }
+    return Boolean(
+      formData.trainerName.trim() ||
+      formData.email.trim() ||
+      formData.phone.trim() ||
+      formData.password.trim() ||
+      formData.description.trim() ||
+      formData.specialitiesInput.trim() ||
+      formData.imageUrl.trim() ||
+      formData.keySentence.trim() ||
+      !formData.isActive
+    )
+  }, [formData, editingTrainer])
 
   const { data: trainers = [], isLoading, isError, refetch } = useTrainers()
   const createTrainer = useCreateTrainer()
@@ -40,12 +131,37 @@ export default function TrainersPage() {
   )
 
   const resetForm = () => {
-    setFormData({
-      trainerName: '', email: '', phone: '', password: '', description: '', specialitiesInput: '',
-      imageUrl: '', keySentence: '', isActive: true,
-    })
+    setFormData(defaultTrainerForm())
     setFormErrors({})
     setEditingTrainer(null)
+    setShowPassword(false)
+    setShowUnsavedConfirm(false)
+  }
+
+  const handleCloseTrainerDialog = () => {
+    if (isTrainerFormDirty) {
+      setShowUnsavedConfirm(true)
+    } else {
+      if (!editingTrainer) {
+        clearTrainerDraft()
+      }
+      setIsDialogOpen(false)
+      resetForm()
+    }
+  }
+
+  const openCreateTrainerModal = () => {
+    setEditingTrainer(null)
+    setFormErrors({})
+    setShowPassword(false)
+    setShowUnsavedConfirm(false)
+    const draft = loadTrainerDraft()
+    if (draft) {
+      setFormData(draft)
+    } else {
+      setFormData(defaultTrainerForm())
+    }
+    setIsDialogOpen(true)
   }
 
   const handleOpenEdit = (trainer: Trainer) => {
@@ -107,6 +223,7 @@ export default function TrainersPage() {
           password: formData.password, description: formData.description, specialities,
           imageUrl: formData.imageUrl, keySentence: formData.keySentence, isActive: formData.isActive,
         })
+        clearTrainerDraft()
       }
       setIsDialogOpen(false)
       resetForm()
@@ -128,13 +245,32 @@ export default function TrainersPage() {
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <IconRefresh className="w-4 h-4 mr-1" /> Refresh
           </Button>
-          <Dialog open={isDialogOpen} onOpenChange={(o) => { setIsDialogOpen(o); if (!o) resetForm() }}>
+          <Dialog open={isDialogOpen} onOpenChange={(o) => { if (!o) handleCloseTrainerDialog() }}>
             <DialogTrigger asChild>
-              <Button onClick={() => { resetForm(); setIsDialogOpen(true) }}>
+              <Button onClick={openCreateTrainerModal}>
                 <IconPlus className="w-4 h-4 mr-2" /> Add Trainer
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent
+              onPointerDownOutside={(e) => {
+                if (isTrainerFormDirty) {
+                  e.preventDefault()
+                  handleCloseTrainerDialog()
+                }
+              }}
+              onInteractOutside={(e) => {
+                if (isTrainerFormDirty) {
+                  e.preventDefault()
+                  handleCloseTrainerDialog()
+                }
+              }}
+              onEscapeKeyDown={(e) => {
+                if (isTrainerFormDirty) {
+                  e.preventDefault()
+                  handleCloseTrainerDialog()
+                }
+              }}
+            >
               <DialogHeader>
                 <DialogTitle>{editingTrainer ? 'Edit Trainer' : 'Add Trainer'}</DialogTitle>
               </DialogHeader>
@@ -158,7 +294,22 @@ export default function TrainersPage() {
                     </div>
                     <div>
                       <label className="text-sm font-medium">Password *</label>
-                      <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          value={formData.password}
+                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                          tabIndex={-1}
+                        >
+                          {showPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
+                        </button>
+                      </div>
                       {formErrors.password && <p className="text-xs text-red-500 mt-1">{formErrors.password}</p>}
                     </div>
                   </>
@@ -187,7 +338,7 @@ export default function TrainersPage() {
                   <Switch checked={formData.isActive} onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })} />
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm() }}>Cancel</Button>
+                  <Button variant="outline" onClick={handleCloseTrainerDialog}>Cancel</Button>
                   <Button onClick={handleSubmit} disabled={isPending}>
                     {isPending ? 'Saving...' : editingTrainer ? 'Save Changes' : 'Add Trainer'}
                   </Button>
@@ -195,6 +346,35 @@ export default function TrainersPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <AlertDialog open={showUnsavedConfirm} onOpenChange={setShowUnsavedConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have unsaved changes. Do you want to leave?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowUnsavedConfirm(false)}>
+                  Stay
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setShowUnsavedConfirm(false)
+                    if (!editingTrainer) {
+                      clearTrainerDraft()
+                    }
+                    setIsDialogOpen(false)
+                    resetForm()
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Leave
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 

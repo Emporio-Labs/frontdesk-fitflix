@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,7 +17,17 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf } from '@tabler/icons-react'
+import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf, IconEye, IconEyeOff } from '@tabler/icons-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
 import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '@/hooks/use-admins'
 import { useMemberships } from '@/hooks/use-memberships'
@@ -29,6 +39,90 @@ import { toast } from 'sonner'
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Others']
+
+const MEMBER_DRAFT_KEY = 'create_member_form_draft'
+
+type MemberFormState = {
+  username: string
+  email: string
+  phone: string
+  password: string
+  age: string
+  gender: string
+  healthGoalsInput: string
+}
+
+function defaultMemberForm(): MemberFormState {
+  return {
+    username: '',
+    email: '',
+    phone: '',
+    password: '',
+    age: '',
+    gender: 'Male',
+    healthGoalsInput: '',
+  }
+}
+
+function saveMemberDraft(data: MemberFormState) {
+  try {
+    sessionStorage.setItem(MEMBER_DRAFT_KEY, JSON.stringify(data))
+  } catch (e) {}
+}
+
+function loadMemberDraft(): MemberFormState | null {
+  try {
+    const item = sessionStorage.getItem(MEMBER_DRAFT_KEY)
+    return item ? JSON.parse(item) : null
+  } catch (e) {
+    return null
+  }
+}
+
+function clearMemberDraft() {
+  try {
+    sessionStorage.removeItem(MEMBER_DRAFT_KEY)
+  } catch (e) {}
+}
+
+const ADMIN_DRAFT_KEY = 'create_admin_form_draft'
+
+type AdminFormState = {
+  adminName: string
+  email: string
+  phone: string
+  password: string
+}
+
+function defaultAdminForm(): AdminFormState {
+  return {
+    adminName: '',
+    email: '',
+    phone: '',
+    password: '',
+  }
+}
+
+function saveAdminDraft(data: AdminFormState) {
+  try {
+    sessionStorage.setItem(ADMIN_DRAFT_KEY, JSON.stringify(data))
+  } catch (e) {}
+}
+
+function loadAdminDraft(): AdminFormState | null {
+  try {
+    const item = sessionStorage.getItem(ADMIN_DRAFT_KEY)
+    return item ? JSON.parse(item) : null
+  } catch (e) {
+    return null
+  }
+}
+
+function clearAdminDraft() {
+  try {
+    sessionStorage.removeItem(ADMIN_DRAFT_KEY)
+  } catch (e) {}
+}
 
 type OnboardingState = 'completed' | 'in_progress' | 'not_started'
 
@@ -61,6 +155,64 @@ export default function UsersPage() {
   })
   const [memberFormErrors, setMemberFormErrors] = useState<Record<string, string>>({})
   const [memberPage, setMemberPage] = useState(1)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false)
+
+  // Auto-persist form draft to sessionStorage while filling in Create mode
+  useEffect(() => {
+    if (isMemberDialogOpen && !editingUser) {
+      saveMemberDraft(memberForm)
+    }
+  }, [memberForm, isMemberDialogOpen, editingUser])
+
+  const isMemberFormDirty = useMemo(() => {
+    if (editingUser) {
+      return (
+        memberForm.username !== (editingUser.username || '') ||
+        memberForm.email !== (editingUser.email || '') ||
+        memberForm.phone !== (editingUser.phone || '') ||
+        memberForm.password !== '' ||
+        memberForm.age !== String(editingUser.age ?? '') ||
+        memberForm.gender !== (editingUser.gender || 'Male') ||
+        memberForm.healthGoalsInput !== (editingUser.healthGoals?.join(', ') || '')
+      )
+    }
+    return Boolean(
+      memberForm.username.trim() ||
+      memberForm.email.trim() ||
+      memberForm.phone.trim() ||
+      memberForm.password.trim() ||
+      memberForm.age.trim() ||
+      memberForm.healthGoalsInput.trim() ||
+      (memberForm.gender && memberForm.gender !== 'Male')
+    )
+  }, [memberForm, editingUser])
+
+  const handleCloseMemberDialog = () => {
+    if (isMemberFormDirty) {
+      setShowUnsavedConfirm(true)
+    } else {
+      if (!editingUser) {
+        clearMemberDraft()
+      }
+      setIsMemberDialogOpen(false)
+      resetMemberForm()
+    }
+  }
+
+  const openCreateMemberModal = () => {
+    setEditingUser(null)
+    setMemberFormErrors({})
+    setShowPassword(false)
+    setShowUnsavedConfirm(false)
+    const draft = loadMemberDraft()
+    if (draft) {
+      setMemberForm(draft)
+    } else {
+      setMemberForm(defaultMemberForm())
+    }
+    setIsMemberDialogOpen(true)
+  }
 
   // Admin state
   const [adminSearch, setAdminSearch] = useState('')
@@ -68,6 +220,57 @@ export default function UsersPage() {
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null)
   const [adminForm, setAdminForm] = useState({ adminName: '', email: '', phone: '', password: '' })
   const [adminPage, setAdminPage] = useState(1)
+  const [showAdminPassword, setShowAdminPassword] = useState(false)
+  const [showAdminUnsavedConfirm, setShowAdminUnsavedConfirm] = useState(false)
+
+  // Auto-persist admin form draft to sessionStorage while filling in Create mode
+  useEffect(() => {
+    if (isAdminDialogOpen && !editingAdmin) {
+      saveAdminDraft(adminForm)
+    }
+  }, [adminForm, isAdminDialogOpen, editingAdmin])
+
+  const isAdminFormDirty = useMemo(() => {
+    if (editingAdmin) {
+      return (
+        adminForm.adminName !== (editingAdmin.adminName || '') ||
+        adminForm.email !== (editingAdmin.email || '') ||
+        adminForm.phone !== (editingAdmin.phone || '') ||
+        adminForm.password !== ''
+      )
+    }
+    return Boolean(
+      adminForm.adminName.trim() ||
+      adminForm.email.trim() ||
+      adminForm.phone.trim() ||
+      adminForm.password.trim()
+    )
+  }, [adminForm, editingAdmin])
+
+  const handleCloseAdminDialog = () => {
+    if (isAdminFormDirty) {
+      setShowAdminUnsavedConfirm(true)
+    } else {
+      if (!editingAdmin) {
+        clearAdminDraft()
+      }
+      setIsAdminDialogOpen(false)
+      resetAdminForm()
+    }
+  }
+
+  const openCreateAdminModal = () => {
+    setEditingAdmin(null)
+    setShowAdminPassword(false)
+    setShowAdminUnsavedConfirm(false)
+    const draft = loadAdminDraft()
+    if (draft) {
+      setAdminForm(draft)
+    } else {
+      setAdminForm(defaultAdminForm())
+    }
+    setIsAdminDialogOpen(true)
+  }
   const itemsPerPage = 12
 
   const { data: users = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useUsers()
@@ -136,6 +339,8 @@ export default function UsersPage() {
     setMemberForm({ username: '', email: '', phone: '', password: '', age: '', gender: 'Male', healthGoalsInput: '' })
     setMemberFormErrors({})
     setEditingUser(null)
+    setShowPassword(false)
+    setShowUnsavedConfirm(false)
   }
 
   const validateMemberForm = (): boolean => {
@@ -204,6 +409,7 @@ export default function UsersPage() {
           payload.password = memberForm.password.trim()
         }
         await createUser.mutateAsync(payload)
+        clearMemberDraft()
       }
       setIsMemberDialogOpen(false)
       resetMemberForm()
@@ -234,6 +440,8 @@ export default function UsersPage() {
   const resetAdminForm = () => {
     setAdminForm({ adminName: '', email: '', phone: '', password: '' })
     setEditingAdmin(null)
+    setShowAdminPassword(false)
+    setShowAdminUnsavedConfirm(false)
   }
 
   const handleOpenEditAdmin = (admin: Admin) => {
@@ -252,6 +460,7 @@ export default function UsersPage() {
     } else {
       if (!adminForm.password) return
       await createAdmin.mutateAsync(adminForm)
+      clearAdminDraft()
     }
     setIsAdminDialogOpen(false)
     resetAdminForm()
@@ -294,13 +503,32 @@ export default function UsersPage() {
               <Button variant="outline" size="sm" onClick={() => refetchUsers()} className="h-9 px-3 text-xs">
                 <IconRefresh className="w-4 h-4 mr-1.5" /> Refresh
               </Button>
-              <Dialog open={isMemberDialogOpen} onOpenChange={(o) => { setIsMemberDialogOpen(o); if (!o) resetMemberForm() }}>
+              <Dialog open={isMemberDialogOpen} onOpenChange={(o) => { if (!o) handleCloseMemberDialog() }}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => { resetMemberForm(); setIsMemberDialogOpen(true) }} size="sm" className="h-9 px-3 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Button onClick={openCreateMemberModal} size="sm" className="h-9 px-3 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
                     <IconPlus className="w-4 h-4 mr-1.5" /> Add Member
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent
+                  onPointerDownOutside={(e) => {
+                    if (isMemberFormDirty) {
+                      e.preventDefault()
+                      handleCloseMemberDialog()
+                    }
+                  }}
+                  onInteractOutside={(e) => {
+                    if (isMemberFormDirty) {
+                      e.preventDefault()
+                      handleCloseMemberDialog()
+                    }
+                  }}
+                  onEscapeKeyDown={(e) => {
+                    if (isMemberFormDirty) {
+                      e.preventDefault()
+                      handleCloseMemberDialog()
+                    }
+                  }}
+                >
                   <DialogHeader>
                     <DialogTitle>{editingUser ? 'Edit Member' : 'Create Member'}</DialogTitle>
                     <DialogDescription>
@@ -335,7 +563,24 @@ export default function UsersPage() {
                     {!editingUser && (
                       <div>
                         <label className="text-sm font-medium">Password</label>
-                        <Input type="password" autoComplete="new-password" value={memberForm.password} onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })} placeholder="Min 8 chars, 1 letter, 1 number" />
+                        <div className="relative">
+                          <Input
+                            type={showPassword ? 'text' : 'password'}
+                            autoComplete="new-password"
+                            value={memberForm.password}
+                            onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })}
+                            placeholder="Min 8 chars, 1 letter, 1 number"
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                            tabIndex={-1}
+                          >
+                            {showPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
+                          </button>
+                        </div>
                         {memberFormErrors.password && <p className="text-xs text-red-500 mt-1">{memberFormErrors.password}</p>}
                       </div>
                     )}
@@ -354,7 +599,7 @@ export default function UsersPage() {
                     </div>
 
                     <div className="flex gap-2 pt-2">
-                      <Button variant="outline" onClick={() => { setIsMemberDialogOpen(false); resetMemberForm() }}>Cancel</Button>
+                      <Button variant="outline" onClick={handleCloseMemberDialog}>Cancel</Button>
                       <Button onClick={handleMemberSubmit} disabled={createUser.isPending || updateUser.isPending}>
                         {createUser.isPending || updateUser.isPending ? 'Saving...' : editingUser ? 'Save Changes' : 'Create Member'}
                       </Button>
@@ -362,6 +607,35 @@ export default function UsersPage() {
                   </div>
                 </DialogContent>
               </Dialog>
+
+              <AlertDialog open={showUnsavedConfirm} onOpenChange={setShowUnsavedConfirm}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      You have unsaved changes. Do you want to leave?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setShowUnsavedConfirm(false)}>
+                      Stay
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        setShowUnsavedConfirm(false)
+                        if (!editingUser) {
+                          clearMemberDraft()
+                        }
+                        setIsMemberDialogOpen(false)
+                        resetMemberForm()
+                      }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Leave
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
 
@@ -527,13 +801,32 @@ export default function UsersPage() {
               <Button variant="outline" size="sm" onClick={() => refetchAdmins()} className="h-9 px-3 text-xs">
                 <IconRefresh className="w-4 h-4 mr-1.5" /> Refresh
               </Button>
-              <Dialog open={isAdminDialogOpen} onOpenChange={(o) => { setIsAdminDialogOpen(o); if (!o) resetAdminForm() }}>
+              <Dialog open={isAdminDialogOpen} onOpenChange={(o) => { if (!o) handleCloseAdminDialog() }}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => { resetAdminForm(); setIsAdminDialogOpen(true) }} size="sm" className="h-9 px-3 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Button onClick={openCreateAdminModal} size="sm" className="h-9 px-3 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
                     <IconPlus className="w-4 h-4 mr-1.5" /> Add Admin
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent
+                  onPointerDownOutside={(e) => {
+                    if (isAdminFormDirty) {
+                      e.preventDefault()
+                      handleCloseAdminDialog()
+                    }
+                  }}
+                  onInteractOutside={(e) => {
+                    if (isAdminFormDirty) {
+                      e.preventDefault()
+                      handleCloseAdminDialog()
+                    }
+                  }}
+                  onEscapeKeyDown={(e) => {
+                    if (isAdminFormDirty) {
+                      e.preventDefault()
+                      handleCloseAdminDialog()
+                    }
+                  }}
+                >
                   <DialogHeader>
                     <DialogTitle>{editingAdmin ? 'Edit Admin' : 'Create Admin'}</DialogTitle>
                     <DialogDescription>
@@ -556,11 +849,27 @@ export default function UsersPage() {
                     {!editingAdmin && (
                       <div>
                         <label className="text-sm font-medium">Password *</label>
-                        <Input type="password" autoComplete="new-password" value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} />
+                        <div className="relative">
+                          <Input
+                            type={showAdminPassword ? 'text' : 'password'}
+                            autoComplete="new-password"
+                            value={adminForm.password}
+                            onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAdminPassword(!showAdminPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                            tabIndex={-1}
+                          >
+                            {showAdminPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
                     )}
                     <div className="flex gap-2 pt-2">
-                      <Button variant="outline" onClick={() => { setIsAdminDialogOpen(false); resetAdminForm() }}>Cancel</Button>
+                      <Button variant="outline" onClick={handleCloseAdminDialog}>Cancel</Button>
                       <Button onClick={handleAdminSubmit} disabled={createAdmin.isPending || updateAdmin.isPending}>
                         {createAdmin.isPending || updateAdmin.isPending ? 'Saving...' : editingAdmin ? 'Save Changes' : 'Create Admin'}
                       </Button>
@@ -568,6 +877,35 @@ export default function UsersPage() {
                   </div>
                 </DialogContent>
               </Dialog>
+
+              <AlertDialog open={showAdminUnsavedConfirm} onOpenChange={setShowAdminUnsavedConfirm}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      You have unsaved changes. Do you want to leave?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setShowAdminUnsavedConfirm(false)}>
+                      Stay
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        setShowAdminUnsavedConfirm(false)
+                        if (!editingAdmin) {
+                          clearAdminDraft()
+                        }
+                        setIsAdminDialogOpen(false)
+                        resetAdminForm()
+                      }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Leave
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
 

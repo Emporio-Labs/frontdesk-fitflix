@@ -1,5 +1,6 @@
 import { apiClient } from '@/lib/api-client'
 import type {
+  PopulatedClassRef,
   PopulatedDoctorRef,
   PopulatedReportRef,
   PopulatedServiceRef,
@@ -24,7 +25,8 @@ export interface Booking {
   status: BookingStatusValue
   user: PopulatedUserRef
   slot: PopulatedSlotRef
-  service: PopulatedServiceRef
+  service?: PopulatedServiceRef | null
+  classId?: PopulatedClassRef | string | null
   doctor?: PopulatedDoctorRef
   creditCostSnapshot?: number
   creditsBypassed?: boolean

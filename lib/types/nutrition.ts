@@ -223,6 +223,13 @@ export interface NutritionDashboardMember {
   onboardingStep?: string
   bookingStatus?: string
   bookingDate?: string
+  // Not confirmed on GET /nutrition/dashboard/members's response shape today
+  // (this endpoint's fields are assumption-driven — see CLAUDE.md's Nutrition
+  // module section) — declared optional so join-window gating
+  // (lib/booking-window.ts) can use them if/when the backend starts sending
+  // them, without widening to `any`.
+  startTime?: string | null
+  endTime?: string | null
 }
 
 // ── Domain entities ───────────────────────────────────────────────────────────

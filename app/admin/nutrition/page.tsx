@@ -97,6 +97,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import type { NutritionDashboardMember, FoodItem, UserNutritionPlan } from '@/lib/types/nutrition'
+import { getBookingJoinState } from '@/lib/booking-window'
 import { onboardingStepLabel, ONBOARDING_STEP_ORDER } from '@/components/onboarding-timeline'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -382,24 +383,45 @@ function OverviewTab({
                         <StatusBadge status={m.bookingStatus} size="sm" />
                       )}
                       {onJoinCall &&
-                        normalizeRosterStatus(m.bookingStatus) === 'confirmed' && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs"
-                            onClick={() =>
-                              onJoinCall({
-                                _id: m._id,
-                                userId: m.member,
-                                zegoRoomId: m.zegoRoomId || `nutri_session_${m._id}`,
-                                appointmentMode: 'ONLINE',
-                              })
-                            }
-                          >
-                            <IconVideo className="mr-1 h-3.5 w-3.5" />
-                            Join Call
-                          </Button>
-                        )}
+                        normalizeRosterStatus(m.bookingStatus) === 'confirmed' &&
+                        (() => {
+                          // `m` only carries a date-only `bookingDate` on this
+                          // endpoint today (see NutritionDashboardMember) — no
+                          // time-of-day, so this resolves to `unknown` and stays
+                          // enabled. The backend token endpoint is still the
+                          // real gate; this just becomes precise the moment the
+                          // dashboard endpoint starts sending startTime/endTime.
+                          const joinState = getBookingJoinState(m)
+                          const joinDisabled = joinState.state === 'too_early' || joinState.state === 'ended'
+                          return (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              disabled={joinDisabled}
+                              className={
+                                joinDisabled
+                                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed h-8 text-xs'
+                                  : 'bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs'
+                              }
+                              title={joinState.label ?? 'Join Video Call'}
+                              onClick={() =>
+                                onJoinCall({
+                                  _id: m._id,
+                                  userId: m.member,
+                                  zegoRoomId: m.zegoRoomId || `nutri_session_${m._id}`,
+                                  appointmentMode: 'ONLINE',
+                                  appointmentDate: m.bookingDate,
+                                  startTime: m.startTime,
+                                  endTime: m.endTime,
+                                  bookingStatus: m.bookingStatus,
+                                })
+                              }
+                            >
+                              <IconVideo className="mr-1 h-3.5 w-3.5" />
+                              Join Call
+                            </Button>
+                          )
+                        })()}
                       <Link href={`/admin/nutrition/members/${m.member._id}`}>
                         <Button variant="outline" size="sm" className="h-8 text-xs">
                           <IconEye className="mr-1 h-3.5 w-3.5" />
@@ -885,6 +907,10 @@ function BookingsTab({
                                   isPast = d < new Date()
                                 }
                               }
+                              // Precise join-window gate (used for the Join Call button
+                              // below) — distinct from `isPast` above, which is a coarse
+                              // date-only check that also drives the Accept tooltip.
+                              const joinState = getBookingJoinState(appt)
 
                               if (row.rosterStatus === 'reschedule') {
                                 return (
@@ -917,24 +943,29 @@ function BookingsTab({
                               }
                               if (row.rosterStatus === 'booked' && bookingId) {
                                 const zegoRoomId = appt?.zegoRoomId || `nutri_session_${bookingId}`
+                                const joinDisabled = joinState.state === 'too_early' || joinState.state === 'ended'
                                 return (
                                   <>
                                     <Button
                                       size="sm"
                                       variant="default"
-                                      disabled={isPast}
+                                      disabled={joinDisabled}
                                       className={
-                                        isPast
+                                        joinDisabled
                                           ? "bg-gray-400 text-gray-200 cursor-not-allowed"
                                           : "bg-blue-600 hover:bg-blue-700 text-white"
                                       }
-                                      title={isPast ? "Appointment date has passed" : "Join Video Call"}
+                                      title={joinState.label ?? "Join Video Call"}
                                       onClick={() =>
                                         setActiveCallBooking({
                                           _id: bookingId,
                                           userId: user,
                                           zegoRoomId,
                                           appointmentMode: appt?.appointmentMode || 'ONLINE',
+                                          appointmentDate: appt?.appointmentDate,
+                                          startTime: appt?.startTime,
+                                          endTime: appt?.endTime,
+                                          bookingStatus: appt?.bookingStatus,
                                         })
                                       }
                                     >

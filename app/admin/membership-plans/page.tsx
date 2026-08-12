@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { IconEdit, IconEye, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
@@ -37,6 +47,29 @@ import {
 } from '@/hooks/use-membership-plans'
 import { toast } from 'sonner'
 import { useMemberships } from '@/hooks/use-memberships'
+
+const DRAFT_KEY = 'membership_plan_create_draft'
+
+function saveDraft(form: FormState) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(form))
+  } catch (e) {}
+}
+
+function loadDraft(): FormState | null {
+  try {
+    const item = sessionStorage.getItem(DRAFT_KEY)
+    return item ? JSON.parse(item) : null
+  } catch (e) {
+    return null
+  }
+}
+
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY)
+  } catch (e) {}
+}
 
 type FormState = {
   planName: string
@@ -88,12 +121,20 @@ export default function MembershipPlansPage() {
   const [editingPlan, setEditingPlan] = useState<MembershipPlan | null>(null)
   const [viewingPlan, setViewingPlan] = useState<MembershipPlan | null>(null)
   const [form, setForm] = useState<FormState>(defaultFormState)
+  const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false)
 
   const { data: plans = [], isLoading, isError, refetch } = useMembershipPlans()
   const createPlan = useCreateMembershipPlan()
   const updatePlan = useUpdateMembershipPlan()
   const deletePlan = useDeleteMembershipPlan()
   const { data: memberships = [] } = useMemberships()
+
+  // Auto-persist form draft to sessionStorage while filling in Create mode
+  useEffect(() => {
+    if (isDialogOpen && !editingPlan) {
+      saveDraft(form)
+    }
+  }, [form, isDialogOpen, editingPlan])
 
   const filteredPlans = useMemo(
     () =>
@@ -114,13 +155,74 @@ export default function MembershipPlansPage() {
   const gymId = process.env.NEXT_PUBLIC_GYM_ID || 'default-gym'
   const resolvedPlanName = form.planName.trim()
 
+  const isFormDirty = useMemo(() => {
+    if (editingPlan) {
+      const normalizedCurrency = String(editingPlan.currency || '').toUpperCase()
+      const hasDays =
+        editingPlan.durationDays !== undefined &&
+        editingPlan.durationDays !== null &&
+        editingPlan.durationDays > 0
+      return (
+        form.planName !== editingPlan.planName ||
+        form.durationUnit !== (hasDays ? 'days' : 'months') ||
+        form.durationMonths !== (hasDays ? 1 : editingPlan.durationMonths) ||
+        form.durationDays !== (hasDays ? editingPlan.durationDays! : 1) ||
+        form.totalPrice !== editingPlan.totalPrice ||
+        form.currency !== (normalizedCurrency === 'USD' ? 'USD' : 'INR') ||
+        form.status !== editingPlan.status ||
+        form.featureInput !== '' ||
+        JSON.stringify(form.features) !== JSON.stringify(editingPlan.features) ||
+        form.credits !== Number(editingPlan.benefits?.credits ?? 0) ||
+        form.pauseDays !== Number(editingPlan.benefits?.pauseDays ?? 0) ||
+        form.trainerSessions !== Number(editingPlan.benefits?.trainerSessions ?? 0) ||
+        form.transferSessions !== Number(editingPlan.benefits?.transferSessions ?? 0) ||
+        form.transferWindowDays !== Number(editingPlan.benefits?.transferWindowDays ?? 0)
+      )
+    }
+    const def = defaultFormState()
+    return (
+      form.planName.trim() !== def.planName ||
+      form.durationUnit !== def.durationUnit ||
+      form.durationMonths !== def.durationMonths ||
+      form.durationDays !== def.durationDays ||
+      form.totalPrice !== def.totalPrice ||
+      form.currency !== def.currency ||
+      form.status !== def.status ||
+      form.featureInput.trim() !== def.featureInput ||
+      form.features.length > 0 ||
+      form.credits !== def.credits ||
+      form.pauseDays !== def.pauseDays ||
+      form.trainerSessions !== def.trainerSessions ||
+      form.transferSessions !== def.transferSessions ||
+      form.transferWindowDays !== def.transferWindowDays
+    )
+  }, [form, editingPlan])
+
   const resetForm = () => {
     setForm(defaultFormState())
     setEditingPlan(null)
   }
 
+  const handleCloseDialog = () => {
+    if (isFormDirty) {
+      setShowUnsavedConfirm(true)
+    } else {
+      if (!editingPlan) {
+        clearDraft()
+      }
+      setIsDialogOpen(false)
+      resetForm()
+    }
+  }
+
   const openCreate = () => {
-    resetForm()
+    setEditingPlan(null)
+    const draft = loadDraft()
+    if (draft) {
+      setForm(draft)
+    } else {
+      setForm(defaultFormState())
+    }
     setIsDialogOpen(true)
   }
 
@@ -209,6 +311,7 @@ export default function MembershipPlansPage() {
       await updatePlan.mutateAsync({ id: editingPlan.id, payload })
     } else {
       await createPlan.mutateAsync(payload)
+      clearDraft()
     }
 
     setIsDialogOpen(false)
@@ -263,13 +366,33 @@ export default function MembershipPlansPage() {
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <IconRefresh className="mr-1 h-4 w-4" /> Refresh
           </Button>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(o) => { if (!o) handleCloseDialog() }}>
             <DialogTrigger asChild>
               <Button onClick={openCreate}>
                 <IconPlus className="mr-2 h-4 w-4" /> Create New Plan
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+            <DialogContent
+              className="max-h-[90vh] overflow-y-auto sm:max-w-3xl"
+              onPointerDownOutside={(e) => {
+                if (isFormDirty) {
+                  e.preventDefault()
+                  handleCloseDialog()
+                }
+              }}
+              onInteractOutside={(e) => {
+                if (isFormDirty) {
+                  e.preventDefault()
+                  handleCloseDialog()
+                }
+              }}
+              onEscapeKeyDown={(e) => {
+                if (isFormDirty) {
+                  e.preventDefault()
+                  handleCloseDialog()
+                }
+              }}
+            >
               <DialogHeader>
                 <DialogTitle>{editingPlan ? 'Edit Membership Plan' : 'Create Membership Plan'}</DialogTitle>
                 <DialogDescription>
@@ -553,7 +676,7 @@ export default function MembershipPlansPage() {
               </Card>
 
               <div className="flex gap-2 pt-2">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                <Button variant="outline" onClick={handleCloseDialog}>
                   Cancel
                 </Button>
                 <Button onClick={onSave} disabled={isSaving}>
@@ -562,6 +685,35 @@ export default function MembershipPlansPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <AlertDialog open={showUnsavedConfirm} onOpenChange={setShowUnsavedConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have unsaved changes. Do you want to leave?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowUnsavedConfirm(false)}>
+                  Stay
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setShowUnsavedConfirm(false)
+                    if (!editingPlan) {
+                      clearDraft()
+                    }
+                    setIsDialogOpen(false)
+                    resetForm()
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Leave
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
             <DialogContent>
               <DialogHeader>

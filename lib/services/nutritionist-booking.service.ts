@@ -20,6 +20,13 @@ export interface NutritionistBooking {
   appointmentMode?: AppointmentMode
   meetingLink?: string | null
   timeSlot?: string | null
+  // Backend field names (bookingDate/startTime/endTime — see
+  // FITFLIX_BACKEND src/models/NutritionistBooking.ts). Not covered by
+  // normalizeBooking's explicit mapping, but the `...raw` spread there
+  // already forwards them at runtime; typed here so callers (join-window
+  // gating) can read them without a cast.
+  startTime?: string | null
+  endTime?: string | null
   slotId?: string | null
   zegoRoomId?: string | null
   assignedNutritionistId?: string | null

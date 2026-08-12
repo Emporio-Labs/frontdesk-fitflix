@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -28,9 +28,70 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
+
+const LEAD_DRAFT_KEY = 'add_lead_form_draft'
+
+type LeadFormState = {
+  name: string
+  email: string
+  phone: string
+  source: string
+  status: LeadStatus
+  temperature: LeadTemperature
+  notes: string
+  interestedIn: string
+  followUpDate: string
+  assignedStaffName: string
+}
+
+function defaultLeadForm(): LeadFormState {
+  return {
+    name: '',
+    email: '',
+    phone: '',
+    source: 'Website',
+    status: 'new' as LeadStatus,
+    temperature: 'cold' as LeadTemperature,
+    notes: '',
+    interestedIn: '',
+    followUpDate: '',
+    assignedStaffName: '',
+  }
+}
+
+function saveLeadDraft(data: LeadFormState) {
+  try {
+    sessionStorage.setItem(LEAD_DRAFT_KEY, JSON.stringify(data))
+  } catch (e) {}
+}
+
+function loadLeadDraft(): LeadFormState | null {
+  try {
+    const item = sessionStorage.getItem(LEAD_DRAFT_KEY)
+    return item ? JSON.parse(item) : null
+  } catch (e) {
+    return null
+  }
+}
+
+function clearLeadDraft() {
+  try {
+    sessionStorage.removeItem(LEAD_DRAFT_KEY)
+  } catch (e) {}
+}
 import {
   IconPlus, IconEdit, IconTrash, IconCheck, IconFileInvoice,
   IconFlame, IconUserPlus, IconAlertTriangle, IconPhone, IconUserCheck, IconFilter,
@@ -104,6 +165,66 @@ export default function LeadsPage() {
     followUpDate: '',
     assignedStaffName: '',
   })
+  const [showLeadUnsavedConfirm, setShowLeadUnsavedConfirm] = useState(false)
+
+  // Auto-persist form draft to sessionStorage while filling in Add Lead mode
+  useEffect(() => {
+    if (isAddDialogOpen && !editingLead) {
+      saveLeadDraft(formData)
+    }
+  }, [formData, isAddDialogOpen, editingLead])
+
+  const isLeadFormDirty = useMemo(() => {
+    if (editingLead) {
+      return (
+        formData.name !== (editingLead.name || '') ||
+        formData.email !== (editingLead.email || '') ||
+        formData.phone !== (editingLead.phone || '') ||
+        formData.source !== (editingLead.source || 'Website') ||
+        formData.status !== (editingLead.status || 'new') ||
+        formData.notes !== (editingLead.notes || '') ||
+        formData.interestedIn !== (editingLead.interestedIn || '') ||
+        formData.assignedStaffName !== (editingLead.assignedStaffName || '') ||
+        formData.followUpDate !== (editingLead.followUpDate ? String(editingLead.followUpDate).split('T')[0] : '')
+      )
+    }
+    const def = defaultLeadForm()
+    return (
+      formData.name.trim() !== def.name ||
+      formData.email.trim() !== def.email ||
+      formData.phone.trim() !== def.phone ||
+      formData.source !== def.source ||
+      formData.status !== def.status ||
+      formData.notes.trim() !== def.notes ||
+      formData.interestedIn.trim() !== def.interestedIn ||
+      formData.assignedStaffName.trim() !== def.assignedStaffName ||
+      formData.followUpDate !== def.followUpDate
+    )
+  }, [formData, editingLead])
+
+  const handleCloseAddLeadDialog = () => {
+    if (isLeadFormDirty) {
+      setShowLeadUnsavedConfirm(true)
+    } else {
+      if (!editingLead) {
+        clearLeadDraft()
+      }
+      setIsAddDialogOpen(false)
+      setEditingLead(null)
+      resetForm()
+    }
+  }
+
+  const openAddLeadModal = () => {
+    setEditingLead(null)
+    const draft = loadLeadDraft()
+    if (draft) {
+      setFormData(draft)
+    } else {
+      resetForm()
+    }
+    setIsAddDialogOpen(true)
+  }
   const [convertFormData, setConvertFormData] = useState({
     username: '',
     phone: '',
@@ -266,6 +387,7 @@ export default function LeadsPage() {
         assignedStaffName: formData.assignedStaffName.trim(),
         followUpDate: formData.followUpDate ? new Date(formData.followUpDate).toISOString() : undefined,
       })
+      clearLeadDraft()
     }
 
     resetForm()
@@ -650,14 +772,34 @@ export default function LeadsPage() {
           <Button variant="outline" onClick={() => refetch()}>
             Refresh
           </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog open={isAddDialogOpen} onOpenChange={(o) => { if (!o) handleCloseAddLeadDialog() }}>
             <DialogTrigger asChild>
-              <Button onClick={() => setEditingLead(null)}>
+              <Button onClick={openAddLeadModal}>
                 <IconPlus className="w-4 h-4 mr-2" />
                 Add Lead
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+            <DialogContent
+              className="max-h-[90vh] overflow-y-auto sm:max-w-lg"
+              onPointerDownOutside={(e) => {
+                if (isLeadFormDirty) {
+                  e.preventDefault()
+                  handleCloseAddLeadDialog()
+                }
+              }}
+              onInteractOutside={(e) => {
+                if (isLeadFormDirty) {
+                  e.preventDefault()
+                  handleCloseAddLeadDialog()
+                }
+              }}
+              onEscapeKeyDown={(e) => {
+                if (isLeadFormDirty) {
+                  e.preventDefault()
+                  handleCloseAddLeadDialog()
+                }
+              }}
+            >
               <DialogHeader>
                 <DialogTitle>{editingLead ? 'Edit Lead' : 'Add New Lead'}</DialogTitle>
                 <DialogDescription>
@@ -766,11 +908,7 @@ export default function LeadsPage() {
                 <div className="flex gap-2 pt-4">
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      setIsAddDialogOpen(false)
-                      setEditingLead(null)
-                      resetForm()
-                    }}
+                    onClick={handleCloseAddLeadDialog}
                   >
                     Cancel
                   </Button>
@@ -781,6 +919,36 @@ export default function LeadsPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <AlertDialog open={showLeadUnsavedConfirm} onOpenChange={setShowLeadUnsavedConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have unsaved changes. Do you want to leave?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowLeadUnsavedConfirm(false)}>
+                  Stay
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setShowLeadUnsavedConfirm(false)
+                    if (!editingLead) {
+                      clearLeadDraft()
+                    }
+                    setIsAddDialogOpen(false)
+                    setEditingLead(null)
+                    resetForm()
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Leave
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 

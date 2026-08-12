@@ -36,6 +36,7 @@ import {
   useRejectNutritionistBooking,
 } from '@/hooks/use-nutritionist-bookings'
 import { useSlots } from '@/hooks/use-slots'
+import { getBookingJoinState } from '@/lib/booking-window'
 import type {
   NutritionistBooking,
   NutritionistBookingStatus,
@@ -436,17 +437,27 @@ export function NutritionistAppointmentsTab() {
                                       </Button>
                                     </>
                                   )}
-                                  {(b.bookingStatus === 'Confirmed' || b.bookingStatus === 'Completed' || (b as any).status === 'ACCEPTED') &&
-                                    (b.appointmentMode ?? 'ONLINE') === 'ONLINE' && (
-                                      <Button
-                                        size="sm"
-                                        variant="default"
-                                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                                        onClick={() => setActiveCallBooking(b)}
-                                      >
-                                        <IconVideo className="w-4 h-4 mr-1" /> Join Call
-                                      </Button>
-                                  )}
+                                  {(b.bookingStatus === 'Confirmed' || (b as any).status === 'ACCEPTED') &&
+                                    (b.appointmentMode ?? 'ONLINE') === 'ONLINE' && (() => {
+                                      const joinState = getBookingJoinState(b)
+                                      const disabled = joinState.state === 'too_early' || joinState.state === 'ended'
+                                      return (
+                                        <Button
+                                          size="sm"
+                                          variant="default"
+                                          disabled={disabled}
+                                          className={
+                                            disabled
+                                              ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                              : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                          }
+                                          title={joinState.label ?? 'Join Video Call'}
+                                          onClick={() => setActiveCallBooking(b)}
+                                        >
+                                          <IconVideo className="w-4 h-4 mr-1" /> Join Call
+                                        </Button>
+                                      )
+                                    })()}
                                   {userId && (
                                     <Button asChild size="sm" variant="outline">
                                       <Link href={`/admin/users/${userId}`}>View User</Link>

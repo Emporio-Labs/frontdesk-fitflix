@@ -29,10 +29,12 @@ import { useBookings, useCreateBooking, useDeleteBooking, useChangeBookingStatus
 import { useSlots } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
+import { useGroupClasses } from '@/hooks/use-group-classes'
 import { useUsers } from '@/hooks/use-users'
 import { useMemberships } from '@/hooks/use-memberships'
 import { useTopUpUserCredits, useUserCreditBalance } from '@/hooks/use-credits'
 import { BOOKING_STATUS, BookingStatusValue, Booking } from '@/lib/services/booking.service'
+import { getBookingServiceName } from '@/lib/populated'
 import { cn, toUtcDateKey } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -135,6 +137,7 @@ export default function BookingsPage() {
   const { data: slots = [] } = useSlots()
   const { data: services = [] } = useServices()
   const { data: therapies = [] } = useTherapies()
+  const { data: groupClasses = [] } = useGroupClasses()
   const { data: users = [] } = useUsers()
   const { data: allMemberships = [] } = useMemberships()
   const {
@@ -293,6 +296,11 @@ export default function BookingsPage() {
     [services, therapies]
   )
 
+  const classNameById = useMemo(
+    () => new Map(groupClasses.map((c) => [c.id, c.name] as const)),
+    [groupClasses]
+  )
+
   const slotById = useMemo(() => new Map(slots.map((slot) => [slot._id, slot] as const)), [slots])
 
   const enrichedBookings = useMemo<BookingWithNames[]>(
@@ -304,17 +312,19 @@ export default function BookingsPage() {
             booking.user?.username ||
             userNameById.get(booking.user?._id ?? '') ||
             'Unknown User',
-          serviceName:
-            booking.service?.serviceName ||
-            itemNameById.get(booking.service?._id ?? '') ||
-            'Unknown Service',
+          serviceName: getBookingServiceName(
+            booking,
+            classNameById,
+            itemNameById,
+            'Unknown Service'
+          ),
         }))
         .sort((a, b) => {
           const aTime = new Date(a.createdAt || a.bookingDate).getTime()
           const bTime = new Date(b.createdAt || b.bookingDate).getTime()
           return bTime - aTime
         }),
-    [bookings, userNameById, itemNameById]
+    [bookings, userNameById, itemNameById, classNameById]
   )
 
   const filtered = useMemo(
