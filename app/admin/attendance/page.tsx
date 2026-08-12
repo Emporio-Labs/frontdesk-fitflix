@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -30,13 +31,17 @@ import {
   IconClockHour4,
   IconUserCheck,
   IconSearch,
+  IconTrash,
+  IconAlertTriangle,
 } from '@tabler/icons-react'
 import { useUsers } from '@/hooks/use-users'
+import { useMemberships } from '@/hooks/use-memberships'
 import { QrScannerDialog } from '@/components/attendance/qr-scanner-dialog'
 import {
   useCheckIn,
   useCheckOut,
   useCurrentlyIn,
+  useDeleteGymVisit,
   useGymVisitAnalytics,
   useGymVisits,
 } from '@/hooks/use-gym-visits'
@@ -104,6 +109,8 @@ export default function AttendancePage() {
     refetch: refetchRecent,
   } = useGymVisits({ status: 'closed', limit: 50 })
 
+  const deleteVisit = useDeleteGymVisit()
+
   const recent = recentData?.items ?? []
 
   const todayIso = new Date().toISOString().slice(0, 10)
@@ -125,7 +132,7 @@ export default function AttendancePage() {
           <h2 className="text-3xl font-bold tracking-tight">Attendance</h2>
           <p className="text-muted-foreground">
             Mark members present when they arrive and out when they leave.
-            Members can visit more than once a day.
+            Only members with an active membership plan can be checked in.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -250,6 +257,7 @@ export default function AttendancePage() {
                     <th className="py-2 pr-4 font-medium">Out</th>
                     <th className="py-2 pr-4 font-medium">Duration</th>
                     <th className="py-2 pr-4 font-medium">Notes</th>
+                    <th className="py-2 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -285,6 +293,28 @@ export default function AttendancePage() {
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground truncate max-w-[180px]">
                         {v.notes ?? '—'}
+                      </td>
+                      <td className="py-2 text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            if (
+                              confirm(
+                                `Delete visit record for ${
+                                  v.username || 'this member'
+                                }?`
+                              )
+                            ) {
+                              deleteVisit.mutate(v.id)
+                            }
+                          }}
+                          disabled={deleteVisit.isPending}
+                          title="Delete visit record"
+                        >
+                          <IconTrash className="w-4 h-4" />
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -331,14 +361,38 @@ function KpiCard({
 
 function CheckInCard() {
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<{ id: string; label: string } | null>(
-    null
-  )
+  const [selected, setSelected] = useState<{
+    id: string
+    label: string
+    hasActiveMembership: boolean
+    isCurrentlyIn: boolean
+  } | null>(null)
   const [visitType, setVisitType] = useState<VisitType>('workout')
   const [notes, setNotes] = useState('')
 
   const { data: users = [], isLoading: usersLoading } = useUsers()
+  const { data: memberships = [] } = useMemberships()
+  const { data: currentlyIn = [] } = useCurrentlyIn()
   const checkIn = useCheckIn()
+
+  const activeUserIds = useMemo(() => {
+    const now = new Date()
+    const activeSet = new Set<string>()
+    for (const m of memberships) {
+      if (m.status === 'Active') {
+        const start = m.startDate ? new Date(m.startDate) : null
+        const end = m.endDate ? new Date(m.endDate) : null
+        if ((!start || start <= now) && (!end || end >= now)) {
+          activeSet.add(String(m.userId))
+        }
+      }
+    }
+    return activeSet
+  }, [memberships])
+
+  const currentlyInUserIds = useMemo(() => {
+    return new Set(currentlyIn.map((v) => String(v.userId)))
+  }, [currentlyIn])
 
   const matches = useMemo(() => {
     if (!search.trim() || selected) return []
@@ -357,6 +411,8 @@ function CheckInCard() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!selected) return
+    if (!selected.hasActiveMembership || selected.isCurrentlyIn) return
+
     checkIn.mutate(
       {
         userId: selected.id,
@@ -381,7 +437,7 @@ function CheckInCard() {
           <IconLogin className="w-4 h-4" /> Check a member in
         </CardTitle>
         <CardDescription>
-          Mark a member present when they arrive at the gym.
+          Mark a member present when they arrive at the gym. Check-in is only allowed for members with an active membership plan.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -390,7 +446,23 @@ function CheckInCard() {
             <Label htmlFor="member-search">Member</Label>
             {selected ? (
               <div className="mt-1 flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                <span>{selected.label}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium">{selected.label}</span>
+                  {selected.hasActiveMembership ? (
+                    <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 text-[10px] px-1.5 py-0">
+                      Active Membership
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive text-[10px] px-1.5 py-0">
+                      No Active Membership
+                    </Badge>
+                  )}
+                  {selected.isCurrentlyIn && (
+                    <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 text-[10px] px-1.5 py-0">
+                      Already Checked In
+                    </Badge>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="text-xs text-muted-foreground hover:underline"
@@ -414,34 +486,70 @@ function CheckInCard() {
                   autoComplete="off"
                 />
                 {matches.length > 0 && (
-                  <div className="mt-1 max-h-56 overflow-auto rounded-md border bg-popover shadow-sm">
-                    {matches.map((u) => (
-                      <button
-                        key={u.id}
-                        type="button"
-                        onClick={() =>
-                          setSelected({
-                            id: u.id,
-                            label: `${u.username || u.email || u.id}${
-                              u.email ? ` · ${u.email}` : ''
-                            }`,
-                          })
-                        }
-                        className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                      >
-                        <div className="font-medium">
-                          {u.username || 'Unnamed'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {u.email || u.phone || u.id}
-                        </div>
-                      </button>
-                    ))}
+                  <div className="mt-1 max-h-56 overflow-auto rounded-md border bg-popover shadow-sm divide-y">
+                    {matches.map((u) => {
+                      const hasActive = activeUserIds.has(u.id)
+                      const isCurrentlyIn = currentlyInUserIds.has(u.id)
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() =>
+                            setSelected({
+                              id: u.id,
+                              label: u.username || u.email || u.id,
+                              hasActiveMembership: hasActive,
+                              isCurrentlyIn,
+                            })
+                          }
+                          className="block w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-medium">
+                              {u.username || 'Unnamed'}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {hasActive ? (
+                                <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 text-[10px] px-1.5 py-0">
+                                  Active
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive text-[10px] px-1.5 py-0">
+                                  No Active Membership
+                                </Badge>
+                              )}
+                              {isCurrentlyIn && (
+                                <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 text-[10px] px-1.5 py-0">
+                                  In Gym
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {u.email || u.phone || u.id}
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </div>
             )}
           </div>
+
+          {selected && !selected.hasActiveMembership && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
+              <IconAlertTriangle className="h-4 w-4 shrink-0" />
+              <span>Cannot check in: Member does not have an active membership plan.</span>
+            </div>
+          )}
+
+          {selected && selected.isCurrentlyIn && (
+            <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs text-amber-600">
+              <IconAlertTriangle className="h-4 w-4 shrink-0" />
+              <span>Cannot check in: Member is already checked in. Check them out first.</span>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="visit-type">Visit type</Label>
@@ -474,7 +582,12 @@ function CheckInCard() {
 
           <Button
             type="submit"
-            disabled={!selected || checkIn.isPending}
+            disabled={
+              !selected ||
+              !selected.hasActiveMembership ||
+              selected.isCurrentlyIn ||
+              checkIn.isPending
+            }
             className="w-full"
           >
             {checkIn.isPending ? 'Checking in…' : 'Mark present'}
@@ -493,6 +606,16 @@ function CurrentlyInCard({
   loading: boolean
 }) {
   const checkOut = useCheckOut()
+  const deleteVisit = useDeleteGymVisit()
+
+  const userCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const v of visits) {
+      counts.set(v.userId, (counts.get(v.userId) || 0) + 1)
+    }
+    return counts
+  }, [visits])
+
   return (
     <Card>
       <CardHeader>
@@ -518,31 +641,68 @@ function CurrentlyInCard({
           />
         ) : (
           <div className="space-y-2">
-            {visits.map((v) => (
-              <div
-                key={v.id}
-                className="flex items-center justify-between rounded-md border p-3"
-              >
-                <div>
-                  <div className="text-sm font-medium">
-                    {v.username || 'Unknown member'}
+            {visits.map((v) => {
+              const isDuplicate = (userCounts.get(v.userId) || 0) > 1
+              return (
+                <div
+                  key={v.id}
+                  className={`flex items-center justify-between rounded-md border p-3 ${
+                    isDuplicate ? 'border-amber-500/50 bg-amber-500/5' : ''
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">
+                        {v.username || 'Unknown member'}
+                      </span>
+                      {isDuplicate && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/40 bg-amber-500/10 text-amber-600 text-[10px] px-1.5 py-0"
+                        >
+                          Duplicate Check-in
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      In {new Date(v.checkInAt).toLocaleTimeString()} ·{' '}
+                      {formatDuration(minutesSince(v.checkInAt))} so far ·{' '}
+                      <span className="capitalize">{v.visitType}</span>
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    In {new Date(v.checkInAt).toLocaleTimeString()} ·{' '}
-                    {formatDuration(minutesSince(v.checkInAt))} so far ·{' '}
-                    <span className="capitalize">{v.visitType}</span>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => checkOut.mutate({ id: v.id })}
+                      disabled={checkOut.isPending}
+                    >
+                      <IconLogout className="w-4 h-4 mr-1" /> Check out
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Delete visit entry for ${
+                              v.username || 'this member'
+                            }? This removes the check-in.`
+                          )
+                        ) {
+                          deleteVisit.mutate(v.id)
+                        }
+                      }}
+                      disabled={deleteVisit.isPending}
+                      title="Delete / Remove check-in"
+                    >
+                      <IconTrash className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => checkOut.mutate({ id: v.id })}
-                  disabled={checkOut.isPending}
-                >
-                  <IconLogout className="w-4 h-4 mr-1" /> Check out
-                </Button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </CardContent>
@@ -580,3 +740,4 @@ function VisitsBarList({
     </div>
   )
 }
+

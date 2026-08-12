@@ -98,6 +98,13 @@ export const gymVisitService = {
     }
   },
 
+  delete: async (id: string): Promise<{ message: string }> => {
+    const { data } = await apiClient.delete(`/gym-visits/${id}`)
+    return {
+      message: data?.message || 'Visit deleted successfully',
+    }
+  },
+
   list: async (
     filters: GymVisitFilters = {},
   ): Promise<{ items: GymVisit[]; total: number; limit: number; offset: number }> => {
