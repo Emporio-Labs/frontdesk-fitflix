@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { trainerWorkoutService } from '@/lib/services/trainer-workout.service'
 import {
   useActiveMemberWorkoutSession,
   useStartMemberWorkoutSession,
@@ -96,6 +97,25 @@ export default function MemberLiveWorkoutPage() {
   const [newTargetSets, setNewTargetSets] = useState(3)
   const [newTargetReps, setNewTargetReps] = useState(10)
   const [newTargetWeight, setNewTargetWeight] = useState(0)
+
+  // PT Live Oversight Heartbeat & Immediate Cleanup on Exit
+  useEffect(() => {
+    if (!userId) return
+
+    // Immediately register PT oversight
+    trainerWorkoutService.startOverseeing(userId).catch(() => {})
+
+    // Heartbeat ping every 15s to keep active oversight fresh
+    const intervalId = setInterval(() => {
+      trainerWorkoutService.startOverseeing(userId).catch(() => {})
+    }, 15000)
+
+    // Cleanup: when trainer leaves, navigates back, or closes page, stop oversight immediately
+    return () => {
+      clearInterval(intervalId)
+      trainerWorkoutService.stopOverseeing(userId).catch(() => {})
+    }
+  }, [userId])
 
   // Format timer
   const formatTimer = (secs: number) => {

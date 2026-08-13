@@ -7,7 +7,7 @@ export function useActiveMemberWorkoutSession(userId: string) {
     queryKey: ['trainer', 'member-workouts', userId, 'active'],
     queryFn: () => trainerWorkoutService.getActiveSession(userId),
     enabled: !!userId,
-    refetchInterval: 10000, // 10s polling for live session sync
+    refetchInterval: (query: any) => (query.state.data?.session ? 15000 : false),
   })
 }
 

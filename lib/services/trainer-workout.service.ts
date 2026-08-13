@@ -85,6 +85,14 @@ export const trainerWorkoutService = {
     const { data } = await apiClient.get(`/trainers/me/members/${userId}/workouts/active`)
     return data
   },
+  startOverseeing: async (userId: string): Promise<{ isOverseen: boolean }> => {
+    const { data } = await apiClient.post(`/trainers/me/members/${userId}/workouts/oversee`)
+    return data
+  },
+  stopOverseeing: async (userId: string): Promise<{ isOverseen: boolean }> => {
+    const { data } = await apiClient.delete(`/trainers/me/members/${userId}/workouts/oversee`)
+    return data
+  },
   /**
    * Paginated session history, newest first. Admins reach this too: the mount
    * is `buildWorkoutRouter(["trainer", "admin"], subjectIsMember)` and the
@@ -189,7 +197,11 @@ export const trainerWorkoutService = {
     const { data } = await apiClient.get(`/workout-plans/assignments/user/${userId}`)
     return data
   },
-  updateUserDayExercises: async (userId: string, dayNumber: number, payload: { exercises: any[] }): Promise<any> => {
+  updateUserDayExercises: async (
+    userId: string,
+    dayNumber: number,
+    payload: { isRestDay?: boolean; exercises: any[] }
+  ): Promise<any> => {
     const { data } = await apiClient.patch(`/workout-plans/assignments/user/${userId}/days/${dayNumber}`, payload)
     return data
   },

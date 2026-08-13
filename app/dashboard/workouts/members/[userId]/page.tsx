@@ -30,11 +30,15 @@ import {
   IconArrowUp,
   IconArrowDown,
   IconUserCheck,
+  IconCopy,
+  IconCoffee,
+  IconBed,
 } from '@tabler/icons-react'
 import { useUser } from '@/hooks/use-users'
 import { useExercises } from '@/hooks/use-exercises'
 import { trainerWorkoutService } from '@/lib/services/trainer-workout.service'
 import { MemberWorkoutJourney } from '@/components/workouts/member-workout-journey'
+import { AssignOrCreatePlanModal } from '@/components/workouts/assign-or-create-plan-modal'
 
 interface PlanExerciseItem {
   exerciseId: string
@@ -148,50 +152,131 @@ export default function MemberSchedulePage() {
 
   const [activeDayNumber, setActiveDayNumber] = useState<number>(1)
   const [editingDays, setEditingDays] = useState<Record<number, PlanExerciseItem[]>>({})
+  const [restDays, setRestDays] = useState<Record<number, boolean>>({})
   const [addExerciseDialogOpen, setAddExerciseDialogOpen] = useState(false)
+  const [copyFromDialogOpen, setCopyFromDialogOpen] = useState(false)
   const [exerciseSearch, setExerciseSearch] = useState('')
+  const [assignOrCreateModalOpen, setAssignOrCreateModalOpen] = useState(false)
+  const [showExpiredSchedule, setShowExpiredSchedule] = useState(false)
 
-  // Initialize local editable state from assignment data
+  const handleAddNewDay = () => {
+    const existingNums = Object.keys(editingDays).map(Number)
+    const maxDay = existingNums.length > 0 ? Math.max(...existingNums) : (assignment?.userDays?.length || 0)
+    const newDayNum = maxDay + 1
+    setEditingDays((prev) => ({
+      ...prev,
+      [newDayNum]: [],
+    }))
+    setActiveDayNumber(newDayNum)
+    toast.success(`Created Day ${newDayNum}. Add exercises or copy from another day!`)
+  }
+
+  const toCleanExerciseId = (val: any): string => {
+    if (!val) return ''
+    if (typeof val === 'string') return val
+    if (typeof val === 'object') {
+      if (val._id) return String(val._id)
+      if (val.id) return String(val.id)
+      if (val.exerciseId) return toCleanExerciseId(val.exerciseId)
+      if (typeof val.toString === 'function') {
+        const str = val.toString()
+        if (str !== '[object Object]') return str
+      }
+    }
+    return String(val)
+  }
+
+  const handleCopyDayExercises = (sourceDayNum: number) => {
+    const sourceExercises = editingDays[sourceDayNum] || []
+    if (sourceExercises.length === 0) {
+      toast.error(`Day ${sourceDayNum} has no exercises to copy`)
+      return
+    }
+    const copied = sourceExercises.map((ex, idx) => ({
+      ...ex,
+      exerciseId: toCleanExerciseId(ex.exerciseId),
+      orderIndex: idx,
+      section: (ex.section || 'workout').toLowerCase(),
+      targetSets: Math.max(1, Number(ex.targetSets) || 3),
+      targetReps: Math.max(1, Number(ex.targetReps) || 10),
+      targetWeightKg: Math.max(0, Number(ex.targetWeightKg) || 0),
+      restSeconds: Math.max(0, Number(ex.restSeconds) || 60),
+    }))
+    setEditingDays((prev) => ({
+      ...prev,
+      [activeDayNumber]: copied,
+    }))
+    setCopyFromDialogOpen(false)
+    toast.success(`Copied ${copied.length} exercises from Day ${sourceDayNum} to Day ${activeDayNumber}`)
+  }
+
+  // Initialize local editable state from assignment data & auto-select Today
   useEffect(() => {
     if (assignment?.userDays) {
       const daysMap: Record<number, PlanExerciseItem[]> = {}
+      const restMap: Record<number, boolean> = {}
+      let todayDayNum: number | null = null
+
       assignment.userDays.forEach((day: PlanDayItem) => {
+        restMap[day.dayNumber] = day.isRestDay === true
         daysMap[day.dayNumber] = (day.exercises || []).map((ex, idx) => ({
-          exerciseId: ex.exerciseId,
-          // `name`/`muscleGroup` are not stored on the assignment — the backend
-          // re-joins against the Exercise collection on every read and
-          // synthesizes them, flagging rows whose target has been deleted.
+          exerciseId: toCleanExerciseId(ex.exerciseId),
           name: ex.name || 'Exercise',
           muscleGroup: ex.muscleGroup || 'FullBody',
           exerciseMissing: ex.exerciseMissing === true,
-          section: ex.section || 'workout',
+          section: (ex.section || 'workout').toLowerCase(),
           targetSets: ex.targetSets || 3,
           targetReps: ex.targetReps || 10,
           targetWeightKg: ex.targetWeightKg || 0,
           restSeconds: ex.restSeconds || 60,
           orderIndex: ex.orderIndex ?? idx,
         }))
+
+        const dayInfo = getScheduledDayInfo(
+          assignment?.startDate,
+          day.dayNumber,
+          day.name,
+          assignment?.dayProgress
+        )
+        if (dayInfo.relativeTag === 'Today' && !todayDayNum) {
+          todayDayNum = day.dayNumber
+        }
       })
+
       setEditingDays(daysMap)
-      if (assignment.userDays.length > 0 && !activeDayNumber) {
-        setActiveDayNumber(assignment.userDays[0].dayNumber)
+      setRestDays(restMap)
+
+      if (assignment.userDays.length > 0) {
+        const defaultDay = todayDayNum ?? assignment.userDays[0].dayNumber
+        setActiveDayNumber(defaultDay)
       }
     }
   }, [assignment])
 
   // Save updated exercises for a specific day
   const updateDayMutation = useMutation({
-    mutationFn: ({ dayNumber, exercises }: { dayNumber: number; exercises: PlanExerciseItem[] }) =>
+    mutationFn: ({
+      dayNumber,
+      exercises,
+      isRestDay,
+    }: {
+      dayNumber: number
+      exercises: PlanExerciseItem[]
+      isRestDay?: boolean
+    }) =>
       trainerWorkoutService.updateUserDayExercises(userId, dayNumber, {
-        exercises: exercises.map((ex, idx) => ({
-          exerciseId: ex.exerciseId,
-          orderIndex: idx,
-          section: ex.section,
-          targetSets: Number(ex.targetSets),
-          targetReps: Number(ex.targetReps),
-          targetWeightKg: Number(ex.targetWeightKg),
-          restSeconds: Number(ex.restSeconds),
-        })),
+        isRestDay: isRestDay ?? restDays[dayNumber] ?? false,
+        exercises: exercises
+          .map((ex, idx) => ({
+            exerciseId: toCleanExerciseId(ex.exerciseId),
+            orderIndex: idx,
+            section: (ex.section || 'workout').toLowerCase(),
+            targetSets: Math.max(1, Number(ex.targetSets) || 3),
+            targetReps: Math.max(1, Number(ex.targetReps) || 10),
+            targetWeightKg: Math.max(0, Number(ex.targetWeightKg) || 0),
+            restSeconds: Math.max(0, Number(ex.restSeconds) || 60),
+          }))
+          .filter((ex) => ex.exerciseId.length > 0),
       }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['user-assignment', userId] })
@@ -256,6 +341,7 @@ export default function MemberSchedulePage() {
     updateDayMutation.mutate({
       dayNumber: activeDayNumber,
       exercises: currentDayExercises,
+      isRestDay: !!restDays[activeDayNumber],
     })
   }
 
@@ -279,6 +365,18 @@ export default function MemberSchedulePage() {
   const planObj = assignment?.planId
   const trainerObj = assignment?.assignedBy
 
+  const isPlanExpired = (() => {
+    if (!assignment?.startDate) return false
+    const durationWeeks = planObj?.durationWeeks || planObj?.duration || 4
+    const start = new Date(assignment.startDate)
+    if (Number.isNaN(start.getTime())) return false
+    const end = new Date(start)
+    end.setDate(end.getDate() + (durationWeeks * 7))
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return today > end || assignment?.status === 'Completed' || assignment?.status === 'Expired'
+  })()
+
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       {/* Header Navigation */}
@@ -289,12 +387,21 @@ export default function MemberSchedulePage() {
             Back to Roster
           </Button>
         </div>
-        <Button asChild variant="default" className="bg-amber-600 hover:bg-amber-700">
-          <Link href={`/dashboard/workouts/members/${userId}/live`}>
-            <IconFlame className="w-4 h-4 mr-2" />
-            Start Live Session
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setAssignOrCreateModalOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+          >
+            <IconPlus className="w-4 h-4 mr-2" />
+            Assign / Create Plan
+          </Button>
+          <Button asChild variant="default" className="bg-amber-600 hover:bg-amber-700">
+            <Link href={`/dashboard/workouts/members/${userId}/live`}>
+              <IconFlame className="w-4 h-4 mr-2" />
+              Start Live Session
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Member Profile & Active Plan Hero Header */}
@@ -323,41 +430,108 @@ export default function MemberSchedulePage() {
             </div>
 
             {planObj ? (
-              <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/60 flex flex-col gap-1 min-w-[240px]">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Active Prescribed Plan</span>
-                <span className="text-base font-semibold text-emerald-300">{planObj.name}</span>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300 mt-1">
-                  <span>Goal: {planObj.goal || 'Fitness'}</span>
-                  <span>•</span>
-                  <span>{planObj.durationWeeks || 4} Weeks</span>
-                  {assignment?.startDate && (
-                    <>
-                      <span>•</span>
-                      <span className="text-emerald-300 font-medium">
-                        Start: {new Date(assignment.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                    </>
-                  )}
+              isPlanExpired ? (
+                <div className="bg-amber-950/70 p-4 rounded-xl border border-amber-500/50 flex flex-col gap-1.5 min-w-[280px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge variant="outline" className="border-amber-400 text-amber-300 bg-amber-500/10 text-[10px] uppercase tracking-wider font-bold">
+                      Plan Expired / Passed
+                    </Badge>
+                    <Button
+                      size="sm"
+                      onClick={() => setAssignOrCreateModalOpen(true)}
+                      className="h-6 text-[10px] px-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-sm"
+                    >
+                      <IconPlus className="w-3 h-3 mr-1" />
+                      Assign New Plan
+                    </Button>
+                  </div>
+                  <span className="text-base font-bold text-amber-200">{planObj.name}</span>
+                  <p className="text-xs text-amber-300/90 font-medium">
+                    This program has passed. Member is waiting for a new workout plan!
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/60 flex flex-col gap-1 min-w-[260px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Active Prescribed Plan</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setAssignOrCreateModalOpen(true)}
+                      className="h-6 text-[10px] px-2 text-emerald-400 hover:text-emerald-300 hover:bg-slate-700/50"
+                    >
+                      <IconPlus className="w-3 h-3 mr-1" />
+                      New Plan
+                    </Button>
+                  </div>
+                  <span className="text-base font-semibold text-emerald-300">{planObj.name}</span>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300 mt-1">
+                    <span>Goal: {planObj.goal || 'Fitness'}</span>
+                    <span>•</span>
+                    <span>{planObj.durationWeeks || 4} Weeks</span>
+                    {assignment?.startDate && (
+                      <>
+                        <span>•</span>
+                        <span className="text-emerald-300 font-medium">
+                          Start: {new Date(assignment.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )
             ) : (
-              <Badge variant="destructive">No Active Plan Assigned</Badge>
+              <div className="flex flex-col items-end gap-2">
+                <Badge variant="destructive">No Active Plan Assigned</Badge>
+                <Button
+                  size="sm"
+                  onClick={() => setAssignOrCreateModalOpen(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                >
+                  <IconPlus className="w-3.5 h-3.5 mr-1" />
+                  Assign / Create Plan
+                </Button>
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
 
       {/* Whole Schedule View & Days Editor */}
-      {!assignment ? (
-        <Card className="p-12 text-center">
-          <IconBarbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-bold">No Active Workout Plan</h3>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">
-            This member currently has no active workout plan assigned.
-          </p>
-          <Button asChild>
-            <Link href="/dashboard/workouts">Assign Plan Now</Link>
-          </Button>
+      {!assignment || (isPlanExpired && !showExpiredSchedule) ? (
+        <Card className="p-10 text-center bg-gradient-to-b from-amber-500/5 to-transparent border-amber-500/30 shadow-md">
+          <div className="max-w-md mx-auto space-y-3">
+            <div className="h-12 w-12 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto border border-amber-500/20">
+              <IconCalendar className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-foreground">
+              {isPlanExpired ? 'Workout Plan Has Passed / Expired' : 'No Active Workout Plan'}
+            </h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {isPlanExpired
+                ? `The member's previous workout program ended on ${new Date(new Date(assignment.startDate).getTime() + (planObj.durationWeeks || 4) * 7 * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. No workout is scheduled for Today (${new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}).`
+                : 'This member currently has no active workout plan assigned.'}
+            </p>
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2.5">
+              <Button
+                onClick={() => setAssignOrCreateModalOpen(true)}
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs"
+              >
+                <IconPlus className="w-4 h-4 mr-1.5" />
+                Assign / Create Plan Starting Today
+              </Button>
+              {isPlanExpired && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowExpiredSchedule(true)}
+                  className="w-full sm:w-auto text-xs"
+                >
+                  View Past Expired Schedule
+                </Button>
+              )}
+            </div>
+          </div>
         </Card>
       ) : (
         <Card>
@@ -382,66 +556,152 @@ export default function MemberSchedulePage() {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Days Tabs */}
-            <Tabs
-              value={String(activeDayNumber)}
-              onValueChange={(val) => setActiveDayNumber(Number(val))}
-              className="w-full"
-            >
-              <TabsList className="flex flex-wrap h-auto gap-2 bg-muted/50 p-1.5 rounded-xl">
-                {(assignment.userDays || []).map((day: PlanDayItem) => {
-                  const dayInfo = getScheduledDayInfo(
-                    assignment?.startDate,
-                    day.dayNumber,
-                    day.name,
-                    assignment?.dayProgress
-                  )
-                  return (
-                    <TabsTrigger
-                      key={day.dayNumber}
-                      value={String(day.dayNumber)}
-                      className="px-4 py-2.5 rounded-lg text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1.5"
-                    >
-                      <span>{dayInfo.tabLabel}</span>
-                      {dayInfo.relativeTag === 'Today' && (
-                        <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0 h-4">
-                          Today
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                  )
-                })}
-              </TabsList>
+            {(() => {
+              const userDaysList: PlanDayItem[] = assignment?.userDays || []
+              const allDayNumbers = Array.from(
+                new Set([...userDaysList.map((d) => d.dayNumber), ...Object.keys(editingDays).map(Number)])
+              ).sort((a, b) => a - b)
 
-              {(assignment.userDays || []).map((day: PlanDayItem) => {
-                const dayInfo = getScheduledDayInfo(
-                  assignment?.startDate,
-                  day.dayNumber,
-                  day.name,
-                  assignment?.dayProgress
-                )
+              const dayListToRender = allDayNumbers.map((dayNum) => {
+                const found = userDaysList.find((d) => d.dayNumber === dayNum)
                 return (
-                  <TabsContent key={day.dayNumber} value={String(day.dayNumber)} className="mt-6 space-y-4">
-                    <div className="flex items-center justify-between border-b pb-4">
-                      <div>
-                        <h3 className="text-lg font-bold flex items-center gap-2">
-                          {dayInfo.headerTitle}
-                          {dayInfo.relativeTag === 'Today' && (
-                            <Badge className="bg-emerald-500 text-white text-xs font-semibold">Today's Session</Badge>
+                  found || {
+                    dayNumber: dayNum,
+                    name: `Day ${dayNum}`,
+                    isRestDay: false,
+                    exercises: [],
+                  }
+                )
+              })
+
+              return (
+                <Tabs
+                  value={String(activeDayNumber)}
+                  onValueChange={(val) => setActiveDayNumber(Number(val))}
+                  className="w-full"
+                >
+                  <TabsList className="flex flex-wrap h-auto gap-2 bg-muted/50 p-1.5 rounded-xl items-center">
+                    {dayListToRender.map((day: PlanDayItem) => {
+                      const isCurrentDayRest = !!restDays[day.dayNumber] || day.isRestDay === true
+                      const dayInfo = getScheduledDayInfo(
+                        assignment?.startDate,
+                        day.dayNumber,
+                        day.name,
+                        assignment?.dayProgress
+                      )
+                      return (
+                        <TabsTrigger
+                          key={day.dayNumber}
+                          value={String(day.dayNumber)}
+                          className="px-4 py-2.5 rounded-lg text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1.5"
+                        >
+                          <span>{dayInfo.tabLabel}</span>
+                          {isCurrentDayRest && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-500/50 text-amber-600 bg-amber-500/10">
+                              Rest
+                            </Badge>
                           )}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {currentDayExercises.length} prescribed exercises scheduled for {dayInfo.dateString || `Day ${day.dayNumber}`}
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAddExerciseDialogOpen(true)}
-                      >
-                        <IconPlus className="w-4 h-4 mr-2 text-emerald-600" />
-                        Add Exercise to Day {day.dayNumber}
-                      </Button>
-                    </div>
+                          {dayInfo.relativeTag === 'Today' && (
+                            <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0 h-4">
+                              Today
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      )
+                    })}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddNewDay}
+                      className="h-9 px-3 text-xs border-dashed border-emerald-500/50 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium"
+                    >
+                      <IconPlus className="w-3.5 h-3.5 mr-1" />
+                      Add Day
+                    </Button>
+                  </TabsList>
+
+                  {dayListToRender.map((day: PlanDayItem) => {
+                    const isCurrentDayRest = !!restDays[day.dayNumber]
+                    const dayInfo = getScheduledDayInfo(
+                      assignment?.startDate,
+                      day.dayNumber,
+                      day.name,
+                      assignment?.dayProgress
+                    )
+                    return (
+                      <TabsContent key={day.dayNumber} value={String(day.dayNumber)} className="mt-6 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between border-b pb-4 gap-3">
+                          <div>
+                            <h3 className="text-lg font-bold flex items-center gap-2">
+                              {dayInfo.headerTitle}
+                              {isCurrentDayRest && (
+                                <Badge className="bg-amber-500 text-white text-xs font-semibold flex items-center gap-1">
+                                  <IconCoffee className="w-3 h-3" />
+                                  Rest Day
+                                </Badge>
+                              )}
+                              {dayInfo.relativeTag === 'Today' && (
+                                <Badge className="bg-emerald-500 text-white text-xs font-semibold">Today's Session</Badge>
+                              )}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {isCurrentDayRest
+                                ? `Prescribed Rest & Recovery Day for ${dayInfo.dateString || `Day ${day.dayNumber}`}`
+                                : `${currentDayExercises.length} prescribed exercises scheduled for ${dayInfo.dateString || `Day ${day.dayNumber}`}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant={isCurrentDayRest ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => {
+                                const nextVal = !isCurrentDayRest
+                                setRestDays((prev) => ({ ...prev, [day.dayNumber]: nextVal }))
+                                toast.info(nextVal ? `Marked Day ${day.dayNumber} as Rest Day` : `Set Day ${day.dayNumber} as Training Day`)
+                              }}
+                              className={
+                                isCurrentDayRest
+                                  ? 'bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-sm'
+                                  : 'text-xs border-amber-500/40 text-amber-700 hover:bg-amber-50 font-medium'
+                              }
+                            >
+                              <IconCoffee className="w-3.5 h-3.5 mr-1.5" />
+                              {isCurrentDayRest ? 'Rest Day Prescribed' : 'Set as Rest Day'}
+                            </Button>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCopyFromDialogOpen(true)}
+                              className="text-xs border-amber-500/40 text-amber-700 hover:bg-amber-50 font-medium"
+                            >
+                              <IconCopy className="w-3.5 h-3.5 mr-1.5 text-amber-600" />
+                              Copy from Another Day
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setAddExerciseDialogOpen(true)}
+                            >
+                              <IconPlus className="w-4 h-4 mr-2 text-emerald-600" />
+                              Add Exercise to Day {day.dayNumber}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {isCurrentDayRest && (
+                          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3">
+                            <div className="p-2.5 rounded-lg bg-amber-500/20 text-amber-600 font-bold flex-shrink-0">
+                              <IconCoffee className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-amber-700 dark:text-amber-400">Prescribed Rest & Recovery Day</h4>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Day {day.dayNumber} is scheduled for muscle recovery, hydration, and active mobility. You can optionally keep light stretching below or leave empty.
+                              </p>
+                            </div>
+                          </div>
+                        )}
 
                   {currentDayExercises.length === 0 ? (
                     <div className="p-8 text-center border border-dashed rounded-xl">
@@ -561,11 +821,13 @@ export default function MemberSchedulePage() {
                       ))}
                     </div>
                   )}
-                </TabsContent>
-              )
-            })}
+                  </TabsContent>
+                )
+              })}
             </Tabs>
-          </CardContent>
+          )
+        })()}
+      </CardContent>
         </Card>
       )}
 
@@ -613,6 +875,72 @@ export default function MemberSchedulePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Copy Day Dialog */}
+      <Dialog open={copyFromDialogOpen} onOpenChange={setCopyFromDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <IconCopy className="w-5 h-5 text-amber-600" />
+              Copy Exercises to Day {activeDayNumber}
+            </DialogTitle>
+            <DialogDescription>
+              Select an existing day to copy all prescribed exercise targets into Day {activeDayNumber}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2.5 max-h-[60vh] overflow-y-auto">
+            {(() => {
+              const userDaysList: PlanDayItem[] = assignment?.userDays || []
+              const allDayNumbers = Array.from(
+                new Set([...userDaysList.map((d) => d.dayNumber), ...Object.keys(editingDays).map(Number)])
+              ).sort((a, b) => a - b)
+
+              const candidates = allDayNumbers.filter((dNum) => dNum !== activeDayNumber)
+
+              if (candidates.length === 0) {
+                return (
+                  <div className="text-center py-6 text-xs text-muted-foreground">
+                    No other days available to copy from. Click "+ Add Day" to create more days first.
+                  </div>
+                )
+              }
+
+              return candidates.map((dNum) => {
+                const count = (editingDays[dNum] || []).length
+                return (
+                  <div
+                    key={dNum}
+                    className="flex items-center justify-between p-3.5 rounded-xl border bg-card hover:bg-muted/50 transition-colors"
+                  >
+                    <div>
+                      <p className="font-bold text-sm">Day {dNum}</p>
+                      <p className="text-xs text-muted-foreground">{count} exercises prescribed</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={count === 0}
+                      onClick={() => handleCopyDayExercises(dNum)}
+                      className="text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                    >
+                      <IconCopy className="w-3.5 h-3.5 mr-1" />
+                      Copy {count} Exercises
+                    </Button>
+                  </div>
+                )
+              })
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign or Create Plan Modal */}
+      <AssignOrCreatePlanModal
+        open={assignOrCreateModalOpen}
+        onOpenChange={setAssignOrCreateModalOpen}
+        userId={userId}
+        memberName={user?.username || (user as any)?.name}
+      />
     </div>
   )
 }
