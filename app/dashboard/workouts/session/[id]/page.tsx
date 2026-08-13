@@ -253,11 +253,11 @@ function ExerciseCard({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <CardTitle className="text-base">{name}</CardTitle>
-            {exercise.exercise?.muscleGroups && exercise.exercise.muscleGroups.map(m => (
-              <Badge key={m} variant="outline" className="text-[10px] uppercase">
-                {m}
+            {exercise.exercise?.muscleGroup && (
+              <Badge variant="outline" className="text-[10px] uppercase">
+                {exercise.exercise.muscleGroup}
               </Badge>
-            ))}
+            )}
             {exercise.isCompleted && (
               <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-transparent">
                 Done

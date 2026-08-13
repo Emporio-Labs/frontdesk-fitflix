@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { IconPlus, IconDumbbell } from '@tabler/icons-react'
+import { IconPlus, IconDumbbell, IconUsers } from '@tabler/icons-react'
 import { WorkoutStatsCards } from '@/components/workouts/workout-stats-cards'
 import { WorkoutCompletionChart } from '@/components/workouts/workout-completion-chart'
 import { EngagementChart } from '@/components/workouts/engagement-chart'
@@ -24,6 +24,12 @@ export default function WorkoutsPage() {
             <Link href="/dashboard/workouts/exercises">
               <IconDumbbell className="w-4 h-4 mr-2" />
               Exercise Library
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/workouts/members">
+              <IconUsers className="w-4 h-4 mr-2" />
+              Member Roster
             </Link>
           </Button>
           <Button asChild>

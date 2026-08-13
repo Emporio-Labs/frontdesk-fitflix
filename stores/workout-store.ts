@@ -115,11 +115,13 @@ export const useWorkoutStore = create<WorkoutStore>()(
             exerciseId: exercise._id,
             exercise: {
               name: exercise.name,
-              muscleGroups: exercise.muscleGroups,
+              // Mirror the backend projection: the nested sub-object carries a
+              // single muscle group (`muscleGroups[0] ?? "FullBody"`), so an
+              // exercise added locally renders the same as one loaded from the API.
+              muscleGroup: exercise.muscleGroups?.[0],
               difficulty: exercise.difficulty,
               equipment: exercise.equipment,
               caloriesPerSet: exercise.caloriesPerSet,
-              exerciseType: exercise.exerciseType,
               sectionTypes: exercise.sectionTypes,
             },
             section,

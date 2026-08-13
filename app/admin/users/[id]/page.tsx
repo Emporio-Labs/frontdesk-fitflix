@@ -25,8 +25,18 @@ import {
   IconFileText,
   IconCreditCard,
   IconCalendar,
+  IconRun,
 } from '@tabler/icons-react'
 import { useUser } from '@/hooks/use-users'
+import { MemberWorkoutJourney } from '@/components/workouts/member-workout-journey'
+import { useTrainers, useAssignTrainerToUser } from '@/hooks/use-trainers'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useBookings } from '@/hooks/use-bookings'
 import { useMemberships } from '@/hooks/use-memberships'
 import { useServices } from '@/hooks/use-services'
@@ -384,6 +394,17 @@ export default function UserDetailPage() {
             </CardContent>
           </Card>
 
+          <AssignedTrainerSection
+            userId={userId}
+            currentTrainerId={
+              typeof user.assignedTrainer === 'object' && user.assignedTrainer
+                ? (user.assignedTrainer as any)._id
+                : typeof user.assignedTrainer === 'string'
+                ? user.assignedTrainer
+                : undefined
+            }
+          />
+
           <Card>
             <CardHeader>
               <CardTitle>Health Goals</CardTitle>
@@ -546,6 +567,9 @@ export default function UserDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* ─── WORKOUT JOURNEY ─── */}
+          <MemberWorkoutJourney userId={userId} />
 
           {/* ─── ONBOARDING PROGRESS ─── */}
           <Card>
@@ -784,5 +808,69 @@ export default function UserDetailPage() {
         </>
       )}
     </div>
+  )
+}
+
+function AssignedTrainerSection({
+  userId,
+  currentTrainerId,
+}: {
+  userId: string
+  currentTrainerId?: string
+}) {
+  const { data: trainers = [], isLoading } = useTrainers()
+  const assignMutation = useAssignTrainerToUser()
+  const [selectedTrainer, setSelectedTrainer] = useState<string>(
+    currentTrainerId || 'none',
+  )
+
+  useEffect(() => {
+    if (currentTrainerId) setSelectedTrainer(currentTrainerId)
+  }, [currentTrainerId])
+
+  const handleSave = () => {
+    const trainerId = selectedTrainer === 'none' ? null : selectedTrainer
+    assignMutation.mutate({ userId, trainerId })
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <IconRun className="w-5 h-5 text-primary" />
+          Assigned Personal Trainer
+        </CardTitle>
+        <CardDescription>
+          Assign a dedicated trainer to manage this member's workout plans and live training sessions.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-3 max-w-md">
+          <Select
+            value={selectedTrainer}
+            onValueChange={setSelectedTrainer}
+            disabled={isLoading || assignMutation.isPending}
+          >
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Select a trainer..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Unassigned (No Trainer)</SelectItem>
+              {trainers.map((t) => (
+                <SelectItem key={t._id} value={t._id}>
+                  {t.trainerName} ({t.email})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={handleSave}
+            disabled={assignMutation.isPending}
+          >
+            Save Assignment
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

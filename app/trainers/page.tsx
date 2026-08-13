@@ -161,11 +161,12 @@ export default function PublicTrainersDirectory() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {filteredTrainers.map((trainer, index) => {
+                  const trainerKey = trainer._id || (trainer as any).id || `pub-trainer-${index}`
                   const gradient = GRADIENTS[index % GRADIENTS.length]
                   
                   return (
                     <Card
-                      key={trainer._id}
+                      key={trainerKey}
                       className="group bg-neutral-900/30 hover:bg-neutral-900/60 border-neutral-800/80 hover:border-neutral-700/80 overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1.5 shadow-xl hover:shadow-2xl hover:shadow-orange-500/5"
                     >
                       {/* Image Frame */}
@@ -174,14 +175,14 @@ export default function PublicTrainersDirectory() {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={trainer.imageUrl}
-                            alt={trainer.trainerName}
+                            alt={trainer.trainerName || 'Trainer'}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                           />
                         ) : (
                           <div className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center opacity-85 relative`}>
                             <div className="absolute inset-0 bg-neutral-950/40" />
                             <span className="text-5xl font-black text-white tracking-widest relative z-10 uppercase drop-shadow-md">
-                              {trainer.trainerName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                              {(trainer.trainerName || 'T').split(' ').map(n => n[0]).join('').slice(0, 2)}
                             </span>
                           </div>
                         )}
@@ -189,9 +190,9 @@ export default function PublicTrainersDirectory() {
                         
                         {/* Overlay Specialities badges */}
                         <div className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-1.5">
-                          {trainer.specialities.slice(0, 3).map((s) => (
+                          {(trainer.specialities || []).slice(0, 3).map((s, idx) => (
                             <Badge
-                              key={s}
+                              key={`${trainerKey}-spec-${s}-${idx}`}
                               className="bg-neutral-950/90 text-orange-400 hover:bg-neutral-950 border border-neutral-800 text-[10px] py-0.5 px-2 rounded-md font-bold uppercase tracking-wider"
                             >
                               {s}

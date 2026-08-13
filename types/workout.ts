@@ -22,6 +22,13 @@ export type PlanGoal =
 export interface Exercise {
   _id: string
   name: string
+  /**
+   * The library document stores an array: the backend `Exercise` schema is
+   * `muscleGroups: [String]` and `createExerciseBodySchema` requires it
+   * (`.min(1)`). Note this is the plural *document* shape — the nested
+   * `exercise` sub-object on `WorkoutExercise` below is singular, because the
+   * plan/session controllers project `muscleGroups[0]` into it.
+   */
   muscleGroups: MuscleGroup[]
   targetedMuscles: string[]
   difficulty: Difficulty
@@ -95,7 +102,22 @@ export interface UpdateExercisePayload {
 export interface WorkoutExercise {
   _id?: string
   exerciseId: string
-  exercise?: Pick<Exercise, 'name' | 'muscleGroups' | 'difficulty' | 'equipment' | 'caloriesPerSet' | 'exerciseType' | 'sectionTypes'>
+  // The nested shape the plan/session controllers build. `muscleGroup` is
+  // singular here by design, and is NOT the same shape as the `Exercise`
+  // document above: the backend stores `muscleGroups[]` on the document and
+  // projects `muscleGroups[0] ?? "FullBody"` into this sub-object (see
+  // workout.controller.ts, workout-plan.controller.ts and
+  // workout-assignment.controller.ts). Reading the plural here yields undefined.
+  exercise?: {
+    name: string
+    muscleGroup?: MuscleGroup
+    difficulty?: Difficulty
+    equipment?: string
+    caloriesPerSet?: number
+    sectionTypes?: WorkoutSection[]
+  }
+  /** Set when the referenced Exercise document no longer exists. */
+  exerciseMissing?: boolean
   orderIndex: number
   targetSets: number
   targetReps: number
