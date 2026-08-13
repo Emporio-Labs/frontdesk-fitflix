@@ -28,13 +28,18 @@ import {
   IconCalendar,
   IconExternalLink,
   IconBarbell,
+  IconClipboardCheck,
 } from '@tabler/icons-react'
 import { useUser } from '@/hooks/use-users'
 import { useTrainers, useAssignTrainerToUser } from '@/hooks/use-trainers'
 import { User } from '@/lib/services/user.service'
 import { Membership } from '@/lib/services/membership.service'
 import { StatusBadge } from '@/components/status-badge'
-import { computeBmi, getBmiCategory } from '@/lib/health-insights'
+import { computeBmi, getBmiCategory, toNumberSafe } from '@/lib/health-insights'
+import {
+  OnboardingTimeline,
+  onboardingStepLabel,
+} from '@/components/onboarding-timeline'
 
 interface UserDetailsDialogProps {
   user: User | null
@@ -86,13 +91,47 @@ export function UserDetailsDialog({
       ? (u.assignedTrainer as any).trainerName || (u.assignedTrainer as any).email
       : trainers.find((t) => t._id === currentTrainerId)?.trainerName
 
-  const healthMarkers = (u.healthMarkers || {}) as Record<string, any>
-  const bmi = computeBmi(healthMarkers.heightCm, healthMarkers.weightKg)
-  const bmiCategory = getBmiCategory(bmi)
+  const markers = (u.healthMarkers || {}) as Record<string, any>
+  const heightVal = markers.height || markers.heightCm
+  const weightVal = markers.weight || markers.weightKg
+  const heightDisplay = heightVal
+    ? String(heightVal).toLowerCase().endsWith('cm')
+      ? String(heightVal)
+      : `${heightVal} cm`
+    : '—'
+  const weightDisplay = weightVal
+    ? String(weightVal).toLowerCase().endsWith('kg')
+      ? String(weightVal)
+      : `${weightVal} kg`
+    : '—'
+
+  const bmiVal = markers.bmi || computeBmi(heightVal, weightVal)
+  const bmiNum = toNumberSafe(bmiVal)
+  const bmiDisplay = bmiVal != null ? String(bmiVal) : '—'
+  const bmiCategory = getBmiCategory(bmiNum)
+
+  const activityLvl = markers.activityLevel ? String(markers.activityLevel) : '—'
+  const targetWeightVal = markers.targetWeight || markers.goalWeight
+  const targetWeightDisplay = targetWeightVal
+    ? String(targetWeightVal).toLowerCase().endsWith('kg')
+      ? String(targetWeightVal)
+      : `${targetWeightVal} kg`
+    : '—'
+
+  const bloodPressure =
+    markers.systolicBp && markers.diastolicBp
+      ? `${markers.systolicBp}/${markers.diastolicBp} mmHg`
+      : '—'
+
+  const sleepWater = `${markers.sleepHours ? `${markers.sleepHours} hrs` : '—'} / ${
+    markers.waterIntakeLiters ? `${markers.waterIntakeLiters} L` : '—'
+  }`
+
+  const onboarding = u.onboardingStatus
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-6">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-6 space-y-6">
         <DialogHeader className="border-b pb-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -172,19 +211,18 @@ export function UserDetailsDialog({
                 <IconHeart className="w-4 h-4 text-red-500" />
                 Health & Fitness Indicators
               </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div className="p-3 rounded-lg border bg-muted/30 space-y-1">
                   <p className="text-[10px] uppercase font-bold text-muted-foreground">Height & Weight</p>
-                  <p className="text-sm font-semibold">
-                    {u.healthMarkers?.heightCm ? `${u.healthMarkers.heightCm} cm` : '—'} /{' '}
-                    {u.healthMarkers?.weightKg ? `${u.healthMarkers.weightKg} kg` : '—'}
+                  <p className="text-sm font-semibold truncate">
+                    {heightDisplay} / {weightDisplay}
                   </p>
                 </div>
 
                 <div className="p-3 rounded-lg border bg-muted/30 space-y-1">
                   <p className="text-[10px] uppercase font-bold text-muted-foreground">BMI Index</p>
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-semibold">{bmi ?? '—'}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-sm font-semibold">{bmiDisplay}</p>
                     {bmiCategory && (
                       <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
                         {bmiCategory}
@@ -195,19 +233,22 @@ export function UserDetailsDialog({
 
                 <div className="p-3 rounded-lg border bg-muted/30 space-y-1">
                   <p className="text-[10px] uppercase font-bold text-muted-foreground">Blood Pressure</p>
-                  <p className="text-sm font-semibold">
-                    {u.healthMarkers?.systolicBp && u.healthMarkers?.diastolicBp
-                      ? `${u.healthMarkers.systolicBp}/${u.healthMarkers.diastolicBp} mmHg`
-                      : '—'}
-                  </p>
+                  <p className="text-sm font-semibold truncate">{bloodPressure}</p>
                 </div>
 
                 <div className="p-3 rounded-lg border bg-muted/30 space-y-1">
                   <p className="text-[10px] uppercase font-bold text-muted-foreground">Sleep / Water</p>
-                  <p className="text-sm font-semibold">
-                    {u.healthMarkers?.sleepHours ? `${u.healthMarkers.sleepHours} hrs` : '—'} /{' '}
-                    {u.healthMarkers?.waterIntakeLiters ? `${u.healthMarkers.waterIntakeLiters} L` : '—'}
-                  </p>
+                  <p className="text-sm font-semibold truncate">{sleepWater}</p>
+                </div>
+
+                <div className="p-3 rounded-lg border bg-muted/30 space-y-1">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Activity Level</p>
+                  <p className="text-sm font-semibold truncate">{activityLvl}</p>
+                </div>
+
+                <div className="p-3 rounded-lg border bg-muted/30 space-y-1">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Target Weight</p>
+                  <p className="text-sm font-semibold truncate">{targetWeightDisplay}</p>
                 </div>
               </div>
 
@@ -228,7 +269,31 @@ export function UserDetailsDialog({
               </div>
             </div>
 
-            {/* 3. Membership Overview */}
+            {/* 3. Onboarding Progress Tracker */}
+            {onboarding && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <IconClipboardCheck className="w-4 h-4 text-blue-500" />
+                  Onboarding Progress
+                </h4>
+                <div className="rounded-lg border bg-card p-4 space-y-2">
+                  <OnboardingTimeline
+                    currentStep={onboarding.currentStep}
+                    completedSteps={onboarding.completedSteps ?? []}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Current step:{' '}
+                    <span className="font-medium text-foreground">
+                      {onboardingStepLabel(onboarding.currentStep)}
+                    </span>
+                    {' · '}
+                    {onboarding.completedSteps?.length ?? 0} of 7 completed
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 4. Membership Overview */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <IconCalendar className="w-4 h-4 text-emerald-500" />
@@ -259,7 +324,7 @@ export function UserDetailsDialog({
               )}
             </div>
 
-            {/* 4. Action Links */}
+            {/* 5. Action Links */}
             <div className="flex flex-wrap gap-3 pt-2 border-t justify-end">
               <Button asChild variant="outline" size="sm" className="text-xs">
                 <Link href={`/dashboard/workouts/members/${u._id}`}>

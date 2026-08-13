@@ -55,7 +55,7 @@ export default function LoginPage() {
         super_admin: 'super_admin',
         frontdesk: 'staff',
         doctor: 'clinician',
-        trainer: 'staff',
+        trainer: 'trainer',
         nutritionist: 'staff',
         user: 'sales', // restrict normal 'user' from accessing powerful dashboard reads if they shouldn't
       }

@@ -1,6 +1,6 @@
 // Role-based access control definitions
 
-export type UserRole = 'super_admin' | 'clinic_admin' | 'staff' | 'clinician' | 'sales'
+export type UserRole = 'super_admin' | 'clinic_admin' | 'staff' | 'clinician' | 'sales' | 'trainer'
 
 export interface Permission {
   resource: string
@@ -107,6 +107,16 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'leads', action: 'create' },
     { resource: 'leads', action: 'update' },
     { resource: 'memberships', action: 'read' },
+  ],
+  trainer: [
+    { resource: 'users', action: 'read' },
+    { resource: 'workout_plans', action: 'create' },
+    { resource: 'workout_plans', action: 'read' },
+    { resource: 'workout_plans', action: 'update' },
+    { resource: 'workout_sessions', action: 'create' },
+    { resource: 'workout_sessions', action: 'read' },
+    { resource: 'workout_sessions', action: 'update' },
+    { resource: 'exercises', action: 'read' },
   ],
 }
 

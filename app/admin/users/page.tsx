@@ -34,6 +34,7 @@ import { useMemberships } from '@/hooks/use-memberships'
 import { User, CreateUserPayload } from '@/lib/services/user.service'
 import { Admin } from '@/lib/services/admin.service'
 import { StatusBadge } from '@/components/status-badge'
+import { UserDetailsDialog } from '@/components/users/user-details-dialog'
 import { toast } from 'sonner'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -156,6 +157,8 @@ export default function UsersPage() {
   const [memberPage, setMemberPage] = useState(1)
   const [showPassword, setShowPassword] = useState(false)
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false)
+  const [selectedDetailUser, setSelectedDetailUser] = useState<User | null>(null)
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
 
   // Auto-persist form draft to sessionStorage while filling in Create mode
   useEffect(() => {
@@ -663,7 +666,7 @@ export default function UsersPage() {
                       <TableHead className="w-[130px] font-semibold">Membership</TableHead>
                       <TableHead className="w-[100px] font-semibold">Plan Start</TableHead>
                       <TableHead className="w-[100px] font-semibold">Plan Expiry</TableHead>
-                      <TableHead className="w-[150px] text-right pr-6 font-semibold">Actions</TableHead>
+                      <TableHead className="w-[160px] text-right pr-6 font-semibold">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -674,7 +677,19 @@ export default function UsersPage() {
                         const membership = getUserMembership(user)
                         return (
                           <TableRow key={user._id || index} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
-                            <TableCell className="pl-6 font-semibold text-foreground truncate max-w-[140px]">{user.username}</TableCell>
+                            <TableCell className="pl-6 font-semibold text-foreground truncate max-w-[140px]">
+                              <button
+                                type="button"
+                                className="text-left font-semibold hover:underline text-primary hover:text-primary/80 transition-colors"
+                                onClick={() => {
+                                  setSelectedDetailUser(user)
+                                  setIsDetailDialogOpen(true)
+                                }}
+                                title="Click to view full health markers, assigned trainer & member details"
+                              >
+                                {user.username}
+                              </button>
+                            </TableCell>
                             <TableCell className="text-muted-foreground truncate max-w-[180px]" title={user.email}>{user.email}</TableCell>
                             <TableCell className="text-center">{user.age}</TableCell>
                             <TableCell>
@@ -713,6 +728,18 @@ export default function UsersPage() {
                                     </Link>
                                   </Button>
                                 )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                  onClick={() => {
+                                    setSelectedDetailUser(user)
+                                    setIsDetailDialogOpen(true)
+                                  }}
+                                  title="View Member Details & Health Markers"
+                                >
+                                  <IconEye className="w-4 h-4 text-primary" />
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -1013,6 +1040,13 @@ export default function UsersPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <UserDetailsDialog
+        user={selectedDetailUser}
+        membership={selectedDetailUser ? getUserMembership(selectedDetailUser) : null}
+        open={isDetailDialogOpen}
+        onOpenChange={setIsDetailDialogOpen}
+      />
     </div>
   )
 }
