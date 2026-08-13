@@ -7,6 +7,19 @@ import {
 import { queryKeys } from '@/lib/query-keys'
 import { toast } from 'sonner'
 
+// Surfaces per-field validation reasons from the backend's zod error shape
+// ({ message, errors: [{ path, message }] }) instead of only the generic
+// "Invalid class payload" / axios "Request failed with status code 400".
+function formatApiError(err: any, fallback: string): string {
+  const data = err?.response?.data
+  const issues = Array.isArray(data?.errors)
+    ? data.errors
+        .map((i: any) => `${(Array.isArray(i?.path) ? i.path.join('.') : '') || 'field'}: ${i?.message}`)
+        .join('; ')
+    : ''
+  return [data?.message || err?.message || fallback, issues].filter(Boolean).join(' — ')
+}
+
 export function useGroupClasses() {
   return useQuery({
     queryKey: queryKeys.groupClasses.all(),
@@ -25,7 +38,7 @@ export function useCreateGroupClass() {
       toast.success(data.message || 'Group class created successfully')
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to create group class')
+      toast.error(formatApiError(err, 'Failed to create group class'))
     },
   })
 }

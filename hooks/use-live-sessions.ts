@@ -13,6 +13,19 @@ export function useLiveSessions() {
   })
 }
 
+// Same shape as useLiveSessions(), but includes OFFLINE occurrences too — for
+// callers that need every class's schedule (e.g. deriving which Group Classes
+// have finished), not just the online-sessions view LiveSessionsPanel shows.
+export function useAllScheduledSessions() {
+  return useQuery({
+    queryKey: queryKeys.liveSessions.allDeliveryTypes(),
+    queryFn: () => liveSessionService.getAll({ includeOffline: true }),
+    select: (data) => data.sessions,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000
+  })
+}
+
 export function useEndSession() {
   const queryClient = useQueryClient()
   

@@ -91,21 +91,27 @@ function normalizeLiveSession(raw: any): LiveSession {
 }
 
 export const liveSessionService = {
-  async getAll(filters?: { date?: string; status?: string; trainerId?: string }) {
+  // `includeOffline` keeps OFFLINE occurrences in the result. The default stays
+  // ONLINE/HYBRID-only because the Live Sessions panel is explicitly an
+  // online-sessions view; callers that reason about every class's schedule
+  // (e.g. the Group Classes "Completed" tab) opt in.
+  async getAll(filters?: { date?: string; status?: string; trainerId?: string; includeOffline?: boolean }) {
     const params = new URLSearchParams()
     if (filters?.date) params.append('date', filters.date)
     if (filters?.status) params.append('status', filters.status)
     if (filters?.trainerId) params.append('trainerId', filters.trainerId)
 
     const res = await apiClient.get(`/api/v1/admin/classes/schedule?${params.toString()}`)
-    
+
     let sessions = (res.data?.sessions || []).map(normalizeLiveSession)
-    
+
     // Filter to ONLINE or HYBRID
-    sessions = sessions.filter((s: LiveSession) => 
-      s.deliveryType === 'ONLINE' || s.deliveryType === 'HYBRID'
-    )
-    
+    if (!filters?.includeOffline) {
+      sessions = sessions.filter((s: LiveSession) =>
+        s.deliveryType === 'ONLINE' || s.deliveryType === 'HYBRID'
+      )
+    }
+
     // Sort by sessionDate and startTime
     sessions.sort((a: LiveSession, b: LiveSession) => {
       const dateA = new Date(`${a.sessionDate.split('T')[0]}T${a.startTime}`)

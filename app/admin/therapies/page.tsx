@@ -80,7 +80,8 @@ import type { TherapyCatalogItem } from '@/lib/services/therapy.service'
 import type { GroupClass, GroupClassMode } from '@/lib/services/group-class.service'
 import { slotService, type Slot } from '@/lib/services/slot.service'
 import { LiveSessionsPanel } from '@/components/live-sessions/live-sessions-panel'
-import { useLiveSessions } from '@/hooks/use-live-sessions'
+import { useLiveSessions, useAllScheduledSessions } from '@/hooks/use-live-sessions'
+import { resolveBookingWindow } from '@/lib/booking-window'
 import GroupClassBookingsPanel from './group-class-bookings-panel'
 
 type ScheduleMode = 'one-time' | 'recurring'
@@ -348,7 +349,7 @@ export default function TherapiesPage() {
   const [capacityWarnInfo, setCapacityWarnInfo] = useState<{ payload: any; maxBooked: number; gcSlots: Slot[] } | null>(null)
   const [publishWarnOpen, setPublishWarnOpen] = useState(false)
   const [pendingPublishGc, setPendingPublishGc] = useState<{ id: string; isPublished: boolean } | null>(null)
-  const [gcPublishFilter, setGcPublishFilter] = useState<'all' | 'published' | 'unpublished' | 'retired'>('all')
+  const [gcPublishFilter, setGcPublishFilter] = useState<'all' | 'published' | 'unpublished' | 'retired' | 'completed'>('all')
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false)
 
   const isFormDirty = () => {
@@ -498,6 +499,40 @@ export default function TherapiesPage() {
     best.forEach((v, k) => m.set(k, v.session))
     return m
   }, [liveSessionsForHosting])
+
+  // Group Classes "Completed" tab: a class is completed once it has at least
+  // one scheduled occurrence and every non-cancelled occurrence has finished
+  // (backend status COMPLETED, or its end instant has passed — reusing
+  // resolveBookingWindow, the same source of truth already used for booking
+  // join windows elsewhere in the app). Classes with zero sessions are never
+  // auto-completed — nothing has finished for them yet.
+  const { data: allScheduledSessions = [] } = useAllScheduledSessions()
+  const completedClassIds = useMemo(() => {
+    const now = new Date()
+    const hasSession = new Set<string>()
+    const hasUnfinished = new Set<string>()
+    for (const s of allScheduledSessions) {
+      if (!s.classId) continue
+      if (s.status === 'CANCELLED') continue
+      hasSession.add(s.classId)
+      if (s.status === 'COMPLETED') continue
+      const window = resolveBookingWindow({
+        startsAtUtc: s.startsAtUtc,
+        endsAtUtc: s.endsAtUtc,
+        date: s.sessionDate,
+        startTime: s.startTime,
+        endTime: s.endTime,
+      })
+      if (!window || now < window.endsAt) {
+        hasUnfinished.add(s.classId)
+      }
+    }
+    const result = new Set<string>()
+    hasSession.forEach((id) => {
+      if (!hasUnfinished.has(id)) result.add(id)
+    })
+    return result
+  }, [allScheduledSessions])
 
   const createTherapy = useCreateTherapy()
   const updateTherapy = useUpdateTherapy()
@@ -963,7 +998,13 @@ export default function TherapiesPage() {
       isPublished: gcForm.isPublished,
     }
 
-    await executeSave(payload, [])
+    try {
+      await executeSave(payload, [])
+    } catch {
+      // Mutation's onError already raised the toast with the real reason;
+      // keep the dialog open so the admin can correct and resubmit.
+      return
+    }
   }
 
   const handleDeleteGc = (id: string) => deleteGroupClass.mutate(id)
@@ -972,8 +1013,10 @@ export default function TherapiesPage() {
     let list = groupClasses
     if (gcPublishFilter === 'retired') {
       list = list.filter((gc) => gc.isRetired)
+    } else if (gcPublishFilter === 'completed') {
+      list = list.filter((gc) => !gc.isRetired && completedClassIds.has(gc.id))
     } else {
-      list = list.filter((gc) => !gc.isRetired)
+      list = list.filter((gc) => !gc.isRetired && !completedClassIds.has(gc.id))
       if (gcPublishFilter === 'published') {
         list = list.filter((gc) => gc.isPublished)
       } else if (gcPublishFilter === 'unpublished') {
@@ -989,7 +1032,7 @@ export default function TherapiesPage() {
         gc.description.toLowerCase().includes(q) ||
         gc.tags.some((t) => t.toLowerCase().includes(q))
     )
-  }, [groupClasses, gcSearchTerm, gcPublishFilter])
+  }, [groupClasses, gcSearchTerm, gcPublishFilter, completedClassIds])
 
   const gcModeLabel: Record<GroupClassMode, string> = { online: 'Online', offline: 'In-Person', hybrid: 'Hybrid' }
   const gcModeIcon: Record<GroupClassMode, React.ReactElement> = {
@@ -1931,7 +1974,7 @@ export default function TherapiesPage() {
                     <div className="flex gap-1.5">
                       <Input
                         type="number"
-                        min={1}
+                        min={0}
                         className={cn(
                           "h-8 text-xs w-20",
                           isFieldChanged('bookingWindowValue') && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
@@ -2489,7 +2532,7 @@ export default function TherapiesPage() {
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                All ({groupClasses.filter((g) => !g.isRetired).length})
+                All ({groupClasses.filter((g) => !g.isRetired && !completedClassIds.has(g.id)).length})
               </button>
               <button
                 type="button"
@@ -2501,7 +2544,7 @@ export default function TherapiesPage() {
                     : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/50"
                 )}
               >
-                Published ({groupClasses.filter((g) => !g.isRetired && g.isPublished).length})
+                Published ({groupClasses.filter((g) => !g.isRetired && !completedClassIds.has(g.id) && g.isPublished).length})
               </button>
               <button
                 type="button"
@@ -2513,7 +2556,7 @@ export default function TherapiesPage() {
                     : "text-amber-700 dark:text-amber-400 hover:bg-amber-100/50"
                 )}
               >
-                Unpublished ({groupClasses.filter((g) => !g.isRetired && !g.isPublished).length})
+                Unpublished ({groupClasses.filter((g) => !g.isRetired && !completedClassIds.has(g.id) && !g.isPublished).length})
               </button>
               <button
                 type="button"
@@ -2526,6 +2569,18 @@ export default function TherapiesPage() {
                 )}
               >
                 Retired ({groupClasses.filter((g) => g.isRetired).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGcPublishFilter('completed')}
+                className={cn(
+                  "px-3 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5",
+                  gcPublishFilter === 'completed'
+                    ? "bg-indigo-600 text-white shadow-sm font-semibold"
+                    : "text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100/50"
+                )}
+              >
+                Completed ({groupClasses.filter((g) => !g.isRetired && completedClassIds.has(g.id)).length})
               </button>
             </div>
           </div>
@@ -2597,6 +2652,14 @@ export default function TherapiesPage() {
                             >
                               <IconAlertTriangle className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                               <span>Retired</span>
+                            </div>
+                          ) : completedClassIds.has(gc.id) ? (
+                            <div
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-indigo-500/15 text-indigo-700 border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800"
+                              title="All scheduled sessions for this class have finished"
+                            >
+                              <IconCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                              <span>Completed</span>
                             </div>
                           ) : (
                             <button
