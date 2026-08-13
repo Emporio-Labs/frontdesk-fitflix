@@ -6,6 +6,7 @@ export type OnboardingStep =
   | 'HEALTH_GOALS'
   | 'CONSENT'
   | 'REPORT_UPLOAD'
+  | 'SPORTS_SCIENTIST_BOOKING'
   | 'NUTRITIONIST_BOOKING'
   | 'COMPLETED'
 
@@ -16,6 +17,7 @@ export interface UserOnboardingSummary {
   healthGoalsCompleted: boolean
   consentCompleted: boolean
   reportsUploaded: boolean
+  sportsScientistBooked: boolean
   nutritionistBooked: boolean
   onboardingCompleted: boolean
 }
@@ -72,6 +74,8 @@ export interface User {
   age: number
   gender: string
   healthGoals: string[]
+  assignedTrainer?: string | { _id: string; trainerName?: string; email?: string }
+  assignedTrainerAt?: string
   dateOfBirth?: string
   emergencyContact?: string
   address?: string
@@ -168,6 +172,8 @@ function normalizeUser(raw: any): User {
     healthGoals: Array.isArray(raw?.healthGoals) ? raw.healthGoals.map(String) : [],
     createdAt: String(raw?.createdAt || ''),
     updatedAt: String(raw?.updatedAt || raw?.createdAt || ''),
+    assignedTrainer: raw?.assignedTrainer ?? undefined,
+    assignedTrainerAt: raw?.assignedTrainerAt ? String(raw.assignedTrainerAt) : undefined,
     onboarded: raw?.onboarded != null ? Boolean(raw.onboarded) : undefined,
     onboardingStatus: raw?.onboardingStatus ?? undefined,
     healthMarkers: raw?.healthMarkers ?? undefined,
