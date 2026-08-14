@@ -578,6 +578,13 @@ function MealTimelineRow({ meal, log }: { meal: StoredMeal; log?: MealLog }) {
   const option   = normalized.defaultOption
   const optionMacros = sumMealMacros(option.items)
   
+  const resolvedRecipeName =
+    (option as any).recipeName && !/^Option\s+\d+$/i.test((option as any).recipeName)
+      ? (option as any).recipeName
+      : (option as any).recipes?.[0]?.name ??
+        (option.items as any[]).find((i: any) => i?.recipeSource)?.recipeSource ??
+        (option.label && !/^Option\s+\d+$/i.test(option.label) ? option.label : null)
+
   const calories = log?.totals?.caloriesKcal ?? optionCalories(option)
   const macros = log?.totals
     ? {
@@ -608,6 +615,11 @@ function MealTimelineRow({ meal, log }: { meal: StoredMeal; log?: MealLog }) {
             <span className="font-medium">
               {normalized.name || MEAL_TYPE_LABELS[meal.mealType] || meal.mealType}
             </span>
+            {resolvedRecipeName && (
+              <Badge variant="secondary" className="text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                {resolvedRecipeName}
+              </Badge>
+            )}
             {normalized.options.length > 1 && option.label && option.label !== normalized.name && (
               <Badge variant="outline" className="text-xs font-semibold">
                 {option.label}

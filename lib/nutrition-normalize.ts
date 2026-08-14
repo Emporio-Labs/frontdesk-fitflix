@@ -22,6 +22,9 @@ export interface NormalizedMealOption {
   items: StoredMealItem[]
   reasoning?: MealReasoning
   isDefault: boolean
+  recipeId?: string
+  recipeName?: string
+  recipes?: { id?: string; name?: string }[]
 }
 
 export interface NormalizedMeal {
@@ -67,12 +70,18 @@ function normalizeOption(
     : []
   const label = raw.label?.trim() || raw.title?.trim() || raw.recipeName?.trim() || `Option ${index + 1}`
   const optionId = raw.optionId?.trim() || (raw as any)._id?.toString() || `opt-${index}`
+  const recipeName = raw.recipeName?.trim() || (raw as any).recipes?.[0]?.name?.trim()
+  const recipeId = raw.recipeId?.trim() || (raw as any).recipes?.[0]?.id?.trim() || (raw as any).recipes?.[0]?._id?.trim()
+
   return {
     optionId,
     label,
     items,
     reasoning: raw.reasoning,
     isDefault: forcedDefault || raw.isDefault === true,
+    recipeId,
+    recipeName,
+    recipes: (raw as any).recipes,
   }
 }
 
@@ -91,6 +100,7 @@ export function normalizeMeal(meal: StoredMeal): NormalizedMeal {
         items: Array.isArray(meal.items) ? meal.items : [],
         reasoning: meal.reasoning,
         isDefault: true,
+        recipeName: (meal as any).recipeName || (meal as any).recipes?.[0]?.name,
       },
     ]
   } else {

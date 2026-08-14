@@ -58,6 +58,13 @@ export function MealLogRow({
     ? activeOption.items.map((i) => `${i.foodName} (${i.quantityG}g)`).join(', ')
     : 'No foods'
 
+  const resolvedRecipeName =
+    (activeOption as any).recipeName && !/^Option\s+\d+$/i.test((activeOption as any).recipeName)
+      ? (activeOption as any).recipeName
+      : (activeOption as any).recipes?.[0]?.name ??
+        (activeOption.items as any[]).find((i: any) => i?.recipeSource)?.recipeSource ??
+        (activeOption.label && !/^Option\s+\d+$/i.test(activeOption.label) ? activeOption.label : null)
+
   return (
     <div
       className={cn(
@@ -78,7 +85,12 @@ export function MealLogRow({
               {normalized.name ||
                 (MEAL_TYPE_LABELS[meal.mealType] ?? meal.mealType)}
             </span>
-            {hasMultipleOptions && activeOption.label && activeOption.label !== normalized.name && (
+            {resolvedRecipeName && (
+              <Badge variant="secondary" className="text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                {resolvedRecipeName}
+              </Badge>
+            )}
+            {hasMultipleOptions && activeOption.label && activeOption.label !== normalized.name && activeOption.label !== resolvedRecipeName && (
               <Badge variant="outline" className="text-xs font-semibold">
                 {activeOption.label}
               </Badge>
