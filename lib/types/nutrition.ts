@@ -602,6 +602,7 @@ export type TemplateFormValues = z.infer<typeof templateSchema>
 export const assignPlanSchema = z.object({
   userId: z.string().min(1, 'Select a member'),
   planId: z.string().min(1, 'Select a plan'),
+  startDate: z.string().min(1, 'Select a start date'),
 })
 export type AssignPlanFormValues = z.infer<typeof assignPlanSchema>
 

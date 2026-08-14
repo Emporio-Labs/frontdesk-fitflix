@@ -110,7 +110,10 @@ export const nutritionService = {
   },
   assignPlan: async (payload: AssignPlanPayload) => {
     const { planId, ...body } = payload
-    const { data } = await apiClient.post(`/nutrition/templates/${planId}/assign`, body)
+    const { data } = await apiClient.post(`/nutrition/templates/${planId}/assign`, {
+      startDate: new Date().toISOString(),
+      ...body,
+    })
     return data as { message: string; plan: UserNutritionPlan }
   },
   updatePlan: async (id: string, payload: UpdateTemplatePayload) => {

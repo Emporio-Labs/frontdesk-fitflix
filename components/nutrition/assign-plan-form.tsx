@@ -52,6 +52,7 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
     defaultValues: {
       userId: userId ?? '',
       planId: '',
+      startDate: new Date().toISOString().slice(0, 10),
     },
   })
 
@@ -60,6 +61,7 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
       form.reset({
         userId: userId ?? '',
         planId: '',
+        startDate: new Date().toISOString().slice(0, 10),
       })
     }
   }, [open, userId, form])
@@ -68,6 +70,7 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
     await assignPlan.mutateAsync({
       userId: values.userId,
       planId: values.planId,
+      startDate: values.startDate,
     })
     onOpenChange(false)
   }
@@ -177,6 +180,19 @@ export function AssignPlanForm({ open, onOpenChange, userId }: AssignPlanFormPro
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="startDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Start Date *</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
