@@ -143,6 +143,19 @@ export function useUpdateTemplate() {
   })
 }
 
+export function useDeleteTemplate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => nutritionService.deleteTemplate(id),
+    onSuccess: (data) => {
+      invalidateNutrition(qc)
+      toast.success(data.message || 'Diet plan template deleted')
+    },
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.message || 'Failed to delete template'),
+  })
+}
+
 // ── Assigned plans ────────────────────────────────────────────────────────────
 export function useNutritionPlans(userId?: string) {
   return useQuery({

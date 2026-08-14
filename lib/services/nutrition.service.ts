@@ -92,6 +92,10 @@ export const nutritionService = {
     const { data } = await apiClient.patch(`/nutrition/templates/${id}`, payload)
     return data as { message: string; template: NutritionTemplate }
   },
+  deleteTemplate: async (id: string) => {
+    const { data } = await apiClient.delete(`/nutrition/templates/${id}`)
+    return data as { message: string }
+  },
 
   // ── Assigned user plans (deep snapshot of a template) ───────────────────────
   getPlans: async (userId?: string) => {

@@ -489,6 +489,8 @@ function MealSlotCard({
         setValue(`${base}.options.${safeActiveOi}.items` as any, items)
         setValue(`${base}.options.${safeActiveOi}.recipeId` as any, recipeId)
         setValue(`${base}.options.${safeActiveOi}.recipeName` as any, recipeName)
+        setValue(`${base}.options.${safeActiveOi}.label` as any, recipeName)
+        setValue(`${base}.options.${safeActiveOi}.title` as any, recipeName)
         
         if (res.recipe?.defaultMealType) {
           const slot = MEALTYPE_TO_TIMELINE[res.recipe.defaultMealType as keyof typeof MEALTYPE_TO_TIMELINE]
@@ -685,10 +687,23 @@ function MealSlotCard({
             <div className="space-y-4">
               {/* Option metadata and tools */}
               <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/15 p-2 rounded-lg border">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-[#0B1520]/10 text-[#0B1520] hover:bg-[#0B1520]/15 font-bold text-xs px-2.5 py-0.5 border border-[#0B1520]/10">
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="bg-[#0B1520]/10 text-[#0B1520] hover:bg-[#0B1520]/15 font-bold text-xs px-2.5 py-0.5 border border-[#0B1520]/10 shrink-0">
                     {kcal} kcal
                   </Badge>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">Recipe:</span>
+                    <Input
+                      placeholder="Recipe / Food Name..."
+                      value={watch(`${base}.options.${safeActiveOi}.recipeName` as any) || watch(`${base}.options.${safeActiveOi}.title` as any) || ''}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setValue(`${base}.options.${safeActiveOi}.recipeName` as any, val)
+                        setValue(`${base}.options.${safeActiveOi}.title` as any, val)
+                      }}
+                      className="h-7 text-xs font-semibold w-48 bg-white border border-input"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">

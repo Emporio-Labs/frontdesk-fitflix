@@ -78,13 +78,8 @@ export function MealLogRow({
               {normalized.name ||
                 (MEAL_TYPE_LABELS[meal.mealType] ?? meal.mealType)}
             </span>
-            {activeOption.label && activeOption.label !== normalized.name && (
+            {hasMultipleOptions && activeOption.label && activeOption.label !== normalized.name && (
               <Badge variant="outline" className="text-xs font-semibold">
-                {activeOption.label}
-              </Badge>
-            )}
-            {hasMultipleOptions && (
-              <Badge variant="secondary" className="text-xs">
                 {activeOption.label}
               </Badge>
             )}

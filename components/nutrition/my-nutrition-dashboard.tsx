@@ -608,7 +608,7 @@ function MealTimelineRow({ meal, log }: { meal: StoredMeal; log?: MealLog }) {
             <span className="font-medium">
               {normalized.name || MEAL_TYPE_LABELS[meal.mealType] || meal.mealType}
             </span>
-            {option.label && option.label !== normalized.name && (
+            {normalized.options.length > 1 && option.label && option.label !== normalized.name && (
               <Badge variant="outline" className="text-xs font-semibold">
                 {option.label}
               </Badge>

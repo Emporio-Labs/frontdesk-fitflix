@@ -65,6 +65,8 @@ import {
 import {
   useNutritionMembers,
   useNutritionPlans,
+  useNutritionTemplates,
+  useDeleteTemplate,
   useFoods,
   useRecipes,
   useRecipe,
@@ -96,7 +98,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import type { NutritionDashboardMember, FoodItem, UserNutritionPlan } from '@/lib/types/nutrition'
+import type { NutritionDashboardMember, FoodItem, UserNutritionPlan, NutritionTemplate } from '@/lib/types/nutrition'
 import { getBookingJoinState } from '@/lib/booking-window'
 import { onboardingStepLabel, ONBOARDING_STEP_ORDER } from '@/components/onboarding-timeline'
 
@@ -1074,7 +1076,9 @@ function BookingsTab({
 
 // ── Diet Plans Tab ────────────────────────────────────────────────────────────
 
-function DietPlansTab({
+// ── Assigned Plans Tab ────────────────────────────────────────────────────────
+
+function AssignedPlansTab({
   onAssign,
   canCreate,
   canDelete,
@@ -1089,7 +1093,7 @@ function DietPlansTab({
   const [editingPlan, setEditingPlan] = useState<any>(null) // UserNutritionPlan
 
   const handleDelete = (p: UserNutritionPlan) => {
-    if (confirm(`Remove plan "${p.name}" from ${planMemberName(p)}?`)) {
+    if (confirm(`Remove assigned plan "${p.name}" from ${planMemberName(p)}?`)) {
       deletePlan.mutate(p._id)
     }
   }
@@ -1100,7 +1104,7 @@ function DietPlansTab({
         <div>
           <h3 className="text-xl font-semibold">Assigned Plans</h3>
           <p className="text-sm text-muted-foreground">
-            Nutrition plans assigned to members
+            Nutrition plans assigned to specific members
           </p>
         </div>
         <div className="flex gap-2">
@@ -1108,18 +1112,10 @@ function DietPlansTab({
             <IconRefresh className="h-4 w-4" />
           </Button>
           {canCreate && (
-            <>
-              <Button variant="outline" onClick={() => onAssign(undefined)}>
-                <IconSalad className="mr-2 h-4 w-4" />
-                Assign Plan
-              </Button>
-              <Link href="/admin/nutrition/diet-plans/new">
-                <Button>
-                  <IconSparkles className="mr-2 h-4 w-4" />
-                  New Diet plan
-                </Button>
-              </Link>
-            </>
+            <Button onClick={() => onAssign(undefined)}>
+              <IconSalad className="mr-2 h-4 w-4" />
+              Assign Plan
+            </Button>
           )}
         </div>
       </div>
@@ -1130,7 +1126,7 @@ function DietPlansTab({
             <SkeletonTable />
           ) : isError ? (
             <div className="py-8 text-center text-red-500">
-              Failed to load plans.{' '}
+              Failed to load assigned plans.{' '}
               <button className="underline" onClick={() => refetch()}>
                 Retry
               </button>
@@ -1155,18 +1151,18 @@ function DietPlansTab({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
-                    <TableHead>Plan</TableHead>
+                    <TableHead>Assigned Plan</TableHead>
                     <TableHead>Goal</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Start</TableHead>
+                    <TableHead>Start Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {plans.map((p) => (
                     <TableRow key={p._id}>
-                      <TableCell>{planMemberName(p)}</TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium">{planMemberName(p)}</TableCell>
+                      <TableCell className="font-semibold text-primary">
                         <Link
                           href={`/admin/nutrition/plans/${p._id}`}
                           className="hover:underline"
@@ -1176,7 +1172,7 @@ function DietPlansTab({
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
-                          {p.goal.replace(/([a-z])([A-Z])/g, '$1 $2')}
+                          {p.goal ? p.goal.replace(/([a-z])([A-Z])/g, '$1 $2') : 'General Health'}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -1229,6 +1225,155 @@ function DietPlansTab({
         plan={editingPlan} 
         onClose={() => setEditingPlan(null)} 
       />
+    </div>
+  )
+}
+
+
+// ── Diet Plan Templates Tab ──────────────────────────────────────────────────
+
+function DietPlanTemplatesTab({
+  onAssign,
+  canCreate,
+  canDelete,
+}: {
+  onAssign: (userId?: string) => void
+  canCreate: boolean
+  canDelete: boolean
+}) {
+  const { data: templates = [], isLoading, isError, refetch } = useNutritionTemplates()
+  const deleteTemplate = useDeleteTemplate()
+
+  const handleDelete = (t: NutritionTemplate) => {
+    if (confirm(`Delete diet plan template "${t.name}"?`)) {
+      deleteTemplate.mutate(t._id)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-xl font-semibold">Diet Plan Templates</h3>
+          <p className="text-sm text-muted-foreground">
+            Reusable master diet plans and templates created by nutritionists & admins
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <IconRefresh className="h-4 w-4" />
+          </Button>
+          {canCreate && (
+            <Link href="/admin/nutrition/diet-plans/new">
+              <Button>
+                <IconSparkles className="mr-2 h-4 w-4" />
+                New Diet Plan
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          {isLoading ? (
+            <SkeletonTable />
+          ) : isError ? (
+            <div className="py-8 text-center text-red-500">
+              Failed to load diet plan templates.{' '}
+              <button className="underline" onClick={() => refetch()}>
+                Retry
+              </button>
+            </div>
+          ) : templates.length === 0 ? (
+            <EmptyState
+              icon={<IconClipboardList className="h-10 w-10" />}
+              title="No templates created"
+              description="Create a master diet plan template to use for member assignments."
+              action={
+                canCreate ? (
+                  <Link href="/admin/nutrition/diet-plans/new">
+                    <Button>
+                      <IconSparkles className="mr-2 h-4 w-4" />
+                      New Diet Plan
+                    </Button>
+                  </Link>
+                ) : undefined
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Template Name</TableHead>
+                    <TableHead>Goal</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Target Calories</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {templates.map((t) => (
+                    <TableRow key={t._id}>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/admin/nutrition/diet-plans/${t._id}/edit`}
+                          className="hover:underline font-semibold"
+                        >
+                          {t.name}
+                        </Link>
+                        {t.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-1">{t.description}</p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {t.goal ? t.goal.replace(/([a-z])([A-Z])/g, '$1 $2') : 'General Health'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm font-medium">
+                          {`${t.days?.length || 7} Days`}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm font-semibold">{t.targetCaloriesKcal ? `${t.targetCaloriesKcal} kcal` : '—'}</span>
+                      </TableCell>
+                      <TableCell className="text-right space-x-2 whitespace-nowrap">
+                        <Link href={`/admin/nutrition/diet-plans/${t._id}/edit`}>
+                          <Button variant="outline" size="sm">
+                            <IconEdit className="mr-1 h-3.5 w-3.5" />
+                            Edit
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onAssign(undefined)}
+                        >
+                          <IconSalad className="mr-1 h-3.5 w-3.5" />
+                          Assign
+                        </Button>
+                        {canDelete && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-500"
+                            onClick={() => handleDelete(t)}
+                          >
+                            <IconTrash className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -1752,7 +1897,8 @@ function NutritionDashboardContent() {
           <TabsTrigger value="overview" className="text-sm px-4 py-2">Overview</TabsTrigger>
           <TabsTrigger value="bookings" className="text-sm px-4 py-2">Bookings</TabsTrigger>
           <TabsTrigger value="my-nutrition" className="text-sm px-4 py-2">My Nutrition</TabsTrigger>
-          <TabsTrigger value="diet-plans" className="text-sm px-4 py-2">Diet Plans</TabsTrigger>
+          <TabsTrigger value="assigned-plans" className="text-sm px-4 py-2">Assigned Plans</TabsTrigger>
+          <TabsTrigger value="diet-plans" className="text-sm px-4 py-2">Diet Plan Templates</TabsTrigger>
           <TabsTrigger value="food-catalog" className="text-sm px-4 py-2">Food Catalog</TabsTrigger>
           <TabsTrigger value="appointments" className="text-sm px-4 py-2">Nutritionist Appointments</TabsTrigger>
           <TabsTrigger value="active-users" className="text-sm px-4 py-2">Active Users</TabsTrigger>
@@ -1789,8 +1935,16 @@ function NutritionDashboardContent() {
           />
         </TabsContent>
 
+        <TabsContent value="assigned-plans" className="mt-6">
+          <AssignedPlansTab
+            onAssign={handleAssign}
+            canCreate={canCreate}
+            canDelete={canDelete}
+          />
+        </TabsContent>
+
         <TabsContent value="diet-plans" className="mt-6">
-          <DietPlansTab
+          <DietPlanTemplatesTab
             onAssign={handleAssign}
             canCreate={canCreate}
             canDelete={canDelete}
