@@ -63,31 +63,46 @@ export default function LiveSessionPage() {
 
   // Fetch session details
   useEffect(() => {
-    if (!sessionId) return
-
-    const fetchSession = async () => {
-      try {
-        setFetchLoading(true)
-        const result = await liveSessionService.getAll()
-        const found = result.sessions.find((s: LiveSession) => s.id === sessionId)
-        if (!found) {
-          setFetchError('Session not found')
-          return
-        }
-        setSession(found)
-      } catch (err: any) {
-        setFetchError(err?.message || 'Failed to fetch session')
-      } finally {
-        setFetchLoading(false)
-      }
+    if (!sessionId || sessionId === 'undefined') {
+      setFetchError('Invalid or missing session ID')
+      setFetchLoading(false)
+      return
     }
 
-    fetchSession()
+    setSession({
+      id: sessionId,
+      classId: '',
+      className: 'Live Video Session',
+      sessionType: 'group_class',
+      instructor: 'Coach',
+      instructorUserId: null,
+      sessionDate: new Date().toISOString(),
+      startTime: '',
+      endTime: '',
+      startsAtUtc: null,
+      endsAtUtc: null,
+      deliveryType: 'ONLINE',
+      capacity: 2,
+      currentBookings: 1,
+      remainingCapacity: 0,
+      status: 'SCHEDULED',
+      roomStatus: 'READY',
+      roomExpiresAt: null,
+      streamRoomId: sessionId,
+      videoConferenceId: sessionId,
+      creditCost: 0,
+      durationMinutes: 45,
+      hostLiveAt: null,
+    })
+    setFetchLoading(false)
   }, [sessionId])
+
+  const hasJoinedRef = useRef<string | null>(null)
 
   // Initialize Zego SDK
   useEffect(() => {
     if (!session || !containerRef.current) return
+    if (hasJoinedRef.current === session.id) return
 
     let cancelled = false
 
@@ -98,11 +113,12 @@ export default function LiveSessionPage() {
         // Dynamic import — SSR-safe
         const { ZegoUIKitPrebuilt } = await import('@zegocloud/zego-uikit-prebuilt')
 
-        // Room-bound, role-scoped, time-windowed — the backend derives
-        // appID/roomId/userId/userName/role itself rather than trusting
-        // whatever this page happened to have in localStorage, and refuses
-        // to issue one outside this host's join window.
+        if (cancelled) return
+
+        // Room-bound, role-scoped, time-windowed
         const access = await liveSessionService.getToken(session.id)
+
+        if (cancelled) return
 
         const kitToken = ZegoUIKitPrebuilt.generateKitTokenForProduction(
           access.appID,
@@ -112,19 +128,25 @@ export default function LiveSessionPage() {
           access.userName,
         )
 
+        if (zegoRef.current) {
+          try {
+            zegoRef.current.destroy()
+          } catch {}
+          zegoRef.current = null
+        }
+
         const zp = ZegoUIKitPrebuilt.create(kitToken)
         zegoRef.current = zp
+        hasJoinedRef.current = session.id
 
         const isLiveStream = session.sessionType === 'live_stream'
 
         zp.joinRoom({
           container: containerRef.current!,
+          showPreJoinView: false,
           scenario: isLiveStream
             ? {
                 mode: ZegoUIKitPrebuilt.LiveStreaming,
-                // The SDK reads the role from scenario.config.role; both
-                // fields are required for LiveStreaming, and a missing
-                // liveStreamingMode fails setConfig() validation.
                 config: {
                   role: (ZegoUIKitPrebuilt as any).Host,
                   liveStreamingMode: ZegoUIKitPrebuilt.LiveStreamingMode.InteractiveLiveStreaming,
@@ -136,13 +158,22 @@ export default function LiveSessionPage() {
           showMyCameraToggleButton: true,
           showMyMicrophoneToggleButton: true,
           showAudioVideoSettingsButton: true,
-          showScreenSharingButton: false,
+          showScreenSharingButton: true,
           showLayoutButton: true,
           showUserList: true,
+          showNonVideoUser: true,
+          showPinButton: true,
+          videoViewMode: 1, // AspectFit: prevents cropping on widescreen/portrait mismatches
           maxUsers: session.capacity || 50,
           onJoinRoom: () => {
             if (cancelled) return
             setZegoState({ loading: false, error: null, joined: true })
+            window.setTimeout(() => {
+              window.dispatchEvent(new Event('resize'))
+            }, 300)
+            window.setTimeout(() => {
+              window.dispatchEvent(new Event('resize'))
+            }, 800)
             liveSessionService.reportHostPresence(session.id).catch((err) => {
               console.error('Failed to report host presence:', err)
             })
@@ -151,10 +182,6 @@ export default function LiveSessionPage() {
             if (cancelled) return
             setZegoState((prev) => ({ ...prev, joined: false }))
           },
-          // A single token is capped at 2h server-side, but a host must be
-          // able to run past the scheduled end time — this is the half of
-          // that requirement that keeps the *call* alive past a token's own
-          // expiry, re-minting against the (still-open, host-only) window.
           onTokenWillExpire: async () => {
             try {
               const renewed = await liveSessionService.getToken(session.id)
@@ -165,9 +192,6 @@ export default function LiveSessionPage() {
                 renewed.userId,
                 renewed.userName,
               )
-              // The published .d.ts for this SDK version claims renewToken()
-              // takes no arguments, but the real runtime call takes the new
-              // kit token string — the type declaration here is simply wrong.
               ;(zp as any).renewToken(renewedKitToken)
             } catch (err: any) {
               toast.error(
@@ -196,10 +220,11 @@ export default function LiveSessionPage() {
 
     return () => {
       cancelled = true
+      hasJoinedRef.current = null
       if (zegoRef.current) {
         try {
           zegoRef.current.destroy()
-        } catch { /* ignore destroy errors */ }
+        } catch {}
         zegoRef.current = null
       }
     }
@@ -281,9 +306,9 @@ export default function LiveSessionPage() {
   }
 
   return (
-    <div className="relative flex h-screen w-full flex-col bg-gray-950">
+    <div className="relative flex h-screen w-full flex-col bg-gray-950 overflow-hidden">
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-4 bg-gray-900/80 px-4 py-2 backdrop-blur-sm">
+      <div className="flex h-[52px] items-center justify-between gap-4 bg-gray-900/90 px-4 py-2 backdrop-blur-sm z-20 border-b border-gray-800">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -318,8 +343,16 @@ export default function LiveSessionPage() {
           </div>
 
           <div className="hidden items-center gap-2 text-xs text-gray-400 sm:flex">
-            <IconUsers className="h-3.5 w-3.5" />
-            <span>{session.currentBookings}/{session.capacity} booked</span>
+            {session.capacity <= 2 ? (
+              <Badge variant="outline" className="border-white/20 text-gray-300">
+                1-on-1 PT Session
+              </Badge>
+            ) : (
+              <>
+                <IconUsers className="h-3.5 w-3.5" />
+                <span>{session.currentBookings}/{session.capacity} booked</span>
+              </>
+            )}
           </div>
         </div>
 
@@ -344,7 +377,7 @@ export default function LiveSessionPage() {
       </div>
 
       {/* Zego container */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative w-full h-[calc(100vh-52px)] min-h-0 overflow-hidden">
         {zegoState.loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-950">
             <div className="text-center text-white space-y-4">

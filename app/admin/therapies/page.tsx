@@ -506,7 +506,14 @@ export default function TherapiesPage() {
   // resolveBookingWindow, the same source of truth already used for booking
   // join windows elsewhere in the app). Classes with zero sessions are never
   // auto-completed — nothing has finished for them yet.
-  const { data: allScheduledSessions = [] } = useAllScheduledSessions()
+  const {
+    data: allScheduledSessions = [],
+    isLoading: isLoadingSessions,
+    refetch: refetchSessions,
+  } = useAllScheduledSessions()
+
+  const isGroupClassesLoading = isLoadingGc || isLoadingSessions
+
   const completedClassIds = useMemo(() => {
     const now = new Date()
     const hasSession = new Set<string>()
@@ -1534,15 +1541,21 @@ export default function TherapiesPage() {
                 <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
                   <div>
                     <p className="text-xs text-purple-50/90">Classes</p>
-                    <p className="text-xl font-semibold">{groupClasses.filter(gc => !gc.isRetired).length}</p>
+                    <p className="text-xl font-semibold">
+                      {isGroupClassesLoading ? '...' : groupClasses.filter(gc => !gc.isRetired).length}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-purple-50/90">Active</p>
-                    <p className="text-xl font-semibold">{groupClasses.filter(gc => !gc.isRetired && gc.isActive).length}</p>
+                    <p className="text-xl font-semibold">
+                      {isGroupClassesLoading ? '...' : groupClasses.filter(gc => !gc.isRetired && !completedClassIds.has(gc.id) && gc.isActive).length}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-purple-50/90">Modes</p>
-                    <p className="text-xl font-semibold">{new Set(groupClasses.filter(gc => !gc.isRetired).map(gc => gc.mode)).size}</p>
+                    <p className="text-xl font-semibold">
+                      {isGroupClassesLoading ? '...' : new Set(groupClasses.filter(gc => !gc.isRetired).map(gc => gc.mode)).size}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1556,7 +1569,14 @@ export default function TherapiesPage() {
           <p className="text-muted-foreground">Manage scheduled group sessions — online, in-person, or hybrid.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetchGc()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              refetchGc()
+              refetchSessions()
+            }}
+          >
             <IconRefresh className="mr-1 h-4 w-4" /> Refresh
           </Button>
           <Dialog open={gcDialogOpen} onOpenChange={handleGcDialogOpenChange}>
@@ -2532,7 +2552,7 @@ export default function TherapiesPage() {
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                All ({groupClasses.filter((g) => !g.isRetired && !completedClassIds.has(g.id)).length})
+                All ({isGroupClassesLoading ? '...' : groupClasses.filter((g) => !g.isRetired && !completedClassIds.has(g.id)).length})
               </button>
               <button
                 type="button"
@@ -2544,7 +2564,7 @@ export default function TherapiesPage() {
                     : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/50"
                 )}
               >
-                Published ({groupClasses.filter((g) => !g.isRetired && !completedClassIds.has(g.id) && g.isPublished).length})
+                Published ({isGroupClassesLoading ? '...' : groupClasses.filter((g) => !g.isRetired && !completedClassIds.has(g.id) && g.isPublished).length})
               </button>
               <button
                 type="button"
@@ -2556,7 +2576,7 @@ export default function TherapiesPage() {
                     : "text-amber-700 dark:text-amber-400 hover:bg-amber-100/50"
                 )}
               >
-                Unpublished ({groupClasses.filter((g) => !g.isRetired && !completedClassIds.has(g.id) && !g.isPublished).length})
+                Unpublished ({isGroupClassesLoading ? '...' : groupClasses.filter((g) => !g.isRetired && !completedClassIds.has(g.id) && !g.isPublished).length})
               </button>
               <button
                 type="button"
@@ -2568,7 +2588,7 @@ export default function TherapiesPage() {
                     : "text-slate-700 dark:text-slate-400 hover:bg-slate-100/50"
                 )}
               >
-                Retired ({groupClasses.filter((g) => g.isRetired).length})
+                Retired ({isGroupClassesLoading ? '...' : groupClasses.filter((g) => g.isRetired).length})
               </button>
               <button
                 type="button"
@@ -2580,7 +2600,7 @@ export default function TherapiesPage() {
                     : "text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100/50"
                 )}
               >
-                Completed ({groupClasses.filter((g) => !g.isRetired && completedClassIds.has(g.id)).length})
+                Completed ({isGroupClassesLoading ? '...' : groupClasses.filter((g) => !g.isRetired && completedClassIds.has(g.id)).length})
               </button>
             </div>
           </div>
@@ -2606,11 +2626,11 @@ export default function TherapiesPage() {
             Group Classes
           </CardTitle>
           <CardDescription>
-            {isLoadingGc ? 'Loading...' : `${filteredGroupClasses.length} class${filteredGroupClasses.length !== 1 ? 'es' : ''} found`}
+            {isGroupClassesLoading ? 'Loading...' : `${filteredGroupClasses.length} class${filteredGroupClasses.length !== 1 ? 'es' : ''} found`}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoadingGc ? (
+          {isGroupClassesLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {[...Array(4)].map((_, i) => (
                 <Skeleton key={i} className="h-52 w-full rounded-2xl" />

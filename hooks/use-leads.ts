@@ -13,14 +13,16 @@ import {
 import { queryKeys } from '@/lib/query-keys'
 import { toast } from 'sonner'
 
-export function useLeads() {
+export function useLeads(options?: { enabled?: boolean }) {
+  const isEnabled = options?.enabled ?? true
   return useQuery({
     queryKey: queryKeys.leads.all(),
     queryFn: () => leadService.getAll(10),
     select: (data) => data.leads,
+    enabled: isEnabled,
     staleTime: 0,
-    refetchOnWindowFocus: true,
-    refetchInterval: 10000,
+    refetchOnWindowFocus: isEnabled,
+    refetchInterval: isEnabled ? 10000 : false,
   })
 }
 
