@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Card,
   CardContent,
@@ -35,6 +36,7 @@ import { BookingDetailsDialog } from '@/components/bookings/booking-details-dial
 import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog'
 import { RescheduleBookingDialog } from '@/components/bookings/reschedule-booking-dialog'
 import { cn } from '@/lib/utils'
+import { queryKeys } from '@/lib/query-keys'
 
 // Status Badge styling helper
 const STATUS_COLORS: Record<string, string> = {
@@ -98,6 +100,7 @@ export default function GroupClassBookingsPanel({
 
   const { data: bookings = [], isLoading, isError, refetch } = useGroupClassBookings()
   const { data: groupClasses = [] } = useGroupClasses()
+  const queryClient = useQueryClient()
 
   // Booking responses often carry classId as an unpopulated reference (name missing),
   // while the class catalog (already cached from the therapies page) has the real names.
@@ -499,6 +502,7 @@ export default function GroupClassBookingsPanel({
                                   onClick={async (e) => {
                                     e.stopPropagation()
                                     await groupClassBookingService.updateStatus(booking._id, 'completed')
+                                    queryClient.invalidateQueries({ queryKey: queryKeys.slots.all() })
                                     refetch()
                                   }}
                                 >
@@ -511,6 +515,7 @@ export default function GroupClassBookingsPanel({
                                   onClick={async (e) => {
                                     e.stopPropagation()
                                     await groupClassBookingService.updateStatus(booking._id, 'noshow')
+                                    queryClient.invalidateQueries({ queryKey: queryKeys.slots.all() })
                                     refetch()
                                   }}
                                 >
@@ -589,6 +594,7 @@ export default function GroupClassBookingsPanel({
             'Group Class'
           }
           onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.slots.all() })
             refetch()
             setSelectedBooking(null)
           }}
@@ -637,6 +643,7 @@ export default function GroupClassBookingsPanel({
               : undefined
           }
           onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.slots.all() })
             refetch()
             setSelectedBooking(null)
           }}

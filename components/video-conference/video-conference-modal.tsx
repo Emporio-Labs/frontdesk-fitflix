@@ -72,12 +72,12 @@ export function VideoConferenceModal({
   // still has a transform on it, so that first measurement can settle a beat
   // too small (footer clipped). Nudging a resize event once the 200ms
   // animation is done makes it recompute against the real, settled box.
-  const scheduleSettleResize = useCallback(() => {
+  const scheduleSettleResize = useCallback((delay = 400) => {
     clearSettleResizeTimer()
     settleResizeTimerRef.current = window.setTimeout(() => {
       window.dispatchEvent(new Event('resize'))
       settleResizeTimerRef.current = null
-    }, 400)
+    }, delay)
   }, [clearSettleResizeTimer])
 
   const destroyZego = useCallback(() => {
@@ -265,7 +265,7 @@ export function VideoConferenceModal({
               className="h-7 text-xs text-gray-300 hover:text-white px-2"
               onClick={() => {
                 setIsMinimized(false)
-                scheduleSettleResize()
+                scheduleSettleResize(600)
               }}
             >
               <IconMaximize className="w-3.5 h-3.5 mr-1" /> Expand
@@ -351,8 +351,12 @@ export function VideoConferenceModal({
             // controls. w-full/max-w-lg/gap-4/max-h-[90vh]/overflow-y-auto
             // from the base DialogContent are all overridden below.
             'w-[96vw] max-w-[1400px] h-[92vh] max-h-[92vh] min-h-[520px] p-0 gap-0 overflow-hidden overflow-y-hidden bg-black border-gray-800 flex flex-col',
-            isMinimized &&
-              'pointer-events-none opacity-0 !left-[-20000px] !top-0 !translate-x-0 !translate-y-0',
+            // When minimized: keep the dialog in-viewport (invisible) so
+            // ZEGOCLOUD's internal layout engine can still measure its
+            // container. Moving it off-screen (left: -20000px) causes
+            // ZEGOCLOUD to compute collapsed / zero dimensions which don't
+            // recover after the dialog slides back into view.
+            isMinimized && 'pointer-events-none invisible',
           )}
         >
           <DialogHeader className="px-4 py-3 bg-gray-900 border-b border-gray-800 flex flex-row items-center justify-between space-y-0">

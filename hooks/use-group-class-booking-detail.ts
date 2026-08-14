@@ -22,6 +22,7 @@ export function useCancelGroupClassBooking() {
       queryClient.invalidateQueries({ queryKey: queryKeys.groupClassBookings.all() })
       queryClient.invalidateQueries({ queryKey: queryKeys.groupClassBookings.detail(variables.id) })
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.slots.all() })
       queryClient.invalidateQueries({ queryKey: ['credits'] })
       toast.success('Booking cancelled successfully')
     },
@@ -46,6 +47,7 @@ export function useRescheduleGroupClassBooking() {
       queryClient.invalidateQueries({ queryKey: queryKeys.groupClassBookings.all() })
       queryClient.invalidateQueries({ queryKey: queryKeys.groupClassBookings.detail(variables.id) })
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.slots.all() })
       queryClient.invalidateQueries({ queryKey: ['credits'] })
       toast.success('Booking rescheduled successfully')
     },
