@@ -620,8 +620,15 @@ function MealTimelineRow({ meal, log }: { meal: StoredMeal; log?: MealLog }) {
               <span className="text-xs text-muted-foreground">· {normalized.timeOfDay}</span>
             )}
           </div>
-          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-            {displayFoods}
+          {option.recipeName && (
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {option.recipeName}
+            </p>
+          )}
+          <p className={cn("text-sm text-muted-foreground line-clamp-2", option.recipeName ? "mt-0.5" : "mt-1")}>
+            {option.items.length
+              ? option.items.map((i) => `${i.foodName} (${i.quantityG}g)`).join(', ')
+              : 'No foods'}
           </p>
         </div>
         <StatusBadge status={status} size="sm" />

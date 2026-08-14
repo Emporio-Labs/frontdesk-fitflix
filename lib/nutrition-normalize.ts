@@ -22,6 +22,8 @@ export interface NormalizedMealOption {
   items: StoredMealItem[]
   reasoning?: MealReasoning
   isDefault: boolean
+  recipeId?: string
+  recipeName?: string
 }
 
 export interface NormalizedMeal {
@@ -73,6 +75,8 @@ function normalizeOption(
     items,
     reasoning: raw.reasoning,
     isDefault: forcedDefault || raw.isDefault === true,
+    recipeId: raw.recipeId,
+    recipeName: raw.recipeName,
   }
 }
 
