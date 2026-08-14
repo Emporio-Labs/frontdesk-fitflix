@@ -77,15 +77,16 @@ export function useQrCheckIn() {
     },
     onError: (err: any) => {
       const code = err?.response?.data?.code
+      const msg = extractApiError(err, '')
       if (code === 'INVALID_QR') {
-        toast.error('QR code expired — ask the member to refresh it')
+        toast.error(msg || 'QR code expired or invalid — ask the member to refresh it')
         return
       }
       if (code === 'NO_ACTIVE_MEMBERSHIP') {
-        toast.error('Member has no active membership')
+        toast.error(msg || 'Member has no active membership')
         return
       }
-      toast.error(extractApiError(err, 'Check-in failed'))
+      toast.error(msg || 'Check-in failed')
     },
   })
 }

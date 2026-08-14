@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { IconQrcode, IconUserCheck } from '@tabler/icons-react'
+import { toast } from 'sonner'
 import { useQrCheckIn } from '@/hooks/use-gym-visits'
 
 const SCANNER_ELEMENT_ID = 'gym-qr-scanner'
@@ -17,6 +18,47 @@ const SCANNER_ELEMENT_ID = 'gym-qr-scanner'
 // duplicate check-in requests while the camera is still pointed at it.
 const RESCAN_DELAY_MS = 2000
 
+export function extractQrToken(raw: string): string {
+  let cleaned = raw.trim()
+  if (!cleaned) return ''
+
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1).trim()
+  }
+
+  // 1. Try parsing JSON object
+  if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(cleaned)
+      if (parsed && typeof parsed === 'object') {
+        const candidate = parsed.token || parsed.qrToken || parsed.code || parsed.jwt || parsed.data || parsed.qr
+        if (typeof candidate === 'string' && candidate.trim()) {
+          return candidate.trim()
+        }
+      }
+    } catch {
+      // Ignore JSON parse error
+    }
+  }
+
+  // 2. Try parsing URL
+  if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+    try {
+      const url = new URL(cleaned)
+      const tokenParam =
+        url.searchParams.get('token') ||
+        url.searchParams.get('qrToken') ||
+        url.searchParams.get('code') ||
+        url.searchParams.get('jwt') ||
+        url.searchParams.get('qr')
+      if (tokenParam) return tokenParam.trim()
+    } catch {
+      // Ignore URL parse error
+    }
+  }
+
+  return cleaned
+}
 export function QrScannerDialog() {
   const [open, setOpen] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
@@ -43,7 +85,16 @@ export function QrScannerDialog() {
             if (pausedRef.current) return
             pausedRef.current = true
             setLastResult(null)
-            qrCheckIn.mutate(decodedText, {
+            const token = extractQrToken(decodedText)
+            if (!token) {
+              toast.error('Invalid QR code content')
+              setTimeout(() => {
+                pausedRef.current = false
+              }, RESCAN_DELAY_MS)
+              return
+            }
+
+            qrCheckIn.mutate(token, {
               onSuccess: (data) => {
                 setLastResult({ name: data.visit.username || 'Member' })
               },
