@@ -49,14 +49,37 @@ export default function NutritionPlanDetailPage() {
 
   const logBySlot = useMemo(() => {
     const map = new Map<string, (typeof mealLogs)[number]>()
-    for (const l of mealLogs) map.set(l.slot, l)
+    for (const l of mealLogs) {
+      const key = l.slot || l.mealType
+      if (key) map.set(key, l)
+    }
     return map
   }, [mealLogs])
 
-  const allMeals: StoredMeal[] = useMemo(() => {
-    if (!plan?.days) return []
-    return plan.days.flatMap((d) => d.meals ?? [])
-  }, [plan])
+  const [selectedDayNumber, setSelectedDayNumber] = useState<number | null>(null)
+
+  const currentDayNumber = useMemo(() => {
+    if (!plan?.startDate) return 1
+    const start = new Date(plan.startDate)
+    if (isNaN(start.getTime())) return 1
+    const target = new Date(today)
+    start.setHours(0, 0, 0, 0)
+    target.setHours(0, 0, 0, 0)
+    const diffDays = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays < 0) return 1
+    const duration = plan.durationDays && plan.durationDays > 0 ? plan.durationDays : 7
+    return (diffDays % duration) + 1
+  }, [plan?.startDate, plan?.durationDays, today])
+
+  const activeDayNum = selectedDayNumber ?? currentDayNumber
+
+  const activeDay = useMemo(() => {
+    return plan?.days?.find((d) => d.dayNumber === activeDayNum) ?? plan?.days?.[0]
+  }, [plan?.days, activeDayNum])
+
+  const dayMeals: StoredMeal[] = useMemo(() => {
+    return activeDay?.meals ?? []
+  }, [activeDay])
 
   if (isLoading) {
     return (
@@ -180,16 +203,36 @@ export default function NutritionPlanDetailPage() {
 
         <div className="lg:col-span-2 space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Today&apos;s Meals</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <div>
+                <CardTitle>Prescribed Meals</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Day {activeDayNum} of {plan.durationDays || plan.days?.length || 7}
+                </p>
+              </div>
+              {plan.days && plan.days.length > 1 && (
+                <div className="flex flex-wrap gap-1">
+                  {plan.days.map((d) => (
+                    <Button
+                      key={d.dayNumber}
+                      variant={activeDayNum === d.dayNumber ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-7 px-2.5 text-xs"
+                      onClick={() => setSelectedDayNumber(d.dayNumber)}
+                    >
+                      Day {d.dayNumber}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </CardHeader>
             <CardContent className="space-y-3">
-              {allMeals.length === 0 ? (
+              {dayMeals.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No meals in this plan.
+                  No meals configured for Day {activeDayNum}.
                 </p>
               ) : (
-                allMeals.map((meal, i) => (
+                dayMeals.map((meal, i) => (
                   <MealLogRow
                     key={`${meal.mealType}-${i}`}
                     planId={plan._id}

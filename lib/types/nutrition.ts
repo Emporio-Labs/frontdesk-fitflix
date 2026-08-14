@@ -331,10 +331,14 @@ export interface MealItemInput {
 
 export interface MealOption {
   optionId?: string
+  title?: string
   label?: string
-  items: StoredMealItem[]
+  items?: StoredMealItem[]
+  foods?: StoredMealItem[]
   reasoning?: MealReasoning
   isDefault?: boolean
+  recipeId?: string
+  recipeName?: string
 }
 
 export interface MealOptionInput {
@@ -428,16 +432,28 @@ export interface UserNutritionPlan {
 
 export interface MealLog {
   _id: string
-  planId: string
+  planId?: string | null
   userId: string
-  date: string
-  slot: MealType
-  consumed: boolean
+  date?: string
+  logDate?: string
+  slot?: MealType
+  mealType?: MealType
+  consumed?: boolean
+  status?: string
   calories?: number
   notes?: string
-  // Optional, inert with respect to slot-based optimistic logging
   selectedOptionId?: string
   loggedAt?: string
+  consumedAt?: string
+  createdAt?: string
+  items?: StoredMealItem[]
+  totals?: MacroSnapshot
+  plannedMealRef?: {
+    dayNumber: number
+    mealIndex: number
+    selectedOptionId?: string | null
+    completedOptionId?: string | null
+  }
 }
 
 export interface HydrationLog {

@@ -173,7 +173,23 @@ function sumMealMacros(items: { proteinG: number; carbsG: number; fatG: number; 
 
 function mealStatus(meal: StoredMeal, log: MealLog | undefined): MealStatus {
   if (!log) return 'pending'
-  return log.consumed ? 'completed' : 'skipped'
+  const isConsumed = log.consumed === true || log.status === 'Logged' || log.status === 'completed'
+  const isSkipped = log.status === 'Skipped' || log.consumed === false
+  return isConsumed ? 'completed' : isSkipped ? 'skipped' : 'pending'
+}
+
+function computeDayNumber(startDateStr?: string | null, durationDays?: number | null, dateIso?: string): number {
+  if (!startDateStr) return 1
+  const start = new Date(startDateStr)
+  if (isNaN(start.getTime())) return 1
+  const target = dateIso ? new Date(dateIso) : new Date()
+  start.setHours(0, 0, 0, 0)
+  target.setHours(0, 0, 0, 0)
+  const diffTime = target.getTime() - start.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return 1
+  const duration = durationDays && durationDays > 0 ? durationDays : 7
+  return (diffDays % duration) + 1
 }
 
 /** Map free-text onboarding goal labels to the typed NutritionGoal enum. */
@@ -277,14 +293,23 @@ function computeNutritionTargets(
   return { calories, protein, carbs, fat, water, source }
 }
 
-/** Compute macros consumed today from logs (only `consumed === true` slots). */
+/** Compute macros consumed today from logs (only consumed slots). */
 function computeConsumed(meals: StoredMeal[], logBySlot: Map<string, MealLog>): MacroTotals {
   let calories = 0, protein = 0, carbs = 0, fat = 0
   for (const meal of meals) {
     const log = logBySlot.get(meal.mealType)
-    if (!log?.consumed) continue
-    const m = sumMealMacros(normalizeMeal(meal).defaultOption.items)
-    calories += m.calories; protein += m.protein; carbs += m.carbs; fat += m.fat
+    const isConsumed = log && (log.consumed === true || log.status === 'Logged' || log.status === 'completed')
+    if (!isConsumed) continue
+
+    if (log?.totals) {
+      calories += log.totals.caloriesKcal ?? 0
+      protein += log.totals.proteinG ?? 0
+      carbs += log.totals.carbsG ?? 0
+      fat += log.totals.fatG ?? 0
+    } else {
+      const m = sumMealMacros(normalizeMeal(meal).defaultOption.items)
+      calories += m.calories; protein += m.protein; carbs += m.carbs; fat += m.fat
+    }
   }
   return { calories, protein, carbs, fat }
 }
@@ -551,8 +576,23 @@ function MealTimelineRow({ meal, log }: { meal: StoredMeal; log?: MealLog }) {
   const status   = mealStatus(meal, log)
   const normalized = normalizeMeal(meal)
   const option   = normalized.defaultOption
-  const macros   = sumMealMacros(option.items)
-  const calories = optionCalories(option)
+  const optionMacros = sumMealMacros(option.items)
+  
+  const calories = log?.totals?.caloriesKcal ?? optionCalories(option)
+  const macros = log?.totals
+    ? {
+        calories: log.totals.caloriesKcal ?? 0,
+        protein: log.totals.proteinG ?? 0,
+        carbs: log.totals.carbsG ?? 0,
+        fat: log.totals.fatG ?? 0,
+      }
+    : optionMacros
+
+  const displayFoods = log?.items?.length
+    ? log.items.map((i) => `${i.foodName} (${i.quantityG}g)`).join(', ')
+    : option.items.length
+    ? option.items.map((i) => `${i.foodName} (${i.quantityG}g)`).join(', ')
+    : log?.notes || 'No foods'
 
   return (
     <div
@@ -568,6 +608,11 @@ function MealTimelineRow({ meal, log }: { meal: StoredMeal; log?: MealLog }) {
             <span className="font-medium">
               {normalized.name || MEAL_TYPE_LABELS[meal.mealType] || meal.mealType}
             </span>
+            {option.label && option.label !== normalized.name && (
+              <Badge variant="outline" className="text-xs font-semibold">
+                {option.label}
+              </Badge>
+            )}
             <Badge variant="secondary" className="text-xs">
               {MEAL_TYPE_LABELS[meal.mealType] ?? meal.mealType}
             </Badge>
@@ -576,9 +621,7 @@ function MealTimelineRow({ meal, log }: { meal: StoredMeal; log?: MealLog }) {
             )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-            {option.items.length
-              ? option.items.map((i) => `${i.foodName} (${i.quantityG}g)`).join(', ')
-              : 'No foods'}
+            {displayFoods}
           </p>
         </div>
         <StatusBadge status={status} size="sm" />
@@ -624,18 +667,31 @@ function NutritionWorkspace({
 
   const logBySlot = useMemo(() => {
     const map = new Map<string, MealLog>()
-    for (const l of mealLogs) map.set(l.slot, l)
+    for (const l of mealLogs) {
+      const key = l.slot || l.mealType
+      if (key) map.set(key, l)
+    }
     return map
   }, [mealLogs])
 
-  const allMeals: StoredMeal[] = useMemo(
-    () => plan?.days?.flatMap((d) => d.meals ?? []) ?? [],
-    [plan]
+  const currentDayNumber = useMemo(
+    () => computeDayNumber(plan?.startDate, plan?.durationDays, today),
+    [plan?.startDate, plan?.durationDays, today]
+  )
+
+  const currentDay = useMemo(
+    () => plan?.days?.find((d) => d.dayNumber === currentDayNumber) ?? plan?.days?.[0],
+    [plan?.days, currentDayNumber]
+  )
+
+  const todayMeals: StoredMeal[] = useMemo(
+    () => currentDay?.meals ?? [],
+    [currentDay]
   )
 
   const consumed = useMemo(
-    () => computeConsumed(allMeals, logBySlot),
-    [allMeals, logBySlot]
+    () => computeConsumed(todayMeals, logBySlot),
+    [todayMeals, logBySlot]
   )
 
   const profile: NutritionProfile = useMemo(() => {
@@ -658,8 +714,8 @@ function NutritionWorkspace({
   )
 
   const recovery = useMemo(
-    () => redistributeMissedMacros(allMeals, logBySlot),
-    [allMeals, logBySlot]
+    () => redistributeMissedMacros(todayMeals, logBySlot),
+    [todayMeals, logBySlot]
   )
 
   // Deficit is active when main meals were skipped AND remaining slots still exist.
@@ -802,7 +858,7 @@ function NutritionWorkspace({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Meals / day</span>
-                <span>{allMeals.length}</span>
+                <span>{todayMeals.length}</span>
               </div>
             </CardContent>
           </Card>
@@ -855,17 +911,17 @@ function NutritionWorkspace({
           <CardHeader>
             <CardTitle>Today&apos;s Meals</CardTitle>
             <CardDescription>
-              {allMeals.length} meal{allMeals.length === 1 ? '' : 's'} in the active plan
+              {todayMeals.length} meal{todayMeals.length === 1 ? '' : 's'} prescribed for today (Day {currentDayNumber})
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 max-h-[480px] overflow-y-auto pr-2">
-            {allMeals.length === 0 ? (
+            {todayMeals.length === 0 ? (
               <EmptyState
-                title="No meals in this plan"
-                description="The assigned plan has no meals configured."
+                title="No meals for today"
+                description="The assigned plan has no meals configured for today."
               />
             ) : (
-              allMeals.map((meal, i) => (
+              todayMeals.map((meal, i) => (
                 <MealTimelineRow
                   key={`${meal.mealType}-${i}`}
                   meal={meal}
@@ -878,7 +934,7 @@ function NutritionWorkspace({
       </div>
 
       {/* Recent meal logs */}
-      <RecentMealLogsCard meals={allMeals} mealLogs={mealLogs} />
+      <RecentMealLogsCard meals={todayMeals} mealLogs={mealLogs} />
 
       {/* Progress tracking */}
       <ProgressTrackingSection progress={progress} goal={profile.goal} />
@@ -904,30 +960,50 @@ function RecentMealLogsCard({
   const rows = useMemo(() => {
     return [...mealLogs]
       .sort((a, b) => {
-        const ta = a.loggedAt ? new Date(a.loggedAt).getTime() : 0
-        const tb = b.loggedAt ? new Date(b.loggedAt).getTime() : 0
+        const ta = a.consumedAt ? new Date(a.consumedAt).getTime() : a.createdAt ? new Date(a.createdAt).getTime() : a.loggedAt ? new Date(a.loggedAt).getTime() : 0
+        const tb = b.consumedAt ? new Date(b.consumedAt).getTime() : b.createdAt ? new Date(b.createdAt).getTime() : b.loggedAt ? new Date(b.loggedAt).getTime() : 0
         return tb - ta
       })
       .map((log) => {
-        const meal = mealBySlot.get(log.slot)
+        const slotKey = log.slot || log.mealType || ''
+        const meal = mealBySlot.get(slotKey)
         const option = meal ? normalizeMeal(meal).defaultOption : null
-        const macros = option ? sumMealMacros(option.items) : { calories: 0, protein: 0, carbs: 0, fat: 0 }
-        const calories = option ? optionCalories(option) : (log.calories ?? 0)
-        const foods = option?.items.length
+
+        const logMacros = log.totals
+          ? {
+              calories: log.totals.caloriesKcal ?? 0,
+              protein: log.totals.proteinG ?? 0,
+              carbs: log.totals.carbsG ?? 0,
+              fat: log.totals.fatG ?? 0,
+            }
+          : null
+        const optionMacros = option ? sumMealMacros(option.items) : { calories: 0, protein: 0, carbs: 0, fat: 0 }
+        const macros = logMacros ?? optionMacros
+
+        const calories = log.calories ?? log.totals?.caloriesKcal ?? (option ? optionCalories(option) : 0)
+
+        const foods = log.items?.length
+          ? log.items.map((i) => `${i.foodName} (${i.quantityG}g)`).join(', ')
+          : option?.items.length
           ? option.items.map((i) => `${i.foodName} (${i.quantityG}g)`).join(', ')
-          : '—'
-        const when = log.loggedAt
-          ? new Date(log.loggedAt).toLocaleString(undefined, {
+          : log.notes || '—'
+
+        const rawDate = log.consumedAt || log.createdAt || log.loggedAt || log.logDate || log.date
+        const when = rawDate
+          ? new Date(rawDate).toLocaleString(undefined, {
               month: 'short',
               day: 'numeric',
               hour: 'numeric',
               minute: '2-digit',
             })
-          : new Date(log.date).toLocaleDateString()
+          : '—'
+
+        const isConsumed = log.consumed === true || log.status === 'Logged' || log.status === 'completed'
+
         return {
           id: log._id,
-          slot: log.slot,
-          consumed: log.consumed,
+          slot: slotKey,
+          consumed: isConsumed,
           foods,
           calories,
           macros,
@@ -971,7 +1047,7 @@ function RecentMealLogsCard({
                   <TableRow key={r.id}>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs">
-                        {MEAL_TYPE_LABELS[r.slot] ?? r.slot}
+                        {MEAL_TYPE_LABELS[r.slot as MealType] ?? r.slot}
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-[280px]">

@@ -27,7 +27,7 @@ export function MealLogRow({
   editable = true,
 }: MealLogRowProps) {
   const logMeal = useLogMeal(planId, date)
-  const consumed = log?.consumed ?? false
+  const consumed = log?.consumed === true || log?.status === 'Logged' || log?.status === 'completed'
 
   // Normalize to handle both old flat meals and new option-based meals.
   // If backend strips `options`, falls back to `items` transparently.
@@ -40,7 +40,7 @@ export function MealLogRow({
           normalized.defaultOption)
       : normalized.defaultOption
 
-  const calories = optionCalories(activeOption)
+  const calories = log?.totals?.caloriesKcal ?? log?.calories ?? optionCalories(activeOption)
 
   const toggle = (next: boolean) => {
     logMeal.mutate({
@@ -52,6 +52,11 @@ export function MealLogRow({
   }
 
   const hasMultipleOptions = normalized.options.length > 1
+  const displayFoods = log?.items?.length
+    ? log.items.map((i) => `${i.foodName} (${i.quantityG}g)`).join(', ')
+    : activeOption.items.length
+    ? activeOption.items.map((i) => `${i.foodName} (${i.quantityG}g)`).join(', ')
+    : 'No foods'
 
   return (
     <div
@@ -73,6 +78,11 @@ export function MealLogRow({
               {normalized.name ||
                 (MEAL_TYPE_LABELS[meal.mealType] ?? meal.mealType)}
             </span>
+            {activeOption.label && activeOption.label !== normalized.name && (
+              <Badge variant="outline" className="text-xs font-semibold">
+                {activeOption.label}
+              </Badge>
+            )}
             {hasMultipleOptions && (
               <Badge variant="secondary" className="text-xs">
                 {activeOption.label}
@@ -87,11 +97,7 @@ export function MealLogRow({
               )}
           </div>
           <div className="text-sm text-muted-foreground truncate">
-            {activeOption.items.length
-              ? activeOption.items
-                  .map((i) => `${i.foodName} (${i.quantityG}g)`)
-                  .join(', ')
-              : 'No foods'}
+            {displayFoods}
           </div>
         </div>
       </div>

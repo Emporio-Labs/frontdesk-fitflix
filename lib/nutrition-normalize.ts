@@ -56,10 +56,21 @@ function normalizeOption(
   index: number,
   forcedDefault: boolean
 ): NormalizedMealOption {
+  const items = Array.isArray(raw.items) && raw.items.length > 0
+    ? raw.items
+    : Array.isArray(raw.foods) && raw.foods.length > 0
+    ? raw.foods
+    : Array.isArray(raw.items)
+    ? raw.items
+    : Array.isArray(raw.foods)
+    ? raw.foods
+    : []
+  const label = raw.label?.trim() || raw.title?.trim() || raw.recipeName?.trim() || `Option ${index + 1}`
+  const optionId = raw.optionId?.trim() || (raw as any)._id?.toString() || `opt-${index}`
   return {
-    optionId: raw.optionId?.trim() || `opt-${index}`,
-    label: raw.label?.trim() || `Option ${index + 1}`,
-    items: Array.isArray(raw.items) ? raw.items : [],
+    optionId,
+    label,
+    items,
     reasoning: raw.reasoning,
     isDefault: forcedDefault || raw.isDefault === true,
   }
