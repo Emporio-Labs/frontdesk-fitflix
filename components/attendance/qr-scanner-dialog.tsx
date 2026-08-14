@@ -43,8 +43,23 @@ export function QrScannerDialog() {
             if (pausedRef.current) return
             pausedRef.current = true
             setLastResult(null)
+<<<<<<< Updated upstream
             qrCheckIn.mutate(decodedText, {
               onSuccess: (data) => {
+=======
+
+            const token = extractQrToken(decodedText)
+            if (!token) {
+              toast.error('Invalid QR code content')
+              setTimeout(() => {
+                pausedRef.current = false
+              }, RESCAN_DELAY_MS)
+              return
+            }
+
+            qrCheckIn.mutate(token, {
+              onSuccess: (data: any) => {
+>>>>>>> Stashed changes
                 setLastResult({ name: data.visit.username || 'Member' })
               },
               onSettled: () => {

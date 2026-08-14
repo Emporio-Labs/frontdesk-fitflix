@@ -335,6 +335,8 @@ export interface MealOption {
   items: StoredMealItem[]
   reasoning?: MealReasoning
   isDefault?: boolean
+  recipeId?: string
+  recipeName?: string
 }
 
 export interface MealOptionInput {

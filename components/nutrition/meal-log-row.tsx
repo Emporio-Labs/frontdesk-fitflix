@@ -86,7 +86,12 @@ export function MealLogRow({
                 </span>
               )}
           </div>
-          <div className="text-sm text-muted-foreground truncate">
+          {activeOption.recipeName && (
+            <div className="mt-1 text-sm font-medium text-foreground">
+              {activeOption.recipeName}
+            </div>
+          )}
+          <div className={cn("text-sm text-muted-foreground truncate", activeOption.recipeName ? "mt-0.5" : "")}>
             {activeOption.items.length
               ? activeOption.items
                   .map((i) => `${i.foodName} (${i.quantityG}g)`)

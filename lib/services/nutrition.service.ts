@@ -127,7 +127,22 @@ export const nutritionService = {
     const { data } = await apiClient.get(`/nutrition/my/meal-logs`, {
       params: { planId, ...(date ? { date } : {}), ...(userId ? { userId } : {}) },
     })
-    return data as { items: MealLog[] }
+    
+    // Map backend raw MongoDB document structure to expected MealLog DTO
+    const items: MealLog[] = (data.items || []).map((raw: any) => ({
+      _id: raw._id,
+      planId: raw.planId,
+      userId: raw.userId,
+      date: raw.logDate,
+      slot: raw.mealType,
+      consumed: raw.status === 'Logged',
+      calories: raw.totals?.caloriesKcal,
+      notes: raw.notes,
+      selectedOptionId: raw.plannedMealRef?.selectedOptionId || raw.plannedMealRef?.completedOptionId,
+      loggedAt: raw.consumedAt,
+    }))
+
+    return { items }
   },
   logMeal: async (payload: LogMealPayload) => {
     const { data } = await apiClient.post('/nutrition/my/meal-logs', payload)
