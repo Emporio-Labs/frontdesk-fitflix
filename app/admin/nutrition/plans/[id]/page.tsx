@@ -34,12 +34,13 @@ import { useCanAccess } from '@/hooks/use-auth'
 import { LIFESTYLE_CATEGORY_LABELS } from '@/lib/types/nutrition'
 import { Badge } from '@/components/ui/badge'
 import type { StoredMeal } from '@/lib/types/nutrition'
+import { getTodayDateKey } from '@/lib/utils'
 
 export default function NutritionPlanDetailPage() {
   const params = useParams()
   const router = useRouter()
   const id = String(params?.id ?? '')
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getTodayDateKey()
   const [progressOpen, setProgressOpen] = useState(false)
 
   const { data: plan, isLoading, isError } = useNutritionPlan(id)

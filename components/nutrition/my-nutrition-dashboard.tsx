@@ -76,7 +76,7 @@ import {
   type NutritionProgress,
 } from '@/lib/types/nutrition'
 import { normalizeMeal, optionCalories } from '@/lib/nutrition-normalize'
-import { cn } from '@/lib/utils'
+import { cn, getTodayDateKey } from '@/lib/utils'
 import { toNumberSafe } from '@/lib/health-insights'
 import type { User, ActivityLevel } from '@/lib/services/user.service'
 
@@ -657,7 +657,7 @@ function NutritionWorkspace({
   userId: string
   selectedUser: User
 }) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getTodayDateKey()
 
   const { data: plans = [],  isLoading: plansLoading }  = useNutritionPlans(userId)
   const { data: assessment }                            = useNutritionAssessment(userId)
