@@ -1767,7 +1767,7 @@ function ActiveUsersTab() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map((u) => {
-                    const status = u.onboarded ? 'active' : 'pending'
+                    const status = (u.onboarded || u.onboardingStatus?.onboardingCompleted) ? 'active' : 'pending'
                     return (
                       <TableRow key={u._id}>
                         <TableCell className="font-medium">{u.username}</TableCell>

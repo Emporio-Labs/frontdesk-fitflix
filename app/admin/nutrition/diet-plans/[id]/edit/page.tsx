@@ -5,14 +5,14 @@ import { IconArrowLeft } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
 import { SkeletonCard } from '@/components/skeleton-loader'
 import { ClinicalTemplateForm } from '@/components/nutrition/clinical-template-form'
-import { useNutritionPlan } from '@/hooks/use-nutrition'
+import { useNutritionTemplate } from '@/hooks/use-nutrition'
 
-export default function EditAssignedPlanPage() {
+export default function EditDietPlanTemplatePage() {
   const params = useParams()
   const router = useRouter()
   const id = String(params?.id ?? '')
 
-  const { data: plan, isLoading, isError } = useNutritionPlan(id)
+  const { data: template, isLoading, isError } = useNutritionTemplate(id)
 
   if (isLoading) {
     return (
@@ -22,7 +22,7 @@ export default function EditAssignedPlanPage() {
     )
   }
 
-  if (isError || !plan) {
+  if (isError || !template) {
     return (
       <div className="flex-1 space-y-4 p-8 pt-6">
         <Button
@@ -34,7 +34,7 @@ export default function EditAssignedPlanPage() {
           Back
         </Button>
         <div className="p-8 text-center text-muted-foreground">
-          Assigned plan not found.
+          Diet plan template not found.
         </div>
       </div>
     )
@@ -52,14 +52,14 @@ export default function EditAssignedPlanPage() {
           Back
         </Button>
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Edit Assigned Plan</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Edit Diet Plan Template</h2>
           <p className="text-muted-foreground">
-            Modifying full nutrition structure for {plan.member?.username || plan.userName || 'Member'}
+            Modifying master template: {template.name}
           </p>
         </div>
       </div>
 
-      <ClinicalTemplateForm plan={plan} mode="plan" />
+      <ClinicalTemplateForm template={template} mode="template" />
     </div>
   )
 }

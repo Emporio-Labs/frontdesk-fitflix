@@ -178,7 +178,7 @@ export const MEAL_REASON_TAG_LABELS: Record<MealReasonTag, string> = {
   Digestion: 'Supports digestion',
 }
 
-export interface MealReasoning {
+export type MealReasoning = string | {
   tags?: MealReasonTag[]
   rationale?: string | null
 }
@@ -516,10 +516,14 @@ export const templateMealItemSchema = z.object({
 })
 
 export const mealReasoningSchema = z
-  .object({
-    tags: z.array(z.enum(MEAL_REASON_TAGS)).optional(),
-    rationale: z.string().max(1000).nullable().optional(),
-  })
+  .union([
+    z.string(),
+    z.object({
+      tags: z.array(z.enum(MEAL_REASON_TAGS)).optional(),
+      rationale: z.string().max(1000).nullable().optional(),
+    }),
+  ])
+  .nullable()
   .optional()
 
 export const mealOptionSchema = z.object({

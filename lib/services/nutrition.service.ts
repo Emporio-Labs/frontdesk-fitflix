@@ -84,6 +84,10 @@ export const nutritionService = {
     const { data } = await apiClient.get('/nutrition/templates')
     return data as { templates: NutritionTemplate[] }
   },
+  getTemplate: async (id: string) => {
+    const { data } = await apiClient.get(`/nutrition/templates/${id}`)
+    return data as { template: NutritionTemplate }
+  },
   createTemplate: async (payload: CreateTemplatePayload) => {
     const { data } = await apiClient.post('/nutrition/templates', payload)
     return data as { message: string; template: NutritionTemplate }

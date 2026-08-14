@@ -174,7 +174,7 @@ function normalizeUser(raw: any): User {
     updatedAt: String(raw?.updatedAt || raw?.createdAt || ''),
     assignedTrainer: raw?.assignedTrainer ?? undefined,
     assignedTrainerAt: raw?.assignedTrainerAt ? String(raw.assignedTrainerAt) : undefined,
-    onboarded: raw?.onboarded != null ? Boolean(raw.onboarded) : undefined,
+    onboarded: raw?.onboarded != null ? Boolean(raw.onboarded) : (raw?.onboardingStatus?.onboardingCompleted != null ? Boolean(raw.onboardingStatus.onboardingCompleted) : undefined),
     onboardingStatus: raw?.onboardingStatus ?? undefined,
     healthMarkers: raw?.healthMarkers ?? undefined,
     healthGoalsSnapshot: raw?.healthGoalsSnapshot ?? undefined,

@@ -234,18 +234,22 @@ function IngredientRow({
   const quantityG = watch(`${base}.quantityG` as any) ?? 100
 
   const food = foods.find((f) => f._id === foodId)
-  const calories = food ? scaleMacros(food, quantityG).caloriesKcal : 0
+  const scaled = food ? scaleMacros(food, quantityG) : { caloriesKcal: 0, proteinG: 0, carbsG: 0, fatG: 0 }
+  const calories = Math.round(scaled.caloriesKcal)
+  const protein = Math.round(scaled.proteinG)
+  const carbs = Math.round(scaled.carbsG)
+  const fat = Math.round(scaled.fatG)
 
   return (
-    <div className="grid grid-cols-[1fr_120px_100px_auto] gap-3 items-center">
+    <div className="grid grid-cols-1 sm:grid-cols-[1fr_90px_auto_auto] gap-2.5 items-center">
       <FormField
         control={control}
         name={`${base}.foodId` as any}
         render={({ field }) => (
-          <FormItem className="space-y-0">
+          <FormItem className="space-y-0 min-w-0">
             <Select value={field.value ?? ''} onValueChange={field.onChange}>
               <FormControl>
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-9 text-xs font-medium">
                   <SelectValue placeholder="Select food" />
                 </SelectTrigger>
               </FormControl>
@@ -254,7 +258,7 @@ function IngredientRow({
                   <SelectLabel>Foods</SelectLabel>
                   {foods.map((food) => (
                     <SelectItem key={food._id} value={food._id}>
-                      <span className="flex items-center gap-1 text-xs">
+                      <span className="flex items-center gap-1.5 text-xs">
                         {food.isVeg && <IconLeaf className="h-3.5 w-3.5 text-green-600 inline shrink-0" />}
                         {food.name}
                       </span>
@@ -276,18 +280,33 @@ function IngredientRow({
               <Input
                 type="number"
                 min={0}
-                className="h-9 pr-6 text-xs font-medium"
+                className="h-9 pr-6 text-xs font-semibold text-right"
                 {...field}
                 onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
               />
-              <span className="absolute right-2.5 text-[10px] text-muted-foreground font-bold uppercase pointer-events-none">g</span>
+              <span className="absolute right-2 text-[10px] text-muted-foreground font-bold uppercase pointer-events-none">g</span>
             </div>
           </FormItem>
         )}
       />
 
-      <div className="text-xs font-semibold text-foreground bg-muted/40 rounded border h-9 px-2 flex items-center justify-center whitespace-nowrap">
-        {calories} kcal
+      <div className="text-xs font-medium text-foreground bg-muted/30 rounded-md border h-9 px-3 flex items-center justify-between gap-3 shrink-0">
+        <span className="font-semibold text-foreground min-w-[54px] text-right">{calories} kcal</span>
+        <span className="text-muted-foreground/30 font-normal">|</span>
+        <span className="min-w-[42px] inline-flex items-center gap-1 text-muted-foreground">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase">P</span>
+          <strong className="text-foreground font-bold text-xs">{protein}g</strong>
+        </span>
+        <span className="text-muted-foreground/30 font-normal">|</span>
+        <span className="min-w-[42px] inline-flex items-center gap-1 text-muted-foreground">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase">C</span>
+          <strong className="text-foreground font-bold text-xs">{carbs}g</strong>
+        </span>
+        <span className="text-muted-foreground/30 font-normal">|</span>
+        <span className="min-w-[42px] inline-flex items-center gap-1 text-muted-foreground">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase">F</span>
+          <strong className="text-foreground font-bold text-xs">{fat}g</strong>
+        </span>
       </div>
 
       <Button
@@ -1279,15 +1298,20 @@ export function ClinicalTemplateForm({
               timelineSlot: meal.timelineSlot || undefined,
               notes: meal.notes || undefined,
               reasoning:
-                meal.reasoning?.tags?.length || meal.reasoning?.rationale
+                typeof meal.reasoning === 'string'
                   ? meal.reasoning
-                  : undefined,
+                  : (meal.reasoning?.tags?.length || meal.reasoning?.rationale
+                      ? meal.reasoning
+                      : undefined),
               items: cleanItems(mirroredItems),
               options: opts.length
                 ? opts.map((o) => ({
                     title: o.label || 'Option',
                     isDefault: o.isDefault,
-                    reasoning: o.reasoning?.rationale || undefined,
+                    reasoning:
+                      typeof o.reasoning === 'string'
+                        ? o.reasoning
+                        : (o.reasoning?.rationale || undefined),
                     foods: cleanItems(o.items ?? []),
                     recipeId: (o as any).recipeId || undefined,
                     recipeName: (o as any).recipeName || undefined,

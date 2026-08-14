@@ -115,6 +115,15 @@ export function useNutritionTemplates() {
   })
 }
 
+export function useNutritionTemplate(id: string) {
+  return useQuery({
+    queryKey: ['nutrition', 'templates', id],
+    queryFn: () => nutritionService.getTemplate(id),
+    select: (data) => data.template,
+    enabled: !!id,
+  })
+}
+
 export function useCreateTemplate() {
   const qc = useQueryClient()
   return useMutation({
