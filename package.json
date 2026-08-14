@@ -3,8 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+<<<<<<< Updated upstream
     "build": "next build",
     "dev": "next dev -p 3001",
+=======
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next build",
+    "clean": "node -e \"fs.rmSync('.next', { recursive: true, force: true })\"",
+    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next dev -p 3001",
+>>>>>>> Stashed changes
     "lint": "eslint .",
     "start": "next start"
   },
