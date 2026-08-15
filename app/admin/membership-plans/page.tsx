@@ -116,6 +116,9 @@ function formatPrice(amount: number | string, currency?: string) {
 
 export default function MembershipPlansPage() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [editingPlan, setEditingPlan] = useState<MembershipPlan | null>(null)
@@ -151,6 +154,14 @@ export default function MembershipPlansPage() {
       }),
     [plans, searchTerm]
   )
+
+  const totalPages = Math.ceil(filteredPlans.length / itemsPerPage)
+  const activePage = Math.max(1, Math.min(currentPage, totalPages || 1))
+  const startIndex = (activePage - 1) * itemsPerPage
+
+  const paginatedPlans = useMemo(() => {
+    return filteredPlans.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredPlans, startIndex, itemsPerPage])
 
   const gymId = process.env.NEXT_PUBLIC_GYM_ID || 'default-gym'
   const resolvedPlanName = form.planName.trim()
@@ -769,7 +780,10 @@ export default function MembershipPlansPage() {
         <CardHeader>
           <Input
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setCurrentPage(1)
+            }}
             placeholder="Search plans by name, duration, status"
             className="max-w-sm"
           />
@@ -792,74 +806,115 @@ export default function MembershipPlansPage() {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Plan Name</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPlans.length === 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                        No plans found
-                      </TableCell>
+                      <TableHead>Plan Name</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created Date</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredPlans.map((plan) => (
-                      <TableRow key={plan.id}>
-                        <TableCell>{plan.planName}</TableCell>
-                        <TableCell>
-                          {plan.durationDays && plan.durationDays > 0
-                            ? `${plan.durationDays} day${plan.durationDays !== 1 ? 's' : ''}`
-                            : `${plan.durationMonths} month${plan.durationMonths !== 1 ? 's' : ''}`
-                          }
-                        </TableCell>
-                        <TableCell>
-                          {formatPrice(plan.totalPrice, plan.currency)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={plan.status === 'Active' ? 'default' : 'secondary'}>{plan.status}</Badge>
-                            <Switch
-                              checked={plan.status === 'Active'}
-                              onCheckedChange={(checked) => onToggleStatus(plan, checked)}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {plan.createdAt ? new Date(plan.createdAt).toLocaleDateString() : '-'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" onClick={() => openView(plan)}>
-                              <IconEye className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => openEdit(plan)}>
-                              <IconEdit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => onDelete(plan)}
-                              disabled={deletePlan.isPending}
-                            >
-                              <IconTrash className="h-4 w-4" />
-                            </Button>
-                          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedPlans.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                          No plans found
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    ) : (
+                      paginatedPlans.map((plan) => (
+                        <TableRow key={plan.id}>
+                          <TableCell>{plan.planName}</TableCell>
+                          <TableCell>
+                            {plan.durationDays && plan.durationDays > 0
+                              ? `${plan.durationDays} day${plan.durationDays !== 1 ? 's' : ''}`
+                              : `${plan.durationMonths} month${plan.durationMonths !== 1 ? 's' : ''}`
+                            }
+                          </TableCell>
+                          <TableCell>
+                            {formatPrice(plan.totalPrice, plan.currency)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={plan.status === 'Active' ? 'default' : 'secondary'}>{plan.status}</Badge>
+                              <Switch
+                                checked={plan.status === 'Active'}
+                                onCheckedChange={(checked) => onToggleStatus(plan, checked)}
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {plan.createdAt ? new Date(plan.createdAt).toLocaleDateString() : '-'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button size="sm" variant="outline" onClick={() => openView(plan)}>
+                                <IconEye className="h-4 w-4" />
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => openEdit(plan)}>
+                                <IconEdit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onDelete(plan)}
+                                disabled={deletePlan.isPending}
+                              >
+                                <IconTrash className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {filteredPlans.length > 0 && (
+                <div className="mt-4 flex flex-col items-center justify-between gap-4 border-t pt-4 sm:flex-row">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredPlans.length)} of {filteredPlans.length} plans
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={activePage === 1}
+                    >
+                      Previous
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={activePage === page ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-9 h-9 p-0 font-medium"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={activePage === totalPages}
+                    >
+                      Next page
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

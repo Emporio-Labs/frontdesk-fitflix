@@ -78,6 +78,9 @@ function clearTrainerDraft() {
 
 export default function TrainersPage() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTrainer, setEditingTrainer] = useState<Trainer | null>(null)
   const [showPassword, setShowPassword] = useState(false)
@@ -124,11 +127,23 @@ export default function TrainersPage() {
   const deleteTrainer = useDeleteTrainer()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  const filtered = (trainers || []).filter(
-    (t) =>
-      (t.trainerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (t.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+  const filtered = useMemo(
+    () =>
+      (trainers || []).filter(
+        (t) =>
+          (t.trainerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (t.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [trainers, searchTerm]
   )
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+  const activePage = Math.max(1, Math.min(currentPage, totalPages || 1))
+  const startIndex = (activePage - 1) * itemsPerPage
+
+  const paginatedTrainers = useMemo(() => {
+    return filtered.slice(startIndex, startIndex + itemsPerPage)
+  }, [filtered, startIndex, itemsPerPage])
 
   const resetForm = () => {
     setFormData(defaultTrainerForm())
@@ -380,85 +395,134 @@ export default function TrainersPage() {
 
       <Card>
         <CardHeader>
-          <Input placeholder="Search trainers..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm" />
+          <Input
+            placeholder="Search trainers..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setCurrentPage(1)
+            }}
+            className="max-w-sm"
+          />
         </CardHeader>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>All Trainers</CardTitle>
-          <CardDescription>{isLoading ? 'Loading...' : `${filtered.length} trainers`}</CardDescription>
+          <CardDescription>{isLoading ? 'Loading...' : `Total: ${filtered.length} trainers`}</CardDescription>
         </CardHeader>
         <CardContent>
           {isError && <div className="text-center py-8 text-red-500">Failed to load trainers.</div>}
           {isLoading ? (
             <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Trainer</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Specialities</TableHead>
-                    <TableHead>Public Status</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No trainers found</TableCell></TableRow>
-                  ) : (
-                    filtered.map((trainer, index) => {
-                      const trainerKey = trainer._id || (trainer as any).id || `trainer-${index}`
-                      return (
-                        <TableRow key={trainerKey}>
-                          <TableCell className="font-medium flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0 border">
-                              {trainer.imageUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={trainer.imageUrl} alt={trainer.trainerName || 'Trainer'} className="w-full h-full object-cover" />
-                              ) : (
-                                <span className="text-sm font-bold text-muted-foreground">
-                                  {(trainer.trainerName || 'T').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                                </span>
-                              )}
-                            </div>
-                            <div>
-                              <div className="font-medium">{trainer.trainerName}</div>
-                              {trainer.keySentence && (
-                                <div className="text-xs text-muted-foreground max-w-[200px] truncate">{trainer.keySentence}</div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>{trainer.email}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {(trainer.specialities || []).map((s, idx) => (
-                                <Badge key={`${trainerKey}-spec-${s}-${idx}`} variant="secondary" className="text-xs">{s}</Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={trainer.isActive !== false ? "default" : "destructive"}>
-                              {trainer.isActive !== false ? "Active" : "Inactive"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{trainer.createdAt ? new Date(trainer.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button size="sm" variant="outline" onClick={() => handleOpenEdit(trainer)}><IconEdit className="w-4 h-4" /></Button>
-                              <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${trainer.trainerName}?`)) deleteTrainer.mutate(trainerKey) }} disabled={deleteTrainer.isPending}><IconTrash className="w-4 h-4" /></Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Trainer</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Specialities</TableHead>
+                      <TableHead>Public Status</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedTrainers.length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No trainers found</TableCell></TableRow>
+                    ) : (
+                      paginatedTrainers.map((trainer, index) => {
+                        const trainerKey = trainer._id || (trainer as any).id || `trainer-${index}`
+                        return (
+                          <TableRow key={trainerKey}>
+                            <TableCell className="font-medium flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0 border">
+                                {trainer.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={trainer.imageUrl} alt={trainer.trainerName || 'Trainer'} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span className="text-sm font-bold text-muted-foreground">
+                                    {(trainer.trainerName || 'T').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-medium">{trainer.trainerName}</div>
+                                {trainer.keySentence && (
+                                  <div className="text-xs text-muted-foreground max-w-[200px] truncate">{trainer.keySentence}</div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{trainer.email}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {(trainer.specialities || []).map((s, idx) => (
+                                  <Badge key={`${trainerKey}-spec-${s}-${idx}`} variant="secondary" className="text-xs">{s}</Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={trainer.isActive !== false ? "default" : "destructive"}>
+                                {trainer.isActive !== false ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{trainer.createdAt ? new Date(trainer.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button size="sm" variant="outline" onClick={() => handleOpenEdit(trainer)}><IconEdit className="w-4 h-4" /></Button>
+                                <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${trainer.trainerName}?`)) deleteTrainer.mutate(trainerKey) }} disabled={deleteTrainer.isPending}><IconTrash className="w-4 h-4" /></Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {filtered.length > 0 && (
+                <div className="mt-4 flex flex-col items-center justify-between gap-4 border-t pt-4 sm:flex-row">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filtered.length)} of {filtered.length} trainers
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={activePage === 1}
+                    >
+                      Previous
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={activePage === page ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-9 h-9 p-0 font-medium"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={activePage === totalPages}
+                    >
+                      Next page
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

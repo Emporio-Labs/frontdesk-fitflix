@@ -19,10 +19,16 @@ export interface SlotDto {
   isAvailable: boolean
 }
 
-export interface WeeklySlotConfig {
-  dayOfWeek: number // 0 = Sun, 1 = Mon, ..., 6 = Sat
+export interface ShiftWindowDto {
   startTime: string
   endTime: string
+}
+
+export interface WeeklySlotConfig {
+  dayOfWeek: number // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  startTime?: string
+  endTime?: string
+  shifts?: ShiftWindowDto[]
   isAvailable: boolean
 }
 
