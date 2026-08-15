@@ -11,11 +11,25 @@ import {
 import { Button } from '@/components/ui/button'
 import { IconQrcode, IconUserCheck } from '@tabler/icons-react'
 import { useQrCheckIn } from '@/hooks/use-gym-visits'
+import { toast } from 'sonner'
 
 const SCANNER_ELEMENT_ID = 'gym-qr-scanner'
 // Debounce so the same frame decoded multiple times in a row doesn't fire
 // duplicate check-in requests while the camera is still pointed at it.
 const RESCAN_DELAY_MS = 2000
+
+function extractQrToken(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (parsed && typeof parsed.token === 'string') return parsed.token
+    if (parsed && typeof parsed.qrToken === 'string') return parsed.qrToken
+  } catch {
+    // Not JSON
+  }
+  return trimmed
+}
 
 export function QrScannerDialog() {
   const [open, setOpen] = useState(false)
@@ -43,10 +57,6 @@ export function QrScannerDialog() {
             if (pausedRef.current) return
             pausedRef.current = true
             setLastResult(null)
-<<<<<<< Updated upstream
-            qrCheckIn.mutate(decodedText, {
-              onSuccess: (data) => {
-=======
 
             const token = extractQrToken(decodedText)
             if (!token) {
@@ -58,9 +68,8 @@ export function QrScannerDialog() {
             }
 
             qrCheckIn.mutate(token, {
-              onSuccess: (data: any) => {
->>>>>>> Stashed changes
-                setLastResult({ name: data.visit.username || 'Member' })
+              onSuccess: (data) => {
+                setLastResult({ name: data.visit?.username || 'Member' })
               },
               onSettled: () => {
                 setTimeout(() => {
@@ -96,7 +105,7 @@ export function QrScannerDialog() {
       setCameraError(null)
       setLastResult(null)
     }
-  }, [open])
+  }, [open, qrCheckIn])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

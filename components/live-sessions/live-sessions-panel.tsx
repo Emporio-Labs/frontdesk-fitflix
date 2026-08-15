@@ -158,15 +158,11 @@ const ROOM_STATUS_BADGE_STYLES: Record<string, string> = {
 
 export function LiveSessionsPanel() {
   const router = useRouter()
-  let authUser: any = null
-  let userRole: string = 'admin'
-  try {
-    const auth = useAuth()
-    authUser = auth.user
-    userRole = auth.role
-  } catch {
-    /* fallback if auth provider not present */
-  }
+  // useAuth must be called unconditionally at the top level (Rules of Hooks).
+  // The context may return null/undefined values — guard those instead.
+  const auth = useAuth()
+  const authUser: any = auth?.user ?? null
+  const userRole: string = auth?.role ?? 'admin'
 
   const { data: sessions = [], isLoading, isError, refetch } = useLiveSessions()
   const endSession = useEndSession()

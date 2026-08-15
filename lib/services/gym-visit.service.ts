@@ -1,6 +1,5 @@
 import { apiClient } from '@/lib/api-client'
 
-<<<<<<< Updated upstream
 export const VISIT_TYPES = ['workout', 'class', 'consultation', 'other'] as const
 export type VisitType = (typeof VISIT_TYPES)[number]
 
@@ -42,23 +41,16 @@ export interface GymVisitFilters {
   visitType?: VisitType
   from?: string
   to?: string
-  status?: 'open' | 'closed'
+  status?: 'open' | 'closed' | string
+  date?: string
   limit?: number
   offset?: number
-=======
-export interface GymVisitFilters {
-  status?: string
-  date?: string
   [key: string]: any
->>>>>>> Stashed changes
 }
 
 export interface CheckInPayload {
   userId: string
-<<<<<<< Updated upstream
   visitType?: VisitType
-=======
->>>>>>> Stashed changes
   notes?: string
 }
 
@@ -66,7 +58,6 @@ export interface CheckOutPayload {
   notes?: string
 }
 
-<<<<<<< Updated upstream
 function toParams(input?: Record<string, unknown>): Record<string, string> {
   if (!input) return {}
   const out: Record<string, string> = {}
@@ -158,39 +149,5 @@ export const gymVisitService = {
         data?.avgDurationMinutes == null ? null : Number(data.avgDurationMinutes),
       byDay: Array.isArray(data?.byDay) ? data.byDay : [],
     }
-=======
-export const gymVisitService = {
-  list: async (filters: GymVisitFilters) => {
-    const { data } = await apiClient.get('/gym-visits', { params: filters })
-    return data
-  },
-  currentlyIn: async () => {
-    const { data } = await apiClient.get('/gym-visits/active')
-    return data
-  },
-  getMine: async (limit = 50) => {
-    const { data } = await apiClient.get('/gym-visits/my', { params: { limit } })
-    return data
-  },
-  getAnalytics: async (range: { from?: string; to?: string } = {}) => {
-    const { data } = await apiClient.get('/gym-visits/analytics', { params: range })
-    return data
-  },
-  checkIn: async (payload: CheckInPayload) => {
-    const { data } = await apiClient.post('/gym-visits/check-in', payload)
-    return data
-  },
-  qrCheckIn: async (token: string) => {
-    const { data } = await apiClient.post('/gym-visits/qr-check-in', { token })
-    return data
-  },
-  checkOut: async (id: string, payload: CheckOutPayload) => {
-    const { data } = await apiClient.post(`/gym-visits/${id}/check-out`, payload)
-    return data
-  },
-  delete: async (id: string) => {
-    const { data } = await apiClient.delete(`/gym-visits/${id}`)
-    return data
->>>>>>> Stashed changes
   },
 }

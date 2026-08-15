@@ -100,6 +100,7 @@ export const liveSessionService = {
     if (filters?.date) params.append('date', filters.date)
     if (filters?.status) params.append('status', filters.status)
     if (filters?.trainerId) params.append('trainerId', filters.trainerId)
+    if (filters?.includeOffline) params.append('includeOffline', 'true')
 
     const res = await apiClient.get(`/api/v1/admin/classes/schedule?${params.toString()}`)
 
@@ -125,9 +126,31 @@ export const liveSessionService = {
   // Room-bound, role-scoped, time-windowed — replaces the old client-side
   // generateKitTokenForTest/local /api/zego-token mint, neither of which
   // checked who was asking or which room they were allowed into.
-  async getToken(sessionId: string): Promise<ZegoSessionToken> {
-    const res = await apiClient.post(`/api/v1/zego/sessions/${sessionId}/token`)
+  async getToken(sessionId: string, force = false): Promise<ZegoSessionToken> {
+    const url = force
+      ? `/api/v1/zego/sessions/${sessionId}/token?force=true`
+      : `/api/v1/zego/sessions/${sessionId}/token`
+    const res = await apiClient.post(url, { force })
     return res.data
+  },
+
+  // Clears the hostLiveAt lock on the session, allowing a fresh host join.
+  // Used when the admin gets a 409 (host already marked live) after a
+  // previous session was left without the server-side state being cleaned up.
+  async clearHostPresence(sessionId: string): Promise<void> {
+    try {
+      await apiClient.delete(`/api/v1/zego/sessions/${sessionId}/host-presence`)
+    } catch {
+      try {
+        await apiClient.post(`/api/v1/zego/sessions/${sessionId}/clear-host`)
+      } catch {
+        try {
+          await apiClient.post(`/api/v1/zego/sessions/${sessionId}/host-presence/clear`)
+        } catch {
+          // best-effort
+        }
+      }
+    }
   },
 
   // Host-only heartbeat: called when host client successfully joins Zego room

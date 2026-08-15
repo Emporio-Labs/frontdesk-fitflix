@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { IconVideo, IconX, IconMaximize, IconMinus } from '@tabler/icons-react'
+import { IconVideo, IconX, IconMaximize, IconMinus, IconLoader2 } from '@tabler/icons-react'
 import { liveSessionService } from '@/lib/services/live-session.service'
 import { cn } from '@/lib/utils'
 
@@ -59,6 +59,7 @@ export function VideoConferenceModal({
   const [isMinimized, setIsMinimized] = useState(false)
   const [showMinimizeConfirm, setShowMinimizeConfirm] = useState(false)
   const [staffDisplay, setStaffDisplay] = useState<string>('Admin Host')
+  const [retryCount, setRetryCount] = useState(0)
 
   const clearSettleResizeTimer = useCallback(() => {
     if (settleResizeTimerRef.current !== null) {
@@ -102,6 +103,12 @@ export function VideoConferenceModal({
 
   useEffect(() => {
     if (!open) {
+      // Clear the server-side host-live lock when closing, so the next open
+      // doesn't get a 409 "host already live" from the token endpoint.
+      // Fire-and-forget: the user is already leaving, errors here are silent.
+      if (sessionId) {
+        liveSessionService.clearHostPresence(sessionId).catch(() => {})
+      }
       destroyZego()
       setIsMinimized(false)
       setShowMinimizeConfirm(false)
@@ -135,7 +142,20 @@ export function VideoConferenceModal({
 
         const { ZegoUIKitPrebuilt } = await import('@zegocloud/zego-uikit-prebuilt')
 
-        const access = await liveSessionService.getToken(sessionId)
+        let access: any
+        try {
+          access = await liveSessionService.getToken(sessionId)
+        } catch (tokenErr: any) {
+          const status = tokenErr?.response?.status
+          // 409 — backend says a host is already live (stale hostLiveAt lock).
+          // Clear the lock server-side and retry with force=true before giving up.
+          if (status === 409) {
+            await liveSessionService.clearHostPresence(sessionId)
+            access = await liveSessionService.getToken(sessionId, true)
+          } else {
+            throw tokenErr
+          }
+        }
         if (cancelled) return
 
         setStaffDisplay(access.userName)
@@ -210,13 +230,15 @@ export function VideoConferenceModal({
       } catch (err: any) {
         console.error('ZEGOCLOUD Video Conference init error:', err)
         if (!cancelled) {
+          const status = err?.response?.status
           const resData = err?.response?.data
           const apiMsg = resData?.message || resData?.error
-          const errMsg = apiMsg || err?.message || 'Failed to connect to ZEGOCLOUD Video Conference suite.'
+          const default409 = status === 409 ? 'A host session lock is active for this room. Click "Retry Connection" below to force join.' : null
+          const errMsg = apiMsg || default409 || err?.message || 'Failed to connect to ZEGOCLOUD Video Conference suite.'
           setError(errMsg)
           setErrorDetails({
             message: errMsg,
-            code: resData?.code,
+            code: resData?.code || (status === 409 ? 'HOST_CONFLICT' : undefined),
             startsAt: resData?.startsAt,
             endsAt: resData?.endsAt,
           })
@@ -230,7 +252,7 @@ export function VideoConferenceModal({
     return () => {
       cancelled = true
     }
-  }, [open, sessionId, containerElement, mode, destroyZego, scheduleSettleResize])
+  }, [open, sessionId, containerElement, mode, retryCount, destroyZego, scheduleSettleResize])
 
   const handleLeaveCall = () => {
     destroyZego()
@@ -265,6 +287,9 @@ export function VideoConferenceModal({
               className="h-7 text-xs text-gray-300 hover:text-white px-2"
               onClick={() => {
                 setIsMinimized(false)
+                window.dispatchEvent(new Event('resize'))
+                setTimeout(() => window.dispatchEvent(new Event('resize')), 50)
+                setTimeout(() => window.dispatchEvent(new Event('resize')), 200)
                 scheduleSettleResize(600)
               }}
             >
@@ -322,7 +347,7 @@ export function VideoConferenceModal({
           }
           onOpenChange(nextOpen)
         }}
-        modal={!isMinimized}
+        modal={false}
       >
         <DialogContent
           hideOverlay={isMinimized}
@@ -351,12 +376,9 @@ export function VideoConferenceModal({
             // controls. w-full/max-w-lg/gap-4/max-h-[90vh]/overflow-y-auto
             // from the base DialogContent are all overridden below.
             'w-[96vw] max-w-[1400px] h-[92vh] max-h-[92vh] min-h-[520px] p-0 gap-0 overflow-hidden overflow-y-hidden bg-black border-gray-800 flex flex-col',
-            // When minimized: keep the dialog in-viewport (invisible) so
-            // ZEGOCLOUD's internal layout engine can still measure its
-            // container. Moving it off-screen (left: -20000px) causes
-            // ZEGOCLOUD to compute collapsed / zero dimensions which don't
-            // recover after the dialog slides back into view.
-            isMinimized && 'pointer-events-none invisible',
+            // When minimized: hide visually via opacity and pointer-events while keeping
+            // visibility: visible in DOM so WebRTC video frame rendering doesn't pause/freeze.
+            isMinimized && 'opacity-0 pointer-events-none fixed -z-50 scale-95 transition-none',
           )}
         >
           <DialogHeader className="px-4 py-3 bg-gray-900 border-b border-gray-800 flex flex-row items-center justify-between space-y-0">
@@ -397,9 +419,17 @@ export function VideoConferenceModal({
             </div>
           </DialogHeader>
 
-          <div className="flex-1 relative bg-black">
-            {error ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white bg-gray-950/95 gap-4">
+          <div className="flex-1 w-full h-full min-h-0 relative bg-black">
+            {loading && !error && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-950 text-white space-y-3">
+                <IconLoader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                <p className="text-sm font-medium text-gray-200">Connecting to Video Conference...</p>
+                <p className="text-xs text-gray-400">Initializing room and media streams</p>
+              </div>
+            )}
+
+            {error && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 text-center text-white bg-gray-950/95 gap-4">
                 <div className="rounded-full bg-indigo-500/10 p-4 border border-indigo-500/20 text-indigo-400">
                   <IconVideo className="w-10 h-10" />
                 </div>
@@ -422,6 +452,14 @@ export function VideoConferenceModal({
                       )}
                     </p>
                   </div>
+                ) : error.toLowerCase().includes('no valid schedule') || error.toLowerCase().includes('invalid schedule') ? (
+                  <div className="space-y-2 max-w-md">
+                    <h3 className="text-base font-semibold text-amber-400">Class Has No Active Schedule</h3>
+                    <p className="text-xs text-gray-300 leading-relaxed">
+                      This group class occurrence does not have a valid date or time range set in the backend database.
+                      Please click <span className="font-medium text-white">Edit</span> on the class card to update its schedule date and time.
+                    </p>
+                  </div>
                 ) : (
                   <div className="space-y-1.5 max-w-md">
                     <h3 className="text-base font-semibold text-rose-400">Unable to Join Session</h3>
@@ -429,18 +467,36 @@ export function VideoConferenceModal({
                   </div>
                 )}
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 text-xs border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800 hover:text-white px-6"
-                  onClick={() => onOpenChange(false)}
-                >
-                  Close
-                </Button>
+                <div className="flex items-center gap-2">
+                  {/* Only show Retry for connection errors, not for "not open yet" */}
+                  {errorDetails?.code !== 'NOT_OPEN_YET' && !error.toLowerCase().includes('not open') && (
+                    <Button
+                      size="sm"
+                      className="mt-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-6"
+                      onClick={() => {
+                        // Clear error and increment retryCount to re-trigger the init effect
+                        setError(null)
+                        setErrorDetails(null)
+                        joinedKeyRef.current = null
+                        setRetryCount((c) => c + 1)
+                      }}
+                    >
+                      Retry Connection
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2 text-xs border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800 hover:text-white px-6"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
-            ) : (
-              <div ref={setContainerElement} className="h-full w-full" />
             )}
+            {/* Absolutely positioned to fill 100% width & height of the modal body */}
+            <div ref={setContainerElement} className={cn('absolute inset-0 w-full h-full', error && 'invisible')} />
           </div>
         </DialogContent>
       </Dialog>

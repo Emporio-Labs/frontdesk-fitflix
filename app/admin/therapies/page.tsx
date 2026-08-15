@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -274,8 +275,11 @@ function calculateEndTime(startTime: string, durationMinutes: number): string {
   return minutesToTime(totalEndMins)
 }
 
-export default function TherapiesPage() {
-  const [activeTab, setActiveTab] = useState('therapies')
+function TherapiesPageContent() {
+  const searchParams = useSearchParams()
+  const initialTab = searchParams.get('tab') || 'therapies'
+  const validTabs = ['therapies', 'group-classes', 'group-class-bookings', 'live-sessions']
+  const [activeTab, setActiveTab] = useState(validTabs.includes(initialTab) ? initialTab : 'therapies')
   const [selectedClassFilter, setSelectedClassFilter] = useState<{ id: string; name: string } | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -486,6 +490,7 @@ export default function TherapiesPage() {
     for (const s of liveSessionsForHosting) {
       if (s.status === 'CANCELLED' || s.status === 'COMPLETED') continue
       const { rank, distance } = rankOf(s, now)
+      if (rank === 3) continue // Skip occurrences with invalid or missing date/time bounds
       const current = best.get(s.classId)
       if (
         !current ||
@@ -2915,5 +2920,13 @@ export default function TherapiesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function TherapiesPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center"><IconLoader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>}>
+      <TherapiesPageContent />
+    </Suspense>
   )
 }

@@ -68,7 +68,8 @@ export default function LiveSessionPage() {
     const fetchSession = async () => {
       try {
         setFetchLoading(true)
-        const result = await liveSessionService.getAll()
+        // Use includeOffline:true so we find the session regardless of delivery type
+        const result = await liveSessionService.getAll({ includeOffline: true })
         const found = result.sessions.find((s: LiveSession) => s.id === sessionId)
         if (!found) {
           setFetchError('Session not found')
@@ -102,7 +103,19 @@ export default function LiveSessionPage() {
         // appID/roomId/userId/userName/role itself rather than trusting
         // whatever this page happened to have in localStorage, and refuses
         // to issue one outside this host's join window.
-        const access = await liveSessionService.getToken(session.id)
+        let access: Awaited<ReturnType<typeof liveSessionService.getToken>>
+        try {
+          access = await liveSessionService.getToken(session.id)
+        } catch (tokenErr: any) {
+          // 409 — backend says a host is already live (stale hostLiveAt lock
+          // from a previous visit). Clear the lock and retry with force=true.
+          if (tokenErr?.response?.status === 409) {
+            await liveSessionService.clearHostPresence(session.id)
+            access = await liveSessionService.getToken(session.id, true)
+          } else {
+            throw tokenErr
+          }
+        }
 
         const kitToken = ZegoUIKitPrebuilt.generateKitTokenForProduction(
           access.appID,
@@ -202,6 +215,11 @@ export default function LiveSessionPage() {
         } catch { /* ignore destroy errors */ }
         zegoRef.current = null
       }
+      // Best-effort: clear the server-side host-live lock so re-entry doesn't
+      // get a 409 "host already live" error from a stale hostLiveAt timestamp.
+      if (session?.id) {
+        liveSessionService.clearHostPresence(session.id).catch(() => {})
+      }
     }
   }, [session])
 
@@ -269,7 +287,7 @@ export default function LiveSessionPage() {
           <p className="text-lg text-red-400">{fetchError || 'Session not found'}</p>
           <Button
             variant="outline"
-            onClick={() => router.push('/admin/therapies')}
+            onClick={() => router.push('/admin/therapies?tab=live-sessions')}
             className="text-white border-white/30 hover:bg-white/10"
           >
             <IconArrowLeft className="mr-2 h-4 w-4" />

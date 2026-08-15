@@ -54,16 +54,24 @@ export interface GroupClassBooking {
 
 export const groupClassBookingService = {
   getAll: async (): Promise<{ bookings: GroupClassBooking[] }> => {
+    // Helper: normalise whatever the API returns into { bookings: [...] }
+    const normalise = (data: any): { bookings: GroupClassBooking[] } => {
+      if (Array.isArray(data)) return { bookings: data }
+      if (Array.isArray(data?.bookings)) return { bookings: data.bookings }
+      if (Array.isArray(data?.data)) return { bookings: data.data }
+      return { bookings: [] }
+    }
+
     try {
       const { data } = await apiClient.get('/api/v1/admin/bookings')
-      return data
-    } catch {
+      return normalise(data)
+    } catch (firstErr) {
       try {
         const { data } = await apiClient.get('/api/v1/bookings')
-        return data
+        return normalise(data)
       } catch {
-        const { data } = await apiClient.get('/bookings')
-        return data
+        // Rethrow the original error so React Query can surface it
+        throw firstErr
       }
     }
   },
