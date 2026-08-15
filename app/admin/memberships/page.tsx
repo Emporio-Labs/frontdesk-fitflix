@@ -23,13 +23,15 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconPlus, IconTrash, IconEye, IconRefresh, IconEdit } from '@tabler/icons-react'
+import { IconPlus, IconTrash, IconEye, IconRefresh, IconEdit, IconPlayerPause, IconPlayerPlay } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { Membership, MembershipStatus } from '@/lib/services/membership.service'
 import { useMembershipPlans } from '@/hooks/use-membership-plans'
 import { useUsers } from '@/hooks/use-users'
 import {
   useMemberships,
+  usePauseMembership,
+  useResumeMembership,
   useCreateMembership,
   useUpdateMembership,
   useDeleteMembership,
@@ -78,6 +80,8 @@ function MembershipsPageContent() {
   const itemsPerPage = 12
 
   const { data: memberships = [], isLoading, isError, refetch } = useMemberships()
+  const pauseMembership = usePauseMembership()
+  const resumeMembership = useResumeMembership()
   const { data: users = [] } = useUsers()
   const { data: membershipPlans = [] } = useMembershipPlans()
   const createMembership = useCreateMembership()
@@ -702,6 +706,32 @@ function MembershipsPageContent() {
                               >
                                 <IconEye className="w-4 h-4" />
                               </Button>
+                              {membership.status === 'Active' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  title="Freeze — frozen days are credited back to the expiry on resume"
+                                  onClick={() =>
+                                    pauseMembership.mutate({ id: membership.id })
+                                  }
+                                  disabled={pauseMembership.isPending}
+                                >
+                                  <IconPlayerPause className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {membership.status === 'Paused' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  title="Resume and credit the frozen days back"
+                                  onClick={() =>
+                                    resumeMembership.mutate(membership.id)
+                                  }
+                                  disabled={resumeMembership.isPending}
+                                >
+                                  <IconPlayerPlay className="w-4 h-4" />
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"

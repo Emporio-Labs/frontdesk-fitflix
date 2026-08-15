@@ -162,4 +162,10 @@ export const queryKeys = {
   settings: {
     conference: () => ['settings', 'conference'] as const,
   },
+  locations: {
+    all: (includeInactive?: boolean) =>
+      ['locations', includeInactive ? 'with-inactive' : 'active'] as const,
+    detail: (id: string) => ['locations', id] as const,
+    settings: (id: string) => ['locations', id, 'settings'] as const,
+  },
 }

@@ -103,3 +103,38 @@ export function useDeleteMembership() {
     },
   })
 }
+
+export function usePauseMembership() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      membershipService.pause(id, reason),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.memberships.all() })
+      toast.success(data.message || 'Membership frozen')
+    },
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.message || 'Failed to freeze membership'),
+  })
+}
+
+export function useResumeMembership() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => membershipService.resume(id),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.memberships.all() })
+      // Surface a capped credit explicitly — the member will otherwise notice
+      // the shortfall themselves and the desk won't know why.
+      if (data.cappedBy) {
+        toast.warning(
+          `Resumed. ${data.creditedDays} of ${data.pausedDays} frozen days credited (capped at the ${data.cappedBy}-day allowance).`
+        )
+      } else {
+        toast.success(data.message || 'Membership resumed')
+      }
+    },
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.message || 'Failed to resume membership'),
+  })
+}

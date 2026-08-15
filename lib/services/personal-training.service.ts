@@ -82,20 +82,24 @@ export interface UnifiedBookingDto {
 }
 
 export interface TrainerChangeRequestDto {
-  _id: string
+  _id?: string
+  id?: string
   userId: {
-    _id: string
+    _id?: string
+    id?: string
     username?: string
     email?: string
     phone?: string
   }
   currentTrainerId?: {
-    _id: string
+    _id?: string
+    id?: string
     trainerName: string
     imageUrl?: string
   } | null
   requestedTrainerId: {
-    _id: string
+    _id?: string
+    id?: string
     trainerName: string
     imageUrl?: string
   }

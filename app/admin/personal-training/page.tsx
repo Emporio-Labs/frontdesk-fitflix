@@ -545,66 +545,71 @@ export default function PersonalTrainingAdminPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(changeRequests || []).map((req, idx) => (
-                      <TableRow key={req._id || `req-${idx}`}>
-                        <TableCell>
-                          <div className="font-medium">{req.userId?.username || 'Member'}</div>
-                          <div className="text-xs text-muted-foreground">{req.userId?.phone}</div>
-                        </TableCell>
-                        <TableCell>{req.currentTrainerId?.trainerName || 'None'}</TableCell>
-                        <TableCell className="font-medium">
-                          {req.requestedTrainerId?.trainerName}
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">{req.reason}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              req.status === 'APPROVED'
-                                ? 'default'
-                                : req.status === 'PENDING'
-                                ? 'secondary'
-                                : 'destructive'
-                            }
-                          >
-                            {req.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right space-x-2">
-                          {req.status === 'PENDING' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() =>
-                                  resolveRequestMutation.mutate({
-                                    requestId: req._id,
-                                    action: 'APPROVE',
-                                    adminNotes: 'Approved by Frontdesk',
-                                  })
-                                }
-                              >
-                                <IconCheck className="h-3.5 w-3.5 mr-1" />
-                                Approve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  resolveRequestMutation.mutate({
-                                    requestId: req._id,
-                                    action: 'REJECT',
-                                    adminNotes: 'Declined due to trainer capacity',
-                                  })
-                                }
-                              >
-                                <IconX className="h-3.5 w-3.5 mr-1" />
-                                Decline
-                              </Button>
-                            </>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {(changeRequests || []).map((req, idx) => {
+                      const reqId = req.id || req._id || ''
+                      return (
+                        <TableRow key={reqId || `req-${idx}`}>
+                          <TableCell>
+                            <div className="font-medium">{req.userId?.username || 'Member'}</div>
+                            <div className="text-xs text-muted-foreground">{req.userId?.phone}</div>
+                          </TableCell>
+                          <TableCell>{req.currentTrainerId?.trainerName || 'None'}</TableCell>
+                          <TableCell className="font-medium">
+                            {req.requestedTrainerId?.trainerName}
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">{req.reason}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                req.status === 'APPROVED'
+                                  ? 'default'
+                                  : req.status === 'PENDING'
+                                  ? 'secondary'
+                                  : 'destructive'
+                              }
+                            >
+                              {req.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right space-x-2">
+                            {req.status === 'PENDING' && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  disabled={resolveRequestMutation.isPending || !reqId}
+                                  onClick={() =>
+                                    resolveRequestMutation.mutate({
+                                      requestId: reqId,
+                                      action: 'APPROVE',
+                                      adminNotes: 'Approved by Frontdesk',
+                                    })
+                                  }
+                                >
+                                  <IconCheck className="h-3.5 w-3.5 mr-1" />
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={resolveRequestMutation.isPending || !reqId}
+                                  onClick={() =>
+                                    resolveRequestMutation.mutate({
+                                      requestId: reqId,
+                                      action: 'REJECT',
+                                      adminNotes: 'Declined due to trainer capacity',
+                                    })
+                                  }
+                                >
+                                  <IconX className="h-3.5 w-3.5 mr-1" />
+                                  Decline
+                                </Button>
+                              </>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               )}

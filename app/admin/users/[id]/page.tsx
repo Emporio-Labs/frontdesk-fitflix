@@ -27,6 +27,7 @@ import {
   IconCalendar,
   IconRun,
 } from '@tabler/icons-react'
+import { GrantGraceDialog } from '@/components/grant-grace-dialog'
 import { useUser } from '@/hooks/use-users'
 import { MemberWorkoutJourney } from '@/components/workouts/member-workout-journey'
 import { useTrainers, useAssignTrainerToUser } from '@/hooks/use-trainers'
@@ -353,10 +354,13 @@ export default function UserDetailPage() {
                 <CardTitle className="text-2xl">{user.username}</CardTitle>
                 <CardDescription>{user.email}</CardDescription>
               </div>
-              <Button>
-                <IconEdit className="w-4 h-4 mr-2" />
-                Edit User
-              </Button>
+              <div className="flex items-center gap-2">
+                <GrantGraceDialog userId={userId} userName={user.username} />
+                <Button>
+                  <IconEdit className="w-4 h-4 mr-2" />
+                  Edit User
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">

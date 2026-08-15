@@ -1,6 +1,7 @@
 'use client'
 
 import { AppSidebar } from '@/components/app-sidebar'
+import { LocationScopeProvider } from '@/components/location-scope-provider'
 import { SidebarRouteSync } from '@/components/sidebar-route-sync'
 import { SiteHeader } from '@/components/site-header'
 import {
@@ -23,14 +24,16 @@ export default function DashboardLayout({
         } as React.CSSProperties
       }
     >
-      <SidebarRouteSync />
-      <AppSidebar variant="inset" collapsible="icon" />
-      <SidebarInset>
-        <SiteHeader />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {children}
-        </div>
-      </SidebarInset>
+      <LocationScopeProvider>
+        <SidebarRouteSync />
+        <AppSidebar variant="inset" collapsible="icon" />
+        <SidebarInset>
+          <SiteHeader />
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {children}
+          </div>
+        </SidebarInset>
+      </LocationScopeProvider>
     </SidebarProvider>
   )
 }

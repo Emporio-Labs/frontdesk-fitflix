@@ -6,6 +6,7 @@ import {
   IconListDetails,
   IconReport,
   IconSettings,
+  IconBuildingStore,
   IconUsers,
   IconHeartHandshake,
   IconCalendarEvent,
@@ -98,6 +99,7 @@ const navGroups = [
   {
     label: "Admin",
     items: [
+      { title: "Locations", url: "/admin/locations", icon: IconBuildingStore },
       { title: "Settings", url: "/admin/settings", icon: IconSettings },
     ],
   },

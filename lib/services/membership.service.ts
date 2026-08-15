@@ -269,4 +269,28 @@ export const membershipService = {
     const { data } = await apiClient.delete(`/memberships/${id}`)
     return { message: data?.message || 'Membership deleted successfully' }
   },
+
+  // Freezing stops access immediately; the frozen days are added back to the
+  // expiry on resume, capped by the branch's pauseMaxDaysPerTerm.
+  pause: async (id: string, reason?: string) => {
+    const { data } = await apiClient.post(`/memberships/${id}/pause`, { reason })
+    return data as {
+      message: string
+      membership: Membership
+      daysRemainingInAllowance: number | null
+    }
+  },
+
+  resume: async (id: string) => {
+    const { data } = await apiClient.post(`/memberships/${id}/resume`)
+    return data as {
+      message: string
+      membership: Membership
+      pausedDays: number
+      creditedDays: number
+      cappedBy: number | null
+      previousEndDate: string | null
+      newEndDate: string | null
+    }
+  },
 }
