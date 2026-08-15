@@ -25,6 +25,7 @@ export function useGroupClasses() {
     queryKey: queryKeys.groupClasses.all(),
     queryFn: groupClassService.getAll,
     select: (data) => data.groupClasses,
+    staleTime: 30_000,
   })
 }
 
@@ -35,6 +36,7 @@ export function useCreateGroupClass() {
     mutationFn: (payload: CreateGroupClassPayload) => groupClassService.create(payload),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.groupClasses.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.liveSessions.allDeliveryTypes() })
       toast.success(data.message || 'Group class created successfully')
     },
     onError: (err: any) => {
@@ -51,6 +53,7 @@ export function useUpdateGroupClass() {
       groupClassService.update(id, payload),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.groupClasses.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.liveSessions.allDeliveryTypes() })
       toast.success(data.message || 'Group class updated successfully')
     },
     onError: (err: any) => {
@@ -66,6 +69,7 @@ export function useDeleteGroupClass() {
     mutationFn: (id: string) => groupClassService.delete(id),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.groupClasses.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.liveSessions.allDeliveryTypes() })
       toast.success(data.message || 'Group class deleted successfully')
     },
     onError: (err: any) => {
@@ -82,6 +86,7 @@ export function useTogglePublishGroupClass() {
       groupClassService.togglePublish(id, isPublished),
     onSuccess: (data, variables) => {
       qc.invalidateQueries({ queryKey: queryKeys.groupClasses.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.liveSessions.allDeliveryTypes() })
       if (variables.isPublished) {
         toast.success(data.message || 'Class published successfully')
       } else {

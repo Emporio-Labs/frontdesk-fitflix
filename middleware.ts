@@ -22,10 +22,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Trainer role restriction: Trainers land in /dashboard/workouts/members and cannot access /admin/*
+  // Trainer role access: Trainers can access Personal Training hub and live session rooms
+  const TRAINER_ALLOWED_ADMIN_ROUTES = [
+    '/admin/personal-training',
+    '/admin/live-session',
+    '/admin/slots',
+  ]
+
   if (isAuthed && role === 'trainer') {
-    if (pathname.startsWith('/admin') || pathname === '/dashboard') {
+    const isAllowedAdmin = TRAINER_ALLOWED_ADMIN_ROUTES.some((route) => pathname.startsWith(route))
+    if (pathname.startsWith('/admin') && !isAllowedAdmin) {
       return NextResponse.redirect(new URL('/dashboard/workouts/members', request.url))
+    }
+    if (pathname === '/dashboard') {
+      return NextResponse.redirect(new URL('/admin/personal-training', request.url))
     }
   }
 

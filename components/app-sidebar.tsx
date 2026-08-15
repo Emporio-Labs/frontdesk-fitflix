@@ -23,6 +23,7 @@ import {
   IconFileInvoice,
   IconTemplate,
   IconMessage2,
+  IconDumbbell,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -55,6 +56,7 @@ const navGroups = [
   {
     label: "Programs",
     items: [
+      { title: "Personal Training", url: "/admin/personal-training", icon: IconDumbbell },
       { title: "Nutrition", url: "/admin/nutrition", icon: IconSalad },
       { title: "Workouts", url: "/dashboard/workouts", icon: IconBarbell },
       { title: "Workout Templates", url: "/dashboard/workouts/templates", icon: IconTemplate },
@@ -104,6 +106,7 @@ const navGroups = [
 const navTrainerGroup = [
   {
     items: [
+      { title: "Personal Training", url: "/admin/personal-training", icon: IconDumbbell },
       { title: "My Members", url: "/dashboard/workouts/members", icon: IconUsers },
       { title: "Workout Plans", url: "/dashboard/workouts/plans", icon: IconBarbell },
       { title: "Exercise Library", url: "/dashboard/workouts/exercises", icon: IconActivity },
