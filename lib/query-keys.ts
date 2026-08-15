@@ -168,4 +168,11 @@ export const queryKeys = {
     detail: (id: string) => ['locations', id] as const,
     settings: (id: string) => ['locations', id, 'settings'] as const,
   },
+  // Promotions are location-scoped, so callers pass these through `scopedKey`
+  // from the location scope provider before use.
+  promotions: {
+    all: (includeInactive?: boolean) =>
+      ['promotions', includeInactive ? 'with-inactive' : 'live'] as const,
+    detail: (id: string) => ['promotions', id] as const,
+  },
 }

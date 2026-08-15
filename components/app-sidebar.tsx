@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   IconDashboard,
   IconListDetails,
+  IconSpeakerphone,
   IconReport,
   IconSettings,
   IconBuildingStore,
@@ -85,6 +86,7 @@ const navGroups = [
     label: "Insights",
     items: [
       { title: "Leads", url: "/admin/leads", icon: IconTarget },
+      { title: "Promotions", url: "/admin/promotions", icon: IconSpeakerphone },
       { title: "DNA Testing", url: "/admin/dna", icon: IconDna },
       { title: "Reports", url: "/admin/reports", icon: IconReport },
       { title: "Audit Logs", url: "/admin/audit-logs", icon: IconHistory },

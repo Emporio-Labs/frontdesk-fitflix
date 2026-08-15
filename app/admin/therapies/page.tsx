@@ -77,7 +77,7 @@ import {
 } from '@/hooks/use-group-classes'
 import { useSlots } from '@/hooks/use-slots'
 import type { TherapyCatalogItem } from '@/lib/services/therapy.service'
-import type { GroupClass, GroupClassMode } from '@/lib/services/group-class.service'
+import type { ClassFormat, GroupClass, GroupClassMode } from '@/lib/services/group-class.service'
 import { slotService, type Slot } from '@/lib/services/slot.service'
 import { LiveSessionsPanel } from '@/components/live-sessions/live-sessions-panel'
 import { useLiveSessions, useAllScheduledSessions } from '@/hooks/use-live-sessions'
@@ -315,6 +315,18 @@ export default function TherapiesPage() {
     sessionTitle: '',
     mode: 'VideoConference',
   })
+  // `date` inputs speak YYYY-MM-DD; the API speaks ISO. Convert at the edges so
+  // the form state stays exactly what the input element wants.
+  const toDateInput = (iso: string | null | undefined): string => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  }
+  const fromDateInput = (value: string): string | null =>
+    value ? new Date(`${value}T00:00:00`).toISOString() : null
+
   const defaultGcForm = {
     name: '',
     description: '',
@@ -337,6 +349,13 @@ export default function TherapiesPage() {
     bookingWindowUnit: 'hours' as 'hours' | 'days',
     bookingCloseValue: '' as string | number,
     bookingCloseUnit: 'minutes' as 'minutes' | 'hours' | 'days',
+    // ── Events ──
+    imageUrl: '',
+    format: 'drop_in' as ClassFormat,
+    startDate: '',
+    endDate: '',
+    enrollmentOpensAt: '',
+    enrollmentClosesAt: '',
   }
   const [gcForm, setGcForm] = useState(defaultGcForm)
   const [gcSchedule, setGcSchedule] = useState<GcSchedule>(DEFAULT_SCHEDULE)
@@ -382,6 +401,8 @@ export default function TherapiesPage() {
       gcForm.access !== 'members_only' ||
       gcForm.bookingWindowValue !== 72 ||
       gcForm.bookingCloseValue !== '' ||
+      gcForm.imageUrl.trim() !== '' ||
+      gcForm.format !== 'drop_in' ||
       isScheduleChanged
     )
   }
@@ -827,6 +848,12 @@ export default function TherapiesPage() {
       bookingWindowUnit: (gc as any).bookingWindowUnit ?? 'hours',
       bookingCloseValue: (gc as any).bookingCloseValue ?? '',
       bookingCloseUnit: (gc as any).bookingCloseUnit ?? 'minutes',
+      imageUrl: gc.imageUrl ?? '',
+      format: gc.format ?? 'drop_in',
+      startDate: toDateInput(gc.startDate),
+      endDate: toDateInput(gc.endDate),
+      enrollmentOpensAt: toDateInput(gc.enrollmentOpensAt),
+      enrollmentClosesAt: toDateInput(gc.enrollmentClosesAt),
     })
     const info = gc.scheduleInfo || ''
     if (info.startsWith('One-Time:')) {
@@ -908,6 +935,32 @@ export default function TherapiesPage() {
     }
     if (gcForm.mode === 'online' && !gcForm.sessionType) {
       errors.sessionType = 'Session Type is required when Online mode is selected'
+    }
+    if (gcForm.format === 'batch') {
+      // A batch is a cohort with a bounded run, so both ends are mandatory.
+      if (!gcForm.startDate) errors.startDate = 'A batch needs a start date'
+      if (!gcForm.endDate) errors.endDate = 'A batch needs an end date'
+      if (
+        gcForm.startDate &&
+        gcForm.endDate &&
+        new Date(gcForm.endDate) <= new Date(gcForm.startDate)
+      ) {
+        errors.endDate = 'The run must end after it starts'
+      }
+      if (
+        gcForm.enrollmentOpensAt &&
+        gcForm.enrollmentClosesAt &&
+        new Date(gcForm.enrollmentClosesAt) <= new Date(gcForm.enrollmentOpensAt)
+      ) {
+        errors.enrollmentClosesAt = 'Enrolment must close after it opens'
+      }
+      if (
+        gcForm.enrollmentClosesAt &&
+        gcForm.endDate &&
+        new Date(gcForm.enrollmentClosesAt) > new Date(gcForm.endDate)
+      ) {
+        errors.enrollmentClosesAt = 'Enrolment cannot close after the run ends'
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -1003,6 +1056,14 @@ export default function TherapiesPage() {
       bookingCloseValue: gcForm.bookingCloseValue === '' ? null : Number(gcForm.bookingCloseValue),
       bookingCloseUnit: gcForm.bookingCloseValue === '' ? null : gcForm.bookingCloseUnit,
       isPublished: gcForm.isPublished,
+      imageUrl: gcForm.imageUrl.trim(),
+      format: gcForm.format,
+      // The backend rejects a drop-in carrying run or enrolment dates, so the
+      // service strips them unless this is a batch.
+      startDate: fromDateInput(gcForm.startDate),
+      endDate: fromDateInput(gcForm.endDate),
+      enrollmentOpensAt: fromDateInput(gcForm.enrollmentOpensAt),
+      enrollmentClosesAt: fromDateInput(gcForm.enrollmentClosesAt),
     }
 
     try {
@@ -2046,6 +2107,107 @@ export default function TherapiesPage() {
                     </div>
                     <p className="text-[10px] text-muted-foreground">Default is 15 minutes (Set to 0 to keep open until start time)</p>
                   </div>
+                </div>
+
+                {/* Image + event format */}
+                <div className="space-y-3 border rounded-lg p-3 bg-muted/20">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold block">
+                      Image URL
+                      {renderModifiedBadge('imageUrl')}
+                    </label>
+                    <Input
+                      className={cn(
+                        "h-8 text-xs",
+                        isFieldChanged('imageUrl') && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
+                      )}
+                      value={gcForm.imageUrl}
+                      onChange={(e) => setGcForm({ ...gcForm, imageUrl: e.target.value })}
+                      placeholder="https://cdn.fitflix.in/classes/strength.jpg"
+                      disabled={isGcPending}
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Shown on the class card in the app. Without one the card draws a plain block.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold block">
+                      Format
+                      {renderModifiedBadge('format')}
+                    </label>
+                    <select
+                      className="h-8 text-xs border rounded bg-transparent px-2 w-full dark:bg-zinc-950"
+                      value={gcForm.format}
+                      onChange={(e) => setGcForm({ ...gcForm, format: e.target.value as ClassFormat })}
+                      disabled={isGcPending}
+                    >
+                      <option value="drop_in">Drop-in — book each session</option>
+                      <option value="batch">Batch — enrol once for the run</option>
+                    </select>
+                    <p className="text-[10px] text-muted-foreground">
+                      {gcForm.format === 'batch'
+                        ? 'A batch runs between fixed dates and opens once. The booking window above does not apply to it.'
+                        : 'Members book each occurrence separately, using the booking window above.'}
+                    </p>
+                  </div>
+
+                  {gcForm.format === 'batch' && (
+                    <div className="grid grid-cols-2 gap-3 border-t pt-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold block">Run starts</label>
+                        <Input
+                          type="date"
+                          className="h-8 text-xs"
+                          value={gcForm.startDate}
+                          onChange={(e) => setGcForm({ ...gcForm, startDate: e.target.value })}
+                          disabled={isGcPending}
+                        />
+                        {gcErrors.startDate && (
+                          <p className="text-xs text-rose-500 mt-1">{gcErrors.startDate}</p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold block">Run ends</label>
+                        <Input
+                          type="date"
+                          className="h-8 text-xs"
+                          value={gcForm.endDate}
+                          onChange={(e) => setGcForm({ ...gcForm, endDate: e.target.value })}
+                          disabled={isGcPending}
+                        />
+                        {gcErrors.endDate && (
+                          <p className="text-xs text-rose-500 mt-1">{gcErrors.endDate}</p>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold block">Enrolment opens</label>
+                        <Input
+                          type="date"
+                          className="h-8 text-xs"
+                          value={gcForm.enrollmentOpensAt}
+                          onChange={(e) => setGcForm({ ...gcForm, enrollmentOpensAt: e.target.value })}
+                          disabled={isGcPending}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold block">Enrolment closes</label>
+                        <Input
+                          type="date"
+                          className="h-8 text-xs"
+                          value={gcForm.enrollmentClosesAt}
+                          onChange={(e) => setGcForm({ ...gcForm, enrollmentClosesAt: e.target.value })}
+                          disabled={isGcPending}
+                        />
+                        {gcErrors.enrollmentClosesAt && (
+                          <p className="text-xs text-rose-500 mt-1">{gcErrors.enrollmentClosesAt}</p>
+                        )}
+                      </div>
+                      <p className="col-span-2 text-[10px] text-muted-foreground">
+                        Leave the enrolment dates empty to keep the batch open for its whole run.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Waitlist Toggle */}

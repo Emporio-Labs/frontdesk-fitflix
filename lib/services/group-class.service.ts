@@ -2,6 +2,8 @@ import { apiClient } from '@/lib/api-client'
 
 export type GroupClassMode = 'online' | 'offline' | 'hybrid'
 
+export type ClassFormat = 'drop_in' | 'batch'
+
 export interface GroupClass {
   id: string
   name: string
@@ -37,6 +39,14 @@ export interface GroupClass {
   bookingWindowUnit?: 'hours' | 'days'
   bookingCloseValue?: number
   bookingCloseUnit?: 'minutes' | 'hours' | 'days'
+  // ── Events ──
+  imageUrl?: string
+  /** drop_in books per occurrence; batch enrols once across the whole run. */
+  format?: ClassFormat
+  startDate?: string | null
+  endDate?: string | null
+  enrollmentOpensAt?: string | null
+  enrollmentClosesAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -69,6 +79,12 @@ export interface CreateGroupClassPayload {
   bookingWindowUnit?: 'hours' | 'days'
   bookingCloseValue?: number
   bookingCloseUnit?: 'minutes' | 'hours' | 'days'
+  imageUrl?: string
+  format?: ClassFormat
+  startDate?: string | null
+  endDate?: string | null
+  enrollmentOpensAt?: string | null
+  enrollmentClosesAt?: string | null
 }
 
 export interface UpdateGroupClassPayload extends Partial<CreateGroupClassPayload> {}
@@ -111,8 +127,34 @@ function normalizeGroupClass(raw: any): GroupClass {
     bookingWindowUnit: raw?.bookingWindowUnit ?? 'hours',
     bookingCloseValue: raw?.bookingCloseValue ?? 15,
     bookingCloseUnit: raw?.bookingCloseUnit ?? 'minutes',
+    imageUrl: raw?.imageUrl ?? '',
+    format: raw?.format === 'batch' ? 'batch' : 'drop_in',
+    startDate: raw?.startDate ?? null,
+    endDate: raw?.endDate ?? null,
+    enrollmentOpensAt: raw?.enrollmentOpensAt ?? null,
+    enrollmentClosesAt: raw?.enrollmentClosesAt ?? null,
     createdAt: raw?.createdAt ?? new Date().toISOString(),
     updatedAt: raw?.updatedAt ?? new Date().toISOString(),
+  }
+}
+
+/**
+ * The backend rejects a drop-in that carries run or enrolment dates, so those
+ * are only sent for a batch. Sending them as null on a drop-in also passes,
+ * but omitting them keeps an accidental stale date from being stored at all.
+ */
+function eventFields(payload: CreateGroupClassPayload | UpdateGroupClassPayload) {
+  const format = payload.format ?? 'drop_in'
+  if (format !== 'batch') {
+    return { imageUrl: payload.imageUrl, format }
+  }
+  return {
+    imageUrl: payload.imageUrl,
+    format,
+    startDate: payload.startDate ?? null,
+    endDate: payload.endDate ?? null,
+    enrollmentOpensAt: payload.enrollmentOpensAt ?? null,
+    enrollmentClosesAt: payload.enrollmentClosesAt ?? null,
   }
 }
 
@@ -182,6 +224,7 @@ export const groupClassService = {
       bookingWindowUnit: payload.bookingWindowUnit,
       bookingCloseValue: payload.bookingCloseValue,
       bookingCloseUnit: payload.bookingCloseUnit,
+      ...eventFields(payload),
     })
     return {
       message: data?.message || 'Group class created successfully',
@@ -222,6 +265,7 @@ export const groupClassService = {
       bookingWindowUnit: payload.bookingWindowUnit,
       bookingCloseValue: payload.bookingCloseValue,
       bookingCloseUnit: payload.bookingCloseUnit,
+      ...eventFields(payload),
     })
     return {
       message: data?.message || 'Group class updated successfully',
