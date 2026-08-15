@@ -41,12 +41,6 @@ export const queryKeys = {
     mine: () => ['memberships', 'me'] as const,
     detail: (id: string) => ['memberships', id] as const,
   },
-  gymVisits: {
-    all: (filters?: Record<string, unknown>) => ['gym-visits', filters] as const,
-    mine: (limit?: number) => ['gym-visits', 'me', { limit }] as const,
-    currentlyIn: () => ['gym-visits', 'active'] as const,
-    analytics: (range?: Record<string, unknown>) => ['gym-visits', 'analytics', range] as const,
-  },
   membershipPlans: {
     all: () => ['membership-plans'] as const,
     detail: (id: string) => ['membership-plans', id] as const,
