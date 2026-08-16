@@ -5,6 +5,7 @@ import { AuthProvider } from '@/app/context/auth-context'
 import { ReactQueryProvider } from '@/app/context/react-query-provider'
 import { Toaster } from 'sonner'
 import { AuthDiagnostics } from '@/lib/auth-diagnostics'
+import { VideoConferenceProvider } from '@/components/video-conference/video-conference-provider'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -44,7 +45,8 @@ export default function RootLayout({
         <ReactQueryProvider>
           <AuthProvider>
             <AuthDiagnostics />
-            {children}
+            {/* Above the router so a hosted class survives navigation. */}
+            <VideoConferenceProvider>{children}</VideoConferenceProvider>
             <Toaster richColors position="top-right" />
           </AuthProvider>
         </ReactQueryProvider>

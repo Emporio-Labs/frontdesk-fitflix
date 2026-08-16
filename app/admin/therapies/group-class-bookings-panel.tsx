@@ -31,7 +31,6 @@ import { useGroupClassBookings } from '@/hooks/use-group-class-bookings'
 import { useGroupClasses } from '@/hooks/use-group-classes'
 import { GroupClassBooking, groupClassBookingService } from '@/lib/services/group-class-booking.service'
 import type { GroupClass } from '@/lib/services/group-class.service'
-import { VideoConferenceModal } from '@/components/video-conference/video-conference-modal'
 import { BookingDetailsDialog } from '@/components/bookings/booking-details-dialog'
 import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog'
 import { RescheduleBookingDialog } from '@/components/bookings/reschedule-booking-dialog'
@@ -91,12 +90,6 @@ export default function GroupClassBookingsPanel({
   const [selectedBooking, setSelectedBooking] = useState<GroupClassBooking | null>(null)
   const [isCancelOpen, setIsCancelOpen] = useState(false)
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
-  const [callModal, setCallModal] = useState<{ isOpen: boolean; sessionId: string; roomID: string; sessionTitle: string }>({
-    isOpen: false,
-    sessionId: '',
-    roomID: '',
-    sessionTitle: '',
-  })
 
   const { data: bookings = [], isLoading, isError, refetch } = useGroupClassBookings()
   const { data: groupClasses = [] } = useGroupClasses()
@@ -534,14 +527,6 @@ export default function GroupClassBookingsPanel({
           )}
         </CardContent>
       </Card>
-
-      <VideoConferenceModal
-        open={callModal.isOpen}
-        onOpenChange={(open) => setCallModal((prev) => ({ ...prev, isOpen: open }))}
-        sessionId={callModal.sessionId || ''}
-        roomID={callModal.roomID}
-        sessionTitle={callModal.sessionTitle}
-      />
 
       {/* Booking Details Modal */}
       <BookingDetailsDialog

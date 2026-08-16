@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { VideoConferenceModal } from '@/components/video-conference/video-conference-modal'
+import { useVideoConference } from '@/components/video-conference/video-conference-provider'
 import {
   IconClock,
   IconDroplet,
@@ -302,19 +302,9 @@ export default function TherapiesPage() {
   const [gcDialogOpen, setGcDialogOpen] = useState(false)
   const [editingGc, setEditingGc] = useState<GroupClass | null>(null)
   const [gcSearchTerm, setGcSearchTerm] = useState('')
-  const [videoModal, setVideoModal] = useState<{
-    isOpen: boolean
-    sessionId: string
-    roomID: string
-    sessionTitle: string
-    mode?: 'VideoConference' | 'LiveStreaming'
-  }>({
-    isOpen: false,
-    sessionId: '',
-    roomID: '',
-    sessionTitle: '',
-    mode: 'VideoConference',
-  })
+  // The call itself lives in VideoConferenceProvider (root layout) so it keeps
+  // running when the admin navigates away from this page.
+  const { startCall } = useVideoConference()
   // `date` inputs speak YYYY-MM-DD; the API speaks ISO. Convert at the edges so
   // the form state stays exactly what the input element wants.
   const toDateInput = (iso: string | null | undefined): string => {
@@ -2990,8 +2980,7 @@ export default function TherapiesPage() {
                                 toast.error('No scheduled session found to host — schedule an occurrence for this class first.')
                                 return
                               }
-                              setVideoModal({
-                                isOpen: true,
+                              startCall({
                                 sessionId: matchedSession.id,
                                 roomID: matchedSession.videoConferenceId || '',
                                 sessionTitle: `${gc.name} (Live Host)`,
@@ -3059,14 +3048,6 @@ export default function TherapiesPage() {
         </TabsContent>
       </Tabs>
 
-      <VideoConferenceModal
-        open={videoModal.isOpen}
-        onOpenChange={(open) => setVideoModal((prev) => ({ ...prev, isOpen: open }))}
-        sessionId={videoModal.sessionId}
-        roomID={videoModal.roomID}
-        sessionTitle={videoModal.sessionTitle}
-        mode={videoModal.mode}
-      />
       {/* Unsaved Changes Confirmation Modal */}
       <Dialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
         <DialogContent className="sm:max-w-[425px]">
