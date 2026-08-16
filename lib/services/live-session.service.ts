@@ -34,6 +34,10 @@ export interface LiveSession {
 
 export interface ZegoSessionToken {
   token: string
+  // Present only for live_stream sessions. A second, room-unbound token for
+  // ZIM login — separate from `token` because ZIM login is per-user, not
+  // per-room, and rejects a room-bound RTC payload.
+  zimToken?: string
   appID: number
   roomId: string
   userId: string

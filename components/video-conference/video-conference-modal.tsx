@@ -331,6 +331,22 @@ export function VideoConferenceModal({
         const isLiveStream = mode === 'LiveStreaming'
         const isGroupCall = mode === 'GroupCall'
 
+        // Co-host invitations ride on ZIM (signaling), a separate login from
+        // RTC. Loaded only for live streams — group classes and 1-on-1
+        // consults never invite a co-host, so they don't pay for the plugin.
+        // Registered before joinRoom(): addPlugins builds the UIKit's
+        // _zimManager, which every co-host code path is a no-op without.
+        if (isLiveStream) {
+          try {
+            const { ZIM } = await import('zego-zim-web')
+            zp.addPlugins({ ZIM })
+          } catch (err) {
+            // Co-host becomes unavailable but the stream itself still joins —
+            // never block the room on a plugin that only one button needs.
+            console.error('Failed to load ZIM signaling plugin:', err)
+          }
+        }
+
         zp.joinRoom({
           container: containerElement,
           scenario: isLiveStream
@@ -355,6 +371,11 @@ export function VideoConferenceModal({
           showLayoutButton: true,
           showNonVideoUser: !isLiveStream,
           showTextChat: true,
+          // Both default false. Meaningless without the ZIM plugin above, but
+          // harmless to set unconditionally for the other two modes — the
+          // UIKit only surfaces co-host UI when scenario.mode is LiveStreaming.
+          showInviteToCohostButton: isLiveStream,
+          showRemoveCohostButton: isLiveStream,
           // Pinned rather than left to the SDK's negotiation. The members are
           // Android and iOS phones, where VP8 has no hardware decoder on a lot
           // of devices — a stream the phone can't decode plays as audio with a
