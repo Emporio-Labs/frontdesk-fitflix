@@ -54,6 +54,7 @@ import { HealthMarkersDialog } from '@/components/health-markers-dialog'
 import { HealthGoalsDialog } from '@/components/health-goals-dialog'
 import { ConsentDialog } from '@/components/consent-dialog'
 import { OnboardingReportsDialog } from '@/components/onboarding-reports-dialog'
+import { InterestSummary } from '@/components/crm/interest-summary'
 import {
   Dialog,
   DialogContent,
@@ -397,6 +398,11 @@ export default function UserDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Same panel the leads board shows, for whoever reaches this
+              person from their member record instead. Renders nothing when
+              there is no consented activity. */}
+          <InterestSummary userId={userId} />
 
           <AssignedTrainerSection
             userId={userId}
