@@ -717,8 +717,11 @@ function MealSlotCard({
                       value={watch(`${base}.options.${safeActiveOi}.recipeName` as any) || watch(`${base}.options.${safeActiveOi}.title` as any) || ''}
                       onChange={(e) => {
                         const val = e.target.value
-                        setValue(`${base}.options.${safeActiveOi}.recipeName` as any, val)
-                        setValue(`${base}.options.${safeActiveOi}.title` as any, val)
+                        setValue(`${base}.options.${safeActiveOi}.recipeName` as any, val, { shouldDirty: true, shouldValidate: true })
+                        setValue(`${base}.options.${safeActiveOi}.title` as any, val, { shouldDirty: true, shouldValidate: true })
+                        if (val) {
+                          setValue(`${base}.options.${safeActiveOi}.label` as any, val, { shouldDirty: true })
+                        }
                       }}
                       className="h-7 text-xs font-semibold w-48 bg-white border border-input"
                     />
@@ -1305,17 +1308,23 @@ export function ClinicalTemplateForm({
                       : undefined),
               items: cleanItems(mirroredItems),
               options: opts.length
-                ? opts.map((o) => ({
-                    title: o.label || 'Option',
-                    isDefault: o.isDefault,
-                    reasoning:
-                      typeof o.reasoning === 'string'
-                        ? o.reasoning
-                        : (o.reasoning?.rationale || undefined),
-                    foods: cleanItems(o.items ?? []),
-                    recipeId: (o as any).recipeId || undefined,
-                    recipeName: (o as any).recipeName || undefined,
-                  }))
+                ? opts.map((o) => {
+                    const resolvedName =
+                      (o as any).recipeName ||
+                      (o as any).title ||
+                      (o.label && !/^Option\s+\d+$/i.test(o.label) ? o.label : undefined)
+                    return {
+                      title: resolvedName || o.label || 'Option',
+                      isDefault: o.isDefault,
+                      reasoning:
+                        typeof o.reasoning === 'string'
+                          ? o.reasoning
+                          : (o.reasoning?.rationale || undefined),
+                      foods: cleanItems(o.items ?? []),
+                      recipeId: (o as any).recipeId || undefined,
+                      recipeName: (o as any).recipeName || resolvedName || undefined,
+                    }
+                  })
                 : undefined,
             }
           }),
