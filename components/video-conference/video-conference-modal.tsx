@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { IconVideo, IconX, IconMaximize, IconMinus } from '@tabler/icons-react'
 import { liveSessionService } from '@/lib/services/live-session.service'
 import { cn } from '@/lib/utils'
+import { usePortraitTiles } from './use-portrait-tiles'
 
 interface VideoConferenceModalProps {
   open: boolean
@@ -48,6 +49,12 @@ export function VideoConferenceModal({
   // re-triggers a join — only an actual session/mode change does.
   const joinedKeyRef = useRef<string | null>(null)
   const settleResizeTimerRef = useRef<number | null>(null)
+  // Live camera/mic state and our own publish stream id, kept for the
+  // extra-info re-emit below. Seeded to match turnOn*WhenJoining.
+  const localStreamIdRef = useRef<string | null>(null)
+  const cameraOnRef = useRef(true)
+  const micOnRef = useRef(true)
+  const expressOffRef = useRef<(() => void) | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [errorDetails, setErrorDetails] = useState<{
@@ -59,6 +66,10 @@ export function VideoConferenceModal({
   const [isMinimized, setIsMinimized] = useState(false)
   const [showMinimizeConfirm, setShowMinimizeConfirm] = useState(false)
   const [staffDisplay, setStaffDisplay] = useState<string>('Admin Host')
+
+  // Reshapes phone participants' tiles to their own aspect ratio. Self-disables
+  // if the UIKit's DOM doesn't match what it expects.
+  usePortraitTiles(containerElement)
 
   const clearSettleResizeTimer = useCallback(() => {
     if (settleResizeTimerRef.current !== null) {
@@ -82,6 +93,18 @@ export function VideoConferenceModal({
 
   const destroyZego = useCallback(() => {
     clearSettleResizeTimer()
+    // Detach before destroy(): `zp.express` is rebuilt per join cycle
+    // (destroy() clears the UIKit's static core), so a listener left attached
+    // belongs to an object we can no longer reach to remove it from.
+    try {
+      expressOffRef.current?.()
+    } catch {
+      // ignore cleanup errors
+    }
+    expressOffRef.current = null
+    localStreamIdRef.current = null
+    cameraOnRef.current = true
+    micOnRef.current = true
     if (zegoRef.current) {
       try {
         zegoRef.current.destroy()
@@ -152,6 +175,59 @@ export function VideoConferenceModal({
         zegoRef.current = zp
         joinedKeyRef.current = key
 
+        // Members read our camera state from the publish stream's "extra info"
+        // ({isCameraOn, isMicrophoneOn, ...}); a member whose client sees that
+        // as absent or unparseable falls back to "camera muted" and renders a
+        // placeholder instead of our video — the black host tile reported from
+        // the phone app. The UIKit does attach extra info to the publish
+        // request, but an extra-info write that lands before the stream is
+        // actually publishable is rejected, and the UIKit swallows that
+        // rejection and never retries; the only thing that would set it
+        // afterwards is the admin manually toggling the camera.
+        //
+        // So re-emit once the express layer says the stream is PUBLISHING,
+        // which is exactly when the write can succeed. Idempotent and harmless
+        // when the publish-time write already worked.
+        //
+        // `zp.express` is declared on the UIKit but typed `{}`, hence the cast
+        // and the feature-detect: if a future version stops exposing it, this
+        // degrades to today's behaviour rather than throwing.
+        const express: any = (zp as any).express
+        if (
+          express &&
+          typeof express.on === 'function' &&
+          typeof express.setStreamExtraInfo === 'function'
+        ) {
+          const onPublisherState = (event: { state?: string; streamID?: string }) => {
+            if (event?.state !== 'PUBLISHING') return
+            const streamID = event.streamID
+            if (!streamID || streamID.endsWith('_screensharing')) return
+            if (localStreamIdRef.current && streamID !== localStreamIdRef.current) return
+            Promise.resolve(
+              express.setStreamExtraInfo(
+                streamID,
+                JSON.stringify({
+                  isCameraOn: cameraOnRef.current,
+                  isMicrophoneOn: micOnRef.current,
+                  hasVideo: true,
+                  hasAudio: true,
+                }),
+              ),
+            ).catch(() => {
+              // A rejected extra-info write is the pre-existing failure mode,
+              // not a new one — never surface it to the admin.
+            })
+          }
+          express.on('publisherStateUpdate', onPublisherState)
+          expressOffRef.current = () => {
+            try {
+              express.off?.('publisherStateUpdate', onPublisherState)
+            } catch {
+              // ignore cleanup errors
+            }
+          }
+        }
+
         const isLiveStream = mode === 'LiveStreaming'
 
         zp.joinRoom({
@@ -175,9 +251,29 @@ export function VideoConferenceModal({
           showUserList: true,
           showLayoutButton: true,
           showNonVideoUser: !isLiveStream,
+          // Pinned rather than left to the SDK's negotiation. The members are
+          // Android and iOS phones, where VP8 has no hardware decoder on a lot
+          // of devices — a stream the phone can't decode plays as audio with a
+          // black picture, which is indistinguishable from the camera-state bug
+          // the extra-info re-emit above addresses. H264 is decodable in
+          // hardware essentially everywhere the app runs.
+          videoCodec: 'H264',
           // Room messages open by default so the admin can see member chat
           // arrive without hunting for the button first.
           rightPanelExpandedType: 'RoomMessages',
+          // Mirror the camera/mic state into the refs the extra-info re-emit
+          // reads, so a re-publish after the admin has muted doesn't announce
+          // a camera that is actually off.
+          onLocalStreamUpdated: (state: string, streamId: string) => {
+            if (state === 'published') localStreamIdRef.current = streamId
+            if (state === 'stopped') localStreamIdRef.current = null
+          },
+          onCameraStateUpdated: (state: 'ON' | 'OFF') => {
+            cameraOnRef.current = state === 'ON'
+          },
+          onMicrophoneStateUpdated: (state: 'ON' | 'OFF') => {
+            micOnRef.current = state === 'ON'
+          },
           onJoinRoom: () => {
             if (!cancelled) setLoading(false)
             liveSessionService.reportHostPresence(sessionId).catch((err) => {
@@ -439,7 +535,9 @@ export function VideoConferenceModal({
                 </Button>
               </div>
             ) : (
-              <div ref={setContainerElement} className="h-full w-full" />
+              // zg-video-root scopes the portrait-tile CSS in globals.css to
+              // this modal — see use-portrait-tiles.ts.
+              <div ref={setContainerElement} className="h-full w-full zg-video-root" />
             )}
           </div>
         </DialogContent>

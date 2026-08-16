@@ -163,7 +163,12 @@ export default function LiveSessionPage() {
           showUserList: true,
           showNonVideoUser: true,
           showPinButton: true,
-          videoViewMode: 1, // AspectFit: prevents cropping on widescreen/portrait mismatches
+          // NB: there used to be a `videoViewMode: 1` here, described as
+          // "AspectFit: prevents cropping". No such key exists in the UIKit —
+          // it was silently ignored (the `as any` cast below is what let it
+          // compile). The supported key is `videoScreenConfig.objectFit`, which
+          // already defaults to "contain"; portrait handling for the surface
+          // the admin actually uses lives in the group-class modal instead.
           maxUsers: session.capacity || 50,
           onJoinRoom: () => {
             if (cancelled) return

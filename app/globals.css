@@ -90,3 +90,44 @@
     @apply bg-background text-foreground;
   }
 }
+/* ---------------------------------------------------------------------------
+ * Portrait tiles for phone participants in the ZEGOCLOUD group-class grid.
+ *
+ * Paired with components/video-conference/use-portrait-tiles.ts, which measures
+ * each <video>'s intrinsic ratio and stamps --zg-ar / data-zg-ar / data-zg-grid
+ * onto the UIKit's tile. This block is the only place geometry is decided.
+ *
+ * Deliberately references NO ZEGOCLOUD class names: they are CSS-modules build
+ * hashes that change on any package bump. Do not "tidy" this by adding one.
+ *
+ * The grid gives each tile a definite height, so width:auto + aspect-ratio
+ * resolves the width to height x ratio. Narrower items in a wrapping flex row
+ * cannot cause extra wrapping, so the UIKit's own row maths still holds and
+ * justify-content:center absorbs the space freed up. The min-width floors the
+ * UIKit sets (124px/160px) have to be zeroed or they win over the ratio.
+ *
+ * If the hook stamps nothing — DOM contract changed, or a layout other than the
+ * grid — none of this matches and tiles render exactly as they do today, with
+ * the SDK's default object-fit:contain.
+ * ------------------------------------------------------------------------- */
+.zg-video-root [data-zg-ar='portrait'][data-zg-grid] {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  aspect-ratio: var(--zg-ar);
+}
+
+.zg-video-root [data-zg-ar='portrait'][data-zg-grid] > div {
+  min-width: 0 !important;
+}
+
+/* Scoped to tiles the hook actually reshaped: since the box now matches the
+ * stream's own ratio, cover and contain are geometrically the same, and cover
+ * just avoids hairline bars from sub-pixel rounding. Applying this globally
+ * (or via videoScreenConfig) would crop every tile if the hook ever no-ops. */
+.zg-video-root [data-zg-ar='portrait'][data-zg-grid] video {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  object-fit: cover !important;
+}
