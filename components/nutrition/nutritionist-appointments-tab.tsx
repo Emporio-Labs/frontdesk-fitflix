@@ -42,7 +42,7 @@ import type {
   NutritionistBookingStatus,
   AppointmentMode,
 } from '@/lib/services/nutritionist-booking.service'
-import { NutritionistCallModal } from './nutritionist-call-modal'
+import { useVideoConference } from '@/components/video-conference/video-conference-provider'
 
 type Tab = 'pending' | 'confirmed' | 'cancelled' | 'all'
 
@@ -176,7 +176,9 @@ export function NutritionistAppointmentsTab() {
   const [tab, setTab] = useState<Tab>('pending')
   const [search, setSearch] = useState('')
   const [confirmReject, setConfirmReject] = useState<NutritionistBooking | null>(null)
-  const [activeCallBooking, setActiveCallBooking] = useState<NutritionistBooking | null>(null)
+  // The call is hosted by VideoConferenceProvider (root layout), so it keeps
+  // running if the admin navigates away from this tab.
+  const { startCall } = useVideoConference()
 
   const { data: bookings = [], isLoading, isError, refetch } = useNutritionistBookings()
   const { data: slots = [] } = useSlots()
@@ -452,7 +454,16 @@ export function NutritionistAppointmentsTab() {
                                               : 'bg-blue-600 hover:bg-blue-700 text-white'
                                           }
                                           title={joinState.label ?? 'Join Video Call'}
-                                          onClick={() => setActiveCallBooking(b)}
+                                          onClick={() =>
+                                            startCall({
+                                              sessionId: b._id,
+                                              roomID: b.zegoRoomId || `nutri_session_${b._id}`,
+                                              sessionTitle: `${u?.username || 'Member'} — Nutrition Consult`,
+                                              mode: 'GroupCall',
+                                              joinMuted: true,
+                                              onEnded: () => refetch(),
+                                            })
+                                          }
                                         >
                                           <IconVideo className="w-4 h-4 mr-1" /> Join Call
                                         </Button>
@@ -515,15 +526,6 @@ export function NutritionistAppointmentsTab() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <NutritionistCallModal
-        open={!!activeCallBooking}
-        onOpenChange={(open) => !open && setActiveCallBooking(null)}
-        booking={activeCallBooking}
-        onComplete={() => {
-          refetch()
-          setActiveCallBooking(null)
-        }}
-      />
     </div>
   )
 }

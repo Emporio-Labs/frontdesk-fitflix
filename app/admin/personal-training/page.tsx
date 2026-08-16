@@ -52,6 +52,7 @@ import {
 import { useLeads } from '@/hooks/use-leads'
 import { UnifiedBookingDto } from '@/lib/services/personal-training.service'
 import { getBookingJoinState } from '@/lib/booking-window'
+import { useVideoConference } from '@/components/video-conference/video-conference-provider'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -70,6 +71,9 @@ const DAYS_OF_WEEK = [
 export default function PersonalTrainingAdminPage() {
   const { user } = useAuth()
   const isTrainer = user?.role === 'trainer'
+  // Hosted by VideoConferenceProvider (root layout): the session keeps running
+  // if the trainer navigates elsewhere in Frontdesk mid-call.
+  const { startCall } = useVideoConference()
 
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>('')
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -672,12 +676,23 @@ export default function PersonalTrainingAdminPage() {
                               }
 
                               return (
-                                <Link href={`/admin/live-session/${bookingId}`}>
-                                  <Button size="sm" variant="default" className="gap-1">
-                                    <IconVideo className="h-3.5 w-3.5" />
-                                    Start Video Call
-                                  </Button>
-                                </Link>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="gap-1"
+                                  onClick={() =>
+                                    startCall({
+                                      sessionId: bookingId,
+                                      roomID: (b as any).zegoRoomId || bookingId,
+                                      sessionTitle: `${user.username || 'Member'} — PT Session`,
+                                      mode: 'GroupCall',
+                                      joinMuted: true,
+                                    })
+                                  }
+                                >
+                                  <IconVideo className="h-3.5 w-3.5" />
+                                  Start Video Call
+                                </Button>
                               )
                             })()}
                             {b.status === 'CONFIRMED' && (

@@ -37,7 +37,7 @@ import { MyNutritionDashboard } from '@/components/nutrition/my-nutrition-dashbo
 import { EditAssignedPlanModal } from '@/components/nutrition/edit-assigned-plan-modal'
 import { ClinicalUserDialog } from '@/components/nutrition/clinical-user-dialog'
 import { NutritionistAppointmentsTab } from '@/components/nutrition/nutritionist-appointments-tab'
-import { NutritionistCallModal } from '@/components/nutrition/nutritionist-call-modal'
+import { useVideoConference } from '@/components/video-conference/video-conference-provider'
 import {
   BookingStatusTabs,
   type BookingSegment,
@@ -296,7 +296,6 @@ function OverviewTab({
   todaysAppointments,
   onAssign,
   onSelectMember,
-  onJoinCall,
 }: {
   members: NutritionDashboardMember[]
   totalMembersCount?: number
@@ -306,8 +305,8 @@ function OverviewTab({
   todaysAppointments: (NutritionDashboardMember & { zegoRoomId?: string })[]
   onAssign: (userId?: string) => void
   onSelectMember: (userId: string) => void
-  onJoinCall?: (booking: any) => void
 }) {
+  const { startCall } = useVideoConference()
   const activePlans = plans.filter((p) => p.status === 'Active').length
 
   const recentPlans = useMemo(
@@ -384,8 +383,7 @@ function OverviewTab({
                       {m.bookingStatus && (
                         <StatusBadge status={m.bookingStatus} size="sm" />
                       )}
-                      {onJoinCall &&
-                        normalizeRosterStatus(m.bookingStatus) === 'confirmed' &&
+                      {normalizeRosterStatus(m.bookingStatus) === 'confirmed' &&
                         (() => {
                           // `m` only carries a date-only `bookingDate` on this
                           // endpoint today (see NutritionDashboardMember) — no
@@ -407,15 +405,12 @@ function OverviewTab({
                               }
                               title={joinState.label ?? 'Join Video Call'}
                               onClick={() =>
-                                onJoinCall({
-                                  _id: m._id,
-                                  userId: m.member,
-                                  zegoRoomId: m.zegoRoomId || `nutri_session_${m._id}`,
-                                  appointmentMode: 'ONLINE',
-                                  appointmentDate: m.bookingDate,
-                                  startTime: m.startTime,
-                                  endTime: m.endTime,
-                                  bookingStatus: m.bookingStatus,
+                                startCall({
+                                  sessionId: m._id,
+                                  roomID: m.zegoRoomId || `nutri_session_${m._id}`,
+                                  sessionTitle: `${memberDisplayName(m.member)} — Nutrition Consult`,
+                                  mode: 'GroupCall',
+                                  joinMuted: true,
                                 })
                               }
                             >
@@ -557,7 +552,9 @@ function BookingsTab({
     initialReviewUserId ?? null
   )
   const [dialogOpen, setDialogOpen] = useState<boolean>(!!initialReviewUserId)
-  const [activeCallBooking, setActiveCallBooking] = useState<any | null>(null)
+  // Hosted by VideoConferenceProvider (root layout) so the consult survives
+  // navigation away from this tab.
+  const { startCall } = useVideoConference()
   const [confirmCompleteBooking, setConfirmCompleteBooking] = useState<{
     id: string
     name: string
@@ -959,15 +956,13 @@ function BookingsTab({
                                       }
                                       title={joinState.label ?? "Join Video Call"}
                                       onClick={() =>
-                                        setActiveCallBooking({
-                                          _id: bookingId,
-                                          userId: user,
-                                          zegoRoomId,
-                                          appointmentMode: appt?.appointmentMode || 'ONLINE',
-                                          appointmentDate: appt?.appointmentDate,
-                                          startTime: appt?.startTime,
-                                          endTime: appt?.endTime,
-                                          bookingStatus: appt?.bookingStatus,
+                                        startCall({
+                                          sessionId: bookingId,
+                                          roomID: zegoRoomId,
+                                          sessionTitle: `${user.username || user.email || 'Member'} — Nutrition Consult`,
+                                          mode: 'GroupCall',
+                                          joinMuted: true,
+                                          onEnded: () => refetchUsers(),
                                         })
                                       }
                                     >
@@ -1021,16 +1016,6 @@ function BookingsTab({
         open={dialogOpen}
         onOpenChange={handleDialogChange}
         onAssignExisting={(uid) => onAssign(uid)}
-      />
-
-      <NutritionistCallModal
-        open={!!activeCallBooking}
-        onOpenChange={(open) => !open && setActiveCallBooking(null)}
-        booking={activeCallBooking}
-        onComplete={() => {
-          refetchUsers()
-          setActiveCallBooking(null)
-        }}
       />
 
       <AlertDialog
@@ -1826,7 +1811,7 @@ function NutritionDashboardContent() {
     [members.length, users.length]
   )
 
-  const [activeCallBooking, setActiveCallBooking] = useState<any | null>(null)
+
 
   const todaysAppointments = useMemo(() => {
     // Only a live (still-actionable) booking belongs on "Today's Consultations" —
@@ -1917,7 +1902,6 @@ function NutritionDashboardContent() {
               setSelectedMemberId(userId)
               setActiveTab('my-nutrition')
             }}
-            onJoinCall={(booking) => setActiveCallBooking(booking)}
           />
         </TabsContent>
 
@@ -1963,12 +1947,6 @@ function NutritionDashboardContent() {
           <ActiveUsersTab />
         </TabsContent>
       </Tabs>
-
-      <NutritionistCallModal
-        open={!!activeCallBooking}
-        onOpenChange={(open) => !open && setActiveCallBooking(null)}
-        booking={activeCallBooking}
-      />
 
       <AssignPlanForm
         open={assignOpen}

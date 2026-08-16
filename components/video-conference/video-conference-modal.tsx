@@ -4,10 +4,22 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { IconVideo, IconX, IconMaximize, IconMinus } from '@tabler/icons-react'
+import {
+  IconClock,
+  IconLoader2,
+  IconMaximize,
+  IconMinus,
+  IconPlayerStop,
+  IconVideo,
+  IconX,
+} from '@tabler/icons-react'
 import { liveSessionService } from '@/lib/services/live-session.service'
+import { useEndSession } from '@/hooks/use-live-sessions'
 import { cn } from '@/lib/utils'
 import { usePortraitTiles } from './use-portrait-tiles'
+
+/** Prebuilt scenario. `GroupCall` is the right shape for a 1-on-1 consult. */
+export type VideoConferenceMode = 'VideoConference' | 'LiveStreaming' | 'GroupCall'
 
 interface VideoConferenceModalProps {
   open: boolean
@@ -15,7 +27,61 @@ interface VideoConferenceModalProps {
   sessionId: string
   roomID: string
   sessionTitle: string
-  mode?: 'VideoConference' | 'LiveStreaming'
+  mode?: VideoConferenceMode
+  /**
+   * Join with camera and mic off. Consultations do — the host is expected to
+   * check their setup before appearing to a single member — while a group
+   * class host goes live immediately.
+   */
+  joinMuted?: boolean
+  /**
+   * Show the in-call "End Session" control. Group classes only: the backend
+   * rejects the end endpoint for trainer and nutritionist bookings, which have
+   * no ScheduledSession behind them.
+   */
+  canEndSession?: boolean
+}
+
+interface ErrorDetails {
+  message: string
+  code?: string
+  startsAt?: string
+  endsAt?: string
+}
+
+// Codes the join window can recover from on its own (host hasn't started yet,
+// or the slot hasn't opened) vs. terminal ones (booking cancelled, slot
+// already ended) where retrying is pointless.
+const RETRYABLE_CODES = new Set(['NOT_OPEN_YET', 'HOST_NOT_STARTED'])
+
+function formatDayLabel(d: Date, now: Date = new Date()): string {
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate())
+  const diffDays = Math.round((startOfDay(d).getTime() - startOfDay(now).getTime()) / 86_400_000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Tomorrow'
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function formatClock(d: Date): string {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+function describeDenial(details: ErrorDetails): string {
+  const startsAt = details.startsAt ? new Date(details.startsAt) : null
+  const endsAt = details.endsAt ? new Date(details.endsAt) : null
+  const fmt = (d: Date) =>
+    d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', month: 'short', day: 'numeric' })
+
+  switch (details.code) {
+    case 'NOT_OPEN_YET':
+      return startsAt ? `This session opens at ${fmt(startsAt)}.` : 'This session has not opened yet.'
+    case 'ENDED':
+      return endsAt ? `This session ended at ${fmt(endsAt)}.` : 'This session has ended.'
+    case 'HOST_NOT_STARTED':
+      return 'Waiting for the host to start the session.'
+    default:
+      return details.message
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -54,6 +120,8 @@ export function VideoConferenceModal({
   roomID,
   sessionTitle,
   mode = 'VideoConference',
+  joinMuted = false,
+  canEndSession = false,
 }: VideoConferenceModalProps) {
   const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
   const zegoRef = useRef<any>(null)
@@ -63,21 +131,25 @@ export function VideoConferenceModal({
   const joinedKeyRef = useRef<string | null>(null)
   const settleResizeTimerRef = useRef<number | null>(null)
   // Live camera/mic state and our own publish stream id, kept for the
-  // extra-info re-emit below. Seeded to match turnOn*WhenJoining.
+  // extra-info re-emit below. Seeded to match turnOn*WhenJoining — announcing
+  // a camera that is actually off is exactly the bug the re-emit exists to fix.
   const localStreamIdRef = useRef<string | null>(null)
-  const cameraOnRef = useRef(true)
-  const micOnRef = useRef(true)
+  const cameraOnRef = useRef(!joinMuted)
+  const micOnRef = useRef(!joinMuted)
+  // Read by destroyZego, which must keep a stable identity: it is the cleanup
+  // of the unmount-only effect below, so anything that changes its identity
+  // would tear down a live call mid-session.
+  const joinMutedRef = useRef(joinMuted)
+  joinMutedRef.current = joinMuted
   const expressOffRef = useRef<(() => void) | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [errorDetails, setErrorDetails] = useState<{
-    message: string
-    code?: string
-    startsAt?: string
-    endsAt?: string
-  } | null>(null)
+  const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null)
   const [isMinimized, setIsMinimized] = useState(false)
   const [staffDisplay, setStaffDisplay] = useState<string>('Admin Host')
+  // Bumped by "Retry Connection" to re-run the join effect after a recoverable
+  // denial (host hasn't started, window not open yet).
+  const [retryTick, setRetryTick] = useState(0)
+  const endSession = useEndSession()
   // createPortal needs a DOM to aim at, so the first (server) render bails.
   const [mounted, setMounted] = useState(false)
   const [stage, setStage] = useState<Stage>({ w: STAGE_MAX_WIDTH, h: 720 })
@@ -127,8 +199,8 @@ export function VideoConferenceModal({
     }
     expressOffRef.current = null
     localStreamIdRef.current = null
-    cameraOnRef.current = true
-    micOnRef.current = true
+    cameraOnRef.current = !joinMutedRef.current
+    micOnRef.current = !joinMutedRef.current
     if (zegoRef.current) {
       try {
         zegoRef.current.destroy()
@@ -162,8 +234,11 @@ export function VideoConferenceModal({
     if (!open) {
       destroyZego()
       setIsMinimized(false)
-      setError(null)
       setErrorDetails(null)
+      setRetryTick(0)
+      // Re-arm for the next call, so the loading overlay shows from the first
+      // frame rather than after initVideoCall gets around to setting it.
+      setLoading(true)
       return
     }
 
@@ -185,7 +260,6 @@ export function VideoConferenceModal({
     const initVideoCall = async () => {
       try {
         setLoading(true)
-        setError(null)
         setErrorDetails(null)
 
         // A stale session/mode is still connected — leave it before joining anew.
@@ -255,6 +329,7 @@ export function VideoConferenceModal({
         }
 
         const isLiveStream = mode === 'LiveStreaming'
+        const isGroupCall = mode === 'GroupCall'
 
         zp.joinRoom({
           container: containerElement,
@@ -266,10 +341,12 @@ export function VideoConferenceModal({
                   liveStreamingMode: ZegoUIKitPrebuilt.LiveStreamingMode.InteractiveLiveStreaming,
                 },
               }
-            : { mode: ZegoUIKitPrebuilt.VideoConference },
+            : isGroupCall
+              ? { mode: ZegoUIKitPrebuilt.GroupCall }
+              : { mode: ZegoUIKitPrebuilt.VideoConference },
           showPreJoinView: false,
-          turnOnMicrophoneWhenJoining: true,
-          turnOnCameraWhenJoining: true,
+          turnOnMicrophoneWhenJoining: !joinMuted,
+          turnOnCameraWhenJoining: !joinMuted,
           showMyCameraToggleButton: true,
           showMyMicrophoneToggleButton: true,
           showAudioVideoSettingsButton: true,
@@ -309,9 +386,14 @@ export function VideoConferenceModal({
           onJoinRoom: () => {
             if (!cancelled) setLoading(false)
             updateStreamExtraInfo()
-            liveSessionService.reportHostPresence(sessionId).catch((err) => {
-              console.error('Failed to report host presence:', err)
-            })
+            // Only the host may stamp hostLiveAt, and that stamp is what opens
+            // the member's join gate — reporting it as a member would both 403
+            // and be a lie.
+            if (access.role === 'host') {
+              liveSessionService.reportHostPresence(sessionId).catch((err) => {
+                console.error('Failed to report host presence:', err)
+              })
+            }
           },
           onLeaveRoom: () => {
             // Session ended
@@ -371,7 +453,6 @@ export function VideoConferenceModal({
           const resData = err?.response?.data
           const apiMsg = resData?.message || resData?.error
           const errMsg = apiMsg || err?.message || 'Failed to connect to ZEGOCLOUD Video Conference suite.'
-          setError(errMsg)
           setErrorDetails({
             message: errMsg,
             code: resData?.code,
@@ -388,12 +469,24 @@ export function VideoConferenceModal({
     return () => {
       cancelled = true
     }
-  }, [open, sessionId, containerElement, mode, destroyZego, scheduleSettleResize])
+  }, [open, sessionId, containerElement, mode, joinMuted, retryTick, destroyZego, scheduleSettleResize])
 
   const handleLeaveCall = () => {
     destroyZego()
     setIsMinimized(false)
     onOpenChange(false)
+  }
+
+  // Group classes only. Ending finalizes the session server-side (attendance
+  // backfill + participant kick), so the room is over for everyone — leave
+  // straight afterwards rather than sitting in a dead room.
+  const handleEndSession = () => {
+    endSession.mutate(sessionId, { onSettled: handleLeaveCall })
+  }
+
+  const handleRetry = () => {
+    destroyZego()
+    setRetryTick((t) => t + 1)
   }
 
   if (!open || !mounted) return null
@@ -489,6 +582,18 @@ export function VideoConferenceModal({
                 >
                   <IconMinus className="w-4 h-4 mr-1" /> Minimize
                 </Button>
+                {canEndSession && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={endSession.isPending}
+                    className="h-8 text-xs bg-amber-950/60 border-amber-800/80 text-amber-200 hover:bg-amber-600 hover:text-white hover:border-amber-600"
+                    onClick={handleEndSession}
+                  >
+                    <IconPlayerStop className="w-4 h-4 mr-1" />
+                    {endSession.isPending ? 'Ending…' : 'End Session'}
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="destructive"
@@ -529,46 +634,77 @@ export function VideoConferenceModal({
             <div ref={setContainerElement} className="h-full w-full zg-video-root" />
           </div>
 
-          {/* Sibling of the scaled stage, so it stays legible in the PiP. */}
-          {error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white bg-gray-950/95 gap-4">
-              <div className="rounded-full bg-indigo-500/10 p-4 border border-indigo-500/20 text-indigo-400">
-                <IconVideo className="w-10 h-10" />
-              </div>
+          {/* Overlays are siblings of the scaled stage, so they stay legible
+              at PiP size instead of shrinking with the room. */}
+          {loading && !errorDetails && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-950 text-white">
+              <IconLoader2 className="h-8 w-8 animate-spin text-indigo-500" />
+              <p className="text-sm font-medium">Connecting to the session…</p>
+            </div>
+          )}
 
-              {errorDetails?.code === 'NOT_OPEN_YET' || error.toLowerCase().includes('not open') ? (
-                <div className="space-y-2 max-w-md">
-                  <h3 className="text-lg font-semibold text-white">Session Hasn't Started Yet</h3>
-                  <p className="text-xs text-gray-300 leading-relaxed">
-                    {errorDetails?.startsAt && errorDetails?.endsAt ? (
-                      <>
-                        This session is scheduled for{' '}
-                        <span className="font-semibold text-white">
-                          {new Date(errorDetails.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} –{' '}
-                          {new Date(errorDetails.endsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                        </span>
-                        . You can join when the session starts.
-                      </>
-                    ) : (
-                      'This session is not open for joining yet. You can join when the session starts.'
+          {errorDetails && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center text-white bg-gray-950/95">
+              {errorDetails.code === 'NOT_OPEN_YET' ? (
+                <>
+                  <div className="rounded-full bg-amber-500/10 p-4 border border-amber-500/20 text-amber-400">
+                    <IconClock className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-2 max-w-md">
+                    <h3 className="text-base font-semibold text-white">
+                      This session hasn&apos;t opened yet
+                    </h3>
+                    {errorDetails.startsAt && (
+                      <div className="pt-1">
+                        <p className="text-xs text-gray-400">Scheduled for</p>
+                        <p className="text-base font-medium text-gray-100 mt-0.5">
+                          {formatDayLabel(new Date(errorDetails.startsAt))},{' '}
+                          {formatClock(new Date(errorDetails.startsAt))}
+                          {errorDetails.endsAt ? ` – ${formatClock(new Date(errorDetails.endsAt))}` : ''}
+                        </p>
+                      </div>
                     )}
-                  </p>
-                </div>
+                    <p className="text-xs text-gray-500 pt-1">
+                      You can join once the scheduled window opens.
+                    </p>
+                  </div>
+                </>
               ) : (
-                <div className="space-y-1.5 max-w-md">
-                  <h3 className="text-base font-semibold text-rose-400">Unable to Join Session</h3>
-                  <p className="text-xs text-gray-400 leading-relaxed">{error}</p>
-                </div>
+                <>
+                  <div className="rounded-full bg-indigo-500/10 p-4 border border-indigo-500/20 text-indigo-400">
+                    <IconVideo className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1.5 max-w-md">
+                    <h3 className="text-base font-semibold text-rose-400">Unable to Join Session</h3>
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      {describeDenial(errorDetails)}
+                    </p>
+                  </div>
+                </>
               )}
 
-              <Button
-                size="sm"
-                variant="outline"
-                className="mt-2 text-xs border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800 hover:text-white px-6"
-                onClick={() => onOpenChange(false)}
-              >
-                Close
-              </Button>
+              <div className="flex items-center gap-2 mt-1">
+                {/* Waiting is the fix for these two, so offer the retry rather
+                    than making the host close and reopen the call. */}
+                {RETRYABLE_CODES.has(errorDetails.code ?? '') && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800 hover:text-white px-4"
+                    onClick={handleRetry}
+                  >
+                    Retry Connection
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800 hover:text-white px-6"
+                  onClick={handleLeaveCall}
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           )}
         </div>

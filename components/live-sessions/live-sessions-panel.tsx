@@ -31,9 +31,9 @@ import {
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useLiveSessions, useEndSession } from '@/hooks/use-live-sessions'
+import { useVideoConference } from '@/components/video-conference/video-conference-provider'
 import { SessionTypeBadge } from '@/components/live-sessions/session-type-badge'
 import type { LiveSession } from '@/lib/services/live-session.service'
-import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
 
 type StatusFilter = 'ALL' | 'SCHEDULED' | 'FULL' | 'COMPLETED' | 'CANCELLED'
@@ -157,7 +157,6 @@ const ROOM_STATUS_BADGE_STYLES: Record<string, string> = {
 }
 
 export function LiveSessionsPanel() {
-  const router = useRouter()
   let authUser: any = null
   let userRole: string = 'admin'
   try {
@@ -170,6 +169,7 @@ export function LiveSessionsPanel() {
 
   const { data: sessions = [], isLoading, isError, refetch } = useLiveSessions()
   const endSession = useEndSession()
+  const { startCall } = useVideoConference()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -273,7 +273,15 @@ export function LiveSessionsPanel() {
   }
 
   const handleStartSession = (session: LiveSession) => {
-    router.push(`/admin/live-session/${session.id}`)
+    startCall({
+      sessionId: session.id,
+      roomID: session.videoConferenceId,
+      sessionTitle: session.className || 'Live Session',
+      mode: session.sessionType === 'live_stream' ? 'LiveStreaming' : 'VideoConference',
+      // Only group classes have a ScheduledSession behind them, so only they
+      // can be ended server-side.
+      canEndSession: true,
+    })
   }
 
   return (
