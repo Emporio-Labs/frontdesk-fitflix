@@ -58,12 +58,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/empty-state'
 import { useLocationScope } from '@/components/location-scope-provider'
 import { SkeletonTable } from '@/components/skeleton-loader'
+import { useGroupClasses } from '@/hooks/use-group-classes'
+import { useMembershipPlans } from '@/hooks/use-membership-plans'
 import {
   useCreatePromotion,
   useDeletePromotion,
   usePromotions,
   useUpdatePromotion,
 } from '@/hooks/use-promotions'
+import { useTherapies } from '@/hooks/use-therapies'
 import type {
   CreatePromotionPayload,
   Promotion,
@@ -160,6 +163,10 @@ export default function PromotionsPage() {
   const { locations, selectedLocation } = useLocationScope()
   // Staff view: the whole list, including promos that are off or out of window.
   const { data: promotions, isLoading } = usePromotions(true)
+  // Target options, so an admin picks a class instead of pasting a UUID.
+  const { data: classes, isLoading: classesLoading } = useGroupClasses()
+  const { data: therapies, isLoading: therapiesLoading } = useTherapies()
+  const { data: plans, isLoading: plansLoading } = useMembershipPlans()
   const createPromotion = useCreatePromotion()
   const updatePromotion = useUpdatePromotion()
   const deletePromotion = useDeletePromotion()
@@ -172,6 +179,35 @@ export default function PromotionsPage() {
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }))
+
+  const targetOptions = useMemo(() => {
+    switch (form.linkType) {
+      case 'class':
+        return (classes ?? []).map((c) => ({ id: c.id, label: c.name }))
+      case 'therapy':
+        return (therapies ?? []).map((t) => ({ id: t.id, label: t.name }))
+      case 'plan':
+        return (plans ?? []).map((p) => ({ id: p.id, label: p.planName }))
+      default:
+        return []
+    }
+  }, [form.linkType, classes, therapies, plans])
+
+  const targetsLoading =
+    (form.linkType === 'class' && classesLoading) ||
+    (form.linkType === 'therapy' && therapiesLoading) ||
+    (form.linkType === 'plan' && plansLoading)
+
+  /**
+   * An id that came back from the server but is no longer in the catalog —
+   * a retired class, say. Surfaced as its own option rather than silently
+   * cleared, so editing an unrelated field can't quietly repoint the link.
+   */
+  const targetMissingFromCatalog =
+    form.linkType !== 'url' &&
+    form.targetId !== '' &&
+    !targetsLoading &&
+    !targetOptions.some((o) => o.id === form.targetId)
 
   const openCreate = () => {
     setEditing(null)
@@ -217,7 +253,11 @@ export default function PromotionsPage() {
     if (form.linkType === 'url') {
       if (!form.url.trim()) return 'An external URL is required for a URL link'
     } else if (!form.targetId.trim()) {
-      return `A target id is required for a ${form.linkType} link`
+      return form.linkType === 'class'
+        ? 'Choose a class or event to link to'
+        : form.linkType === 'therapy'
+          ? 'Choose a recovery service to link to'
+          : 'Choose a plan to link to'
     }
     if (!form.activeFrom || !form.activeTo) return 'Both window dates are required'
     if (new Date(form.activeTo) <= new Date(form.activeFrom)) {
@@ -551,7 +591,16 @@ export default function PromotionsPage() {
                 <Label>Links to</Label>
                 <Select
                   value={form.linkType}
-                  onValueChange={(v) => set('linkType', v as PromotionLinkType)}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      linkType: v as PromotionLinkType,
+                      // A class UUID is not a valid therapy target; carrying it
+                      // across a type change only produces a server rejection.
+                      targetId: '',
+                      url: '',
+                    }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -578,22 +627,58 @@ export default function PromotionsPage() {
                   </>
                 ) : (
                   <>
-                    <Label htmlFor="targetId">Target id</Label>
-                    <Input
-                      id="targetId"
-                      value={form.targetId}
-                      onChange={(e) => set('targetId', e.target.value)}
-                      placeholder={
-                        form.linkType === 'class'
-                          ? '3f8a1c92-5b7e-4c21-9d44-0e6a71b2c8d5'
-                          : '65f1a2b3c4d5e6f7a8b9c0d1'
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
+                    <Label>
                       {form.linkType === 'class'
-                        ? 'A class id is a UUID.'
-                        : 'An object id.'}
-                    </p>
+                        ? 'Class or event'
+                        : form.linkType === 'therapy'
+                          ? 'Recovery service'
+                          : 'Plan'}
+                    </Label>
+                    <Select
+                      value={form.targetId}
+                      onValueChange={(v) => set('targetId', v)}
+                      disabled={targetsLoading || targetOptions.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            targetsLoading
+                              ? 'Loading…'
+                              : targetOptions.length === 0
+                                ? 'Nothing to link to yet'
+                                : 'Choose one'
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {targetMissingFromCatalog && (
+                          <SelectItem value={form.targetId}>
+                            Current target (no longer listed)
+                          </SelectItem>
+                        )}
+                        {targetOptions.map((o) => (
+                          <SelectItem key={o.id} value={o.id}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {targetMissingFromCatalog && (
+                      <p className="text-xs text-muted-foreground">
+                        This promotion points at something that is no longer in
+                        the catalog. Pick a new target or it will keep pointing
+                        where it does now.
+                      </p>
+                    )}
+                    {!targetsLoading && targetOptions.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {form.linkType === 'class'
+                          ? 'Create a class first, under Services.'
+                          : form.linkType === 'therapy'
+                            ? 'Create a recovery service first, under Services.'
+                            : 'Create a membership plan first.'}
+                      </p>
+                    )}
                   </>
                 )}
               </div>
