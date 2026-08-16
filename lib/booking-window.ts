@@ -121,6 +121,11 @@ function formatClock(d: Date): string {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
+export interface BookingJoinStateOptions {
+  leadMinutes?: number
+  graceMinutes?: number
+}
+
 /**
  * Advisory-only join status for a booking. `unknown` (not enough data to
  * compute a window) is never treated as disallowed — some call sites in this
@@ -130,17 +135,22 @@ function formatClock(d: Date): string {
 export function getBookingJoinState(
   source: BookingWindowSource | null | undefined,
   now: Date = new Date(),
+  options: BookingJoinStateOptions = {},
 ): BookingJoinStatus {
   const window = resolveBookingWindow(source)
   if (!window) return { state: 'unknown', label: null }
 
-  const opensAt = new Date(window.startsAt.getTime() - HOST_LEAD_MINUTES * 60_000)
+  const leadMinutes = options.leadMinutes ?? HOST_LEAD_MINUTES
+  const graceMinutes = options.graceMinutes ?? 0
+
+  const opensAt = new Date(window.startsAt.getTime() - leadMinutes * 60_000)
+  const closesAt = new Date(window.endsAt.getTime() + graceMinutes * 60_000)
 
   if (now.getTime() < opensAt.getTime()) {
-    return { state: 'too_early', label: `Opens ${formatClock(window.startsAt)}` }
+    return { state: 'too_early', label: `Opens ${formatClock(opensAt)}` }
   }
-  if (now.getTime() >= window.endsAt.getTime()) {
-    return { state: 'ended', label: `Ended ${formatClock(window.endsAt)}` }
+  if (now.getTime() >= closesAt.getTime()) {
+    return { state: 'ended', label: `Ended ${formatClock(closesAt)}` }
   }
   return { state: 'open', label: null }
 }

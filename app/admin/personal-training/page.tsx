@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   IconCalendar,
   IconCheck,
@@ -14,6 +14,7 @@ import {
   IconUsers,
   IconVideo,
   IconX,
+  IconTrash,
 } from '@tabler/icons-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -50,6 +51,7 @@ import {
 } from '@/hooks/use-personal-training'
 import { useLeads } from '@/hooks/use-leads'
 import { UnifiedBookingDto } from '@/lib/services/personal-training.service'
+import { getBookingJoinState } from '@/lib/booking-window'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -111,6 +113,264 @@ export default function PersonalTrainingAdminPage() {
   // Schedule editor
   const { data: scheduleData, isLoading: isScheduleLoading } = useTrainerSchedule(activeTrainerId)
   const updateScheduleMutation = useUpdateTrainerSchedule()
+
+  // Schedule editor state & shift helpers
+  const [shiftDurationHours, setShiftDurationHours] = useState<number>(8)
+  const [localWeeklySlots, setLocalWeeklySlots] = useState<
+    Array<{
+      dayOfWeek: number
+      isAvailable: boolean
+      shifts: Array<{ startTime: string; endTime: string }>
+    }>
+  >([])
+
+  useEffect(() => {
+    if (scheduleData?.weeklySlots && scheduleData.weeklySlots.length > 0) {
+      const slots = [0, 1, 2, 3, 4, 5, 6].map((idx) => {
+        const existing = scheduleData.weeklySlots.find((s) => s.dayOfWeek === idx)
+        let shifts: Array<{ startTime: string; endTime: string }> = []
+        if (existing?.shifts && existing.shifts.length > 0) {
+          shifts = existing.shifts.map((st) => ({
+            startTime: st.startTime || '07:00',
+            endTime: st.endTime || '15:00',
+          }))
+        } else if (existing?.startTime && existing?.endTime) {
+          shifts = [{ startTime: existing.startTime, endTime: existing.endTime }]
+        } else {
+          shifts = [{ startTime: idx === 0 ? '08:00' : '07:00', endTime: idx === 0 ? '14:00' : '15:00' }]
+        }
+        return {
+          dayOfWeek: idx,
+          isAvailable: existing ? existing.isAvailable : idx !== 0,
+          shifts,
+        }
+      })
+      setLocalWeeklySlots(slots)
+    } else {
+      setLocalWeeklySlots([
+        { dayOfWeek: 1, isAvailable: true, shifts: [{ startTime: '07:00', endTime: '15:00' }] },
+        { dayOfWeek: 2, isAvailable: true, shifts: [{ startTime: '07:00', endTime: '15:00' }] },
+        { dayOfWeek: 3, isAvailable: true, shifts: [{ startTime: '07:00', endTime: '15:00' }] },
+        { dayOfWeek: 4, isAvailable: true, shifts: [{ startTime: '07:00', endTime: '15:00' }] },
+        { dayOfWeek: 5, isAvailable: true, shifts: [{ startTime: '07:00', endTime: '15:00' }] },
+        { dayOfWeek: 6, isAvailable: true, shifts: [{ startTime: '08:00', endTime: '16:00' }] },
+        { dayOfWeek: 0, isAvailable: false, shifts: [{ startTime: '08:00', endTime: '14:00' }] },
+      ])
+    }
+  }, [scheduleData, activeTrainerId])
+
+  const computeEndTimeFromStart = (startTimeStr: string, durationHours: number): string => {
+    if (!startTimeStr) return '17:00'
+    const [hStr, mStr] = startTimeStr.split(':')
+    const h = parseInt(hStr || '0', 10)
+    const m = parseInt(mStr || '0', 10)
+    if (isNaN(h) || isNaN(m)) return '17:00'
+    const totalMinutes = h * 60 + m + Math.round(durationHours * 60)
+    const newH = Math.floor(totalMinutes / 60) % 24
+    const newM = totalMinutes % 60
+    return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`
+  }
+
+  const computeDurationHours = (startStr: string, endStr: string): string => {
+    if (!startStr || !endStr) return '0.0'
+    const [sh, sm] = startStr.split(':').map(Number)
+    const [eh, em] = endStr.split(':').map(Number)
+    if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return '0.0'
+    let diffMin = eh * 60 + em - (sh * 60 + sm)
+    if (diffMin < 0) diffMin += 24 * 60
+    return (diffMin / 60).toFixed(1)
+  }
+
+  const computeDayTotalHours = (
+    shifts: Array<{ startTime: string; endTime: string }>
+  ): string => {
+    let totalMin = 0
+    shifts.forEach((st) => {
+      const [sh, sm] = st.startTime.split(':').map(Number)
+      const [eh, em] = st.endTime.split(':').map(Number)
+      if (!isNaN(sh) && !isNaN(sm) && !isNaN(eh) && !isNaN(em)) {
+        let diff = eh * 60 + em - (sh * 60 + sm)
+        if (diff < 0) diff += 24 * 60
+        totalMin += diff
+      }
+    })
+    return (totalMin / 60).toFixed(1)
+  }
+
+  const parseTimeToMins = (timeStr: string): number => {
+    if (!timeStr) return 0
+    const [h, m] = timeStr.split(':').map(Number)
+    return (h || 0) * 60 + (m || 0)
+  }
+
+  const getShiftValidationErrors = (
+    shifts: Array<{ startTime: string; endTime: string }>
+  ): string[] => {
+    const errors: string[] = []
+    const indexed = shifts.map((s, idx) => ({
+      ...s,
+      origIndex: idx,
+      startMin: parseTimeToMins(s.startTime),
+      endMin: parseTimeToMins(s.endTime),
+    }))
+
+    for (const item of indexed) {
+      if (item.endMin <= item.startMin) {
+        errors.push(`Shift ${item.origIndex + 1}: End time must be after start time`)
+      }
+    }
+
+    const sorted = indexed.slice().sort((a, b) => a.startMin - b.startMin)
+    for (let i = 0; i < sorted.length - 1; i++) {
+      if (sorted[i + 1].startMin < sorted[i].endMin) {
+        errors.push(
+          `Overlap: Shift starting at ${sorted[i + 1].startTime} conflicts with shift ending at ${sorted[i].endTime}`
+        )
+      }
+    }
+
+    return errors
+  }
+
+  const handleToggleDay = (dayOfWeek: number, isAvailable: boolean) => {
+    setLocalWeeklySlots((prev) =>
+      prev.map((s) => (s.dayOfWeek === dayOfWeek ? { ...s, isAvailable } : s))
+    )
+  }
+
+  const handleShiftStartTimeChange = (
+    dayOfWeek: number,
+    shiftIndex: number,
+    newStart: string
+  ) => {
+    setLocalWeeklySlots((prev) =>
+      prev.map((s) => {
+        if (s.dayOfWeek === dayOfWeek) {
+          const newShifts = [...s.shifts]
+          const calculatedEnd = computeEndTimeFromStart(newStart, shiftDurationHours)
+          newShifts[shiftIndex] = { ...newShifts[shiftIndex], startTime: newStart, endTime: calculatedEnd }
+          return { ...s, shifts: newShifts }
+        }
+        return s
+      })
+    )
+  }
+
+  const handleShiftEndTimeChange = (
+    dayOfWeek: number,
+    shiftIndex: number,
+    newEnd: string
+  ) => {
+    setLocalWeeklySlots((prev) =>
+      prev.map((s) => {
+        if (s.dayOfWeek === dayOfWeek) {
+          const newShifts = [...s.shifts]
+          newShifts[shiftIndex] = { ...newShifts[shiftIndex], endTime: newEnd }
+          return { ...s, shifts: newShifts }
+        }
+        return s
+      })
+    )
+  }
+
+  const handleAddShiftWindow = (dayOfWeek: number) => {
+    setLocalWeeklySlots((prev) =>
+      prev.map((s) => {
+        if (s.dayOfWeek === dayOfWeek) {
+          const lastShift = s.shifts[s.shifts.length - 1]
+          let newStart = '18:00'
+          if (lastShift?.endTime) {
+            const [h, m] = lastShift.endTime.split(':').map(Number)
+            const nextH = (h + 1) % 24
+            newStart = `${String(nextH).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`
+          }
+          const newEnd = computeEndTimeFromStart(newStart, 3)
+          return { ...s, shifts: [...s.shifts, { startTime: newStart, endTime: newEnd }] }
+        }
+        return s
+      })
+    )
+  }
+
+  const handleRemoveShiftWindow = (dayOfWeek: number, shiftIndex: number) => {
+    setLocalWeeklySlots((prev) =>
+      prev.map((s) => {
+        if (s.dayOfWeek === dayOfWeek && s.shifts.length > 1) {
+          return { ...s, shifts: s.shifts.filter((_, idx) => idx !== shiftIndex) }
+        }
+        return s
+      })
+    )
+  }
+
+  const handleApplyPreset = (presetStart: string, presetEnd: string) => {
+    setLocalWeeklySlots((prev) =>
+      prev.map((s) =>
+        s.isAvailable ? { ...s, shifts: [{ startTime: presetStart, endTime: presetEnd }] } : s
+      )
+    )
+    toast.info(`Applied shift (${presetStart} - ${presetEnd}) to all working days`)
+  }
+
+  const handleShiftDurationChange = (newHours: number) => {
+    const validHours = Math.max(1, Math.min(16, newHours))
+    setShiftDurationHours(validHours)
+    setLocalWeeklySlots((prev) =>
+      prev.map((s) => {
+        if (s.isAvailable) {
+          const newShifts = s.shifts.map((st, idx) => {
+            if (idx === 0 && st.startTime) {
+              const newEnd = computeEndTimeFromStart(st.startTime, validHours)
+              return { ...st, endTime: newEnd }
+            }
+            return st
+          })
+          return { ...s, shifts: newShifts }
+        }
+        return s
+      })
+    )
+  }
+
+  const handleSaveSchedule = async () => {
+    if (!activeTrainerId) {
+      toast.error('No trainer selected')
+      return
+    }
+
+    // Pre-save conflict validation
+    for (const slot of localWeeklySlots) {
+      if (slot.isAvailable) {
+        const errs = getShiftValidationErrors(slot.shifts)
+        if (errs.length > 0) {
+          toast.error(`${DAYS_OF_WEEK[slot.dayOfWeek]}: ${errs[0]}`)
+          return
+        }
+      }
+    }
+
+    try {
+      const payloadSlots = localWeeklySlots.map((s) => ({
+        dayOfWeek: s.dayOfWeek,
+        isAvailable: s.isAvailable,
+        startTime: s.shifts[0]?.startTime || '07:00',
+        endTime: s.shifts[0]?.endTime || '15:00',
+        shifts: s.shifts,
+      }))
+
+      await updateScheduleMutation.mutateAsync({
+        trainerId: activeTrainerId,
+        data: {
+          weeklySlots: payloadSlots,
+          slotDurationMinutes: scheduleData?.slotDurationMinutes || 45,
+          bufferMinutes: scheduleData?.bufferMinutes || 15,
+        },
+      })
+      toast.success('Trainer working schedule saved successfully!')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to save trainer schedule')
+    }
+  }
   const completeBookingMutation = useCompletePtBooking()
   const resolveRequestMutation = useResolveTrainerChangeRequest()
 
@@ -388,14 +648,38 @@ export default function PersonalTrainingAdminPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right space-x-2">
-                            {b.appointmentMode === 'ONLINE' && b.status === 'CONFIRMED' && (
-                              <Link href={`/admin/live-session/${bookingId}`}>
-                                <Button size="sm" variant="default" className="gap-1">
-                                  <IconVideo className="h-3.5 w-3.5" />
-                                  Start Video Call
-                                </Button>
-                              </Link>
-                            )}
+                            {b.appointmentMode === 'ONLINE' && b.status === 'CONFIRMED' && (() => {
+                              const joinState = getBookingJoinState(b, new Date(), {
+                                leadMinutes: 30,
+                                graceMinutes: 30,
+                              })
+                              const isJoinDisabled =
+                                joinState.state === 'too_early' || joinState.state === 'ended'
+
+                              if (isJoinDisabled) {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    disabled
+                                    className="gap-1 bg-gray-400 text-gray-200 cursor-not-allowed opacity-60"
+                                    title={joinState.label ?? 'Session video call window closed'}
+                                  >
+                                    <IconVideo className="h-3.5 w-3.5" />
+                                    Start Video Call
+                                  </Button>
+                                )
+                              }
+
+                              return (
+                                <Link href={`/admin/live-session/${bookingId}`}>
+                                  <Button size="sm" variant="default" className="gap-1">
+                                    <IconVideo className="h-3.5 w-3.5" />
+                                    Start Video Call
+                                  </Button>
+                                </Link>
+                              )
+                            })()}
                             {b.status === 'CONFIRMED' && (
                               <Button
                                 size="sm"
@@ -419,32 +703,43 @@ export default function PersonalTrainingAdminPage() {
         {/* Tab 2: Trainer Schedule */}
         <TabsContent value="schedule" className="space-y-4 pt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <CardTitle>
                   {isTrainer ? 'My Weekly Schedule & Working Hours' : 'Trainer Weekly Schedule & Availability'}
                 </CardTitle>
                 <CardDescription>
-                  Configure working hours, session durations (45 min), and sanitization/buffer periods (15 min).
+                  Configure working hours, standard 8-hour trainer shifts, session durations (45 min), and buffer periods (15 min).
                 </CardDescription>
               </div>
-              {isTrainer ? (
-                <Badge variant="outline" className="px-3 py-1 text-sm font-medium">
-                  {currentTrainer?.name || user?.name || 'My Schedule'}
-                </Badge>
-              ) : (
-                <select
-                  value={activeTrainerId}
-                  onChange={(e) => setSelectedTrainerId(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+              <div className="flex items-center gap-3">
+                {isTrainer ? (
+                  <Badge variant="outline" className="px-3 py-1 text-sm font-medium">
+                    {currentTrainer?.name || user?.name || 'My Schedule'}
+                  </Badge>
+                ) : (
+                  <select
+                    value={activeTrainerId}
+                    onChange={(e) => setSelectedTrainerId(e.target.value)}
+                    className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm font-medium"
+                  >
+                    {(trainers || []).map((t) => (
+                      <option key={t._id} value={t._id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <Button
+                  size="sm"
+                  onClick={handleSaveSchedule}
+                  disabled={updateScheduleMutation.isPending}
+                  className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                 >
-                  {(trainers || []).map((t) => (
-                    <option key={t._id} value={t._id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              )}
+                  <IconCheck className="h-4 w-4" />
+                  {updateScheduleMutation.isPending ? 'Saving...' : 'Save Schedule'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {isScheduleLoading ? (
@@ -454,60 +749,195 @@ export default function PersonalTrainingAdminPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Configuration Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-lg bg-muted/30 border">
                     <div>
-                      <label className="text-sm font-medium">Slot Duration (Minutes)</label>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Slot Duration (Minutes)
+                      </label>
                       <Input
                         type="number"
                         value={scheduleData?.slotDurationMinutes || 45}
                         disabled
-                        className="mt-1"
+                        className="mt-1 bg-background"
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Buffer Between Slots (Minutes)</label>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Buffer Between Slots (Minutes)
+                      </label>
                       <Input
                         type="number"
                         value={scheduleData?.bufferMinutes || 15}
                         disabled
-                        className="mt-1"
+                        className="mt-1 bg-background"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Shift Duration (Hours)
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={16}
+                        value={shiftDurationHours}
+                        onChange={(e) => handleShiftDurationChange(Number(e.target.value) || 8)}
+                        className="mt-1 bg-background font-medium"
+                        placeholder="8"
                       />
                     </div>
                   </div>
 
-                  <div className="border rounded-md divide-y">
+                  {/* Weekly Schedule Table */}
+                  <div className="border rounded-md divide-y overflow-hidden">
                     {DAYS_OF_WEEK.map((dayName, idx) => {
-                      const daySlot = (scheduleData?.weeklySlots || []).find(
-                        (s) => s.dayOfWeek === idx
-                      ) || {
+                      const daySlot = localWeeklySlots.find((s) => s.dayOfWeek === idx) || {
                         dayOfWeek: idx,
-                        startTime: '07:00',
-                        endTime: '20:00',
                         isAvailable: idx !== 0,
+                        shifts: [{ startTime: '07:00', endTime: '15:00' }],
                       }
+
+                      const totalDuration = computeDayTotalHours(daySlot.shifts)
+                      const validationErrors = daySlot.isAvailable ? getShiftValidationErrors(daySlot.shifts) : []
 
                       return (
                         <div
                           key={dayName}
-                          className="flex items-center justify-between p-3.5 bg-background"
+                          className={`flex flex-col p-4 gap-3 transition-colors ${
+                            validationErrors.length > 0
+                              ? 'bg-red-50/50 dark:bg-red-950/20 border-red-200'
+                              : daySlot.isAvailable
+                              ? 'bg-background'
+                              : 'bg-muted/20 opacity-75'
+                          }`}
                         >
-                          <div className="flex items-center gap-3 w-40">
-                            <Switch checked={daySlot.isAvailable} />
-                            <span className="font-medium text-sm">{dayName}</span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Switch
+                                checked={daySlot.isAvailable}
+                                onCheckedChange={(checked) => handleToggleDay(idx, checked)}
+                              />
+                              <span className="font-semibold text-sm">{dayName}</span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {daySlot.isAvailable && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[11px] font-mono font-normal"
+                                  title="Total calculated working hours for the day"
+                                >
+                                  {totalDuration} hrs ({daySlot.shifts.length} shift{daySlot.shifts.length > 1 ? 's' : ''})
+                                </Badge>
+                              )}
+                              <Badge variant={daySlot.isAvailable ? (validationErrors.length > 0 ? 'destructive' : 'default') : 'secondary'}>
+                                {daySlot.isAvailable ? (validationErrors.length > 0 ? 'Conflict' : 'Working') : 'Day Off'}
+                              </Badge>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <span>{daySlot.startTime}</span>
-                            <span>to</span>
-                            <span>{daySlot.endTime}</span>
-                          </div>
-                          <div>
-                            <Badge variant={daySlot.isAvailable ? 'default' : 'secondary'}>
-                              {daySlot.isAvailable ? 'Working' : 'Day Off'}
-                            </Badge>
-                          </div>
+
+                          {validationErrors.length > 0 && (
+                            <div className="pl-9 space-y-1">
+                              {validationErrors.map((err, errIdx) => (
+                                <div key={errIdx} className="text-xs text-red-600 dark:text-red-400 font-medium">
+                                  ⚠️ {err}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Shifts list for this day */}
+                          {daySlot.isAvailable && (
+                            <div className="pl-9 space-y-2">
+                              {daySlot.shifts.map((st, shiftIdx) => {
+                                const shiftDur = computeDurationHours(st.startTime, st.endTime)
+                                return (
+                                  <div
+                                    key={shiftIdx}
+                                    className="flex flex-wrap items-center gap-3 p-2 rounded-md bg-muted/30 border border-muted/50 text-xs"
+                                  >
+                                    <span className="font-mono text-muted-foreground w-14">
+                                      Shift {shiftIdx + 1}:
+                                    </span>
+
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground">Start:</span>
+                                      <Input
+                                        type="time"
+                                        value={st.startTime}
+                                        onChange={(e) =>
+                                          handleShiftStartTimeChange(idx, shiftIdx, e.target.value)
+                                        }
+                                        className="w-32 h-8 text-xs font-mono bg-background"
+                                      />
+                                    </div>
+
+                                    <span className="text-muted-foreground">to</span>
+
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground">End:</span>
+                                      <Input
+                                        type="time"
+                                        value={st.endTime}
+                                        onChange={(e) =>
+                                          handleShiftEndTimeChange(idx, shiftIdx, e.target.value)
+                                        }
+                                        className="w-32 h-8 text-xs font-mono bg-background"
+                                      />
+                                    </div>
+
+                                    <Badge variant="secondary" className="text-[10px] font-mono font-normal">
+                                      {shiftDur} hrs
+                                    </Badge>
+
+                                    {daySlot.shifts.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 ml-auto"
+                                        onClick={() => handleRemoveShiftWindow(idx, shiftIdx)}
+                                        title="Remove split shift"
+                                      >
+                                        <IconTrash className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                )
+                              })}
+
+                              <div className="pt-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleAddShiftWindow(idx)}
+                                  className="h-7 text-xs gap-1 border-dashed text-primary hover:bg-accent"
+                                >
+                                  <IconPlus className="h-3 w-3" />
+                                  Add Split Shift Window
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
+                  </div>
+
+                  {/* Bottom Save Action Bar */}
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      size="default"
+                      type="button"
+                      onClick={handleSaveSchedule}
+                      disabled={updateScheduleMutation.isPending}
+                      className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                    >
+                      <IconCheck className="h-4 w-4" />
+                      {updateScheduleMutation.isPending ? 'Saving Working Hours...' : 'Save Schedule Changes'}
+                    </Button>
                   </div>
                 </div>
               )}

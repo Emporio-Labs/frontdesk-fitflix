@@ -96,6 +96,9 @@ function toBackendPayload(payload: UpdateMembershipPlanPayload) {
   if (payload.totalPrice !== undefined) body.price = payload.totalPrice
   if (payload.currency !== undefined) body.currency = payload.currency
   if (payload.durationMonths !== undefined) body.durationMonths = payload.durationMonths
+  // Check `undefined`, not truthiness: an explicit `null` must be forwarded — it's the
+  // signal that clears a day-based duration so durationMonths takes over.
+  if (payload.durationDays !== undefined) body.durationDays = payload.durationDays
   if (payload.features !== undefined) body.features = payload.features
   if (payload.gymId !== undefined) body.gymId = payload.gymId
   if (payload.status !== undefined) body.active = payload.status !== 'Inactive'
