@@ -67,10 +67,12 @@ import {
   useUpdatePromotion,
 } from '@/hooks/use-promotions'
 import { useTherapies } from '@/hooks/use-therapies'
-import type {
-  CreatePromotionPayload,
-  Promotion,
-  PromotionLinkType,
+import {
+  PROMOTION_AUDIENCES,
+  type CreatePromotionPayload,
+  type Promotion,
+  type PromotionAudience,
+  type PromotionLinkType,
 } from '@/lib/services/promotion.service'
 
 /**
@@ -146,6 +148,10 @@ const emptyForm = {
   tag: '',
   // 'both' is the UI spelling of a null mode.
   mode: 'both' as 'both' | 'online' | 'offline',
+  // Untargeted by default: a promotion nobody thought about the audience for
+  // should reach everyone, which is how every existing one already behaves.
+  audience: 'all' as PromotionAudience,
+  ctaLabel: '',
   linkType: 'url' as PromotionLinkType,
   targetId: '',
   url: '',
@@ -230,6 +236,8 @@ export default function PromotionsPage() {
       subtext: promotion.subtext,
       tag: promotion.tag,
       mode: promotion.mode ?? 'both',
+      audience: promotion.audience,
+      ctaLabel: promotion.ctaLabel,
       linkType: promotion.link.type,
       targetId: promotion.link.targetId ?? '',
       url: promotion.link.url ?? '',
@@ -281,6 +289,8 @@ export default function PromotionsPage() {
       subtext: form.subtext.trim(),
       tag: form.tag.trim(),
       mode: form.mode === 'both' ? null : form.mode,
+      audience: form.audience,
+      ctaLabel: form.ctaLabel.trim(),
       link:
         form.linkType === 'url'
           ? { type: 'url', url: form.url.trim() }
@@ -390,6 +400,7 @@ export default function PromotionsPage() {
                   <TableRow>
                     <TableHead>Promotion</TableHead>
                     <TableHead>Links to</TableHead>
+                    <TableHead>Delivery</TableHead>
                     <TableHead>Audience</TableHead>
                     <TableHead>Branch</TableHead>
                     <TableHead>Window</TableHead>
@@ -458,6 +469,14 @@ export default function PromotionsPage() {
                             : promotion.mode === 'online'
                               ? 'Online'
                               : 'In-gym'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {/* Worth a column of its own: a promotion silently
+                              aimed at the wrong group looks identical to one
+                              that is simply not running. */}
+                          {PROMOTION_AUDIENCES.find(
+                            (a) => a.value === promotion.audience
+                          )?.label ?? 'Everyone'}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {locationName(promotion.locationId)}
@@ -565,7 +584,11 @@ export default function PromotionsPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Audience</Label>
+                {/* Relabelled from "Audience": this field is online vs in-gym,
+                    which is how the thing is delivered, not who it is aimed
+                    at. Now that a real audience field exists next to it, the
+                    old label would send an admin to the wrong control. */}
+                <Label>Delivery</Label>
                 <Select
                   value={form.mode}
                   onValueChange={(v) => set('mode', v as FormState['mode'])}
@@ -580,8 +603,47 @@ export default function PromotionsPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  The promotion&apos;s own audience — not inherited from what it
+                  The promotion&apos;s own setting — not inherited from what it
                   links to.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Audience</Label>
+                <Select
+                  value={form.audience}
+                  onValueChange={(v) => set('audience', v as PromotionAudience)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROMOTION_AUDIENCES.map((a) => (
+                      <SelectItem key={a.value} value={a.value}>
+                        {a.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {PROMOTION_AUDIENCES.find((a) => a.value === form.audience)
+                    ?.hint}
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="ctaLabel">Button text</Label>
+                <Input
+                  id="ctaLabel"
+                  value={form.ctaLabel}
+                  onChange={(e) => set('ctaLabel', e.target.value)}
+                  placeholder="Claim your free week"
+                  maxLength={40}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional. Overrides the app&apos;s default button text for
+                  this promotion — no app release needed.
                 </p>
               </div>
             </div>

@@ -107,6 +107,7 @@ import {
   FunnelView,
   toISTDateStr,
 } from '@/components/crm/crm-widgets'
+import { InterestSummary } from '@/components/crm/interest-summary'
 import {
   useAddLeadInteraction,
   useConvertLead,
@@ -807,6 +808,11 @@ export default function LeadsPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
+                {/* Above the fields, because this is the thing that changes
+                    how the call opens — and it renders nothing at all unless
+                    the lead has a linked app account with consented activity,
+                    so it costs no space in the common case. */}
+                <InterestSummary userId={editingLead?.convertedUserId} />
                 <div>
                   <label className="text-sm font-medium">
                     Name <span className="text-red-600">*</span>

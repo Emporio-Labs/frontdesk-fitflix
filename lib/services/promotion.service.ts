@@ -16,6 +16,38 @@ export type PromotionLinkType = 'class' | 'therapy' | 'plan' | 'url'
  */
 export type PromotionMode = 'online' | 'offline' | null
 
+/**
+ * Who the promotion is pitched at — distinct from `mode`, which is about how
+ * the thing is delivered rather than who should hear about it.
+ *
+ * Three membership states rather than two: someone who never joined and
+ * someone who used to be a member want opposite pitches, and collapsing them
+ * is how a lapsed member gets sold the introduction they already sat through.
+ *
+ * The viewer's audience is resolved server-side from their actual memberships,
+ * so a targeted promotion is simply never returned to the wrong person.
+ */
+export type PromotionAudience = 'all' | 'non_member' | 'member' | 'lapsed'
+
+export const PROMOTION_AUDIENCES: {
+  value: PromotionAudience
+  label: string
+  hint: string
+}[] = [
+  { value: 'all', label: 'Everyone', hint: 'No targeting — shown to every viewer' },
+  {
+    value: 'non_member',
+    label: 'Prospects',
+    hint: 'Signed up but never bought a plan, plus the signed-out landing page',
+  },
+  { value: 'member', label: 'Members', hint: 'Currently on an active plan' },
+  {
+    value: 'lapsed',
+    label: 'Lapsed',
+    hint: 'Was a member before, not on a plan now',
+  },
+]
+
 export interface PromotionLink {
   type: PromotionLinkType
   /** Set for class | therapy | plan. A class id is a UUID; the others are ObjectIds. */
@@ -34,6 +66,9 @@ export interface Promotion {
   subtext: string
   tag: string
   mode: PromotionMode
+  audience: PromotionAudience
+  /** Overrides the app's built-in button text. Empty means "use the default". */
+  ctaLabel: string
   link: PromotionLink
   activeFrom: string
   activeTo: string
@@ -50,6 +85,8 @@ export interface CreatePromotionPayload {
   subtext?: string
   tag?: string
   mode?: PromotionMode
+  audience?: PromotionAudience
+  ctaLabel?: string
   link: PromotionLink
   activeFrom: string
   activeTo: string
@@ -75,6 +112,11 @@ const normalizePromotion = (raw: any): Promotion => ({
   tag: raw?.tag ?? '',
   // Absent and null both mean "matches both audiences"; don't coerce to a string.
   mode: raw?.mode ?? null,
+  // Promotions created before targeting existed carry no `audience` at all.
+  // They are shown to everyone (the backend's $in includes null), so reading
+  // them as 'all' is what the server actually does with them.
+  audience: (raw?.audience ?? 'all') as PromotionAudience,
+  ctaLabel: raw?.ctaLabel ?? '',
   link: {
     type: raw?.link?.type ?? 'url',
     targetId: raw?.link?.targetId ?? null,

@@ -175,4 +175,13 @@ export const queryKeys = {
       ['promotions', includeInactive ? 'with-inactive' : 'live'] as const,
     detail: (id: string) => ['promotions', id] as const,
   },
+  // Deliberately not location-scoped: a person's in-app activity is theirs
+  // wherever the staff member reading it happens to be sitting.
+  activity: {
+    summary: (userId: string) => ['activity', 'summary', userId] as const,
+  },
+  // Also global — the app fetches one copy map for every user and branch.
+  content: {
+    all: () => ['content'] as const,
+  },
 }

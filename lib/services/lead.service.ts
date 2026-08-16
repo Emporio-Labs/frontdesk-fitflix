@@ -46,6 +46,14 @@ export interface Lead {
   lastContactedAt?: string
   isDeleted: boolean
   revision: number
+  /**
+   * The app account this lead is linked to, when there is one.
+   *
+   * Set at signup, not only at conversion, so an app signup carries it while
+   * still sitting in New. It is what lets the board pull that person's
+   * in-app activity before someone calls them.
+   */
+  convertedUserId: string
   interactions: LeadInteraction[]
   fcmTokens: string[]
   stageHistory: LeadStageHistory[]
@@ -194,6 +202,14 @@ function normalizeLead(raw: any): Lead {
   const rawEmail = String(raw?.email || '')
   const email = rawEmail.startsWith('noemail-') && rawEmail.endsWith('@fitflix.in') ? '' : rawEmail
 
+  // The list endpoint populates convertedUser into an object; other paths
+  // leave it an id string. Take whichever shape arrived.
+  const convertedUser = raw?.convertedUser
+  const convertedUserId =
+    typeof convertedUser === 'string'
+      ? convertedUser
+      : String(convertedUser?._id || convertedUser?.id || '')
+
   return {
     id: String(raw?._id || raw?.id || ''),
     name: String(raw?.leadName || raw?.name || ''),
@@ -214,6 +230,7 @@ function normalizeLead(raw: any): Lead {
     lastContactedAt: raw?.lastContactedAt ? String(raw.lastContactedAt) : undefined,
     isDeleted: Boolean(raw?.isDeleted),
     revision: Number(raw?.revision ?? 0),
+    convertedUserId,
     interactions: Array.isArray(raw?.interactions)
       ? raw.interactions.map((item: any) => ({
           id: String(item?._id || item?.id || ''),
