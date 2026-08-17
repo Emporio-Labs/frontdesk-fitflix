@@ -1,4 +1,5 @@
 import { LocationSwitcher } from '@/components/location-switcher'
+import { ConciergeAlertBell } from '@/components/concierge-alert-bell'
 
 export function SiteHeader() {
   return (
@@ -6,6 +7,7 @@ export function SiteHeader() {
       <div className="flex w-full items-center gap-3 px-3 sm:gap-3 sm:px-4 lg:px-6">
         <h1 className="truncate text-xl font-semibold sm:text-3xl">Fitflix</h1>
         <div className="ml-auto flex items-center gap-2">
+          <ConciergeAlertBell />
           <LocationSwitcher />
         </div>
       </div>

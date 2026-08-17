@@ -27,6 +27,7 @@ import {
   IconTemplate,
   IconMessage2,
   IconDumbbell,
+  IconBellRinging,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -86,6 +87,7 @@ const navGroups = [
   {
     label: "Insights",
     items: [
+      { title: "Concierge Alerts", url: "/admin/alerts", icon: IconBellRinging },
       { title: "Leads", url: "/admin/leads", icon: IconTarget },
       { title: "Promotions", url: "/admin/promotions", icon: IconSpeakerphone },
       { title: "App Copy", url: "/admin/content", icon: IconArticle },

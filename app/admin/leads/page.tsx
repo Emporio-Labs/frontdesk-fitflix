@@ -95,6 +95,7 @@ function clearLeadDraft() {
 import {
   IconPlus, IconEdit, IconTrash, IconCheck, IconFileInvoice,
   IconFlame, IconUserPlus, IconAlertTriangle, IconPhone, IconUserCheck, IconFilter,
+  IconBellRinging, IconBrandWhatsapp, IconArrowRight, IconClock,
 } from '@tabler/icons-react'
 import { CreateInvoiceSheet } from '@/components/invoices/create-invoice-sheet'
 import { useUsers } from '@/hooks/use-users'
@@ -762,6 +763,16 @@ export default function LeadsPage() {
     }
   }, [filteredLeads])
 
+  const pendingCallbacks = useMemo(() => {
+    return leads.filter((lead) => {
+      const isAppFallback =
+        lead.source?.toUpperCase().includes('APP') ||
+        lead.notes?.includes('[APP_PURCHASE_FALLBACK]') ||
+        lead.tags?.includes('callback')
+      return isAppFallback && lead.status === 'new'
+    })
+  }, [leads])
+
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between">
@@ -957,6 +968,95 @@ export default function LeadsPage() {
           </AlertDialog>
         </div>
       </div>
+
+      {/* ── ⚡ HIGH-TICKET 15-MINUTE CALLBACK SLA TRAY ────────────────────────── */}
+      {pendingCallbacks.length > 0 && (
+        <div className="rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-500/[0.08] via-background to-amber-500/[0.04] p-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                <IconBellRinging className="h-4 w-4 animate-bounce" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  ⚡ High-Ticket Concierge Callbacks (15-Minute SLA)
+                  <Badge className="bg-amber-600 text-white text-[10px] font-bold">
+                    {pendingCallbacks.length} PENDING
+                  </Badge>
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Action immediately to satisfy the 15-minute response guarantee.
+                </p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" className="text-xs h-7 gap-1 border-amber-500/30 text-amber-700 dark:text-amber-400" asChild>
+              <Link href="/admin/alerts">
+                <span>Open Concierge Action Center</span>
+                <IconArrowRight className="h-3 w-3" />
+              </Link>
+            </Button>
+          </div>
+
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {pendingCallbacks.slice(0, 3).map((lead) => {
+              const plan = lead.notes.match(/Inquiring about plan:\s*([^.]+)/i)?.[1]?.trim() || 'Protocol Inquiry'
+              return (
+                <div
+                  key={lead.id}
+                  className="rounded-xl border bg-card/80 p-3 shadow-sm backdrop-blur-sm flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold text-foreground">{lead.name}</h4>
+                        <p className="text-[11px] font-mono text-muted-foreground">{lead.phone}</p>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-0 font-semibold">
+                        {plan}
+                      </Badge>
+                    </div>
+                    {lead.notes && (
+                      <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2 bg-muted/30 p-1.5 rounded">
+                        {lead.notes}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t">
+                    <Button size="sm" variant="outline" className="h-6 text-[11px] flex-1" asChild>
+                      <a href={`tel:${lead.phone}`}>
+                        <IconPhone className="h-3 w-3 mr-1 text-blue-600" />
+                        Call
+                      </a>
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-6 text-[11px] flex-1" asChild>
+                      <a
+                        href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=Hi%20${encodeURIComponent(
+                          lead.name
+                        )},%20this%20is%20FitFlix%20Concierge%20following%20up%20on%20your%20${encodeURIComponent(
+                          plan
+                        )}%20protocol%20inquiry.`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <IconBrandWhatsapp className="h-3 w-3 mr-1 text-emerald-600" />
+                        WhatsApp
+                      </a>
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-6 text-[11px] px-2 bg-foreground text-background"
+                      onClick={() => handleEditLead(lead)}
+                    >
+                      View
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <Tabs defaultValue="board" className="space-y-4">
         <TabsList>
