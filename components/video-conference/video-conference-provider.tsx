@@ -30,8 +30,6 @@ export type StartCallOptions = {
   mode?: VideoConferenceMode
   /** Join with camera and mic off — the consultation default. */
   joinMuted?: boolean
-  /** Offer the in-call End Session control. Group classes only. */
-  canEndSession?: boolean
   /** Run after the call ends, however it ends. Typically a list refetch. */
   onEnded?: () => void
 }
@@ -54,7 +52,6 @@ const IDLE: CallState = {
   sessionTitle: '',
   mode: 'VideoConference',
   joinMuted: false,
-  canEndSession: false,
 }
 
 const VideoConferenceContext = createContext<VideoConferenceValue | null>(null)
@@ -79,7 +76,6 @@ export function VideoConferenceProvider({ children }: { children: React.ReactNod
         ...rest,
         mode: rest.mode ?? 'VideoConference',
         joinMuted: rest.joinMuted ?? false,
-        canEndSession: rest.canEndSession ?? false,
         isOpen: true,
       }
     })
@@ -114,7 +110,6 @@ export function VideoConferenceProvider({ children }: { children: React.ReactNod
         sessionTitle={call.sessionTitle}
         mode={call.mode}
         joinMuted={call.joinMuted}
-        canEndSession={call.canEndSession}
       />
     </VideoConferenceContext.Provider>
   )

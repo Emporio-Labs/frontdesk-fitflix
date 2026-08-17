@@ -9,12 +9,10 @@ import {
   IconLoader2,
   IconMaximize,
   IconMinus,
-  IconPlayerStop,
   IconVideo,
   IconX,
 } from '@tabler/icons-react'
 import { liveSessionService } from '@/lib/services/live-session.service'
-import { useEndSession } from '@/hooks/use-live-sessions'
 import { cn } from '@/lib/utils'
 import { usePortraitTiles } from './use-portrait-tiles'
 
@@ -34,12 +32,6 @@ interface VideoConferenceModalProps {
    * class host goes live immediately.
    */
   joinMuted?: boolean
-  /**
-   * Show the in-call "End Session" control. Group classes only: the backend
-   * rejects the end endpoint for trainer and nutritionist bookings, which have
-   * no ScheduledSession behind them.
-   */
-  canEndSession?: boolean
 }
 
 interface ErrorDetails {
@@ -121,7 +113,6 @@ export function VideoConferenceModal({
   sessionTitle,
   mode = 'VideoConference',
   joinMuted = false,
-  canEndSession = false,
 }: VideoConferenceModalProps) {
   const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
   const zegoRef = useRef<any>(null)
@@ -153,7 +144,6 @@ export function VideoConferenceModal({
   // Bumped by "Retry Connection" to re-run the join effect after a recoverable
   // denial (host hasn't started, window not open yet).
   const [retryTick, setRetryTick] = useState(0)
-  const endSession = useEndSession()
   // createPortal needs a DOM to aim at, so the first (server) render bails.
   const [mounted, setMounted] = useState(false)
   const [stage, setStage] = useState<Stage>({ w: STAGE_MAX_WIDTH, h: 720 })
@@ -523,21 +513,6 @@ export function VideoConferenceModal({
   // joinRoom() time.
   leaveRef.current = handleLeaveCall
 
-  // Group classes only. Ending finalizes the session server-side (attendance
-  // backfill + participant kick), so the room is over for everyone — leave
-  // straight afterwards rather than sitting in a dead room. Irreversible, hence
-  // the confirm, matching the End button on the Live Sessions panel.
-  const handleEndSession = () => {
-    if (
-      !window.confirm(
-        `End "${sessionTitle || 'this session'}" for everyone? Participants will be disconnected and this can't be undone.`,
-      )
-    ) {
-      return
-    }
-    endSession.mutate(sessionId, { onSettled: handleLeaveCall })
-  }
-
   const handleRetry = () => {
     destroyZego()
     setRetryTick((t) => t + 1)
@@ -636,18 +611,6 @@ export function VideoConferenceModal({
                 >
                   <IconMinus className="w-4 h-4 mr-1" /> Minimize
                 </Button>
-                {canEndSession && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={endSession.isPending}
-                    className="h-8 text-xs bg-amber-950/60 border-amber-800/80 text-amber-200 hover:bg-amber-600 hover:text-white hover:border-amber-600"
-                    onClick={handleEndSession}
-                  >
-                    <IconPlayerStop className="w-4 h-4 mr-1" />
-                    {endSession.isPending ? 'Ending…' : 'End Session'}
-                  </Button>
-                )}
                 <Button
                   size="sm"
                   variant="destructive"

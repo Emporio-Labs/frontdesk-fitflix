@@ -40,6 +40,7 @@ import {
   IconClock,
   IconDroplet,
   IconEdit,
+  IconPlayerStop,
   IconPlus,
   IconRefresh,
   IconSparkles,
@@ -80,7 +81,7 @@ import type { TherapyCatalogItem } from '@/lib/services/therapy.service'
 import type { ClassFormat, GroupClass, GroupClassMode } from '@/lib/services/group-class.service'
 import { slotService, type Slot } from '@/lib/services/slot.service'
 import { LiveSessionsPanel } from '@/components/live-sessions/live-sessions-panel'
-import { useLiveSessions, useAllScheduledSessions } from '@/hooks/use-live-sessions'
+import { useLiveSessions, useAllScheduledSessions, useEndSession } from '@/hooks/use-live-sessions'
 import { resolveBookingWindow } from '@/lib/booking-window'
 import GroupClassBookingsPanel from './group-class-bookings-panel'
 
@@ -304,7 +305,10 @@ export default function TherapiesPage() {
   const [gcSearchTerm, setGcSearchTerm] = useState('')
   // The call itself lives in VideoConferenceProvider (root layout) so it keeps
   // running when the admin navigates away from this page.
-  const { startCall } = useVideoConference()
+  const { startCall, endCall, activeSessionId } = useVideoConference()
+  // Ending is a class-card action, not an in-call one: the host can close a
+  // class without being in the room (or after closing the hosting tab).
+  const endGroupClassSession = useEndSession()
   // `date` inputs speak YYYY-MM-DD; the API speaks ISO. Convert at the edges so
   // the form state stays exactly what the input element wants.
   const toDateInput = (iso: string | null | undefined): string => {
@@ -2797,242 +2801,281 @@ export default function TherapiesPage() {
                   </CardContent>
                 </Card>
               ) : (
-                filteredGroupClasses.map((gc) => (
-                  <Card key={gc.id} className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
-                    {/* Header strip with mode colour */}
-                    <div className={`p-4 ${
-                      gc.mode === 'online'
-                        ? 'bg-gradient-to-r from-blue-500/15 to-indigo-500/10'
-                        : gc.mode === 'offline'
-                        ? 'bg-gradient-to-r from-amber-500/15 to-orange-500/10'
-                        : 'bg-gradient-to-r from-purple-500/15 to-violet-500/10'
-                    }`}>
-                      <div className="mb-2 flex items-start justify-between">
-                        <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${
-                          gc.mode === 'online'
-                            ? 'bg-blue-500/20 text-blue-700'
-                            : gc.mode === 'offline'
-                            ? 'bg-amber-500/20 text-amber-700'
-                            : 'bg-purple-500/20 text-purple-700'
-                        }`}>
-                          {gcModeIcon[gc.mode]}
+                filteredGroupClasses.map((gc) => {
+                  // Both call controls below act on the same occurrence — the one
+                  // "Host Session" joins. Resolved once here so hosting and ending
+                  // can never disagree about which room they mean.
+                  const hostableSession = nextSessionByClassId.get(gc.id)
+                  const isEndingThisClass =
+                    endGroupClassSession.isPending &&
+                    endGroupClassSession.variables === hostableSession?.id
+                  return (
+                    <Card key={gc.id} className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
+                      {/* Header strip with mode colour */}
+                      <div className={`p-4 ${
+                        gc.mode === 'online'
+                          ? 'bg-gradient-to-r from-blue-500/15 to-indigo-500/10'
+                          : gc.mode === 'offline'
+                          ? 'bg-gradient-to-r from-amber-500/15 to-orange-500/10'
+                          : 'bg-gradient-to-r from-purple-500/15 to-violet-500/10'
+                      }`}>
+                        <div className="mb-2 flex items-start justify-between">
+                          <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${
+                            gc.mode === 'online'
+                              ? 'bg-blue-500/20 text-blue-700'
+                              : gc.mode === 'offline'
+                              ? 'bg-amber-500/20 text-amber-700'
+                              : 'bg-purple-500/20 text-purple-700'
+                          }`}>
+                            {gcModeIcon[gc.mode]}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {gc.isRetired ? (
+                              <div
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-slate-500/15 text-slate-700 border-slate-300 dark:bg-slate-950/40 dark:text-slate-300 dark:border-slate-800"
+                              >
+                                <IconAlertTriangle className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                <span>Retired</span>
+                              </div>
+                            ) : completedClassIds.has(gc.id) ? (
+                              <div
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-indigo-500/15 text-indigo-700 border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800"
+                                title="All scheduled sessions for this class have finished"
+                              >
+                                <IconCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                                <span>Completed</span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePublish(gc, !gc.isPublished)}
+                                disabled={togglePublishGroupClass.isPending || isGcPending}
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all shadow-sm cursor-pointer border",
+                                  gc.isPublished
+                                    ? "bg-emerald-500/15 text-emerald-700 border-emerald-300 hover:bg-emerald-500/25 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                    : "bg-amber-500/15 text-amber-800 border-amber-300 hover:bg-amber-500/25 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                                )}
+                                title={gc.isPublished ? "Click to unpublish class" : "Click to publish class"}
+                              >
+                                {gc.isPublished ? (
+                                  <>
+                                    <IconToggleRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                    <span>Published</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <IconToggleLeft className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                    <span>Unpublished</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {gc.isRetired ? (
-                            <div
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-slate-500/15 text-slate-700 border-slate-300 dark:bg-slate-950/40 dark:text-slate-300 dark:border-slate-800"
-                            >
-                              <IconAlertTriangle className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                              <span>Retired</span>
-                            </div>
-                          ) : completedClassIds.has(gc.id) ? (
-                            <div
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-indigo-500/15 text-indigo-700 border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800"
-                              title="All scheduled sessions for this class have finished"
-                            >
-                              <IconCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                              <span>Completed</span>
-                            </div>
-                          ) : (
+                        <h4 className="text-base font-semibold tracking-tight">{gc.name}</h4>
+                        <p className="text-xs text-muted-foreground">by {gc.instructor}</p>
+
+                        {(gc.mode === 'online' || gc.mode === 'hybrid') && Boolean(nextSessionByClassId.get(gc.id)) && (
+                          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-mono bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 rounded-lg w-fit text-indigo-700 dark:text-indigo-300">
+                            <span className="font-semibold">Room ID:</span>
+                            {/* Same id VideoConferenceModal joins on "Host Session" — the
+                                per-occurrence ScheduledSession id, matching the User App. */}
+                            <span className="truncate max-w-[140px]">{(nextSessionByClassId.get(gc.id)?.videoConferenceId || '').slice(-6).toUpperCase()}</span>
                             <button
                               type="button"
-                              onClick={() => handleTogglePublish(gc, !gc.isPublished)}
-                              disabled={togglePublishGroupClass.isPending || isGcPending}
-                              className={cn(
-                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all shadow-sm cursor-pointer border",
-                                gc.isPublished
-                                  ? "bg-emerald-500/15 text-emerald-700 border-emerald-300 hover:bg-emerald-500/25 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                                  : "bg-amber-500/15 text-amber-800 border-amber-300 hover:bg-amber-500/25 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
-                              )}
-                              title={gc.isPublished ? "Click to unpublish class" : "Click to publish class"}
+                              className="ml-1 hover:text-indigo-900 dark:hover:text-white cursor-pointer"
+                              title="Copy Room ID"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const realRoomId = nextSessionByClassId.get(gc.id)?.videoConferenceId || ''
+                                navigator.clipboard.writeText(realRoomId)
+                                toast.success('Video Room ID copied to clipboard!')
+                              }}
                             >
-                              {gc.isPublished ? (
-                                <>
-                                  <IconToggleRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                                  <span>Published</span>
-                                </>
-                              ) : (
-                                <>
-                                  <IconToggleLeft className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                                  <span>Unpublished</span>
-                                </>
-                              )}
+                              <IconCopy className="h-3.5 w-3.5" />
                             </button>
-                          )}
-                        </div>
-                      </div>
-                      <h4 className="text-base font-semibold tracking-tight">{gc.name}</h4>
-                      <p className="text-xs text-muted-foreground">by {gc.instructor}</p>
+                          </div>
+                        )}
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <IconClock className="h-3.5 w-3.5" /> {gc.durationMinutes} mins
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <IconCoins className="h-3.5 w-3.5" /> {gc.creditsRequired} credit{gc.creditsRequired !== 1 ? 's' : ''}
+                          </span>
+                          {(() => {
+                            const gcSlots = slots.filter((slot) => gc.slots?.includes(slot._id))
+                            const totalCap = gcSlots.reduce((sum, s) => sum + (s.capacity || 0), 0)
+                            const totalRem = gcSlots.reduce((sum, s) => sum + (s.remainingCapacity || 0), 0)
+                            const filled = totalCap - totalRem
+                            const isFull = totalCap > 0 && totalRem <= 0
 
-                      {(gc.mode === 'online' || gc.mode === 'hybrid') && Boolean(nextSessionByClassId.get(gc.id)) && (
-                        <div className="mt-2 flex items-center gap-1.5 text-[11px] font-mono bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 rounded-lg w-fit text-indigo-700 dark:text-indigo-300">
-                          <span className="font-semibold">Room ID:</span>
-                          {/* Same id VideoConferenceModal joins on "Host Session" — the
-                              per-occurrence ScheduledSession id, matching the User App. */}
-                          <span className="truncate max-w-[140px]">{(nextSessionByClassId.get(gc.id)?.videoConferenceId || '').slice(-6).toUpperCase()}</span>
-                          <button
-                            type="button"
-                            className="ml-1 hover:text-indigo-900 dark:hover:text-white cursor-pointer"
-                            title="Copy Room ID"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              const realRoomId = nextSessionByClassId.get(gc.id)?.videoConferenceId || ''
-                              navigator.clipboard.writeText(realRoomId)
-                              toast.success('Video Room ID copied to clipboard!')
-                            }}
-                          >
-                            <IconCopy className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      )}
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <IconClock className="h-3.5 w-3.5" /> {gc.durationMinutes} mins
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <IconCoins className="h-3.5 w-3.5" /> {gc.creditsRequired} credit{gc.creditsRequired !== 1 ? 's' : ''}
-                        </span>
-                        {(() => {
-                          const gcSlots = slots.filter((slot) => gc.slots?.includes(slot._id))
-                          const totalCap = gcSlots.reduce((sum, s) => sum + (s.capacity || 0), 0)
-                          const totalRem = gcSlots.reduce((sum, s) => sum + (s.remainingCapacity || 0), 0)
-                          const filled = totalCap - totalRem
-                          const isFull = totalCap > 0 && totalRem <= 0
-
-                          if (totalCap > 0) {
+                            if (totalCap > 0) {
+                              return (
+                                <span className="inline-flex items-center gap-1">
+                                  <IconUsers className="h-3.5 w-3.5 text-indigo-600" />
+                                  {isFull ? (
+                                    <Badge variant="destructive" className="h-5 text-[10px] px-1.5 py-0 font-bold uppercase">
+                                      Full ({totalCap})
+                                    </Badge>
+                                  ) : (
+                                    <span className="font-medium text-slate-700 dark:text-slate-200">
+                                      {filled} / {totalCap} filled
+                                    </span>
+                                  )}
+                                </span>
+                              )
+                            }
                             return (
                               <span className="inline-flex items-center gap-1">
-                                <IconUsers className="h-3.5 w-3.5 text-indigo-600" />
-                                {isFull ? (
-                                  <Badge variant="destructive" className="h-5 text-[10px] px-1.5 py-0 font-bold uppercase">
-                                    Full ({totalCap})
-                                  </Badge>
-                                ) : (
-                                  <span className="font-medium text-slate-700 dark:text-slate-200">
-                                    {filled} / {totalCap} filled
-                                  </span>
-                                )}
+                                <IconUsers className="h-3.5 w-3.5" /> 0 / {gc.maxParticipants} filled
                               </span>
                             )
-                          }
-                          return (
-                            <span className="inline-flex items-center gap-1">
-                              <IconUsers className="h-3.5 w-3.5" /> 0 / {gc.maxParticipants} filled
+                          })()}
+                        </div>
+                      </div>
+
+                      <CardContent className="space-y-3 p-4">
+                        {/* Mode badge */}
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${gcModeBadgeClass[gc.mode]}`}>
+                            {gcModeIcon[gc.mode]} {gcModeLabel[gc.mode]}
+                          </span>
+                          {gc.mode === 'online' && gc.sessionType && (
+                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">
+                              {gc.sessionType === 'group_class' ? 'Group Class' : 'Live Stream'}
                             </span>
-                          )
-                        })()}
-                      </div>
-                    </div>
+                          )}
+                          {gc.access === 'open_to_all' && (
+                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                              Open to All
+                            </span>
+                          )}
+                          {gc.creditsRequired === 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                              Free
+                            </span>
+                          )}
+                          {gc.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="rounded-full">{tag}</Badge>
+                          ))}
+                        </div>
 
-                    <CardContent className="space-y-3 p-4">
-                      {/* Mode badge */}
-                      <div className="flex flex-wrap gap-1.5">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${gcModeBadgeClass[gc.mode]}`}>
-                          {gcModeIcon[gc.mode]} {gcModeLabel[gc.mode]}
-                        </span>
-                        {gc.mode === 'online' && gc.sessionType && (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">
-                            {gc.sessionType === 'group_class' ? 'Group Class' : 'Live Stream'}
-                          </span>
-                        )}
-                        {gc.access === 'open_to_all' && (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
-                            Open to All
-                          </span>
-                        )}
-                        {gc.creditsRequired === 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                            Free
-                          </span>
-                        )}
-                        {gc.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="rounded-full">{tag}</Badge>
-                        ))}
-                      </div>
-
-                      {/* Description */}
-                      <p className="min-h-10 text-sm text-muted-foreground">
-                        {gc.description || 'No description provided.'}
-                      </p>
-
-                      {/* Schedule info */}
-                      {gc.scheduleInfo && (
-                        <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <IconClock className="h-3.5 w-3.5 shrink-0" />
-                          {gc.scheduleInfo}
+                        {/* Description */}
+                        <p className="min-h-10 text-sm text-muted-foreground">
+                          {gc.description || 'No description provided.'}
                         </p>
-                      )}
 
-                      {/* Actions */}
-                      <div className="flex justify-end gap-2 flex-wrap">
-                        {(gc.mode === 'online' || gc.mode === 'hybrid') && (
-                          <Button
-                            size="sm"
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
-                            disabled={gc.isRetired || isGcPending}
-                            onClick={() => {
-                              // Must join the same room as the member's User App: that's the
-                              // per-occurrence ScheduledSession id (session.videoConferenceId),
-                              // never the Class template id — joining gc.id would silently put
-                              // the host in an empty room the member can't reach.
-                              const matchedSession = nextSessionByClassId.get(gc.id)
-                              if (!matchedSession) {
-                                toast.error('No scheduled session found to host — schedule an occurrence for this class first.')
-                                return
-                              }
-                              startCall({
-                                sessionId: matchedSession.id,
-                                roomID: matchedSession.videoConferenceId || '',
-                                sessionTitle: `${gc.name} (Live Host)`,
-                                mode: (matchedSession.sessionType || gc.sessionType) === 'live_stream' ? 'LiveStreaming' : 'VideoConference',
-                                // matchedSession comes from useLiveSessions(), so it is always a
-                                // ScheduledSession — exactly what the end endpoint requires. Gives
-                                // the host "End Session" alongside "Leave Meeting" in the call header.
-                                canEndSession: true,
-                              })
-                            }}
-                          >
-                            <IconVideo className="mr-1 h-3.5 w-3.5" /> Host Session
-                          </Button>
+                        {/* Schedule info */}
+                        {gc.scheduleInfo && (
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <IconClock className="h-3.5 w-3.5 shrink-0" />
+                            {gc.scheduleInfo}
+                          </p>
                         )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-xs font-medium"
-                          disabled={isGcPending}
-                          onClick={() => {
-                            setSelectedClassFilter({ id: gc.id, name: gc.name })
-                            setActiveTab('group-class-bookings')
-                          }}
-                        >
-                          <IconUsers className="mr-1 h-3.5 w-3.5" /> View Bookings
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openEditGcDialog(gc)}
-                          disabled={gc.isRetired || isGcPending}
-                        >
-                          <IconEdit className="mr-1 h-4 w-4" /> Edit
-                        </Button>
-                        {!gc.isRetired && (
+
+                        {/* Actions */}
+                        <div className="flex justify-end gap-2 flex-wrap">
+                          {(gc.mode === 'online' || gc.mode === 'hybrid') && (
+                            <>
+                              <Button
+                                size="sm"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium"
+                                disabled={gc.isRetired || isGcPending}
+                                onClick={() => {
+                                  // Must join the same room as the member's User App: that's the
+                                  // per-occurrence ScheduledSession id (session.videoConferenceId),
+                                  // never the Class template id — joining gc.id would silently put
+                                  // the host in an empty room the member can't reach.
+                                  if (!hostableSession) {
+                                    toast.error('No scheduled session found to host — schedule an occurrence for this class first.')
+                                    return
+                                  }
+                                  startCall({
+                                    sessionId: hostableSession.id,
+                                    roomID: hostableSession.videoConferenceId || '',
+                                    sessionTitle: `${gc.name} (Live Host)`,
+                                    mode: (hostableSession.sessionType || gc.sessionType) === 'live_stream' ? 'LiveStreaming' : 'VideoConference',
+                                  })
+                                }}
+                              >
+                                <IconVideo className="mr-1 h-3.5 w-3.5" /> Host Session
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30 text-xs font-medium"
+                                disabled={!hostableSession || isEndingThisClass || isGcPending}
+                                title={
+                                  hostableSession
+                                    ? 'End this class for everyone — also works if the host closed their tab without ending it'
+                                    : 'No live or upcoming occurrence to end'
+                                }
+                                onClick={() => {
+                                  if (!hostableSession) return
+                                  if (
+                                    !window.confirm(
+                                      `End "${gc.name}" for everyone? Participants will be disconnected and this can't be undone.`,
+                                    )
+                                  ) {
+                                    return
+                                  }
+                                  const endedSessionId = hostableSession.id
+                                  endGroupClassSession.mutate(endedSessionId, {
+                                    // The backend kicks the whole room, host included, but that
+                                    // kick is best-effort — tear our own call down explicitly so
+                                    // the host is never left in a room that no longer exists.
+                                    onSettled: () => {
+                                      if (activeSessionId === endedSessionId) endCall()
+                                    },
+                                  })
+                                }}
+                              >
+                                <IconPlayerStop className="mr-1 h-3.5 w-3.5" />
+                                {isEndingThisClass ? 'Ending…' : 'End Session'}
+                              </Button>
+                            </>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => {
-                              setClassToDelete(gc.id)
-                              setDeleteConfirmOpen(true)
-                            }}
+                            className="text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-xs font-medium"
                             disabled={isGcPending}
+                            onClick={() => {
+                              setSelectedClassFilter({ id: gc.id, name: gc.name })
+                              setActiveTab('group-class-bookings')
+                            }}
                           >
-                            <IconTrash className="mr-1 h-4 w-4" /> Delete
+                            <IconUsers className="mr-1 h-3.5 w-3.5" /> View Bookings
                           </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditGcDialog(gc)}
+                            disabled={gc.isRetired || isGcPending}
+                          >
+                            <IconEdit className="mr-1 h-4 w-4" /> Edit
+                          </Button>
+                          {!gc.isRetired && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => {
+                                setClassToDelete(gc.id)
+                                setDeleteConfirmOpen(true)
+                              }}
+                              disabled={isGcPending}
+                            >
+                              <IconTrash className="mr-1 h-4 w-4" /> Delete
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })
               )}
             </div>
           )}

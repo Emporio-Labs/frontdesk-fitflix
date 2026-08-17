@@ -278,9 +278,6 @@ export function LiveSessionsPanel() {
       roomID: session.videoConferenceId,
       sessionTitle: session.className || 'Live Session',
       mode: session.sessionType === 'live_stream' ? 'LiveStreaming' : 'VideoConference',
-      // Only group classes have a ScheduledSession behind them, so only they
-      // can be ended server-side.
-      canEndSession: true,
     })
   }
 
