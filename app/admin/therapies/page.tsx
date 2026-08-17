@@ -2985,6 +2985,10 @@ export default function TherapiesPage() {
                                 roomID: matchedSession.videoConferenceId || '',
                                 sessionTitle: `${gc.name} (Live Host)`,
                                 mode: (matchedSession.sessionType || gc.sessionType) === 'live_stream' ? 'LiveStreaming' : 'VideoConference',
+                                // matchedSession comes from useLiveSessions(), so it is always a
+                                // ScheduledSession — exactly what the end endpoint requires. Gives
+                                // the host "End Session" alongside "Leave Meeting" in the call header.
+                                canEndSession: true,
                               })
                             }}
                           >

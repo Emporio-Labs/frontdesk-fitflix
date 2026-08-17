@@ -142,6 +142,10 @@ export function VideoConferenceModal({
   const joinMutedRef = useRef(joinMuted)
   joinMutedRef.current = joinMuted
   const expressOffRef = useRef<(() => void) | null>(null)
+  // The UIKit captures its callbacks once, at joinRoom() time, while
+  // handleLeaveCall is redefined every render. Routing the leave paths through
+  // a ref keeps them pointed at the current handler.
+  const leaveRef = useRef<() => void>(() => {})
   const [loading, setLoading] = useState(true)
   const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null)
   const [isMinimized, setIsMinimized] = useState(false)
@@ -361,6 +365,11 @@ export function VideoConferenceModal({
               ? { mode: ZegoUIKitPrebuilt.GroupCall }
               : { mode: ZegoUIKitPrebuilt.VideoConference },
           showPreJoinView: false,
+          // Leaving now closes this modal (see onLeaveRoom below), so the
+          // UIKit's post-leave screen would only flash on the way out. With
+          // this and showPreJoinView both false the UIKit unmounts its own DOM
+          // instead of swapping that view in.
+          showLeavingView: false,
           turnOnMicrophoneWhenJoining: !joinMuted,
           turnOnCameraWhenJoining: !joinMuted,
           showMyCameraToggleButton: true,
@@ -417,7 +426,19 @@ export function VideoConferenceModal({
             }
           },
           onLeaveRoom: () => {
-            // Session ended
+            // The UIKit's own red hangup control. It leaves the ZEGOCLOUD room
+            // but knows nothing about this modal, so without this the host is
+            // left staring at a dead room whose only exit is "Leave Meeting".
+            // The UIKit prompts for confirmation first (its
+            // showLeaveRoomConfirmDialog default), so this only ever runs on a
+            // deliberate leave.
+            leaveRef.current()
+          },
+          // Fired *instead of* onLeaveRoom when the server drops us — which is
+          // exactly what the end endpoint does: forceDisconnectRoom kicks every
+          // user in the room, the host included. Same teardown either way.
+          onYouRemovedFromRoom: () => {
+            leaveRef.current()
           },
           onTokenWillExpire: async () => {
             try {
@@ -492,16 +513,28 @@ export function VideoConferenceModal({
     }
   }, [open, sessionId, containerElement, mode, joinMuted, retryTick, destroyZego, scheduleSettleResize])
 
+  // Host-only exit: the room stays live for everyone else.
   const handleLeaveCall = () => {
     destroyZego()
     setIsMinimized(false)
     onOpenChange(false)
   }
+  // Read by the UIKit's leave/removed callbacks, which were captured back at
+  // joinRoom() time.
+  leaveRef.current = handleLeaveCall
 
   // Group classes only. Ending finalizes the session server-side (attendance
   // backfill + participant kick), so the room is over for everyone — leave
-  // straight afterwards rather than sitting in a dead room.
+  // straight afterwards rather than sitting in a dead room. Irreversible, hence
+  // the confirm, matching the End button on the Live Sessions panel.
   const handleEndSession = () => {
+    if (
+      !window.confirm(
+        `End "${sessionTitle || 'this session'}" for everyone? Participants will be disconnected and this can't be undone.`,
+      )
+    ) {
+      return
+    }
     endSession.mutate(sessionId, { onSettled: handleLeaveCall })
   }
 
