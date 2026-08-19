@@ -26,6 +26,12 @@ import type { CreateWorkoutPlanPayload } from '@/lib/services/workout-plan.servi
 
 const isMongoId = (id?: string): boolean => !!id && /^[0-9a-f]{24}$/i.test(id)
 
+// 'Published' is a legacy status that only ever existed client-side — the backend
+// PlanStatus enum has never accepted it. Drafts persisted in localStorage by older
+// builds can still carry it, so normalise before it reaches the API.
+const toApiStatus = (status?: string): string | undefined =>
+  status === 'Published' ? 'Active' : status
+
 function buildApiPayload(plan: Partial<WorkoutPlan>, statusOverride?: string): CreateWorkoutPlanPayload {
   return {
     name: plan.name || 'Untitled Plan',
@@ -34,7 +40,7 @@ function buildApiPayload(plan: Partial<WorkoutPlan>, statusOverride?: string): C
     duration: plan.duration || 4,
     goal: plan.goal || 'Custom',
     splitType: plan.splitType,
-    status: statusOverride ?? plan.status,
+    status: statusOverride ?? toApiStatus(plan.status),
     isTemplate: plan.isTemplate,
     templateCategory: plan.templateCategory ?? undefined,
     days: (plan.days || []).map((day) => ({

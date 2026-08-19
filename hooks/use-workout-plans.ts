@@ -8,6 +8,24 @@ import type {
   BatchUpdateSchedulePayload,
 } from '@/lib/services/workout-plan.service'
 
+/**
+ * Backend validation errors arrive in two shapes: raw zod issues (an array of
+ * `{ path, message }`) from controllers that return `parsed.error.issues`, and a
+ * `Record<field, message>` from `mapError`/`normalizeIssueDetails` in the shared
+ * api-error util. Handle both so the toast always names the offending field.
+ */
+function formatValidationDetails(details: unknown): string {
+  if (Array.isArray(details)) {
+    return details.map((d: any) => `${d.path?.join('.') ?? ''}: ${d.message}`).join(', ')
+  }
+  if (details && typeof details === 'object') {
+    return Object.entries(details as Record<string, unknown>)
+      .map(([field, message]) => `${field}: ${message}`)
+      .join(', ')
+  }
+  return ''
+}
+
 export function useWorkoutPlans(filters?: {
   page?: number
   limit?: number
@@ -39,10 +57,7 @@ export function useCreateWorkoutPlan() {
     },
     onError: (err: any) => {
       console.error('Create Plan Error:', err?.response?.data || err)
-      const details = err?.response?.data?.details
-      const detailsMsg = Array.isArray(details)
-        ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
-        : ''
+      const detailsMsg = formatValidationDetails(err?.response?.data?.details)
       const errorMsg = err?.response?.data?.error || 'Failed to create plan'
       toast.error(detailsMsg ? `${errorMsg} (${detailsMsg})` : errorMsg)
     },
@@ -61,10 +76,7 @@ export function useUpdateWorkoutPlan() {
     },
     onError: (err: any) => {
       console.error('Update Plan Error:', err?.response?.data || err)
-      const details = err?.response?.data?.details
-      const detailsMsg = Array.isArray(details)
-        ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
-        : ''
+      const detailsMsg = formatValidationDetails(err?.response?.data?.details)
       const errorMsg = err?.response?.data?.error || 'Failed to update plan'
       toast.error(detailsMsg ? `${errorMsg} (${detailsMsg})` : errorMsg)
     },
@@ -102,10 +114,7 @@ export function useAssignWorkoutPlan() {
     },
     onError: (err: any) => {
       console.error('Assign Users Error:', err?.response?.data || err)
-      const details = err?.response?.data?.details
-      const detailsMsg = Array.isArray(details)
-        ? details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ')
-        : ''
+      const detailsMsg = formatValidationDetails(err?.response?.data?.details)
       const errorMsg = err?.response?.data?.error || 'Failed to assign users'
       toast.error(detailsMsg ? `${errorMsg} (${detailsMsg})` : errorMsg)
     },
