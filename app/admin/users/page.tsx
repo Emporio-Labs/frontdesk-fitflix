@@ -289,6 +289,11 @@ export default function UsersPage() {
   const membershipsByUserKey = useMemo(() => {
     const mapping = new Map<string, (typeof memberships)[number]>()
     memberships.forEach((membership) => {
+      // Expired/cancelled memberships don't count as "currently assigned" —
+      // only Active/Paused should block re-assignment or show as the member's plan.
+      if (membership.status !== 'Active' && membership.status !== 'Paused') {
+        return
+      }
       const key = (membership.userId || '').trim().toLowerCase()
       if (key) {
         mapping.set(key, membership)

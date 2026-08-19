@@ -67,6 +67,7 @@ function MembershipsPageContent() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [hasHandledAssignParam, setHasHandledAssignParam] = useState(false)
+  const [isLockedMember, setIsLockedMember] = useState(false)
   const [formData, setFormData] = useState({
     userId: '',
     planId: '',
@@ -135,35 +136,29 @@ function MembershipsPageContent() {
     return Number(Math.max(0, discounted).toFixed(2))
   }, [selectedPlan, selectedPlanBasePrice, normalizedDiscountPercent])
 
-  const selectedUser = useMemo(
-    () =>
-      users.find(
-        (user) => user._id === formData.userId || user.username === formData.userId || user.email === formData.userId
-      ),
-    [users, formData.userId]
-  )
+  const selectedUser = useMemo(() => {
+    const key = formData.userId.trim()
+    if (!key) return undefined
+    return (
+      users.find((user) => user._id === key) ??
+      users.find((user) => (user.username && user.username === key) || (user.email && user.email === key))
+    )
+  }, [users, formData.userId])
 
-  const getMembershipUsername = (membership: Membership) => {
-    const membershipUserId = membership.userId.toLowerCase()
-    const match = users.find(
+  const findMembershipUser = (membership: Membership) => {
+    const membershipUserId = membership.userId.trim().toLowerCase()
+    if (!membershipUserId) return undefined
+    return users.find(
       (user) =>
         user._id.toLowerCase() === membershipUserId ||
-        user.username.toLowerCase() === membershipUserId ||
-        user.email.toLowerCase() === membershipUserId
+        (user.username && user.username.toLowerCase() === membershipUserId) ||
+        (user.email && user.email.toLowerCase() === membershipUserId)
     )
-    return match?.username || 'Unknown User'
   }
 
-  const getMembershipUserEmail = (membership: Membership) => {
-    const membershipUserId = membership.userId.toLowerCase()
-    const match = users.find(
-      (user) =>
-        user._id.toLowerCase() === membershipUserId ||
-        user.username.toLowerCase() === membershipUserId ||
-        user.email.toLowerCase() === membershipUserId
-    )
-    return match?.email || '-'
-  }
+  const getMembershipUsername = (membership: Membership) => findMembershipUser(membership)?.username || 'Unknown User'
+
+  const getMembershipUserEmail = (membership: Membership) => findMembershipUser(membership)?.email || '-'
 
 
 
@@ -175,8 +170,8 @@ function MembershipsPageContent() {
     const matchedUser = users.find(
       (user) =>
         user._id === assignUserId ||
-        user.username.toLowerCase() === assignUserId.toLowerCase() ||
-        user.email.toLowerCase() === assignUserId.toLowerCase()
+        (user.username && user.username.toLowerCase() === assignUserId.toLowerCase()) ||
+        (user.email && user.email.toLowerCase() === assignUserId.toLowerCase())
     )
 
     if (!matchedUser) {
@@ -189,8 +184,12 @@ function MembershipsPageContent() {
       .map((value) => value.trim().toLowerCase())
       .filter(Boolean)
 
-    const alreadyAssigned = memberships.some((membership) =>
-      userKeys.includes((membership.userId || '').trim().toLowerCase())
+    // Expired/cancelled memberships don't block re-assignment — only an active
+    // or paused one represents a membership currently in force.
+    const alreadyAssigned = memberships.some(
+      (membership) =>
+        (membership.status === 'Active' || membership.status === 'Paused') &&
+        userKeys.includes((membership.userId || '').trim().toLowerCase())
     )
 
     if (alreadyAssigned) {
@@ -202,6 +201,7 @@ function MembershipsPageContent() {
     setEditingMembership(null)
     resetForm()
     setFormData((prev) => ({ ...prev, userId: matchedUser._id }))
+    setIsLockedMember(true)
     setIsAddDialogOpen(true)
     setHasHandledAssignParam(true)
   }, [assignUserId, hasHandledAssignParam, users, memberships])
@@ -272,8 +272,13 @@ function MembershipsPageContent() {
   const paginatedMemberships = sortedMemberships.slice(startIndex, startIndex + itemsPerPage)
 
   const handleSaveMembership = async () => {
-    if (!formData.userId.trim() || !formData.startDate || !formData.endDate) {
-      toast.error('Username/email must be auto-filled from Assign Membership, plus start and end date are required')
+    if (!formData.userId.trim()) {
+      toast.error('Select a member before saving')
+      return
+    }
+
+    if (!formData.startDate || !formData.endDate) {
+      toast.error('Start and end date are required')
       return
     }
 
@@ -342,6 +347,7 @@ function MembershipsPageContent() {
       endDate: formatDateToInput(membership.endDate),
       notes: membership.notes,
     })
+    setIsLockedMember(true)
     setIsAddDialogOpen(true)
   }
 
@@ -359,6 +365,7 @@ function MembershipsPageContent() {
       endDate: '',
       notes: '',
     })
+    setIsLockedMember(false)
   }
 
   const getStatusColor = (status: string) => {
@@ -410,24 +417,42 @@ function MembershipsPageContent() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">Username</label>
-                    <Input
-                      value={selectedUser?.username || ''}
-                      readOnly
-                      placeholder="Auto-filled from Assign Membership"
-                    />
+                    {isLockedMember ? (
+                      <Input
+                        value={selectedUser?.username || ''}
+                        readOnly
+                        placeholder="Auto-filled from Assign Membership"
+                      />
+                    ) : (
+                      <select
+                        value={formData.userId}
+                        onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
+                        className="w-full rounded-md border px-3 py-2"
+                      >
+                        <option value="">Select a member</option>
+                        {users.map((user) => (
+                          <option key={user._id} value={user._id}>
+                            {user.username}
+                            {user.email ? ` — ${user.email}` : user.phone ? ` — ${user.phone}` : ' — no email'}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Email</label>
+                    <label className="text-sm font-medium">Email (optional)</label>
                     <Input
                       value={selectedUser?.email || ''}
                       readOnly
-                      placeholder="Auto-filled from Assign Membership"
+                      placeholder={selectedUser ? 'No email on record' : 'Auto-filled once a member is selected'}
                     />
                   </div>
                 </div>
                 {!selectedUser && (
                   <p className="text-xs text-muted-foreground">
-                    Open this dialog from Users page using Assign Membership to auto-fill member details.
+                    {isLockedMember
+                      ? 'Open this dialog from Users page using Assign Membership to auto-fill member details.'
+                      : 'Select a member above to continue — email is optional and not required to assign a membership.'}
                   </p>
                 )}
                 <div className="grid grid-cols-2 gap-4">
