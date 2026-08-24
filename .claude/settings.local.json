@@ -15,7 +15,8 @@
       "Bash(cd \"/c/Users/sagun/OneDrive/Desktop/HH/fitflix_user_app/docs/github_issues\" 2>/dev/null && echo \"===LISTING===\" && ls -la && echo \"\" && echo \"===FILE COUNT===\" && ls -1 | wc -l)",
       "Bash(python -)",
       "Bash(sed -i 's/&rarr;/-\\\\&gt;/g' build_sprint_pdf.py)",
-      "Bash(python build_sprint_pdf.py)"
+      "Bash(python build_sprint_pdf.py)",
+      "Bash(vercel --version)"
     ]
   }
 }
