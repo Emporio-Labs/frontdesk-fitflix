@@ -10,6 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { IconFlame, IconTarget, IconInfoCircle, IconAlertTriangle } from '@tabler/icons-react'
+import { ExerciseAnimation } from '@/components/workouts/exercise-animation'
 import type { Exercise } from '@/types/workout'
 
 export function ExerciseDetailsDialog({
@@ -44,6 +45,13 @@ export function ExerciseDetailsDialog({
 
         <ScrollArea className="flex-1 p-6">
           <div className="space-y-6">
+            {(exercise.imageUrls?.length || exercise.imageUrl) && (
+              <ExerciseAnimation
+                urls={exercise.imageUrls?.length ? exercise.imageUrls : [exercise.imageUrl!]}
+                className="w-full aspect-video rounded-lg overflow-hidden bg-muted"
+              />
+            )}
+
             {/* Quick Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-muted/50 p-4 rounded-lg">
               <div>

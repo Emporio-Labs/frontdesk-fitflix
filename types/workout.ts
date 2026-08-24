@@ -40,6 +40,7 @@ export interface Exercise {
   exerciseType?: ExerciseType
   sectionTypes?: WorkoutSection[]
   imageUrl: string | null
+  imageUrls?: string[]
   isSystem: boolean
   createdBy: string | null
   createdAt: string

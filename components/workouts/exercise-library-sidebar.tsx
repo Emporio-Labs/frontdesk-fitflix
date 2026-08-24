@@ -242,8 +242,18 @@ function ExerciseRow({
 }) {
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors group">
-      <div className="flex items-center justify-center w-9 h-9 rounded-md bg-muted flex-shrink-0">
+      <div className="relative flex items-center justify-center w-9 h-9 rounded-md bg-muted flex-shrink-0 overflow-hidden">
         <MuscleGroupIcon group={exercise.muscleGroups?.[0] || 'Chest'} className="w-5 h-5" />
+        {exercise.imageUrl && (
+          <img
+            src={exercise.imageUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={(e) => { e.currentTarget.style.display = 'none' }}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{exercise.name}</p>

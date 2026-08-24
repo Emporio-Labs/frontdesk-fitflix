@@ -60,6 +60,7 @@ import {
 } from '@/types/workout'
 import type { Exercise, CreateExercisePayload, UpdateExercisePayload } from '@/types/workout'
 import { ExerciseDetailsDialog } from '@/components/workouts/exercise-details-dialog'
+import { ExerciseAnimation } from '@/components/workouts/exercise-animation'
 
 // ─── Section Meta ─────────────────────────────────────────────────────────────
 const SECTION_META: Record<
@@ -110,6 +111,7 @@ type FormState = {
   tips: string
   commonMistakes: string
   targetedMuscles: string
+  imageUrl: string
 }
 
 function defaultForm(): FormState {
@@ -124,6 +126,7 @@ function defaultForm(): FormState {
     tips: '',
     commonMistakes: '',
     targetedMuscles: '',
+    imageUrl: '',
   }
 }
 
@@ -146,6 +149,7 @@ function buildFormFromExercise(ex: Exercise): FormState {
     tips: (ex.tips ?? []).join(', '),
     commonMistakes: (ex.commonMistakes ?? []).join(', '),
     targetedMuscles: (ex.targetedMuscles ?? []).join(', '),
+    imageUrl: ex.imageUrl ?? '',
   }
 }
 
@@ -209,6 +213,7 @@ function ExerciseFormDialog({
       tips: parseStringList(form.tips),
       commonMistakes: parseStringList(form.commonMistakes),
       targetedMuscles: parseStringList(form.targetedMuscles),
+      imageUrl: form.imageUrl.trim() || undefined,
     }
 
     if (isEditing && editingExercise) {
@@ -256,7 +261,7 @@ function ExerciseFormDialog({
             <p className="text-xs text-muted-foreground">
               Select one or more primary muscle groups targeted.
             </p>
-            <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
               {MUSCLE_GROUPS.map((g) => {
                 const checked = form.muscleGroups.includes(g)
                 return (
@@ -313,7 +318,7 @@ function ExerciseFormDialog({
             <p className="text-xs text-muted-foreground">
               Select where this exercise can be used. You can select multiple sections.
             </p>
-            <div className="grid grid-cols-3 gap-3 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
               {WORKOUT_SECTIONS.map((section) => {
                 const meta = SECTION_META[section]
                 const checked = form.sectionTypes.includes(section)
@@ -353,6 +358,26 @@ function ExerciseFormDialog({
               value={form.equipment}
               onChange={(e) => setForm({ ...form, equipment: e.target.value })}
             />
+          </div>
+
+          {/* Image URL */}
+          <div className="space-y-1.5">
+            <Label htmlFor="ex-image-url">Image URL</Label>
+            <Input
+              id="ex-image-url"
+              type="url"
+              placeholder="https://..."
+              value={form.imageUrl}
+              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+            />
+            {form.imageUrl.trim() !== '' && (
+              <img
+                src={form.imageUrl.trim()}
+                alt=""
+                className="h-16 w-16 object-cover rounded-md border"
+                onError={(e) => { e.currentTarget.style.display = 'none' }}
+              />
+            )}
           </div>
 
           {/* Calories */}
@@ -465,6 +490,12 @@ function ExerciseGridCard({
       className="group flex flex-col hover:shadow-md transition-all cursor-pointer"
       onClick={() => onView(exercise)}
     >
+      {exercise.imageUrl && (
+        <ExerciseAnimation
+          urls={[exercise.imageUrl]}
+          className="w-full aspect-[4/3] overflow-hidden rounded-t-xl border-b bg-muted"
+        />
+      )}
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-wrap gap-1.5">
@@ -605,7 +636,7 @@ export default function ExercisesPage() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
@@ -635,7 +666,7 @@ export default function ExercisesPage() {
       </div>
 
       {/* Section stat cards — click to filter */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {WORKOUT_SECTIONS.map((section) => {
           const meta = SECTION_META[section]
           const active = sectionTab === section
