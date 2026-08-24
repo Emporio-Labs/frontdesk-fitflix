@@ -53,7 +53,7 @@ function PlansContent() {
   }, [plans, search, statusFilter, difficultyFilter])
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -211,7 +211,7 @@ function PlansContent() {
 
 export default function PlansPage() {
   return (
-    <Suspense fallback={<div className="flex-1 p-8 pt-6 text-muted-foreground text-sm">Loading plans...</div>}>
+    <Suspense fallback={<div className="flex-1 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6 text-muted-foreground text-sm">Loading plans...</div>}>
       <PlansContent />
     </Suspense>
   )

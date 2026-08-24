@@ -474,7 +474,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
+    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div className="flex flex-col gap-1.5">
         <h2 className="text-3xl font-bold tracking-tight">Users</h2>
         <p className="text-muted-foreground">Manage members and staff admin accounts</p>
@@ -496,7 +496,7 @@ export default function UsersPage() {
 
         {/* ─── MEMBERS TAB ─── */}
         <TabsContent value="members" className="mt-4 space-y-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Input
               placeholder="Search by username or email..."
               value={memberSearch}
@@ -504,7 +504,7 @@ export default function UsersPage() {
                 setMemberSearch(e.target.value)
                 setMemberPage(1)
               }}
-              className="max-w-sm h-9 bg-background focus-visible:ring-1"
+              className="w-full sm:max-w-sm h-9 bg-background focus-visible:ring-1"
             />
             <div className="ml-auto flex gap-2">
               <Button variant="outline" size="sm" onClick={() => refetchUsers()} className="h-9 px-3 text-xs">
@@ -663,14 +663,14 @@ export default function UsersPage() {
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-[140px] pl-6 font-semibold">Username</TableHead>
                       <TableHead className="w-[180px] font-semibold">Email</TableHead>
-                      <TableHead className="w-[60px] text-center font-semibold">Age</TableHead>
-                      <TableHead className="w-[80px] font-semibold">Gender</TableHead>
-                      <TableHead className="w-[200px] font-semibold">Health Goals</TableHead>
-                      <TableHead className="w-[110px] font-semibold">Joined</TableHead>
-                      <TableHead className="w-[125px] font-semibold">Onboarding</TableHead>
+                      <TableHead className="hidden w-[60px] text-center font-semibold lg:table-cell">Age</TableHead>
+                      <TableHead className="hidden w-[80px] font-semibold lg:table-cell">Gender</TableHead>
+                      <TableHead className="hidden w-[200px] font-semibold lg:table-cell">Health Goals</TableHead>
+                      <TableHead className="hidden w-[110px] font-semibold md:table-cell">Joined</TableHead>
+                      <TableHead className="hidden w-[125px] font-semibold md:table-cell">Onboarding</TableHead>
                       <TableHead className="w-[130px] font-semibold">Membership</TableHead>
-                      <TableHead className="w-[100px] font-semibold">Plan Start</TableHead>
-                      <TableHead className="w-[100px] font-semibold">Plan Expiry</TableHead>
+                      <TableHead className="hidden w-[100px] font-semibold lg:table-cell">Plan Start</TableHead>
+                      <TableHead className="hidden w-[100px] font-semibold lg:table-cell">Plan Expiry</TableHead>
                       <TableHead className="w-[160px] text-right pr-6 font-semibold">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -696,11 +696,11 @@ export default function UsersPage() {
                               </button>
                             </TableCell>
                             <TableCell className="text-muted-foreground truncate max-w-[180px]" title={user.email}>{user.email}</TableCell>
-                            <TableCell className="text-center">{user.age}</TableCell>
-                            <TableCell>
+                            <TableCell className="hidden text-center lg:table-cell">{user.age}</TableCell>
+                            <TableCell className="hidden lg:table-cell">
                               <Badge variant="outline" className="font-semibold px-2 py-0.5 text-xs rounded-full border-border/80 text-foreground bg-background whitespace-nowrap">{user.gender}</Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden lg:table-cell">
                               <div className="flex flex-wrap gap-1 max-w-[200px]">
                                 {user.healthGoals.slice(0, 2).map((g, i) => (
                                   <Badge key={`${g}-${i}`} variant="secondary" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">{g}</Badge>
@@ -710,8 +710,8 @@ export default function UsersPage() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="text-muted-foreground whitespace-nowrap">{formatJoinedDate(user.createdAt)}</TableCell>
-                            <TableCell className="py-2">
+                            <TableCell className="hidden text-muted-foreground whitespace-nowrap md:table-cell">{formatJoinedDate(user.createdAt)}</TableCell>
+                            <TableCell className="hidden py-2 md:table-cell">
                               <StatusBadge status={deriveOnboardingState(user)} size="sm" />
                             </TableCell>
                             <TableCell className="py-2">
@@ -721,8 +721,8 @@ export default function UsersPage() {
                                 <Badge variant="outline" className="text-muted-foreground border-dashed px-2.5 py-0.5 text-xs rounded-full bg-transparent whitespace-nowrap">Not Assigned</Badge>
                               )}
                             </TableCell>
-                            <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateOnly(membership?.startDate)}</TableCell>
-                            <TableCell className="text-muted-foreground whitespace-nowrap">{formatDateOnly(membership?.endDate)}</TableCell>
+                            <TableCell className="hidden text-muted-foreground whitespace-nowrap lg:table-cell">{formatDateOnly(membership?.startDate)}</TableCell>
+                            <TableCell className="hidden text-muted-foreground whitespace-nowrap lg:table-cell">{formatDateOnly(membership?.endDate)}</TableCell>
 
                             <TableCell className="text-right py-2 pr-6">
                               <div className="flex justify-end items-center gap-1.5">
@@ -818,7 +818,7 @@ export default function UsersPage() {
         </TabsContent>
 
         <TabsContent value="admins" className="mt-4 space-y-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Input
               placeholder="Search by name or email..."
               value={adminSearch}
@@ -826,7 +826,7 @@ export default function UsersPage() {
                 setAdminSearch(e.target.value)
                 setAdminPage(1)
               }}
-              className="max-w-sm h-9 bg-background focus-visible:ring-1"
+              className="w-full sm:max-w-sm h-9 bg-background focus-visible:ring-1"
             />
             <div className="ml-auto flex gap-2">
               <Button variant="outline" size="sm" onClick={() => refetchAdmins()} className="h-9 px-3 text-xs">

@@ -136,8 +136,8 @@ export default function SlotsPage() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Time Slots</h2>
           <p className="text-muted-foreground">Create and manage daily recurring appointment slots</p>
@@ -201,11 +201,11 @@ export default function SlotsPage() {
                     <TableRow>
                       <TableHead>Schedule</TableHead>
                       <TableHead>Start Time</TableHead>
-                      <TableHead>End Time</TableHead>
-                      <TableHead>Capacity</TableHead>
+                      <TableHead className="hidden md:table-cell">End Time</TableHead>
+                      <TableHead className="hidden md:table-cell">Capacity</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Linked Services / Therapies</TableHead>
-                      <TableHead>Today's Bookings</TableHead>
+                      <TableHead className="hidden lg:table-cell">Linked Services / Therapies</TableHead>
+                      <TableHead className="hidden lg:table-cell">Today's Bookings</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -220,8 +220,8 @@ export default function SlotsPage() {
                           <TableRow key={slot._id}>
                             <TableCell>{formatSlotSchedule(slot.date, slot.isDaily)}</TableCell>
                             <TableCell>{slot.startTime}</TableCell>
-                            <TableCell>{slot.endTime}</TableCell>
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell">{slot.endTime}</TableCell>
+                            <TableCell className="hidden md:table-cell">
                               {slot.remainingCapacity} / {slot.capacity}
                             </TableCell>
                             <TableCell>
@@ -229,7 +229,7 @@ export default function SlotsPage() {
                                 {slot.remainingCapacity <= 0 ? 'Full' : 'Open'}
                               </Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden lg:table-cell">
                               {linkedItems.length === 0 ? (
                                 <span className="text-xs text-muted-foreground">—</span>
                               ) : (
@@ -246,7 +246,7 @@ export default function SlotsPage() {
                                 </div>
                               )}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="hidden lg:table-cell">
                               {slotBookings.length === 0 ? (
                                 <span className="text-xs text-muted-foreground">—</span>
                               ) : (

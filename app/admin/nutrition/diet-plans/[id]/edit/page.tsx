@@ -16,7 +16,7 @@ export default function EditDietPlanTemplatePage() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
         <SkeletonCard />
       </div>
     )
@@ -24,7 +24,7 @@ export default function EditDietPlanTemplatePage() {
 
   if (isError || !template) {
     return (
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
         <Button
           variant="ghost"
           size="sm"
@@ -41,7 +41,7 @@ export default function EditDietPlanTemplatePage() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
+    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"

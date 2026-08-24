@@ -1198,7 +1198,7 @@ export default function TherapiesPage() {
   )
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Services</h2>
         <p className="text-sm text-muted-foreground">
@@ -1228,7 +1228,7 @@ export default function TherapiesPage() {
                     Curate the therapy catalog, tune durations, and keep booking slots synchronized in one place.
                   </p>
                 </div>
-                <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
                   <div>
                     <p className="text-xs text-cyan-50/90">Catalog</p>
                     <p className="text-xl font-semibold">{items.length}</p>
@@ -1593,7 +1593,7 @@ export default function TherapiesPage() {
                     Schedule and manage group sessions — online, in-person, or hybrid — with credit-based access.
                   </p>
                 </div>
-                <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
                   <div>
                     <p className="text-xs text-purple-50/90">Classes</p>
                     <p className="text-xl font-semibold">
@@ -1951,7 +1951,7 @@ export default function TherapiesPage() {
                 )}
 
                 {/* Duration + Credits + Max Participants */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div>
                     <label className="text-sm font-medium">
                       Duration (mins)

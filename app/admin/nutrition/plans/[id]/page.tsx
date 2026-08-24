@@ -84,7 +84,7 @@ export default function NutritionPlanDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
         <SkeletonCard />
       </div>
     )
@@ -92,7 +92,7 @@ export default function NutritionPlanDetailPage() {
 
   if (isError || !plan) {
     return (
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
           <IconArrowLeft className="w-4 h-4 mr-2" />
           Back
@@ -110,7 +110,7 @@ export default function NutritionPlanDetailPage() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
+    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <Link href="/admin/nutrition">
         <Button variant="ghost" size="sm">
           <IconArrowLeft className="w-4 h-4 mr-2" />

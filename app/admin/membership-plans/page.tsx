@@ -367,8 +367,8 @@ export default function MembershipPlansPage() {
   const isSaving = createPlan.isPending || updatePlan.isPending
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Membership Plans</h2>
           <p className="text-muted-foreground">Manage reusable gym membership plans</p>

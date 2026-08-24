@@ -219,7 +219,7 @@ export default function GroupClassBookingsPanel({
                 Monitor registration list, search members, and filter booking states from a single dashboard.
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
               <div>
                 <p className="text-xs text-indigo-50/90">Total</p>
                 <p className="text-xl font-semibold">{stats.total}</p>

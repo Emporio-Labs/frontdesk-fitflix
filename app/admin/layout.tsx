@@ -15,21 +15,15 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   return (
-    <SidebarProvider
-      defaultOpen={false}
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 12)",
-        } as React.CSSProperties
-      }
-    >
+    <SidebarProvider defaultOpen={false}>
       <LocationScopeProvider>
         <SidebarRouteSync />
         <AppSidebar variant="inset" collapsible="icon" />
         <SidebarInset>
           <SiteHeader />
-          <div className="flex flex-1 flex-col overflow-hidden">
+          {/* min-w-0 lets this flex child shrink below its content width, so wide
+              tables scroll inside their own container instead of being clipped. */}
+          <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
             {children}
           </div>
         </SidebarInset>

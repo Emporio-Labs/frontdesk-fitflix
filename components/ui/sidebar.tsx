@@ -348,7 +348,9 @@ const SidebarInset = React.forwardRef<
     <main
       ref={ref}
       className={cn(
-        'relative flex min-h-svh flex-1 flex-col bg-background',
+        // min-w-0 is required: without it this flex child refuses to shrink below
+        // its content width and wide tables push the whole page sideways.
+        'relative flex min-h-svh min-w-0 flex-1 flex-col bg-background',
         'peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2',
         state === 'collapsed'
           ? 'md:peer-data-[variant=inset]:ml-2'

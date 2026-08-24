@@ -774,8 +774,8 @@ export default function LeadsPage() {
   }, [leads])
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Leads</h2>
           <p className="text-muted-foreground">Manage sales leads and conversions</p>
@@ -1418,20 +1418,20 @@ export default function LeadsPage() {
                 <p className="pb-4 text-sm text-red-600">Failed to load leads from API. Check auth credentials and backend status.</p>
               )}
               <div className="overflow-x-auto">
-                <Table className="min-w-[1800px] whitespace-nowrap">
+                <Table className="whitespace-nowrap md:min-w-[1800px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
+                      <TableHead className="hidden lg:table-cell">Email</TableHead>
                       <TableHead>Phone</TableHead>
-                      <TableHead>Assigned Staff</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Heat</TableHead>
+                      <TableHead className="hidden lg:table-cell">Assigned Staff</TableHead>
+                      <TableHead className="hidden lg:table-cell">Source</TableHead>
+                      <TableHead className="hidden md:table-cell">Heat</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Contacts</TableHead>
-                      <TableHead>Aging</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Follow Up</TableHead>
+                      <TableHead className="hidden lg:table-cell">Contacts</TableHead>
+                      <TableHead className="hidden lg:table-cell">Aging</TableHead>
+                      <TableHead className="hidden lg:table-cell">Created</TableHead>
+                      <TableHead className="hidden md:table-cell">Follow Up</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1439,15 +1439,15 @@ export default function LeadsPage() {
                     {filteredLeads.map((lead) => (
                       <TableRow key={lead.id}>
                         <TableCell className="font-medium">{lead.name}</TableCell>
-                        <TableCell>{lead.email}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{lead.email}</TableCell>
                         <TableCell>{lead.phone}</TableCell>
-                        <TableCell>{lead.assignedStaffName || '-'}</TableCell>
-                        <TableCell>
+                        <TableCell className="hidden lg:table-cell">{lead.assignedStaffName || '-'}</TableCell>
+                        <TableCell className="hidden lg:table-cell">
                           <Badge className={getSourceColor(lead.source)}>
                             {lead.source.replace('-', ' ')}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <Badge className={getTemperatureColor(lead.temperature)}>{lead.temperature}</Badge>
                         </TableCell>
                         <TableCell>
@@ -1455,10 +1455,10 @@ export default function LeadsPage() {
                             {lead.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{lead.contactCount || 0}</TableCell>
-                        <TableCell>{getLeadAgeDays(lead.createdAt)}d</TableCell>
-                        <TableCell>{formatDateOnly(lead.createdAt)}</TableCell>
-                        <TableCell>{formatDateOnly(lead.followUpDate)}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{lead.contactCount || 0}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{getLeadAgeDays(lead.createdAt)}d</TableCell>
+                        <TableCell className="hidden lg:table-cell">{formatDateOnly(lead.createdAt)}</TableCell>
+                        <TableCell className="hidden md:table-cell">{formatDateOnly(lead.followUpDate)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button

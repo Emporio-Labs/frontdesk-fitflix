@@ -384,8 +384,8 @@ function MembershipsPageContent() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Memberships</h2>
           <p className="text-muted-foreground">Manage member subscriptions and plans</p>
@@ -681,12 +681,12 @@ function MembershipsPageContent() {
                     <TableRow>
                       <TableHead>Username</TableHead>
                       <TableHead>Plan Name</TableHead>
-                      <TableHead>Credits Included</TableHead>
-                      <TableHead>Credits Remaining</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Currency</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
+                      <TableHead className="hidden lg:table-cell">Credits Included</TableHead>
+                      <TableHead className="hidden md:table-cell">Credits Remaining</TableHead>
+                      <TableHead className="hidden lg:table-cell">Price</TableHead>
+                      <TableHead className="hidden lg:table-cell">Currency</TableHead>
+                      <TableHead className="hidden lg:table-cell">Start Date</TableHead>
+                      <TableHead className="hidden md:table-cell">End Date</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -703,12 +703,12 @@ function MembershipsPageContent() {
                         <TableRow key={membership.id}>
                           <TableCell className="font-medium">{getMembershipUsername(membership)}</TableCell>
                           <TableCell>{membership.planName}</TableCell>
-                          <TableCell>{membership.creditsIncluded}</TableCell>
-                          <TableCell>{membership.creditsRemaining}</TableCell>
-                          <TableCell>{formatPrice(membership.price, membership.currency)}</TableCell>
-                          <TableCell>{membership.currency}</TableCell>
-                          <TableCell>{formatDateOnly(membership.startDate)}</TableCell>
-                          <TableCell>{formatDateOnly(membership.endDate)}</TableCell>
+                          <TableCell className="hidden lg:table-cell">{membership.creditsIncluded}</TableCell>
+                          <TableCell className="hidden md:table-cell">{membership.creditsRemaining}</TableCell>
+                          <TableCell className="hidden lg:table-cell">{formatPrice(membership.price, membership.currency)}</TableCell>
+                          <TableCell className="hidden lg:table-cell">{membership.currency}</TableCell>
+                          <TableCell className="hidden lg:table-cell">{formatDateOnly(membership.startDate)}</TableCell>
+                          <TableCell className="hidden md:table-cell">{formatDateOnly(membership.endDate)}</TableCell>
                           <TableCell>
                             <Badge className={getStatusColor(membership.status)}>{membership.status}</Badge>
                           </TableCell>
@@ -872,7 +872,7 @@ function MembershipsPageContent() {
 
 function MembershipsPageFallback() {
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
+    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <Skeleton className="h-10 w-64" />
       <Skeleton className="h-24 w-full" />
       <Skeleton className="h-96 w-full" />

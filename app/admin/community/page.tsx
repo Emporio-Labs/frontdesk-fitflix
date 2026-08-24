@@ -11,7 +11,7 @@ export default function CommunityAdminPage() {
   const [tab, setTab] = useState('reports')
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-bold text-foreground">Community</h1>
         <p className="text-sm text-muted-foreground">

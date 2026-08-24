@@ -356,7 +356,7 @@ export default function MemberSchedulePage() {
 
   if (userLoading || assignmentLoading) {
     return (
-      <div className="flex-1 space-y-6 p-8 pt-6">
+      <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-32 w-full rounded-xl" />
         <Skeleton className="h-64 w-full rounded-xl" />
@@ -380,7 +380,7 @@ export default function MemberSchedulePage() {
   })()
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       {/* Header Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

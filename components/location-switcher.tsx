@@ -51,9 +51,11 @@ export function LocationSwitcher() {
 
   if (isSingleLocation) {
     return (
-      <span className="hidden items-center gap-1.5 text-sm text-muted-foreground sm:flex">
-        <IconMapPin className="size-4" />
-        {selectedLocation?.name ?? locations[0]?.name}
+      // Which branch you're operating on matters at the desk, so keep this on
+      // mobile too — just cap the width and truncate instead of hiding it.
+      <span className="flex min-w-0 max-w-[40vw] items-center gap-1.5 text-sm text-muted-foreground sm:max-w-none">
+        <IconMapPin className="size-4 shrink-0" />
+        <span className="truncate">{selectedLocation?.name ?? locations[0]?.name}</span>
       </span>
     )
   }
@@ -65,7 +67,7 @@ export function LocationSwitcher() {
         setSelectedLocationId(value === ALL_BRANCHES ? null : value)
       }
     >
-      <SelectTrigger className="h-8 w-[180px]" aria-label="Select branch">
+      <SelectTrigger className="h-8 w-[132px] shrink sm:w-[180px]" aria-label="Select branch">
         <IconBuildingStore className="size-4 shrink-0" />
         <SelectValue placeholder="Select branch" />
       </SelectTrigger>

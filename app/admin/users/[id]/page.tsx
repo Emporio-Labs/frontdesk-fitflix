@@ -312,7 +312,7 @@ export default function UserDetailPage() {
   )
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div className="flex items-center gap-4 mb-6">
         <Link href="/admin/users">
           <Button variant="ghost" size="sm">

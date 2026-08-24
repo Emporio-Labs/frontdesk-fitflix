@@ -63,7 +63,7 @@ function NewClinicalTemplatePageContent() {
     : '/admin/nutrition?tab=diet-plans'
 
   return (
-    <div className="flex-1 space-y-5 p-8 pt-6">
+    <div className="flex-1 space-y-5 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" onClick={() => router.push(backHref)}>
           <IconArrowLeft className="mr-2 h-4 w-4" />
@@ -101,7 +101,7 @@ function NewClinicalTemplatePageContent() {
 
 export default function NewClinicalTemplatePage() {
   return (
-    <Suspense fallback={<div className="flex-1 p-8 pt-6 text-muted-foreground">Loading plan page...</div>}>
+    <Suspense fallback={<div className="flex-1 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6 text-muted-foreground">Loading plan page...</div>}>
       <NewClinicalTemplatePageContent />
     </Suspense>
   )

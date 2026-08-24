@@ -1622,7 +1622,7 @@ function FoodCatalogTab({ canCreate }: { canCreate: boolean }) {
               </div>
 
               {/* Macros */}
-              <div className="grid grid-cols-4 gap-2 rounded-md bg-muted p-3 text-center text-sm">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 rounded-md bg-muted p-3 text-center text-sm">
                 <div>
                   <div className="text-xs text-muted-foreground uppercase font-semibold text-[10px]">Calories</div>
                   <div className="font-bold text-foreground mt-0.5">{recipeDetails.recipe.totals.caloriesKcal}</div>
@@ -1869,7 +1869,7 @@ function NutritionDashboardContent() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Nutrition</h2>
         <p className="text-sm text-muted-foreground">
@@ -1962,7 +1962,7 @@ function NutritionDashboardContent() {
 
 export default function NutritionDashboardPage() {
   return (
-    <Suspense fallback={<div className="flex-1 space-y-6 p-8 pt-6">Loading nutrition dashboard...</div>}>
+    <Suspense fallback={<div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">Loading nutrition dashboard...</div>}>
       <NutritionDashboardContent />
     </Suspense>
   )

@@ -137,7 +137,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const brandHref = isTrainer ? '/dashboard/workouts/members' : '/dashboard'
 
   return (
-    <Sidebar collapsible="none" {...props}>
+    // "icon" (not "none") so callers that omit the prop still get the mobile Sheet;
+    // collapsible="none" takes an early-return branch that skips it entirely.
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

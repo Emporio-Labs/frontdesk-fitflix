@@ -171,7 +171,7 @@ export function AssignmentCalendar() {
 
       <CardContent>
         {isLoading ? (
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {[...Array(35)].map((_, i) => (
               <Skeleton key={i} className="aspect-square rounded-lg" />
             ))}
@@ -179,7 +179,7 @@ export function AssignmentCalendar() {
         ) : (
           <div className="space-y-4">
             {/* Weekday headers */}
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                 <div
                   key={day}
@@ -191,7 +191,7 @@ export function AssignmentCalendar() {
             </div>
 
             {/* Calendar grid */}
-            <div className="grid grid-cols-7 gap-2">{renderCalendar()}</div>
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">{renderCalendar()}</div>
 
             {/* Legend */}
             <div className="pt-4 border-t space-y-2">
@@ -208,7 +208,7 @@ export function AssignmentCalendar() {
 
             {/* Stats */}
             {schedule.length > 0 && (
-              <div className="pt-4 border-t grid grid-cols-4 gap-2 text-xs">
+              <div className="pt-4 border-t grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
                 <div className="text-center">
                   <div className="font-semibold text-blue-600">
                     {schedule.filter((e: any) => e.status === 'pending').length}

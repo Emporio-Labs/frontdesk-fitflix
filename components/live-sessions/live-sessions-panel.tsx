@@ -296,7 +296,7 @@ export function LiveSessionsPanel() {
                 Monitor online sessions, manage live streaming and video conferences, and launch hosting in one place.
               </p>
             </div>
-            <div className="grid grid-cols-4 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
               <div>
                 <p className="text-xs text-purple-100/90">Total</p>
                 <p className="text-xl font-semibold">{stats.total}</p>
@@ -333,7 +333,7 @@ export function LiveSessionsPanel() {
 
       <div className="flex justify-start">
         <Tabs value={dateTab} onValueChange={handleTabChange} className="w-[360px]">
-          <TabsList className="grid grid-cols-3">
+          <TabsList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <TabsTrigger value="today">Today</TabsTrigger>
             <TabsTrigger value="tomorrow">Tomorrow</TabsTrigger>
             <TabsTrigger value="all">All Upcoming</TabsTrigger>

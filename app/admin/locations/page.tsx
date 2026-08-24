@@ -290,7 +290,7 @@ export default function LocationsPage() {
                 onChange={(e) => setForm({ ...form, line1: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               <div className="grid gap-1.5">
                 <Label htmlFor="city">City</Label>
                 <Input
@@ -488,7 +488,7 @@ function LocationSettingsDialog({
 
             <div className="rounded-md border p-3">
               <p className="mb-2 text-sm font-medium">Grace grant limits</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <NumberField
                   label="Max / grant"
                   value={settings.graceGrantLimits?.frontdeskMaxPerGrant ?? 5}

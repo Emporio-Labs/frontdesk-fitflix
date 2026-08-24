@@ -526,7 +526,7 @@ export default function PersonalTrainingAdminPage() {
 
       {/* Main Tabs */}
       <Tabs defaultValue="sessions" className="w-full">
-        <TabsList className={isTrainer ? "grid grid-cols-2 max-w-md" : "grid grid-cols-4 max-w-2xl"}>
+        <TabsList className={isTrainer ? "grid grid-cols-2 max-w-md" : "grid grid-cols-2 lg:grid-cols-4 max-w-2xl"}>
           <TabsTrigger value="sessions">Live & Scheduled Sessions</TabsTrigger>
           <TabsTrigger value="schedule">
             {isTrainer ? 'My Weekly Schedule' : 'Trainer Schedules'}

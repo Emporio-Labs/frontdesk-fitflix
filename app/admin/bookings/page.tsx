@@ -465,8 +465,8 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Bookings</h2>
           <p className="text-muted-foreground">Spot-booking desk and scheduling board with credit-aware actions</p>
@@ -714,7 +714,7 @@ export default function BookingsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
               <div className="rounded-md border p-2 text-center bg-muted/10">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Current</p>
                 <p className="text-sm font-semibold mt-0.5">
@@ -928,13 +928,13 @@ export default function BookingsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Booking ID</TableHead>
+                      <TableHead className="hidden lg:table-cell">Booking ID</TableHead>
                       <TableHead>Member</TableHead>
                       <TableHead>Service</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Credits</TableHead>
+                      <TableHead className="hidden md:table-cell">Date</TableHead>
+                      <TableHead className="hidden lg:table-cell">Credits</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Change Status</TableHead>
+                      <TableHead className="hidden md:table-cell">Change Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -948,11 +948,11 @@ export default function BookingsPage() {
                     ) : (
                       paginatedBookings.map((booking) => (
                         <TableRow key={booking._id}>
-                          <TableCell className="font-mono text-xs">{booking._id.slice(-6)}</TableCell>
+                          <TableCell className="hidden font-mono text-xs lg:table-cell">{booking._id.slice(-6)}</TableCell>
                           <TableCell className="font-medium text-sm">{booking.userName}</TableCell>
                           <TableCell className="text-sm">{booking.serviceName}</TableCell>
-                          <TableCell>{formatDateForDisplay(booking.bookingDate)}</TableCell>
-                          <TableCell>
+                          <TableCell className="hidden md:table-cell">{formatDateForDisplay(booking.bookingDate)}</TableCell>
+                          <TableCell className="hidden lg:table-cell">
                             <div className="flex items-center gap-2">
                               <span className="text-xs">
                                 {typeof booking.creditCostSnapshot === 'number'
@@ -971,7 +971,7 @@ export default function BookingsPage() {
                               {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS] ?? booking.status}
                             </Badge>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="hidden md:table-cell">
                             <Select onValueChange={(v) => handleStatusChange(booking._id, v)}>
                               <SelectTrigger className="w-36 h-8 text-xs">
                                 <SelectValue placeholder="Change status" />

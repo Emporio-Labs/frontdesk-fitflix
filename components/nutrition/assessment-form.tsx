@@ -193,7 +193,7 @@ export function AssessmentForm({
               )}
             />
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {numberField('mealsPerDay', 'Meals / day')}
               {numberField('waterTargetMl', 'Water (ml)')}
               {numberField('targetCaloriesKcal', 'Calories')}
@@ -201,7 +201,7 @@ export function AssessmentForm({
 
             <div className="rounded-lg border p-3">
               <p className="mb-3 text-sm font-medium">Target Macros</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {numberField('targetMacros.proteinG', 'Protein (g)')}
                 {numberField('targetMacros.carbsG', 'Carbs (g)')}
                 {numberField('targetMacros.fatG', 'Fat (g)')}

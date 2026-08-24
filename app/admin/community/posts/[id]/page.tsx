@@ -78,7 +78,7 @@ export default function CommunityPostDetailPage() {
   const repliesOf = (id: string) => comments.filter((c) => c.parentId === id)
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
+    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <Button asChild variant="ghost" size="sm" className="h-8 px-2 -ml-2 text-muted-foreground">
         <Link href="/admin/community"><IconArrowLeft className="w-4 h-4 mr-1.5" /> Back to community</Link>
       </Button>

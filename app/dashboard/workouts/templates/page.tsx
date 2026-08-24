@@ -42,7 +42,7 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
+    <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Templates</h2>
         <p className="text-muted-foreground">
