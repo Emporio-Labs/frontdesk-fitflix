@@ -2,6 +2,12 @@ import { apiClient } from '@/lib/api-client'
 import type { MedicalReport, ExpertAppointment } from './onboarding.service'
 
 export type OnboardingStep =
+  | 'ACTIVE_X_TEST'
+  | 'DNA_SAMPLE'
+  | 'VALD_TEST'
+  | 'NUTRITION_APPOINTMENT'
+  | 'SPORT_SCIENTIST_APPOINTMENT'
+  | 'PLAN_TRAINER_ASSIGNMENT'
   | 'HEALTH_MARKERS'
   | 'HEALTH_GOALS'
   | 'CONSENT'
@@ -19,6 +25,11 @@ export interface UserOnboardingSummary {
   reportsUploaded: boolean
   sportsScientistBooked: boolean
   nutritionistBooked: boolean
+  activeXTestCompleted?: boolean
+  dnaSampleCompleted?: boolean
+  valdTestCompleted?: boolean
+  planTrainerAssignmentCompleted?: boolean
+  appOnboardingCompleted?: boolean
   onboardingCompleted: boolean
 }
 

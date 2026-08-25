@@ -301,6 +301,7 @@ function MembershipsPageContent() {
       notes: formData.notes,
     }
 
+    const createdUserId = formData.userId
     if (editingMembership) {
       await updateMembership.mutateAsync({ id: editingMembership.id, payload })
     } else {
@@ -310,6 +311,11 @@ function MembershipsPageContent() {
     resetForm()
     setEditingMembership(null)
     setIsAddDialogOpen(false)
+
+    if (!editingMembership && createdUserId) {
+      toast.success('Membership created. Continue with onboarding at check-in.')
+      router.push(`/admin/users/${createdUserId}`)
+    }
   }
 
   const handleEditMembership = (membership: Membership) => {

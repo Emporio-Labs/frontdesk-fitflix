@@ -30,7 +30,7 @@ export interface MedicalReport {
 }
 
 // ── Expert appointment (returned by POST /onboarding/appointments) ────────────
-export type ExpertType = 'nutritionist'
+export type ExpertType = 'nutritionist' | 'sports_scientist'
 export type ExpertAppointmentStatus = 'Pending' | 'Confirmed' | 'Cancelled' | 'Completed'
 
 export interface ExpertAppointment {
@@ -158,6 +158,11 @@ export const onboardingService = {
   getStatusByUser: async (userId: string): Promise<OnboardingStatusResponse> => {
     const { data } = await apiClient.get(`/onboarding/status/${userId}`)
     return data as OnboardingStatusResponse
+  },
+
+  updateSharedStep: async (userId: string, step: string, completed: boolean) => {
+    const { data } = await apiClient.patch(`/onboarding/steps/${userId}/${step}`, { completed })
+    return data as { message: string; status: OnboardingStatusResponse }
   },
 
   submitHealthMarkers: async (payload: HealthMarkersPayload) => {

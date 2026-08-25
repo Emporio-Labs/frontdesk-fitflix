@@ -44,6 +44,23 @@ function invalidateOnboarding(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: queryKeys.users.all() })
 }
 
+export function useUpdateSharedOnboardingStep() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, step, completed }: { userId: string; step: string; completed: boolean }) =>
+      onboardingService.updateSharedStep(userId, step, completed),
+    onSuccess: (data, variables) => {
+      invalidateOnboarding(qc)
+      qc.invalidateQueries({ queryKey: queryKeys.users.detail(variables.userId) })
+      qc.invalidateQueries({ queryKey: queryKeys.onboarding.byUser(variables.userId) })
+      toast.success(data.message || 'Onboarding step updated')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || err?.response?.data?.message || 'Failed to update onboarding step')
+    },
+  })
+}
+
 export function useSubmitHealthMarkers() {
   const qc = useQueryClient()
   return useMutation({

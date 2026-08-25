@@ -46,7 +46,7 @@ import { useOnboardingProfile } from '@/hooks/use-onboarding'
 import { normalizeHealthMarkers, normalizeProfile } from '@/lib/onboarding-normalize'
 import { BOOKING_STATUS, type BookingStatusValue } from '@/lib/services/booking.service'
 import { StatusBadge } from '@/components/status-badge'
-import { OnboardingTimeline } from '@/components/onboarding-timeline'
+import { MemberOnboardingWorkflow } from '@/components/member-onboarding-workflow'
 import { EmptyState } from '@/components/empty-state'
 import { SkeletonTable } from '@/components/skeleton-loader'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -55,13 +55,6 @@ import { HealthGoalsDialog } from '@/components/health-goals-dialog'
 import { ConsentDialog } from '@/components/consent-dialog'
 import { OnboardingReportsDialog } from '@/components/onboarding-reports-dialog'
 import { InterestSummary } from '@/components/crm/interest-summary'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog'
 import {
   computeBmi,
   computeProteinGoalGrams,
@@ -245,8 +238,6 @@ export default function UserDetailPage() {
   const [goalsOpen, setGoalsOpen] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
   const [reportsOpen, setReportsOpen] = useState(false)
-  const [calOpen, setCalOpen] = useState(false)
-  const [calExpertType, setCalExpertType] = useState<'nutritionist' | null>(null)
 
   const { data: memberships, isLoading: membershipsLoading } = useMemberships()
   const { data: bookings, isLoading: bookingsLoading } = useBookings()
@@ -581,199 +572,15 @@ export default function UserDetailPage() {
           {/* ─── WORKOUT JOURNEY ─── */}
           <MemberWorkoutJourney userId={userId} />
 
-          {/* ─── ONBOARDING PROGRESS ─── */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle>Onboarding Progress</CardTitle>
-                <CardDescription>
-                  Live progression from the onboarding workflow engine
-                </CardDescription>
-              </div>
-              {(() => {
-                const summary = profile.onboardingStatus ?? user.onboardingStatus
-                if (summary?.onboardingCompleted || user.onboarded) {
-                  return <StatusBadge status="completed" size="sm" />
-                }
-                if (
-                  summary?.currentStep ||
-                  (summary?.completedSteps && summary.completedSteps.length > 0)
-                ) {
-                  return <StatusBadge status="in_progress" size="sm" />
-                }
-                return <StatusBadge status="not_started" size="sm" />
-              })()}
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {(() => {
-                const summary = profile.onboardingStatus ?? user.onboardingStatus
-                return (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                        <span className="text-muted-foreground">Current Step</span>
-                        {summary?.currentStep ? (
-                          <span className="font-medium">
-                            {summary.currentStep.replace(/_/g, ' ')}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                        <span className="text-muted-foreground">Completed Steps</span>
-                        <span className="font-medium">
-                          {summary?.completedSteps?.length ?? 0} / 7
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <StatusFlag
-                        label="Health Markers"
-                        value={summary?.healthMarkersCompleted}
-                        action={
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2"
-                            onClick={() => setMarkersOpen(true)}
-                          >
-                            <IconEye className="h-4 w-4 mr-1" />
-                            View Details
-                          </Button>
-                        }
-                      />
-                      <StatusFlag
-                        label="Health Goals"
-                        value={summary?.healthGoalsCompleted}
-                        action={
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2"
-                            onClick={() => setGoalsOpen(true)}
-                          >
-                            <IconEye className="h-4 w-4 mr-1" />
-                            View Details
-                          </Button>
-                        }
-                      />
-                      <StatusFlag
-                        label="Consent"
-                        value={summary?.consentCompleted}
-                        action={
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2"
-                            onClick={() => setConsentOpen(true)}
-                          >
-                            <IconEye className="h-4 w-4 mr-1" />
-                            View Details
-                          </Button>
-                        }
-                      />
-                      <StatusFlag
-                        label="Reports Uploaded"
-                        value={summary?.reportsUploaded}
-                        action={
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2"
-                            onClick={() => setReportsOpen(true)}
-                          >
-                            <IconFileText className="h-4 w-4 mr-1" />
-                            View Reports
-                          </Button>
-                        }
-                      />
-                      <StatusFlag label="Onboarding Completed" value={summary?.onboardingCompleted} />
-                    </div>
-
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium">Onboarding Appointments</h4>
-                      <div className="grid grid-cols-1 gap-3">
-                        {[
-                          {
-                            key: 'nutrition' as const,
-                            expertType: 'nutritionist' as const,
-                            label: 'Nutritionist',
-                            Icon: IconSalad,
-                            booked: !!summary?.nutritionistBooked,
-                          },
-                        ].map(({ key, expertType, label, Icon, booked }) => {
-                          const appt = (profile.expertAppointments ?? []).find(
-                            (a) => a.expertType === expertType,
-                          )
-                          const statusLabel =
-                            appt?.bookingStatus?.toLowerCase() ||
-                            (booked ? 'booked' : 'pending')
-                          const displayDate = appt?.appointmentDate || appt?.appointmentStart
-                          const displayLink = appt?.meetingLink || appt?.meetingUrl
-                          return (
-                            <div
-                              key={key}
-                              className="flex items-start justify-between gap-3 rounded-md border px-4 py-3"
-                            >
-                              <div className="flex items-start gap-3">
-                                <Icon className="h-5 w-5 text-muted-foreground mt-0.5" />
-                                <div>
-                                  <p className="font-medium text-sm">{label}</p>
-                                  {displayDate && (
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                      {formatDateForDisplay(displayDate)}
-                                    </p>
-                                  )}
-                                  {displayLink && (
-                                    <a
-                                      href={displayLink}
-                                      target="_blank"
-                                      rel="noreferrer noopener"
-                                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline block mt-0.5"
-                                    >
-                                      Meeting link
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {statusLabel === 'pending' && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 px-2 text-xs"
-                                    onClick={() => {
-                                      setCalExpertType(expertType)
-                                      setCalOpen(true)
-                                    }}
-                                  >
-                                    Schedule
-                                  </Button>
-                                )}
-                                {booked && (
-                                  <IconCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                )}
-                                <StatusBadge status={statusLabel} size="sm" />
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <OnboardingTimeline
-                        currentStep={summary?.currentStep}
-                        completedSteps={summary?.completedSteps}
-                      />
-                    </div>
-                  </>
-                )
-              })()}
-            </CardContent>
-          </Card>
+          {/* ─── MEMBERSHIP ONBOARDING ─── */}
+          <MemberOnboardingWorkflow
+            userId={userId}
+            userName={user.username}
+            hasActiveMembership={userMemberships.some((membership) => membership.status === 'Active')}
+            hasTrainerAssigned={Boolean(user.assignedTrainer && user.assignedTrainer !== 'none')}
+            onboarding={profile.onboardingStatus ?? user.onboardingStatus}
+            expertAppointments={profile.expertAppointments}
+          />
 
           <HealthMarkersDialog
             open={markersOpen}
@@ -795,26 +602,6 @@ export default function UserDetailPage() {
             onOpenChange={setReportsOpen}
             reports={profile.reports}
           />
-          <Dialog open={calOpen} onOpenChange={setCalOpen}>
-            <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-4">
-              <DialogHeader className="pb-2">
-                <DialogTitle>Schedule Expert Appointment</DialogTitle>
-                <DialogDescription>
-                  Book a Nutritionist slot on behalf of {user.username}.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 w-full h-full min-h-[400px] overflow-hidden rounded-md border bg-card">
-                {calOpen && calExpertType && (
-                  <iframe
-                    src={`https://cal.com/fitflix/nutritionist?email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.username)}&metadata[userId]=${userId}`}
-                    width="100%"
-                    height="100%"
-                    className="border-0"
-                  />
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
         </>
       )}
     </div>

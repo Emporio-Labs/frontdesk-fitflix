@@ -3,12 +3,12 @@ import { cn } from '@/lib/utils'
 import type { OnboardingStep } from '@/lib/services/user.service'
 
 export const ONBOARDING_STEP_ORDER: { key: OnboardingStep; label: string }[] = [
-  { key: 'HEALTH_MARKERS', label: 'Health Markers' },
-  { key: 'HEALTH_GOALS', label: 'Health Goals' },
-  { key: 'CONSENT', label: 'Consent' },
-  { key: 'REPORT_UPLOAD', label: 'Reports' },
-  { key: 'NUTRITIONIST_BOOKING', label: 'Nutritionist' },
-  { key: 'COMPLETED', label: 'Completed' },
+  { key: 'ACTIVE_X_TEST', label: 'Active X test' },
+  { key: 'DNA_SAMPLE', label: 'DNA sample' },
+  { key: 'VALD_TEST', label: 'VALD test' },
+  { key: 'NUTRITION_APPOINTMENT', label: 'Nutrition appointment' },
+  { key: 'SPORT_SCIENTIST_APPOINTMENT', label: 'Sport scientist' },
+  { key: 'PLAN_TRAINER_ASSIGNMENT', label: 'Plan & PT trainer' },
 ]
 
 export function onboardingStepLabel(step?: string | null): string {
@@ -29,47 +29,41 @@ interface OnboardingTimelineProps {
 
 export function OnboardingTimeline({ currentStep, completedSteps = [] }: OnboardingTimelineProps) {
   const completedSet = new Set(completedSteps)
-  const displaySteps = ONBOARDING_STEP_ORDER
 
   return (
     <div className="w-full overflow-x-auto">
-      <ol className="flex items-start min-w-max gap-0 py-2">
-        {displaySteps.map((step, idx) => {
-          const isCompleted = completedSet.has(step.key) || step.key === 'COMPLETED' && completedSet.has('COMPLETED')
+      <ol className="flex min-w-max items-start gap-0 py-2">
+        {ONBOARDING_STEP_ORDER.map((step, idx) => {
+          const isCompleted = completedSet.has(step.key)
           const isCurrent = currentStep === step.key
-          const isLast = idx === displaySteps.length - 1
+          const isLast = idx === ONBOARDING_STEP_ORDER.length - 1
 
           return (
-            <li key={step.key} className="flex items-start flex-1 min-w-[100px]">
-              <div className="flex flex-col items-center text-center px-1">
+            <li key={step.key} className="flex min-w-[120px] flex-1 items-start">
+              <div className="flex flex-col items-center px-1 text-center">
                 <div
                   className={cn(
                     'flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold transition-colors',
                     isCompleted
-                      ? 'bg-primary text-primary-foreground border-primary'
+                      ? 'border-primary bg-primary text-primary-foreground'
                       : isCurrent
-                      ? 'border-primary text-primary bg-background'
-                      : 'bg-muted text-muted-foreground border-border'
+                        ? 'border-primary bg-background text-primary'
+                        : 'border-border bg-muted text-muted-foreground',
                   )}
                 >
                   {isCompleted ? <IconCheck className="h-4 w-4" /> : idx + 1}
                 </div>
                 <span
                   className={cn(
-                    'mt-2 text-[11px] leading-tight max-w-[80px]',
-                    isCompleted || isCurrent ? 'text-foreground font-medium' : 'text-muted-foreground'
+                    'mt-2 max-w-[100px] text-[11px] leading-tight',
+                    isCompleted || isCurrent ? 'font-medium text-foreground' : 'text-muted-foreground',
                   )}
                 >
                   {step.label}
                 </span>
               </div>
               {!isLast && (
-                <div
-                  className={cn(
-                    'mt-4 h-px flex-1 min-w-[12px]',
-                    isCompleted ? 'bg-primary' : 'bg-border'
-                  )}
-                />
+                <div className={cn('mt-4 h-px min-w-[16px] flex-1', isCompleted ? 'bg-primary' : 'bg-border')} />
               )}
             </li>
           )

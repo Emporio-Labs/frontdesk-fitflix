@@ -36,6 +36,7 @@ import {
 } from '@tabler/icons-react'
 import { useUsers } from '@/hooks/use-users'
 import { useMemberships } from '@/hooks/use-memberships'
+import { getMemberOnboardingStatus } from '@/lib/member-onboarding'
 import { QrScannerDialog } from '@/components/attendance/qr-scanner-dialog'
 import {
   useCheckIn,
@@ -366,6 +367,8 @@ function CheckInCard() {
     label: string
     hasActiveMembership: boolean
     isCurrentlyIn: boolean
+    onboardingCompletedCount: number
+    onboardingPendingLabels: string[]
   } | null>(null)
   const [visitType, setVisitType] = useState<VisitType>('workout')
   const [notes, setNotes] = useState('')
@@ -462,6 +465,9 @@ function CheckInCard() {
                       Already Checked In
                     </Badge>
                   )}
+                  <Badge variant="outline" className={selected.onboardingPendingLabels.length === 0 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 text-[10px] px-1.5 py-0' : 'border-amber-500/30 bg-amber-500/10 text-amber-700 text-[10px] px-1.5 py-0'}>
+                    Onboarding {selected.onboardingCompletedCount}/6
+                  </Badge>
                 </div>
                 <button
                   type="button"
@@ -494,14 +500,22 @@ function CheckInCard() {
                         <button
                           key={u.id}
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            const readiness = getMemberOnboardingStatus({
+                              onboarding: u.onboardingStatus,
+                              expertAppointments: u.expertAppointments,
+                              hasActiveMembership: hasActive,
+                              hasTrainerAssigned: Boolean(u.assignedTrainer && u.assignedTrainer !== 'none'),
+                            })
                             setSelected({
                               id: u.id,
                               label: u.username || u.email || u.id,
                               hasActiveMembership: hasActive,
                               isCurrentlyIn,
+                              onboardingCompletedCount: readiness.completedCount,
+                              onboardingPendingLabels: readiness.pendingSteps.map((step) => step.title),
                             })
-                          }
+                          }}
                           className="block w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -548,6 +562,28 @@ function CheckInCard() {
             <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-xs text-amber-600">
               <IconAlertTriangle className="h-4 w-4 shrink-0" />
               <span>Cannot check in: Member is already checked in. Check them out first.</span>
+            </div>
+          )}
+
+          {selected && selected.hasActiveMembership && selected.onboardingPendingLabels.length > 0 && (
+            <div className="rounded-lg border border-amber-300/70 bg-amber-50/70 p-3 text-sm dark:border-amber-900/60 dark:bg-amber-950/20">
+              <div className="flex items-start gap-2">
+                <IconAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-amber-950 dark:text-amber-100">Onboarding incomplete — flag this at check-in</p>
+                  <p className="mt-1 text-xs text-amber-900/80 dark:text-amber-200/80">Outstanding: {selected.onboardingPendingLabels.join(' · ')}</p>
+                  <Button asChild variant="link" size="sm" className="h-auto px-0 pt-2 text-amber-800 dark:text-amber-200">
+                    <Link href={`/admin/users/${selected.id}`}>Open onboarding checklist <span className="ml-1">→</span></Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selected && selected.hasActiveMembership && selected.onboardingPendingLabels.length === 0 && (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-300/70 bg-emerald-50/70 p-3 text-xs text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-200">
+              <IconUserCheck className="h-4 w-4 shrink-0" />
+              <span>All six physical onboarding steps are complete.</span>
             </div>
           )}
 
