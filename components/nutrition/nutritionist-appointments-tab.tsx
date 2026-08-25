@@ -44,11 +44,12 @@ import type {
 } from '@/lib/services/nutritionist-booking.service'
 import { useVideoConference } from '@/components/video-conference/video-conference-provider'
 
-type Tab = 'pending' | 'confirmed' | 'cancelled' | 'all'
+type Tab = 'pending' | 'confirmed' | 'rejected' | 'cancelled' | 'all'
 
 const STATUS_BY_TAB: Record<Exclude<Tab, 'all'>, NutritionistBookingStatus> = {
   pending: 'Pending',
   confirmed: 'Confirmed',
+  rejected: 'Rejected',
   cancelled: 'Cancelled',
 }
 
@@ -86,9 +87,13 @@ function NutritionistStatusBadge({ status }: { status: NutritionistBookingStatus
       label: 'ACCEPTED',
       cls: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-transparent',
     },
-    cancelled: {
+    rejected: {
       label: 'REJECTED',
       cls: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-transparent',
+    },
+    cancelled: {
+      label: 'CANCELLED',
+      cls: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-transparent',
     },
     completed: {
       label: 'COMPLETED',
@@ -117,7 +122,9 @@ function AppointmentModeCell({ booking }: { booking: NutritionistBooking }) {
         <IconMapPin className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
         <div>
           <div className="font-medium text-xs">Fitflix Clinic</div>
-          <div className="text-[11px] text-muted-foreground">Sainikpuri</div>
+          <div className="text-[11px] text-muted-foreground">
+            {booking.clinicLocation || '—'}
+          </div>
         </div>
       </div>
     )
@@ -188,14 +195,16 @@ export function NutritionistAppointmentsTab() {
   const counts = useMemo(() => {
     let pending = 0
     let confirmed = 0
+    let rejected = 0
     let cancelled = 0
     for (const b of bookings) {
       const status = String(b.bookingStatus || '').toLowerCase()
       if (status === 'pending') pending++
       else if (status === 'confirmed') confirmed++
+      else if (status === 'rejected') rejected++
       else if (status === 'cancelled') cancelled++
     }
-    return { pending, confirmed, cancelled, total: bookings.length }
+    return { pending, confirmed, rejected, cancelled, total: bookings.length }
   }, [bookings])
 
   const segmented = useMemo(() => {
@@ -251,7 +260,7 @@ export function NutritionistAppointmentsTab() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Pending"
           value={counts.pending}
@@ -266,8 +275,14 @@ export function NutritionistAppointmentsTab() {
         />
         <StatCard
           title="Rejected"
-          value={counts.cancelled}
+          value={counts.rejected}
           icon={<IconX className="w-4 h-4 text-red-500" />}
+          loading={isLoading}
+        />
+        <StatCard
+          title="Cancelled"
+          value={counts.cancelled}
+          icon={<IconX className="w-4 h-4 text-slate-500" />}
           loading={isLoading}
         />
         <StatCard
@@ -332,7 +347,8 @@ export function NutritionistAppointmentsTab() {
           <TabsList>
             <TabsTrigger value="pending">Pending ({counts.pending})</TabsTrigger>
             <TabsTrigger value="confirmed">Accepted ({counts.confirmed})</TabsTrigger>
-            <TabsTrigger value="cancelled">Rejected ({counts.cancelled})</TabsTrigger>
+            <TabsTrigger value="rejected">Rejected ({counts.rejected})</TabsTrigger>
+            <TabsTrigger value="cancelled">Cancelled ({counts.cancelled})</TabsTrigger>
             <TabsTrigger value="all">All ({counts.total})</TabsTrigger>
           </TabsList>
           <Input
