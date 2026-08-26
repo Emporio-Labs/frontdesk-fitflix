@@ -34,7 +34,7 @@ import { useUsers } from '@/hooks/use-users'
 import { useMemberships } from '@/hooks/use-memberships'
 import { useTopUpUserCredits, useUserCreditBalance } from '@/hooks/use-credits'
 import { BOOKING_STATUS, BookingStatusValue, Booking } from '@/lib/services/booking.service'
-import { getBookingServiceName } from '@/lib/populated'
+import { getBookingServiceName, getBookingTimeSlotLabel } from '@/lib/populated'
 import { cn, toUtcDateKey } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -867,14 +867,7 @@ export default function BookingsPage() {
                 </TableHeader>
                 <TableBody>
                   {todaysUpcomingBookings.map((booking) => {
-                    const slot =
-                      booking.slot?.startTime && booking.slot?.endTime
-                        ? booking.slot
-                        : slotById.get(booking.slot?._id ?? '')
-                    const timeLabel =
-                      slot?.startTime && slot?.endTime
-                        ? `${slot.startTime} to ${slot.endTime}`
-                        : 'Time TBD'
+                    const timeLabel = getBookingTimeSlotLabel(booking, slotById, 'Time TBD')
 
                     return (
                       <TableRow key={`today-${booking._id}`}>

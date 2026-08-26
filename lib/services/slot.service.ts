@@ -1,8 +1,22 @@
 import { apiClient } from '@/lib/api-client'
 
+// Which expert this slot's capacity belongs to. Mirrors backend ExpertType
+// (src/models/Enums.ts). Every slot created before this field existed is
+// backfilled to 'nutritionist' — see scripts/backfill-slot-expert-type.ts in
+// the backend repo.
+export type SlotExpertType = 'nutritionist' | 'trainer' | 'doctor' | 'sports_scientist'
+
+export const SLOT_EXPERT_TYPE_OPTIONS: { value: SlotExpertType; label: string }[] = [
+  { value: 'nutritionist', label: 'Nutritionist' },
+  { value: 'sports_scientist', label: 'Sports Scientist' },
+  { value: 'trainer', label: 'Trainer' },
+  { value: 'doctor', label: 'Doctor' },
+]
+
 export interface Slot {
   _id: string
   date?: string
+  expertType: SlotExpertType
   startTime: string
   endTime: string
   isDaily: boolean
@@ -16,6 +30,7 @@ export interface Slot {
 
 export interface CreateSlotPayload {
   date?: string
+  expertType?: SlotExpertType
   startTime: string
   endTime: string
   isDaily?: boolean
@@ -25,6 +40,7 @@ export interface CreateSlotPayload {
 
 export interface UpdateSlotPayload {
   date?: string
+  expertType?: SlotExpertType
   startTime?: string
   endTime?: string
   isDaily?: boolean
@@ -61,9 +77,16 @@ function normalizeSlot(raw: any): Slot {
     )
   )
 
+  const expertType: SlotExpertType = SLOT_EXPERT_TYPE_OPTIONS.some(
+    (option) => option.value === raw?.expertType
+  )
+    ? raw.expertType
+    : 'nutritionist'
+
   return {
     _id: String(raw?._id || raw?.id || ''),
     date: rawDate || undefined,
+    expertType,
     startTime: String(raw?.startTime || ''),
     endTime: String(raw?.endTime || ''),
     isDaily,

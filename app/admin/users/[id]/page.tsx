@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -41,12 +42,16 @@ import {
 import { useBookings } from '@/hooks/use-bookings'
 import { useMemberships } from '@/hooks/use-memberships'
 import { useServices } from '@/hooks/use-services'
+import { useTherapies } from '@/hooks/use-therapies'
+import { useGroupClasses } from '@/hooks/use-group-classes'
 import { useSlots } from '@/hooks/use-slots'
 import { useOnboardingProfile } from '@/hooks/use-onboarding'
 import { normalizeHealthMarkers, normalizeProfile } from '@/lib/onboarding-normalize'
 import { BOOKING_STATUS, type BookingStatusValue } from '@/lib/services/booking.service'
+import { getBookingServiceName, getBookingTimeSlotLabel } from '@/lib/populated'
 import { StatusBadge } from '@/components/status-badge'
 import { MemberOnboardingWorkflow } from '@/components/member-onboarding-workflow'
+import { MemberBcaMetrics } from '@/components/member-bca-metrics'
 import { EmptyState } from '@/components/empty-state'
 import { SkeletonTable } from '@/components/skeleton-loader'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -154,15 +159,22 @@ interface BookingRow {
   service?: PopulatedServiceRef | null
   slot?: PopulatedSlotRef | null
   classId?: any
+  sessionId?: any
+  startTime?: string
+  endTime?: string
+  name?: string
+  title?: string
 }
 
 function BookingsTable({
   rows,
   serviceMap,
+  classMap,
   slotMap,
 }: {
   rows: BookingRow[]
   serviceMap: Map<string, string>
+  classMap?: Map<string, string>
   slotMap: Map<string, string>
 }) {
   return (
@@ -177,16 +189,34 @@ function BookingsTable({
       </TableHeader>
       <TableBody>
         {rows.map((b) => {
-          const serviceName =
-            b.service?.serviceName || serviceMap.get(b.service?._id ?? '') || '—'
-          const slotLabel =
-            (b.slot?.startTime && b.slot?.endTime
-              ? `${b.slot.startTime} – ${b.slot.endTime}`
-              : slotMap.get(b.slot?._id ?? '')) || '—'
+          const serviceName = getBookingServiceName(b, classMap, serviceMap, '—')
+          const slotLabel = getBookingTimeSlotLabel(b, slotMap, '—')
           const statusLabel = STATUS_TO_BADGE[b.status] || 'pending'
+
+          const isClass = Boolean(b.classId || b.sessionId)
+          const classObj = typeof b.classId === 'object' ? b.classId : null
+          const sessionType = classObj?.sessionType || (isClass ? 'group_class' : null)
+          const instructor = classObj?.instructor
+
           return (
             <TableRow key={b._id}>
-              <TableCell className="font-medium">{serviceName}</TableCell>
+              <TableCell>
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-medium">{serviceName}</span>
+                    {sessionType && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        {sessionType === 'live_stream' ? 'Live Stream' : 'Group Class'}
+                      </Badge>
+                    )}
+                  </div>
+                  {instructor && (
+                    <span className="text-xs text-muted-foreground">
+                      Instructor: {instructor}
+                    </span>
+                  )}
+                </div>
+              </TableCell>
               <TableCell>{formatDateForDisplay(b.bookingDate)}</TableCell>
               <TableCell>{slotLabel}</TableCell>
               <TableCell>
@@ -242,6 +272,8 @@ export default function UserDetailPage() {
   const { data: memberships, isLoading: membershipsLoading } = useMemberships()
   const { data: bookings, isLoading: bookingsLoading } = useBookings()
   const { data: services } = useServices()
+  const { data: therapies } = useTherapies()
+  const { data: groupClasses } = useGroupClasses()
   const { data: slots } = useSlots()
 
   const userMemberships = useMemo(
@@ -252,8 +284,15 @@ export default function UserDetailPage() {
   const serviceMap = useMemo(() => {
     const m = new Map<string, string>()
     ;(services ?? []).forEach((s) => m.set(s.id, s.name))
+    ;(therapies ?? []).forEach((t) => m.set(t.id, t.name))
     return m
-  }, [services])
+  }, [services, therapies])
+
+  const classMap = useMemo(() => {
+    const m = new Map<string, string>()
+    ;(groupClasses ?? []).forEach((c) => m.set(c.id, c.name))
+    return m
+  }, [groupClasses])
 
   const slotMap = useMemo(() => {
     const m = new Map<string, string>()
@@ -406,6 +445,9 @@ export default function UserDetailPage() {
             }
           />
 
+          {/* ─── BODY COMPOSITION (ACTIVE X) ─── */}
+          <MemberBcaMetrics userId={userId} />
+
           <Card>
             <CardHeader>
               <CardTitle>Health Goals</CardTitle>
@@ -512,6 +554,7 @@ export default function UserDetailPage() {
                       <BookingsTable
                         rows={upcomingBookings}
                         serviceMap={serviceMap}
+                        classMap={classMap}
                         slotMap={slotMap}
                       />
                     </div>
@@ -522,6 +565,7 @@ export default function UserDetailPage() {
                       <BookingsTable
                         rows={pastBookings}
                         serviceMap={serviceMap}
+                        classMap={classMap}
                         slotMap={slotMap}
                       />
                     </div>

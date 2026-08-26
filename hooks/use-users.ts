@@ -56,11 +56,15 @@ export function useMyReports() {
   })
 }
 
-export function useMyHpodMetrics() {
+// Staff-facing read of a member's ActiveX body-composition scans, for the
+// onboarding/member-profile card. Replaces the dead useMyHpodMetrics, which
+// called a pre-ActiveX endpoint the backend stopped serving.
+export function useUserBcaMetrics(userId: string) {
   return useQuery({
-    queryKey: ['users', 'me', 'hpod-metrics'] as const,
-    queryFn: userService.getMyHpodMetrics,
+    queryKey: queryKeys.users.bcaMetrics(userId),
+    queryFn: () => userService.getUserBcaMetrics(userId),
     select: (data) => data.history,
+    enabled: !!userId,
   })
 }
 

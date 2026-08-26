@@ -2,6 +2,7 @@ export const queryKeys = {
   users: {
     all: () => ['users'] as const,
     detail: (id: string) => ['users', id] as const,
+    bcaMetrics: (id: string) => ['users', id, 'bca-metrics'] as const,
   },
   admins: {
     all: () => ['admins'] as const,
@@ -113,6 +114,10 @@ export const queryKeys = {
   nutritionistBookings: {
     all: () => ['nutritionist-bookings'] as const,
     detail: (id: string) => ['nutritionist-bookings', id] as const,
+  },
+  sportsScientistBookings: {
+    all: () => ['sports-scientist-bookings'] as const,
+    detail: (id: string) => ['sports-scientist-bookings', id] as const,
   },
   invoices: {
     all: () => ['invoices'] as const,

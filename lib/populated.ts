@@ -108,9 +108,62 @@ export function getBookingServiceName(
     return serviceMap.get(booking.service)!
   }
 
-  // 5. Check populated sessionId object title
-  if (typeof booking.sessionId === 'object' && booking.sessionId?.title) {
-    return booking.sessionId.title
+  // 5. Check populated sessionId object title/name
+  if (typeof booking.sessionId === 'object' && (booking.sessionId?.title || booking.sessionId?.name || booking.sessionId?.sessionName)) {
+    return booking.sessionId.title || booking.sessionId.name || booking.sessionId.sessionName
+  }
+
+  // 6. Direct title/name
+  if (typeof booking.name === 'string' && booking.name) return booking.name
+  if (typeof booking.title === 'string' && booking.title) return booking.title
+
+  return fallback
+}
+
+export function getBookingTimeSlotLabel(
+  booking:
+    | {
+        startTime?: string
+        endTime?: string
+        slot?: PopulatedSlotRef | null
+        sessionId?: { startTime?: string; endTime?: string; [key: string]: any } | null
+        [key: string]: any
+      }
+    | null
+    | undefined,
+  slotMap?: Map<string, any>,
+  fallback = '—',
+): string {
+  if (!booking) return fallback
+
+  // 1. Direct startTime and endTime on booking document
+  if (booking.startTime && booking.endTime) {
+    return `${booking.startTime} – ${booking.endTime}`
+  }
+  if (booking.startTime) return booking.startTime
+
+  // 2. Populated slot on booking
+  if (booking.slot?.startTime && booking.slot?.endTime) {
+    return `${booking.slot.startTime} – ${booking.slot.endTime}`
+  }
+  if (booking.slot?.startTime) return booking.slot.startTime
+
+  // 3. Populated sessionId
+  if (typeof booking.sessionId === 'object' && booking.sessionId?.startTime && booking.sessionId?.endTime) {
+    return `${booking.sessionId.startTime} – ${booking.sessionId.endTime}`
+  }
+  if (typeof booking.sessionId === 'object' && booking.sessionId?.startTime) {
+    return booking.sessionId.startTime
+  }
+
+  // 4. Slot ID lookup
+  if (booking.slot?._id && slotMap?.has(booking.slot._id)) {
+    const val = slotMap.get(booking.slot._id)
+    if (typeof val === 'string') return val
+    if (val && typeof val === 'object' && val.startTime && val.endTime) {
+      return `${val.startTime} – ${val.endTime}`
+    }
+    if (val && typeof val === 'object' && val.startTime) return val.startTime
   }
 
   return fallback

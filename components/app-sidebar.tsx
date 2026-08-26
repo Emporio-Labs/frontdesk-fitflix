@@ -28,6 +28,7 @@ import {
   IconMessage2,
   IconDumbbell,
   IconBellRinging,
+  IconStethoscope,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -62,6 +63,7 @@ const navGroups = [
     items: [
       { title: "Personal Training", url: "/admin/personal-training", icon: IconDumbbell },
       { title: "Nutrition", url: "/admin/nutrition", icon: IconSalad },
+      { title: "Sports Scientist", url: "/admin/sports-scientist", icon: IconStethoscope },
       { title: "Workouts", url: "/dashboard/workouts", icon: IconBarbell },
       { title: "Workout Templates", url: "/dashboard/workouts/templates", icon: IconTemplate },
     ],

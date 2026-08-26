@@ -79,6 +79,10 @@ const statusConfig: Record<string, StatusStyle> = {
   },
 
   // Red/Danger/Expired/Cancelled
+  rejected: {
+    badge: 'bg-rose-50/60 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
+    dot: 'bg-rose-500',
+  },
   expired: {
     badge: 'bg-rose-50/60 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
     dot: 'bg-rose-500',

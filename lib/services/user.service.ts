@@ -149,25 +149,40 @@ export interface UserReport {
   pdf_url: string
 }
 
-export interface HpodMetric {
+// Body Composition Analysis scan, pulled from the ActiveX device.
+// Mirrors the backend `bca_metrics` document (src/models/BcaMetric.ts) —
+// replaces the old HpodMetric shape from the pre-ActiveX Gmail-report
+// pipeline, which the backend no longer serves (see GET /users/me/hpod-metrics,
+// 404 since the ActiveX migration).
+export interface BcaMetric {
   _id: string
-  reportId: string
-  reportDate: string
   recordedAt: string
   receivedAt: string
-  patientName: string
-  patientEmail: string
-  patientPhone: string
-  age: string
-  gender: string
-  vitals: Record<string, unknown>
-  bodyComposition: Record<string, unknown>
-  ecg: Record<string, unknown>
-  idealBodyWeight_kg: number
-  weightToLose_kg: number
-  testsNotTaken: string[]
-  healthInsight: string
-  concerns: string[]
+  patientPhone: string | null
+  age: string | null
+  gender: string | null
+  vitals: {
+    weight_kg: number | null
+    height_cm: number | null
+    bmi: number | null
+    pulse: number | null
+    heart_rate: number | null
+  }
+  bodyComposition: {
+    body_fat_mass_kg: number | null
+    body_fat_percent: number | null
+    skeletal_muscle_mass_kg: number | null
+    muscle_mass_kg: number | null
+    total_body_water_L: number | null
+    protein_kg: number | null
+    minerals_kg: number | null
+    visceral_fat: number | null
+    basal_metabolic_rate_cal: number | null
+    body_age: number | null
+  }
+  idealBodyWeight_kg: number | null
+  weightToLose_kg: number | null
+  source: string
 }
 
 function normalizeUser(raw: any): User {
@@ -237,9 +252,12 @@ export const userService = {
     return data as { reports: UserReport[] }
   },
 
-  getMyHpodMetrics: async () => {
-    const { data } = await apiClient.get('/users/me/hpod-metrics')
-    return data as { history: HpodMetric[] }
+  // Staff-facing counterpart to the member's own GET /users/me/bca-metrics —
+  // lets the front desk see an ActiveX scan the member never opened the app
+  // to view. Guarded server-side to admin/frontdesk.
+  getUserBcaMetrics: async (userId: string) => {
+    const { data } = await apiClient.get(`/users/${userId}/bca-metrics`)
+    return data as { history: BcaMetric[] }
   },
 
   create: async (payload: CreateUserPayload): Promise<{ message: string; user: User }> => {

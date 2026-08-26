@@ -12,11 +12,15 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { IconPlus, IconTrash, IconRefresh } from '@tabler/icons-react'
 import { useSlots, useCreateSlot, useDeleteSlot } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
 import { useBookings } from '@/hooks/use-bookings'
+import { SLOT_EXPERT_TYPE_OPTIONS, SlotExpertType } from '@/lib/services/slot.service'
 import { toUtcDateKey } from '@/lib/utils'
 import { getUserDisplayName } from '@/lib/populated'
 import { toast } from 'sonner'
@@ -52,7 +56,12 @@ function formatSlotSchedule(date?: string, isDaily?: boolean) {
 
 export default function SlotsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [formData, setFormData] = useState({ startTime: '', endTime: '', capacity: 1 })
+  const [formData, setFormData] = useState<{
+    startTime: string
+    endTime: string
+    capacity: number
+    expertType: SlotExpertType
+  }>({ startTime: '', endTime: '', capacity: 1, expertType: 'nutritionist' })
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12
 
@@ -129,10 +138,11 @@ export default function SlotsPage() {
       startTime: formData.startTime,
       endTime: formData.endTime,
       capacity: formData.capacity,
+      expertType: formData.expertType,
       isDaily: true,
     })
     setIsDialogOpen(false)
-    setFormData({ startTime: '', endTime: '', capacity: 1 })
+    setFormData({ startTime: '', endTime: '', capacity: 1, expertType: 'nutritionist' })
   }
 
   return (
@@ -155,6 +165,28 @@ export default function SlotsPage() {
                 <DialogTitle>Create Daily Time Slot</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-2">
+                <div>
+                  <label className="text-sm font-medium">Expert</label>
+                  <Select
+                    value={formData.expertType}
+                    onValueChange={(value) => setFormData({ ...formData, expertType: value as SlotExpertType })}
+                  >
+                    <SelectTrigger id="slot-expert-type">
+                      <SelectValue placeholder="Select expert" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SLOT_EXPERT_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Capacity is separate per expert — a Nutritionist slot and a Sports Scientist
+                    slot at the same time do not share seats.
+                  </p>
+                </div>
                 <div>
                   <label className="text-sm font-medium">Start Time</label>
                   <Input type="time" value={formData.startTime} onChange={(e) => setFormData({ ...formData, startTime: e.target.value })} />
@@ -199,6 +231,7 @@ export default function SlotsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Expert</TableHead>
                       <TableHead>Schedule</TableHead>
                       <TableHead>Start Time</TableHead>
                       <TableHead className="hidden md:table-cell">End Time</TableHead>
@@ -211,13 +244,18 @@ export default function SlotsPage() {
                   </TableHeader>
                   <TableBody>
                     {slots.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No slots found. Create your first slot.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No slots found. Create your first slot.</TableCell></TableRow>
                     ) : (
                       paginatedSlots.map((slot) => {
                         const linkedItems = getLinkedItems(slot._id)
                         const slotBookings = getSlotBookings(slot._id, slot.date ?? undefined, slot.isDaily)
                         return (
                           <TableRow key={slot._id}>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize">
+                                {SLOT_EXPERT_TYPE_OPTIONS.find((o) => o.value === slot.expertType)?.label ?? slot.expertType}
+                              </Badge>
+                            </TableCell>
                             <TableCell>{formatSlotSchedule(slot.date, slot.isDaily)}</TableCell>
                             <TableCell>{slot.startTime}</TableCell>
                             <TableCell className="hidden md:table-cell">{slot.endTime}</TableCell>
