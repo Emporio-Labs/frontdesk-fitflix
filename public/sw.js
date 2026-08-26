@@ -6,7 +6,11 @@
  * /api responses are NEVER cached — doing so could serve one staff member's data
  * to the next person picking up the device.
  */
-const CACHE = 'fitflix-static-v1'
+// Bumped v1 -> v2 so the `activate` handler below evicts anything a previous
+// worker cached. That matters because dev registrations (now disabled — see
+// components/pwa-register.tsx) could pin unhashed `next dev` chunks, and the
+// eviction is keyed on this name changing.
+const CACHE = 'fitflix-static-v2'
 
 // Immutable, content-hashed build assets + our own icons. Nothing user-specific.
 function isCacheable(url) {

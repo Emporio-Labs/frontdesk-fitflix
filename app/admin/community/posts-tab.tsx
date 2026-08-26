@@ -285,7 +285,12 @@ export function PostsTab() {
     // Split attachments into images, video and other files for the backend
     const images = attachments
       .filter(a => a.type === 'image')
-      .map(a => ({ url: (a as UploadedImage).url, thumbnailUrl: (a as UploadedImage).thumbnailUrl }))
+      .map(a => ({
+        url: (a as UploadedImage).url,
+        thumbnailUrl: (a as UploadedImage).thumbnailUrl,
+        width: (a as UploadedImage).width,
+        height: (a as UploadedImage).height,
+      }))
     const video = attachments.find(a => a.type === 'video') as UploadedVideo | undefined
     const fileAttachments = attachments
       .filter(a => a.type === 'file')

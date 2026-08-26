@@ -6,6 +6,7 @@ export type AppointmentMode = 'IN_PERSON' | 'ONLINE'
 export type NutritionistBookingStatus =
   | 'Pending'
   | 'Confirmed'
+  | 'Rejected'
   | 'Cancelled'
   | 'Completed'
   | 'Expired'
@@ -20,6 +21,7 @@ export interface NutritionistBooking {
   appointmentMode?: AppointmentMode
   meetingLink?: string | null
   timeSlot?: string | null
+  clinicLocation?: string | null
   // Backend field names (bookingDate/startTime/endTime — see
   // FITFLIX_BACKEND src/models/NutritionistBooking.ts). Not covered by
   // normalizeBooking's explicit mapping, but the `...raw` spread there
@@ -53,15 +55,20 @@ function normalizeBooking(raw: any): NutritionistBooking {
       raw?.bookingStatus ??
       (raw?.status === 'ACCEPTED'
         ? 'Confirmed'
+        // Staff-declined vs member-withdrawn are distinct outcomes — see
+        // FITFLIX_BACKEND NutritionistBookingStatus. Keeping them apart here
+        // is what lets the appointments tab badge them differently.
         : raw?.status === 'REJECTED'
-          ? 'Cancelled'
-          : raw?.status === 'COMPLETED'
-            ? 'Completed'
-            : raw?.status === 'EXPIRED'
-              ? 'Expired'
-              : raw?.status === 'RESCHEDULE_REQUIRED'
-                ? 'RescheduleRequired'
-                : raw?.status ?? 'Pending'),
+          ? 'Rejected'
+          : raw?.status === 'CANCELLED'
+            ? 'Cancelled'
+            : raw?.status === 'COMPLETED'
+              ? 'Completed'
+              : raw?.status === 'EXPIRED'
+                ? 'Expired'
+                : raw?.status === 'RESCHEDULE_REQUIRED'
+                  ? 'RescheduleRequired'
+                  : raw?.status ?? 'Pending'),
     appointmentDate: raw?.appointmentDate ?? raw?.bookingDate ?? raw?.date ?? null,
     zegoRoomId: raw?.zegoRoomId ?? null,
     assignedNutritionistId: raw?.assignedNutritionistId ?? null,
