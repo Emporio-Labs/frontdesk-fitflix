@@ -188,7 +188,7 @@ export function NutritionistAppointmentsTab() {
   const { startCall } = useVideoConference()
 
   const { data: bookings = [], isLoading, isError, refetch } = useNutritionistBookings()
-  const { data: slots = [] } = useSlots()
+  const { data: slots = [] } = useSlots({ resourceType: 'NUTRITIONIST' })
   const accept = useAcceptNutritionistBooking()
   const reject = useRejectNutritionistBooking()
 

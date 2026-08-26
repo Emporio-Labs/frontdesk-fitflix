@@ -277,7 +277,7 @@ export function BookingsTab() {
     isError,
     refetch,
   } = useSportsScientistBookings()
-  const { data: slots = [] } = useSlots()
+  const { data: slots = [] } = useSlots({ resourceType: 'SPORTS_SCIENTIST' })
   const accept = useAcceptSportsScientistBooking()
   const reject = useRejectSportsScientistBooking()
   const complete = useCompleteSportsScientistBooking()

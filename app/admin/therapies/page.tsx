@@ -80,6 +80,7 @@ import { useSlots } from '@/hooks/use-slots'
 import type { TherapyCatalogItem } from '@/lib/services/therapy.service'
 import type { ClassFormat, GroupClass, GroupClassMode } from '@/lib/services/group-class.service'
 import { slotService, type Slot } from '@/lib/services/slot.service'
+import { timeToMinutes, minutesToTime } from '@/lib/time-utils'
 import { LiveSessionsPanel } from '@/components/live-sessions/live-sessions-panel'
 import { useLiveSessions, useAllScheduledSessions, useEndSession } from '@/hooks/use-live-sessions'
 import { resolveBookingWindow } from '@/lib/booking-window'
@@ -243,28 +244,6 @@ function formatSlotDate(rawDate?: string, isDaily = false) {
     month: 'short',
     day: 'numeric',
   })
-}
-
-function timeToMinutes(value: string): number | null {
-  const [hoursRaw, minutesRaw] = value.split(':')
-  const hours = Number(hoursRaw)
-  const minutes = Number(minutesRaw)
-
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
-    return null
-  }
-
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-    return null
-  }
-
-  return hours * 60 + minutes
-}
-
-function minutesToTime(value: number): string {
-  const hours = Math.floor(value / 60)
-  const minutes = value % 60
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
 function calculateEndTime(startTime: string, durationMinutes: number): string {
@@ -566,12 +545,11 @@ export default function TherapiesPage() {
 
   const handleTogglePublish = async (gc: GroupClass, targetStatus: boolean) => {
     if (targetStatus) {
-      const gcSlots = slots.filter((slot) => gc.slots?.includes(slot._id))
       const isIncomplete =
         !gc.instructor.trim() ||
         gc.instructor === 'Staff' ||
         gc.maxParticipants <= 0 ||
-        gcSlots.length === 0
+        !gc.scheduleInfo?.trim()
 
       if (isIncomplete) {
         setPendingPublishGc({ id: gc.id, isPublished: true })
@@ -665,72 +643,36 @@ export default function TherapiesPage() {
       return
     }
 
-    if (startInMinutes % 60 !== 0 || endInMinutes % 60 !== 0) {
-      toast.error('Hourly slot generation requires full-hour times (for example, 09:00 to 17:00)')
-      return
-    }
-
     if (!Number.isInteger(slotPlan.capacityPerHour) || slotPlan.capacityPerHour <= 0) {
       toast.error('Capacity per hour must be at least 1')
       return
     }
 
-    const hourlyRanges: Array<{ startTime: string; endTime: string }> = []
-    for (let cursor = startInMinutes; cursor + 60 <= endInMinutes; cursor += 60) {
-      hourlyRanges.push({
-        startTime: minutesToTime(cursor),
-        endTime: minutesToTime(cursor + 60),
-      })
-    }
-
-    if (!hourlyRanges.length) {
-      toast.error('No hourly slots can be generated from this time range')
-      return
-    }
+    const durationMinutes = formData.time > 0 ? formData.time : 60
 
     setIsGeneratingSlots(true)
     try {
-      const requests = hourlyRanges.map((range) =>
-        slotService.create({
-          startTime: range.startTime,
-          endTime: range.endTime,
-          isDaily: true,
-          capacity: slotPlan.capacityPerHour,
-        })
-      )
+      const result = await slotService.generate({
+        resourceType: 'THERAPY',
+        resourceId: editingItem?.id || null,
+        windows: [{ startTime: slotPlan.startTime, endTime: slotPlan.endTime }],
+        slotDurationMinutes: durationMinutes,
+        capacity: slotPlan.capacityPerHour,
+        isDaily: true,
+        dryRun: false,
+      })
 
-      const results = await Promise.allSettled(requests)
-      const createdSlotIds: string[] = []
-      let failedCount = 0
-
-      for (const result of results) {
-        if (result.status === 'fulfilled') {
-          const createdId = result.value?.slot?._id
-          if (createdId) {
-            createdSlotIds.push(createdId)
-          }
-        } else {
-          failedCount += 1
-        }
-      }
-
+      const createdSlotIds = (result.created || []).map((s) => s._id)
       if (createdSlotIds.length > 0) {
         setSelectedSlotIds((current) => Array.from(new Set([...current, ...createdSlotIds])))
         await refetchSlots()
-      }
-
-      if (createdSlotIds.length > 0) {
         toast.success(
-          `Created ${createdSlotIds.length} daily hourly slots with ${slotPlan.capacityPerHour} capacity each and attached them to this therapy`
+          `Created ${createdSlotIds.length} daily ${durationMinutes}-minute slots and attached them to this therapy`
         )
-      }
-
-      if (failedCount > 0) {
-        toast.error(`${failedCount} hourly slots could not be created. Check for duplicate or invalid times.`)
-      }
-
-      if (createdSlotIds.length === 0 && failedCount === 0) {
-        toast.error('No slots were created')
+      } else if (result.conflictCount && result.conflictCount > 0) {
+        toast.warning(`${result.conflictCount} slots already exist or overlap for this window`)
+      } else {
+        toast.error('No slots could be generated for this time range')
       }
     } catch {
       toast.error('Failed to generate slots')
@@ -876,20 +818,8 @@ export default function TherapiesPage() {
     setGcDialogOpen(true)
   }
 
-  const executeSave = async (payload: any, gcSlotsToUpdate: Slot[]) => {
+  const executeSave = async (payload: any) => {
     if (editingGc) {
-      if (gcSlotsToUpdate.length > 0) {
-        await Promise.all(
-          gcSlotsToUpdate.map((slot) => {
-            const confirmedBookings = slot.capacity - slot.remainingCapacity
-            const newRemaining = Math.max(0, payload.maxParticipants - confirmedBookings)
-            return slotService.update(slot._id, {
-              capacity: payload.maxParticipants,
-              remainingCapacity: newRemaining,
-            })
-          })
-        )
-      }
       await updateGroupClass.mutateAsync({ id: editingGc.id, payload })
     } else {
       await createGroupClass.mutateAsync(payload)
@@ -1061,7 +991,7 @@ export default function TherapiesPage() {
     }
 
     try {
-      await executeSave(payload, [])
+      await executeSave(payload)
     } catch {
       // Mutation's onError already raised the toast with the real reason;
       // keep the dialog open so the admin can correct and resubmit.
@@ -2633,7 +2563,7 @@ export default function TherapiesPage() {
                   onClick={async () => {
                     if (capacityWarnInfo) {
                       setCapacityConfirmOpen(false)
-                      await executeSave(capacityWarnInfo.payload, capacityWarnInfo.gcSlots)
+                      await executeSave(capacityWarnInfo.payload)
                       setCapacityWarnInfo(null)
                     }
                   }}

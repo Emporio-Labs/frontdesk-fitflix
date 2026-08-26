@@ -121,7 +121,7 @@ export function OverviewTab({
     data: bookings = [],
     isLoading: bookingsLoading,
   } = useSportsScientistBookings()
-  const { data: slots = [], isLoading: slotsLoading } = useSlots()
+  const { data: slots = [], isLoading: slotsLoading } = useSlots({ resourceType: 'SPORTS_SCIENTIST' })
   const { startCall } = useVideoConference()
 
   const [activeXDialogOpen, setActiveXDialogOpen] = useState(false)

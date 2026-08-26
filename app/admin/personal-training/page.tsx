@@ -120,6 +120,8 @@ export default function PersonalTrainingAdminPage() {
 
   // Schedule editor state & shift helpers
   const [shiftDurationHours, setShiftDurationHours] = useState<number>(8)
+  const [slotDurationMinutes, setSlotDurationMinutes] = useState<number>(45)
+  const [bufferMinutes, setBufferMinutes] = useState<number>(15)
   const [localWeeklySlots, setLocalWeeklySlots] = useState<
     Array<{
       dayOfWeek: number
@@ -129,6 +131,14 @@ export default function PersonalTrainingAdminPage() {
   >([])
 
   useEffect(() => {
+    if (scheduleData) {
+      if (scheduleData.slotDurationMinutes) {
+        setSlotDurationMinutes(scheduleData.slotDurationMinutes)
+      }
+      if (scheduleData.bufferMinutes !== undefined) {
+        setBufferMinutes(scheduleData.bufferMinutes)
+      }
+    }
     if (scheduleData?.weeklySlots && scheduleData.weeklySlots.length > 0) {
       const slots = [0, 1, 2, 3, 4, 5, 6].map((idx) => {
         const existing = scheduleData.weeklySlots.find((s) => s.dayOfWeek === idx)
@@ -366,8 +376,8 @@ export default function PersonalTrainingAdminPage() {
         trainerId: activeTrainerId,
         data: {
           weeklySlots: payloadSlots,
-          slotDurationMinutes: scheduleData?.slotDurationMinutes || 45,
-          bufferMinutes: scheduleData?.bufferMinutes || 15,
+          slotDurationMinutes,
+          bufferMinutes,
         },
       })
       toast.success('Trainer working schedule saved successfully!')
@@ -772,9 +782,12 @@ export default function PersonalTrainingAdminPage() {
                       </label>
                       <Input
                         type="number"
-                        value={scheduleData?.slotDurationMinutes || 45}
-                        disabled
-                        className="mt-1 bg-background"
+                        min={15}
+                        max={120}
+                        step={5}
+                        value={slotDurationMinutes}
+                        onChange={(e) => setSlotDurationMinutes(Number(e.target.value) || 45)}
+                        className="mt-1 bg-background font-medium"
                       />
                     </div>
                     <div>
@@ -783,9 +796,12 @@ export default function PersonalTrainingAdminPage() {
                       </label>
                       <Input
                         type="number"
-                        value={scheduleData?.bufferMinutes || 15}
-                        disabled
-                        className="mt-1 bg-background"
+                        min={0}
+                        max={60}
+                        step={5}
+                        value={bufferMinutes}
+                        onChange={(e) => setBufferMinutes(Number(e.target.value) || 0)}
+                        className="mt-1 bg-background font-medium"
                       />
                     </div>
                     <div>

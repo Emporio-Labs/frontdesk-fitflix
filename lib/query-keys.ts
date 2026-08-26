@@ -21,6 +21,7 @@ export const queryKeys = {
   },
   slots: {
     all: () => ['slots'] as const,
+    list: (filters?: Record<string, any>) => ['slots', 'list', filters] as const,
     detail: (id: string) => ['slots', id] as const,
   },
   bookings: {
