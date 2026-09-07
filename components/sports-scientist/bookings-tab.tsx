@@ -192,9 +192,11 @@ function AppointmentModeCell({
     )
   }
 
+  // The room is minted automatically for every ONLINE booking (at creation,
+  // and backfilled on accept if somehow still missing) — no manual link to
+  // fall back to any more, mirroring the nutritionist tab.
   const isReady =
     !!booking.zegoRoomId ||
-    !!booking.meetingLink ||
     String(booking.bookingStatus || '').toLowerCase() === 'confirmed'
 
   return (
@@ -256,7 +258,6 @@ export function BookingsTab() {
   const [acceptBooking, setAcceptBooking] = useState<SportsScientistBooking | null>(
     null,
   )
-  const [meetingLink, setMeetingLink] = useState('')
   const [clinicLocation, setClinicLocation] = useState('')
   const [assignedExpertName, setAssignedExpertName] = useState('')
 
@@ -368,7 +369,6 @@ export function BookingsTab() {
 
   const handleOpenAccept = (b: SportsScientistBooking) => {
     setAcceptBooking(b)
-    setMeetingLink(b.meetingLink || '')
     setClinicLocation(b.clinicLocation || 'Fitflix Clinic')
     setAssignedExpertName(b.assignedExpertName || '')
   }
@@ -760,15 +760,6 @@ export function BookingsTab() {
           </DialogHeader>
           <div className="grid gap-4 py-3">
             <div className="space-y-2">
-              <Label htmlFor="meeting-link">Meeting Link (Online)</Label>
-              <Input
-                id="meeting-link"
-                placeholder="https://meet.google.com/xyz or video room url"
-                value={meetingLink}
-                onChange={(e) => setMeetingLink(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="clinic-location">Clinic Location (In-Person)</Label>
               <Input
                 id="clinic-location"
@@ -804,7 +795,6 @@ export function BookingsTab() {
                   {
                     id: acceptBooking._id,
                     payload: {
-                      meetingLink: meetingLink.trim() || null,
                       clinicLocation: clinicLocation.trim() || null,
                       assignedExpertName: assignedExpertName.trim() || null,
                     },

@@ -48,7 +48,6 @@ export interface SportsScientistBookingActionResponse {
 }
 
 export interface AcceptSportsScientistBookingPayload {
-  meetingLink?: string | null
   clinicLocation?: string | null
   assignedExpertId?: string | null
   assignedExpertName?: string | null
