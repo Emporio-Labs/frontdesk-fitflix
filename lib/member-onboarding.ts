@@ -105,7 +105,13 @@ export function getMemberOnboardingStatus({
   if (onboarding?.valdTestCompleted) serverCompleted.add('VALD_TEST')
   if (onboarding?.nutritionistBooked) serverCompleted.add('NUTRITION_APPOINTMENT')
   if (onboarding?.sportsScientistBooked) serverCompleted.add('SPORT_SCIENTIST_APPOINTMENT')
-  if (onboarding?.planTrainerAssignmentCompleted || (hasActiveMembership && hasTrainerAssigned)) {
+  // Server-authoritative, matching every other step above: an assigned
+  // trainer used to also count as complete, which let this read "done" while
+  // the backend flag (and therefore the member app's "Setup pending" banner)
+  // stayed false — front desk saw 6/6 while the member still saw the banner.
+  // The onboarding checklist now has a real Mark complete control for this
+  // step, so the inference is no longer needed.
+  if (onboarding?.planTrainerAssignmentCompleted) {
     serverCompleted.add('PLAN_TRAINER_ASSIGNMENT')
   }
 

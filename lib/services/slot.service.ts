@@ -1,17 +1,42 @@
 import { apiClient } from '@/lib/api-client'
 
-// Which expert this slot's capacity belongs to. Mirrors backend ExpertType
+// Which pool this slot's capacity belongs to. Mirrors backend ExpertType
 // (src/models/Enums.ts). Every slot created before this field existed is
 // backfilled to 'nutritionist' — see scripts/backfill-slot-expert-type.ts in
 // the backend repo.
-export type SlotExpertType = 'nutritionist' | 'trainer' | 'doctor' | 'sports_scientist'
+export type SlotExpertType =
+  | 'facility'
+  | 'nutritionist'
+  | 'trainer'
+  | 'doctor'
+  | 'sports_scientist'
 
+/**
+ * What a new slot may be created as.
+ *
+ * Slots model *fungible* capacity — N seats where who staffs them is
+ * irrelevant, like a sauna, an ice bath or a therapy room. The 1:1 expert types
+ * left this inventory: a seat count cannot say which nutritionist is free, take
+ * their leave into account, or stop one person being booked into two places at
+ * once. They book against ExpertSchedule now (Admin → Nutritionist /
+ * Sports Scientist → Availability), and the backend rejects new slots created
+ * against them.
+ *
+ * Existing rows keep their old tag and stay editable — see
+ * SLOT_EXPERT_TYPE_LABELS, which still knows how to name them.
+ */
 export const SLOT_EXPERT_TYPE_OPTIONS: { value: SlotExpertType; label: string }[] = [
-  { value: 'nutritionist', label: 'Nutritionist' },
-  { value: 'sports_scientist', label: 'Sports Scientist' },
-  { value: 'trainer', label: 'Trainer' },
-  { value: 'doctor', label: 'Doctor' },
+  { value: 'facility', label: 'Facility / Therapy Resource' },
 ]
+
+/** Labels for every value, including the retired ones on legacy rows. */
+export const SLOT_EXPERT_TYPE_LABELS: Record<SlotExpertType, string> = {
+  facility: 'Facility / Therapy Resource',
+  nutritionist: 'Nutritionist (retired)',
+  sports_scientist: 'Sports Scientist (retired)',
+  trainer: 'Trainer (retired)',
+  doctor: 'Doctor (retired)',
+}
 
 export interface Slot {
   _id: string
@@ -77,11 +102,14 @@ function normalizeSlot(raw: any): Slot {
     )
   )
 
-  const expertType: SlotExpertType = SLOT_EXPERT_TYPE_OPTIONS.some(
-    (option) => option.value === raw?.expertType
+  // Reads must still recognise the retired values — legacy rows carry them and
+  // remain listed and editable. Only creation is restricted.
+  const expertType: SlotExpertType = Object.prototype.hasOwnProperty.call(
+    SLOT_EXPERT_TYPE_LABELS,
+    String(raw?.expertType)
   )
-    ? raw.expertType
-    : 'nutritionist'
+    ? (raw.expertType as SlotExpertType)
+    : 'facility'
 
   return {
     _id: String(raw?._id || raw?.id || ''),

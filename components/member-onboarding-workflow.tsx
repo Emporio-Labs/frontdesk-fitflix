@@ -124,7 +124,16 @@ export function MemberOnboardingWorkflow({
             const Icon = STEP_ICONS[step.key]
             const appointment = step.appointment ? findAppointment(expertAppointments, step.appointment) : undefined
             const appointmentLabel = formatAppointment(appointment)
-            const isPhysical = step.key === 'ACTIVE_X_TEST' || step.key === 'DNA_SAMPLE' || step.key === 'VALD_TEST'
+            // Front desk owns these end to end via the shared-step PATCH — the
+            // three physical tests plus plan/trainer assignment, which used to
+            // be a dead `#trainer-assignment` anchor with no element behind it.
+            // NUTRITION_APPOINTMENT and SPORT_SCIENTIST_APPOINTMENT stay out:
+            // those are booked by the member in the app.
+            const isStaffToggleable =
+              step.key === 'ACTIVE_X_TEST' ||
+              step.key === 'DNA_SAMPLE' ||
+              step.key === 'VALD_TEST' ||
+              step.key === 'PLAN_TRAINER_ASSIGNMENT'
             const isPending = step.status === 'pending'
 
             return (
@@ -137,10 +146,8 @@ export function MemberOnboardingWorkflow({
                     {appointmentLabel && <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300"><IconClock className="h-3.5 w-3.5" />{appointmentLabel}</p>}
                     <p className="mt-2 text-xs text-muted-foreground">{step.helper}</p>
                     <div className="mt-4 flex flex-wrap items-center gap-2">
-                      {isPhysical ? (
+                      {isStaffToggleable ? (
                         <Button size="sm" variant={step.status === 'complete' ? 'outline' : 'default'} disabled={!hasActiveMembership || updateSharedStep.isPending} onClick={() => markPhysicalStep(step.key, isPending)}>{step.status === 'complete' ? 'Mark pending' : updateSharedStep.isPending ? 'Saving…' : 'Mark complete'}</Button>
-                      ) : step.key === 'PLAN_TRAINER_ASSIGNMENT' ? (
-                        <Button asChild size="sm" variant={step.status === 'complete' ? 'outline' : 'default'} disabled={!hasActiveMembership}><Link href="#trainer-assignment">{step.status === 'complete' ? 'Review assignment' : 'Assign plan & trainer'}<IconChevronRight className="ml-1.5 h-4 w-4" /></Link></Button>
                       ) : (
                         <span className="flex items-center gap-1.5 rounded-md border bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground"><IconCalendarEvent className="h-3.5 w-3.5" />Member books in app</span>
                       )}

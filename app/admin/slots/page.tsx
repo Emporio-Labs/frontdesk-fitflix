@@ -20,7 +20,11 @@ import { useSlots, useCreateSlot, useDeleteSlot } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
 import { useBookings } from '@/hooks/use-bookings'
-import { SLOT_EXPERT_TYPE_OPTIONS, SlotExpertType } from '@/lib/services/slot.service'
+import {
+  SLOT_EXPERT_TYPE_LABELS,
+  SLOT_EXPERT_TYPE_OPTIONS,
+  SlotExpertType,
+} from '@/lib/services/slot.service'
 import { toUtcDateKey } from '@/lib/utils'
 import { getUserDisplayName } from '@/lib/populated'
 import { toast } from 'sonner'
@@ -61,7 +65,7 @@ export default function SlotsPage() {
     endTime: string
     capacity: number
     expertType: SlotExpertType
-  }>({ startTime: '', endTime: '', capacity: 1, expertType: 'nutritionist' })
+  }>({ startTime: '', endTime: '', capacity: 1, expertType: 'facility' })
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12
 
@@ -142,7 +146,7 @@ export default function SlotsPage() {
       isDaily: true,
     })
     setIsDialogOpen(false)
-    setFormData({ startTime: '', endTime: '', capacity: 1, expertType: 'nutritionist' })
+    setFormData({ startTime: '', endTime: '', capacity: 1, expertType: 'facility' })
   }
 
   return (
@@ -166,7 +170,7 @@ export default function SlotsPage() {
               </DialogHeader>
               <div className="space-y-4 pt-2">
                 <div>
-                  <label className="text-sm font-medium">Expert</label>
+                  <label className="text-sm font-medium">Resource type</label>
                   <Select
                     value={formData.expertType}
                     onValueChange={(value) => setFormData({ ...formData, expertType: value as SlotExpertType })}
@@ -183,8 +187,11 @@ export default function SlotsPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Capacity is separate per expert — a Nutritionist slot and a Sports Scientist
-                    slot at the same time do not share seats.
+                    Slots hold fungible capacity — seats for a room, a pod or a
+                    machine, where it does not matter who staffs them. 1:1
+                    consultations are booked against the expert&apos;s own schedule
+                    instead: see Nutritionist → Availability and Sports Scientist
+                    → Availability.
                   </p>
                 </div>
                 <div>
@@ -253,7 +260,7 @@ export default function SlotsPage() {
                           <TableRow key={slot._id}>
                             <TableCell>
                               <Badge variant="outline" className="capitalize">
-                                {SLOT_EXPERT_TYPE_OPTIONS.find((o) => o.value === slot.expertType)?.label ?? slot.expertType}
+                                {SLOT_EXPERT_TYPE_LABELS[slot.expertType] ?? slot.expertType}
                               </Badge>
                             </TableCell>
                             <TableCell>{formatSlotSchedule(slot.date, slot.isDaily)}</TableCell>

@@ -1,6 +1,17 @@
 // Role-based access control definitions
 
-export type UserRole = 'super_admin' | 'clinic_admin' | 'staff' | 'clinician' | 'sales' | 'trainer'
+// `nutritionist` and `sports_scientist` are issued by the backend from
+// `User.staffRole`. They exist here so an expert signing in can edit their own
+// availability; everything else they need is on their dedicated dashboard.
+export type UserRole =
+  | 'super_admin'
+  | 'clinic_admin'
+  | 'staff'
+  | 'clinician'
+  | 'sales'
+  | 'trainer'
+  | 'nutritionist'
+  | 'sports_scientist'
 
 export interface Permission {
   resource: string
@@ -130,7 +141,27 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'workout_sessions', action: 'update' },
     { resource: 'exercises', action: 'read' },
   ],
+  nutritionist: [
+    { resource: 'users', action: 'read' },
+    { resource: 'nutrition_plans', action: 'create' },
+    { resource: 'nutrition_plans', action: 'read' },
+    { resource: 'nutrition_plans', action: 'update' },
+  ],
+  sports_scientist: [
+    { resource: 'users', action: 'read' },
+  ],
 }
+
+/**
+ * Expert roles that own an ExpertSchedule and may edit their own availability.
+ * Admin and front-desk roles may edit anyone's; the backend is the authority
+ * on both, this only decides what the UI offers.
+ */
+export const EXPERT_SELF_SERVICE_ROLES: UserRole[] = [
+  'trainer',
+  'nutritionist',
+  'sports_scientist',
+]
 
 export function hasPermission(role: UserRole, resource: string, action: string): boolean {
   const permissions = ROLE_PERMISSIONS[role]

@@ -11,8 +11,10 @@ import {
 import {
   IconActivity,
   IconCalendarEvent,
+  IconClockHour4,
   IconUsers,
 } from '@tabler/icons-react'
+import { ExpertAvailabilityPanel } from '@/components/expert-availability-panel'
 import { OverviewTab } from '@/components/sports-scientist/overview-tab'
 import { BookingsTab } from '@/components/sports-scientist/bookings-tab'
 import { ActiveUsersTab } from '@/components/sports-scientist/active-users-tab'
@@ -25,7 +27,10 @@ function SportsScientistDashboardContent() {
 
   useEffect(() => {
     const paramTab = searchParams.get('tab')
-    if (paramTab && ['overview', 'bookings', 'active-users'].includes(paramTab)) {
+    if (
+      paramTab &&
+      ['overview', 'bookings', 'active-users', 'availability'].includes(paramTab)
+    ) {
       setActiveTab(paramTab)
     }
   }, [searchParams])
@@ -68,6 +73,10 @@ function SportsScientistDashboardContent() {
             <IconUsers className="h-4 w-4" />
             <span>Active Users</span>
           </TabsTrigger>
+          <TabsTrigger value="availability" className="flex items-center gap-2">
+            <IconClockHour4 className="h-4 w-4" />
+            <span>Availability</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -80,6 +89,16 @@ function SportsScientistDashboardContent() {
 
         <TabsContent value="active-users" className="mt-4">
           <ActiveUsersTab initialFilter={userFilter} />
+        </TabsContent>
+
+        <TabsContent value="availability" className="mt-4">
+          {/* Consultations are booked against this schedule now, not against
+              slot inventory — what is set here is exactly what members see. */}
+          <ExpertAvailabilityPanel
+            expertType="sports_scientist"
+            title="Consultation Availability"
+            description="Working hours, blocked dates and the appointment modes offered. Members can only book times that appear here."
+          />
         </TabsContent>
       </Tabs>
     </div>
