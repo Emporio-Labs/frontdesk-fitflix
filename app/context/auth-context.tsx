@@ -4,6 +4,19 @@ import React, { createContext, useState, ReactNode, useEffect } from 'react'
 import { UserRole } from '@/lib/rbac'
 import { storeCredentials, clearCredentials, clearToken, getStoredCredentials, getStoredToken } from '@/lib/api-client'
 
+export function getRoleStartPage(role?: UserRole): string {
+  switch (role) {
+    case 'trainer':
+      return '/admin/personal-training'
+    case 'nutritionist':
+      return '/admin/nutrition'
+    case 'sports_scientist':
+      return '/admin/sports-scientist'
+    default:
+      return '/dashboard'
+  }
+}
+
 // Helpers for auth cookie (read by Next.js middleware for route protection).
 // Note: this is a presence-only indicator cookie, NOT the auth token.
 // The real token lives in localStorage (see lib/api-client.ts).
@@ -56,12 +69,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if ((stored || token) && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser)
+        const validRoles: UserRole[] = [
+          'super_admin',
+          'clinic_admin',
+          'staff',
+          'clinician',
+          'sales',
+          'trainer',
+          'nutritionist',
+          'sports_scientist',
+        ]
+        if (!validRoles.includes(parsedUser.role)) {
+          clearCredentials()
+          clearToken()
+          clearAuthCookie()
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('hh_user')
+            localStorage.removeItem('hh_token')
+            localStorage.removeItem('hh_refresh_token')
+          }
+          setUser(null)
+          return
+        }
         setUser(parsedUser)
         setRole(parsedUser.role)
         // Reinstate auth cookie so middleware allows access on refresh
         setAuthCookie(parsedUser.role)
       } catch (_) {
         clearCredentials()
+        clearToken()
         clearAuthCookie()
       }
     } else {
@@ -88,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(userData?.role ?? 'clinic_admin')
     // Hard redirect — ensures middleware sees the new cookie immediately
     if (typeof window !== 'undefined') {
-      const target = userData?.role === 'trainer' ? '/admin/personal-training' : '/dashboard'
+      const target = getRoleStartPage(userData?.role)
       window.location.href = target
     }
   }
