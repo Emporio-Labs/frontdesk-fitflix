@@ -33,12 +33,15 @@ import {
   IconCopy,
   IconCoffee,
   IconBed,
+  IconFileText,
 } from '@tabler/icons-react'
 import { useUser } from '@/hooks/use-users'
 import { useExercises } from '@/hooks/use-exercises'
 import { trainerWorkoutService } from '@/lib/services/trainer-workout.service'
 import { MemberWorkoutJourney } from '@/components/workouts/member-workout-journey'
 import { AssignOrCreatePlanModal } from '@/components/workouts/assign-or-create-plan-modal'
+import { OnboardingReportsDialog } from '@/components/onboarding-reports-dialog'
+import { useCanAccessMemberReports } from '@/hooks/use-can-access-reports'
 
 interface PlanExerciseItem {
   exerciseId: string
@@ -157,6 +160,8 @@ export default function MemberSchedulePage() {
   const [copyFromDialogOpen, setCopyFromDialogOpen] = useState(false)
   const [exerciseSearch, setExerciseSearch] = useState('')
   const [assignOrCreateModalOpen, setAssignOrCreateModalOpen] = useState(false)
+  const [reportsOpen, setReportsOpen] = useState(false)
+  const reportAccess = useCanAccessMemberReports(user)
   const [showExpiredSchedule, setShowExpiredSchedule] = useState(false)
 
   const handleAddNewDay = () => {
@@ -390,6 +395,29 @@ export default function MemberSchedulePage() {
           </Button>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            id="trainer-medical-reports-btn"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (!reportAccess.allowed) {
+                toast.error('Access Restricted', {
+                  description: reportAccess.reason || 'You can only view medical reports for members you look after.',
+                })
+                return
+              }
+              setReportsOpen(true)
+            }}
+            className="text-xs gap-1.5"
+          >
+            <IconFileText className="w-4 h-4 text-primary" />
+            Medical Reports
+            {Array.isArray(user?.reports) && user.reports.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                {user.reports.length}
+              </Badge>
+            )}
+          </Button>
           <Button
             onClick={() => setAssignOrCreateModalOpen(true)}
             className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
@@ -942,6 +970,15 @@ export default function MemberSchedulePage() {
         onOpenChange={setAssignOrCreateModalOpen}
         userId={userId}
         memberName={user?.username || (user as any)?.name}
+      />
+
+      {/* Uploaded Medical Reports Dialog (AC FX-07.1, FX-07.2, FX-07.3) */}
+      <OnboardingReportsDialog
+        open={reportsOpen}
+        onOpenChange={setReportsOpen}
+        reports={user?.reports}
+        userId={userId}
+        member={user}
       />
     </div>
   )
