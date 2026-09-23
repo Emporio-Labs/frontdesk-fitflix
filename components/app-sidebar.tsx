@@ -117,6 +117,7 @@ const navGroups = [
 const navTrainerGroup = [
   {
     items: [
+      { title: "Today", url: "/admin/personal-training/today", icon: IconCalendarEvent },
       { title: "Personal Training", url: "/admin/personal-training", icon: IconDumbbell },
       { title: "My Members", url: "/dashboard/workouts/members", icon: IconUsers },
       { title: "Workout Plans", url: "/dashboard/workouts/plans", icon: IconBarbell },
@@ -150,7 +151,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const isNutritionist = user?.role === 'nutritionist'
   const groups = isTrainer ? navTrainerGroup : isNutritionist ? navNutritionistGroup : navGroups
   const brandHref = isTrainer
-    ? '/dashboard/workouts/members'
+    ? '/admin/personal-training/today'
     : isNutritionist
     ? '/admin/nutrition/my-clients'
     : '/dashboard'

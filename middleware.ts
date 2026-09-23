@@ -35,7 +35,7 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard/workouts/members', request.url))
     }
     if (pathname === '/dashboard') {
-      return NextResponse.redirect(new URL('/admin/personal-training', request.url))
+      return NextResponse.redirect(new URL('/admin/personal-training/today', request.url))
     }
   }
 

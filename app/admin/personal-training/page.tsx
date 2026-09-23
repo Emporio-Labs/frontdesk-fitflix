@@ -1,11 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   IconCalendar,
   IconCheck,
-  IconClock,
-  IconDeviceTv,
   IconDumbbell,
   IconPhoneCall,
   IconPlus,
@@ -18,14 +16,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -37,9 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
 import {
-  useCompletePtBooking,
   usePtAdminBookings,
   usePtTrainers,
   useResolveTrainerChangeRequest,
@@ -49,11 +37,11 @@ import { useLeads } from '@/hooks/use-leads'
 import { UnifiedBookingDto } from '@/lib/services/personal-training.service'
 import { getBookingJoinState } from '@/lib/booking-window'
 import { useVideoConference } from '@/components/video-conference/video-conference-provider'
-import { toast } from 'sonner'
 import Link from 'next/link'
 
 import { useAuth } from '@/hooks/use-auth'
 import { ExpertAvailabilityEditor } from '@/components/expert-availability-editor'
+import { LogWorkoutDialog } from '@/components/personal-training/log-workout-dialog'
 
 export default function PersonalTrainingAdminPage() {
   const { user } = useAuth()
@@ -73,13 +61,9 @@ export default function PersonalTrainingAdminPage() {
 
   // Modals state
   const [completingBooking, setCompletingBooking] = useState<UnifiedBookingDto | null>(null)
-  const [workoutNotes, setWorkoutNotes] = useState('')
-  const [exercises, setExercises] = useState([
-    { name: '', sets: 3, reps: 10, weight: 0, notes: '' },
-  ])
 
   // Data fetching
-  const { data: trainers, isLoading: isTrainersLoading } = usePtTrainers()
+  const { data: trainers } = usePtTrainers()
 
   // Strict trainer identification: match by user id, email, or name
   const currentTrainer = (trainers || []).find(
@@ -101,38 +85,12 @@ export default function PersonalTrainingAdminPage() {
   const { data: changeRequests, isLoading: isRequestsLoading } = useTrainerChangeRequests(!isTrainer)
   const { data: leads } = useLeads({ enabled: !isTrainer })
 
-  const completeBookingMutation = useCompletePtBooking()
   const resolveRequestMutation = useResolveTrainerChangeRequest()
 
   const pendingRequests = (changeRequests || []).filter((r) => r.status === 'PENDING')
   const fallbackLeads = (leads || []).filter(
     (l) => l.source === 'APP_PAYMENT_FALLBACK' || l.notes?.includes('APP_PAYMENT_FALLBACK')
   )
-
-  const handleAddExercise = () => {
-    setExercises([...exercises, { name: '', sets: 3, reps: 10, weight: 0, notes: '' }])
-  }
-
-  const handleExerciseChange = (index: number, field: string, value: any) => {
-    const next = [...exercises]
-    next[index] = { ...next[index], [field]: value }
-    setExercises(next)
-  }
-
-  const handleSaveWorkout = async () => {
-    if (!completingBooking) return
-    const validExercises = exercises.filter((e) => e.name.trim().length > 0)
-    await completeBookingMutation.mutateAsync({
-      bookingId: completingBooking._id,
-      data: {
-        workoutNotes,
-        exercisesCompleted: validExercises,
-      },
-    })
-    setCompletingBooking(null)
-    setWorkoutNotes('')
-    setExercises([{ name: '', sets: 3, reps: 10, weight: 0, notes: '' }])
-  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -644,81 +602,11 @@ export default function PersonalTrainingAdminPage() {
       </Tabs>
 
       {/* Workout Logger Dialog */}
-      <Dialog open={Boolean(completingBooking)} onOpenChange={() => setCompletingBooking(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Log Workout & Complete Session</DialogTitle>
-            <DialogDescription>
-              Record exercises completed, sets, repetitions, and performance notes for the member&apos;s history.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-            <div>
-              <label className="text-sm font-medium">Session Overview Notes</label>
-              <Textarea
-                placeholder="e.g. Great intensity on compound lifts. Focused on eccentric control."
-                value={workoutNotes}
-                onChange={(e) => setWorkoutNotes(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Exercises Completed</label>
-                <Button size="sm" variant="ghost" onClick={handleAddExercise}>
-                  <IconPlus className="h-3.5 w-3.5 mr-1" />
-                  Add Exercise
-                </Button>
-              </div>
-
-              {exercises.map((ex, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-muted/40 p-2.5 rounded-md">
-                  <div className="col-span-5">
-                    <Input
-                      placeholder="Exercise Name (e.g. Barbell Squat)"
-                      value={ex.name}
-                      onChange={(e) => handleExerciseChange(idx, 'name', e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Input
-                      type="number"
-                      placeholder="Sets"
-                      value={ex.sets}
-                      onChange={(e) => handleExerciseChange(idx, 'sets', Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Input
-                      type="number"
-                      placeholder="Reps"
-                      value={ex.reps}
-                      onChange={(e) => handleExerciseChange(idx, 'reps', Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <Input
-                      type="number"
-                      placeholder="Weight (kg)"
-                      value={ex.weight}
-                      onChange={(e) => handleExerciseChange(idx, 'weight', Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCompletingBooking(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveWorkout}>Save & Complete Session</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LogWorkoutDialog
+        booking={completingBooking}
+        open={Boolean(completingBooking)}
+        onOpenChange={(open) => !open && setCompletingBooking(null)}
+      />
     </div>
   )
 }

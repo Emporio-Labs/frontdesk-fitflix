@@ -91,6 +91,26 @@ const statusConfig: Record<string, StatusStyle> = {
     badge: 'bg-rose-50/60 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
     dot: 'bg-rose-500',
   },
+  noshow: {
+    badge: 'bg-rose-50/60 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
+    dot: 'bg-rose-500',
+  },
+  no_show: {
+    badge: 'bg-rose-50/60 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
+    dot: 'bg-rose-500',
+  },
+  'no-show': {
+    badge: 'bg-rose-50/60 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
+    dot: 'bg-rose-500',
+  },
+  host_no_show: {
+    badge: 'bg-rose-50/60 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
+    dot: 'bg-rose-500',
+  },
+  unattended: {
+    badge: 'bg-rose-50/60 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
+    dot: 'bg-rose-500',
+  },
   lost: {
     badge: 'bg-rose-50/60 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
     dot: 'bg-rose-500',
