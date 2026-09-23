@@ -123,6 +123,7 @@ const navTrainerGroup = [
       { title: "Workout Plans", url: "/dashboard/workouts/plans", icon: IconBarbell },
       { title: "Exercise Library", url: "/dashboard/workouts/exercises", icon: IconActivity },
       { title: "Live Sessions", url: "/dashboard/workouts/sessions", icon: IconClock },
+      { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
     ],
   },
 ]
@@ -134,6 +135,7 @@ const navNutritionistGroup = [
       { title: "Appointments", url: "/admin/nutrition", icon: IconCalendarEvent },
       { title: "Availability", url: "/admin/nutritionist", icon: IconClock },
       { title: "Food Catalog", url: "/admin/nutrition?tab=food-catalog", icon: IconSalad },
+      { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
     ],
   },
 ]
