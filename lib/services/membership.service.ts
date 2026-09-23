@@ -31,6 +31,8 @@ export interface CreateMembershipPayload {
   endDate: string
   features?: string[]
   notes?: string
+  /** The branch this membership is issued at. Backend resolves via resolveLocationId. */
+  locationId?: string
 }
 
 export interface UpdateMembershipPayload {

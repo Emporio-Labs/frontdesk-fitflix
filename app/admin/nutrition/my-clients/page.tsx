@@ -227,7 +227,7 @@ export default function NutritionistMyClientsPage() {
 
                     return (
                       <TableRow key={cid} className="hover:bg-muted/50">
-                        <TableCell>
+                        <TableCell data-label="Member">
                           <div className="flex items-center gap-3">
                             <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-xs shrink-0">
                               {displayName.charAt(0).toUpperCase()}
@@ -243,12 +243,15 @@ export default function NutritionistMyClientsPage() {
                           </div>
                         </TableCell>
 
-                        <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                        <TableCell
+                          data-label="Contact"
+                          className="hidden md:table-cell text-sm text-muted-foreground"
+                        >
                           <div>{client.email || '—'}</div>
                           {client.phone && <div className="text-xs">{client.phone}</div>}
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell data-label="Reports">
                           {reportCount > 0 ? (
                             <Badge
                               variant="secondary"
@@ -262,7 +265,10 @@ export default function NutritionistMyClientsPage() {
                           )}
                         </TableCell>
 
-                        <TableCell className="hidden lg:table-cell">
+                        <TableCell
+                          data-label="Goals"
+                          className="hidden lg:table-cell"
+                        >
                           {goals.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {goals.slice(0, 2).map((g: string) => (
@@ -281,12 +287,12 @@ export default function NutritionistMyClientsPage() {
                           )}
                         </TableCell>
 
-                        <TableCell className="text-right">
+                        <TableCell data-hide-label className="text-right">
                           <Button
                             id={`client-profile-btn-${cid}`}
                             size="sm"
                             variant="default"
-                            className="h-8 text-xs gap-1.5"
+                            className="text-xs gap-1.5 w-full sm:w-auto sm:h-8"
                             onClick={() => handleOpenClient(cid)}
                           >
                             <IconEye className="h-3.5 w-3.5" />

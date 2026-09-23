@@ -50,6 +50,8 @@ export interface CheckInPayload {
   userId: string
   visitType?: VisitType
   notes?: string
+  /** The branch the check-in is happening at. Forwarded to the backend. */
+  locationId?: string
 }
 
 export interface CheckOutPayload {
@@ -66,11 +68,17 @@ function toParams(input?: Record<string, unknown>): Record<string, string> {
   return out
 }
 
+export interface QrCheckInPayload {
+  token: string
+  /** The branch the QR scan is happening at. Forwarded to the backend. */
+  locationId?: string
+}
+
 export const gymVisitService = {
   qrCheckIn: async (
-    token: string,
+    payload: QrCheckInPayload,
   ): Promise<{ message: string; visit: GymVisit }> => {
-    const { data } = await apiClient.post('/gym-visits/qr-check-in', { token })
+    const { data } = await apiClient.post('/gym-visits/qr-check-in', payload)
     return {
       message: data?.message || 'Member checked in',
       visit: data?.visit as GymVisit,

@@ -28,6 +28,7 @@ import {
 import { toUtcDateKey } from '@/lib/utils'
 import { getUserDisplayName } from '@/lib/populated'
 import { toast } from 'sonner'
+import { useLocationScope } from '@/components/location-scope-provider'
 
 function timeToMinutes(value: string): number | null {
   const [hoursRaw, minutesRaw] = value.split(':')
@@ -75,6 +76,7 @@ export default function SlotsPage() {
   const { data: bookings = [] } = useBookings()
   const createSlot = useCreateSlot()
   const deleteSlot = useDeleteSlot()
+  const { selectedLocationId } = useLocationScope()
 
   const totalPages = Math.ceil(slots.length / itemsPerPage)
   const activePage = Math.max(1, Math.min(currentPage, totalPages || 1))
@@ -144,6 +146,7 @@ export default function SlotsPage() {
       capacity: formData.capacity,
       expertType: formData.expertType,
       isDaily: true,
+      locationId: selectedLocationId ?? undefined,
     })
     setIsDialogOpen(false)
     setFormData({ startTime: '', endTime: '', capacity: 1, expertType: 'facility' })

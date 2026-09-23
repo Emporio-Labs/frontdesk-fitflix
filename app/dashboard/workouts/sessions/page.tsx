@@ -203,10 +203,10 @@ export default function SessionsPage() {
 
                       return (
                         <TableRow key={w.id}>
-                          <TableCell className="font-semibold text-sm">
+                          <TableCell data-label="Date" className="font-semibold text-sm">
                             {formatDate(w.date)}
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Muscles">
                             <div className="flex flex-wrap gap-1 max-w-[220px]">
                               {w.muscleGroups && w.muscleGroups.length > 0 ? (
                                 w.muscleGroups.map((g) => (
@@ -219,18 +219,18 @@ export default function SessionsPage() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>{formatDuration(w.duration)}</TableCell>
-                          <TableCell>{w.exerciseCount ?? 0} exercises</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
+                          <TableCell data-label="Duration">{formatDuration(w.duration)}</TableCell>
+                          <TableCell data-label="Exercises">{w.exerciseCount ?? 0} exercises</TableCell>
+                          <TableCell data-label="Sets / Reps" className="text-xs text-muted-foreground">
                             {w.totalSets ?? 0} sets · {w.totalReps ?? 0} reps
                           </TableCell>
-                          <TableCell className="font-medium">
+                          <TableCell data-label="Volume" className="font-medium">
                             {w.totalVolumeKg ? `${w.totalVolumeKg.toLocaleString()} kg` : '0 kg'}
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Calories">
                             {w.caloriesBurned ? `${w.caloriesBurned} kcal` : '—'}
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Status">
                             <Badge className={statusCls}>
                               {w.status?.toUpperCase() || 'UNKNOWN'}
                             </Badge>

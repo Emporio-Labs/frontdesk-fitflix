@@ -346,15 +346,15 @@ export default function PersonalTrainingAdminPage() {
 
                       return (
                         <TableRow key={bookingId || `booking-${idx}-${b.startTime}`}>
-                          <TableCell className="font-medium">
+                          <TableCell data-label="Time" className="font-medium">
                             {b.startTime} – {b.endTime}
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Member">
                             <div className="font-medium">{user.username || 'Member'}</div>
                             <div className="text-xs text-muted-foreground">{user.phone}</div>
                           </TableCell>
-                          <TableCell>{expert.trainerName || b.assignedExpertName}</TableCell>
-                          <TableCell>
+                          <TableCell data-label="Trainer">{expert.trainerName || b.assignedExpertName}</TableCell>
+                          <TableCell data-label="Mode">
                             <Badge variant={b.appointmentMode === 'ONLINE' ? 'default' : 'outline'}>
                               {b.appointmentMode === 'ONLINE' ? (
                                 <IconVideo className="h-3 w-3 mr-1" />
@@ -364,7 +364,7 @@ export default function PersonalTrainingAdminPage() {
                               {b.appointmentMode}
                             </Badge>
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Status">
                             <Badge
                               variant={
                                 b.status === 'CONFIRMED'
@@ -377,7 +377,7 @@ export default function PersonalTrainingAdminPage() {
                               {b.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right space-x-2">
+                          <TableCell data-hide-label className="text-right space-x-2 flex flex-wrap justify-end gap-2">
                             {b.appointmentMode === 'ONLINE' && b.status === 'CONFIRMED' && (() => {
                               const joinState = getBookingJoinState(b, new Date(), {
                                 leadMinutes: 30,
@@ -507,16 +507,16 @@ export default function PersonalTrainingAdminPage() {
                       const reqId = req.id || req._id || ''
                       return (
                         <TableRow key={reqId || `req-${idx}`}>
-                          <TableCell>
+                          <TableCell data-label="Member">
                             <div className="font-medium">{req.userId?.username || 'Member'}</div>
                             <div className="text-xs text-muted-foreground">{req.userId?.phone}</div>
                           </TableCell>
-                          <TableCell>{req.currentTrainerId?.trainerName || 'None'}</TableCell>
-                          <TableCell className="font-medium">
+                          <TableCell data-label="Current">{req.currentTrainerId?.trainerName || 'None'}</TableCell>
+                          <TableCell data-label="Requested" className="font-medium">
                             {req.requestedTrainerId?.trainerName}
                           </TableCell>
-                          <TableCell className="max-w-xs truncate">{req.reason}</TableCell>
-                          <TableCell>
+                          <TableCell data-label="Reason" className="max-w-xs truncate">{req.reason}</TableCell>
+                          <TableCell data-label="Status">
                             <Badge
                               variant={
                                 req.status === 'APPROVED'
@@ -529,7 +529,7 @@ export default function PersonalTrainingAdminPage() {
                               {req.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right space-x-2">
+                          <TableCell data-hide-label className="text-right space-x-2 flex flex-wrap justify-end gap-2">
                             {req.status === 'PENDING' && (
                               <>
                                 <Button
@@ -609,13 +609,13 @@ export default function PersonalTrainingAdminPage() {
 
                       return (
                         <TableRow key={leadId}>
-                          <TableCell className="font-medium">{leadName}</TableCell>
-                          <TableCell>
+                          <TableCell data-label="Member" className="font-medium">{leadName}</TableCell>
+                          <TableCell data-label="Contact">
                             <div>{lead.phone}</div>
                             <div className="text-xs text-muted-foreground">{lead.email}</div>
                           </TableCell>
-                          <TableCell className="max-w-sm truncate">{lead.notes}</TableCell>
-                          <TableCell>
+                          <TableCell data-label="Notes" className="max-w-sm truncate">{lead.notes}</TableCell>
+                          <TableCell data-label="SLA">
                             {isEscalated ? (
                               <Badge variant="destructive" className="animate-pulse">
                                 OVERDUE (&gt;15m)
@@ -624,9 +624,9 @@ export default function PersonalTrainingAdminPage() {
                               <Badge variant="secondary">On Track (&lt;15m)</Badge>
                             )}
                           </TableCell>
-                          <TableCell className="text-right">
-                            <a href={`tel:${lead.phone}`}>
-                              <Button size="sm" variant="outline">
+                          <TableCell data-hide-label className="text-right">
+                            <a href={`tel:${lead.phone}`} data-mobile-tap>
+                              <Button size="sm" variant="outline" className="w-full sm:w-auto">
                                 <IconPhoneCall className="h-3.5 w-3.5 mr-1" />
                                 Call Member
                               </Button>
