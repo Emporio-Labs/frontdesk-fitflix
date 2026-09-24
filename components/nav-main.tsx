@@ -27,6 +27,21 @@ export interface NavGroup {
 
 export function NavMain({ groups }: { groups: NavGroup[] }) {
   const pathname = usePathname()
+  const [currentSearch, setCurrentSearch] = React.useState('')
+
+  React.useEffect(() => {
+    const updateSearch = () => {
+      if (typeof window !== 'undefined') {
+        setCurrentSearch(window.location.search)
+      }
+    }
+    updateSearch()
+    window.addEventListener('popstate', updateSearch)
+    return () => window.removeEventListener('popstate', updateSearch)
+  }, [pathname])
+
+  const currentParams = new URLSearchParams(currentSearch)
+  const currentTab = currentParams.get('tab')
 
   return (
     <>
@@ -40,9 +55,20 @@ export function NavMain({ groups }: { groups: NavGroup[] }) {
           <SidebarGroupContent>
             <SidebarMenu>
               {group.items.map((item) => {
-                const isActive =
-                  pathname === item.url ||
-                  (item.url !== '/dashboard' && pathname.startsWith(item.url + '/'))
+                const [itemPath, itemQuery] = item.url.split('?')
+                const itemTab = itemQuery ? new URLSearchParams(itemQuery).get('tab') : null
+
+                let isActive = false
+                if (itemTab) {
+                  isActive = pathname === itemPath && currentTab === itemTab
+                } else if (itemQuery) {
+                  isActive = pathname === itemPath && currentSearch.includes(itemQuery)
+                } else {
+                  isActive =
+                    (pathname === itemPath && !currentTab) ||
+                    (item.url !== '/dashboard' && pathname.startsWith(item.url + '/'))
+                }
+
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton

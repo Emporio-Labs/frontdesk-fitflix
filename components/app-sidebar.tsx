@@ -29,13 +29,14 @@ import {
   IconDumbbell,
   IconBellRinging,
   IconStethoscope,
-  IconLayoutList,
+  IconApple,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
 import { NavMain } from '@/components/nav-main'
 import { NavUser } from '@/components/nav-user'
 import { useAuth } from '@/hooks/use-auth'
+import { getRoleStartPage } from '@/app/context/auth-context'
 import {
   Sidebar,
   SidebarContent,
@@ -129,10 +130,22 @@ const navTrainerGroup = [
 const navNutritionistGroup = [
   {
     items: [
-      { title: "My Clients", url: "/admin/nutrition/my-clients", icon: IconUsers },
-      { title: "Appointments", url: "/admin/nutrition", icon: IconCalendarEvent },
+      { title: "Nutrition", url: "/admin/nutrition", icon: IconSalad },
+      { title: "Appointments", url: "/admin/nutrition?tab=appointments", icon: IconCalendarEvent },
+      { title: "Diet Plans", url: "/admin/nutrition/diet-plans", icon: IconTemplate },
+      { title: "Food Catalog", url: "/admin/nutrition/foods", icon: IconApple },
       { title: "Availability", url: "/admin/nutritionist", icon: IconClock },
-      { title: "Food Catalog", url: "/admin/nutrition?tab=food-catalog", icon: IconSalad },
+    ],
+  },
+]
+
+const navSportsScientistGroup = [
+  {
+    items: [
+      { title: "Sports Scientist", url: "/admin/sports-scientist", icon: IconStethoscope },
+      { title: "Bookings", url: "/admin/sports-scientist?tab=bookings", icon: IconCalendarEvent },
+      { title: "Active Users", url: "/admin/sports-scientist?tab=active-users", icon: IconUsers },
+      { title: "Availability", url: "/admin/sports-scientist?tab=availability", icon: IconClock },
     ],
   },
 ]
@@ -146,14 +159,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: '/placeholder-user.jpg',
   }
 
-  const isTrainer = user?.role === 'trainer'
-  const isNutritionist = user?.role === 'nutritionist'
-  const groups = isTrainer ? navTrainerGroup : isNutritionist ? navNutritionistGroup : navGroups
-  const brandHref = isTrainer
-    ? '/dashboard/workouts/members'
-    : isNutritionist
-    ? '/admin/nutrition/my-clients'
-    : '/dashboard'
+  const role = user?.role
+  let groups = navGroups
+  if (role === 'trainer') {
+    groups = navTrainerGroup
+  } else if (role === 'nutritionist') {
+    groups = navNutritionistGroup
+  } else if (role === 'sports_scientist') {
+    groups = navSportsScientistGroup
+  }
+
+  const brandHref = getRoleStartPage(role)
 
   return (
     // "icon" (not "none") so callers that omit the prop still get the mobile Sheet;
