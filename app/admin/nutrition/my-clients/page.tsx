@@ -34,6 +34,7 @@ import { useUsers } from '@/hooks/use-users'
 import { ClinicalUserDialog } from '@/components/nutrition/clinical-user-dialog'
 import { EmptyState } from '@/components/empty-state'
 import { Skeleton } from '@/components/skeleton-loader'
+import { useHighlightRow } from '@/components/highlight-row'
 
 export default function NutritionistMyClientsPage() {
   const { user: currentUser } = useAuth()
@@ -226,80 +227,15 @@ export default function NutritionistMyClientsPage() {
                     const goals = Array.isArray(client.healthGoals) ? client.healthGoals : []
 
                     return (
-                      <TableRow key={cid} className="hover:bg-muted/50">
-                        <TableCell data-label="Member">
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-xs shrink-0">
-                              {displayName.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm truncate text-foreground">
-                                {displayName}
-                              </p>
-                              <p className="text-xs text-muted-foreground md:hidden truncate">
-                                {client.email || client.phone || 'No contact'}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-
-                        <TableCell
-                          data-label="Contact"
-                          className="hidden md:table-cell text-sm text-muted-foreground"
-                        >
-                          <div>{client.email || '—'}</div>
-                          {client.phone && <div className="text-xs">{client.phone}</div>}
-                        </TableCell>
-
-                        <TableCell data-label="Reports">
-                          {reportCount > 0 ? (
-                            <Badge
-                              variant="secondary"
-                              className="text-xs gap-1.5 font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                            >
-                              <IconFileText className="h-3.5 w-3.5" />
-                              {reportCount} report{reportCount > 1 ? 's' : ''} available
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">None uploaded</span>
-                          )}
-                        </TableCell>
-
-                        <TableCell
-                          data-label="Goals"
-                          className="hidden lg:table-cell"
-                        >
-                          {goals.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {goals.slice(0, 2).map((g: string) => (
-                                <Badge key={g} variant="outline" className="text-[11px]">
-                                  {g}
-                                </Badge>
-                              ))}
-                              {goals.length > 2 && (
-                                <span className="text-xs text-muted-foreground">
-                                  +{goals.length - 2}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-
-                        <TableCell data-hide-label className="text-right">
-                          <Button
-                            id={`client-profile-btn-${cid}`}
-                            size="sm"
-                            variant="default"
-                            className="text-xs gap-1.5 w-full sm:w-auto sm:h-8"
-                            onClick={() => handleOpenClient(cid)}
-                          >
-                            <IconEye className="h-3.5 w-3.5" />
-                            Client Profile
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                      <HighlightableClientRow
+                        key={cid}
+                        cid={cid}
+                        client={client}
+                        displayName={displayName}
+                        reportCount={reportCount}
+                        goals={goals}
+                        onOpen={handleOpenClient}
+                      />
                     )
                   })}
                 </TableBody>
@@ -319,5 +255,92 @@ export default function NutritionistMyClientsPage() {
         }}
       />
     </div>
+  )
+}
+
+function HighlightableClientRow({
+  cid,
+  client,
+  displayName,
+  reportCount,
+  goals,
+  onOpen,
+}: {
+  cid: string
+  client: any
+  displayName: string
+  reportCount: number
+  goals: string[]
+  onOpen: (id: string) => void
+}) {
+  const highlight = useHighlightRow<HTMLTableRowElement>(cid)
+  return (
+    <TableRow ref={highlight.ref} className={`hover:bg-muted/50 ${highlight.className}`.trim()}>
+      <TableCell data-label="Member">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-xs shrink-0">
+            {displayName.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold text-sm truncate text-foreground">{displayName}</p>
+            <p className="text-xs text-muted-foreground md:hidden truncate">
+              {client.email || client.phone || 'No contact'}
+            </p>
+          </div>
+        </div>
+      </TableCell>
+
+      <TableCell
+        data-label="Contact"
+        className="hidden md:table-cell text-sm text-muted-foreground"
+      >
+        <div>{client.email || '—'}</div>
+        {client.phone && <div className="text-xs">{client.phone}</div>}
+      </TableCell>
+
+      <TableCell data-label="Reports">
+        {reportCount > 0 ? (
+          <Badge
+            variant="secondary"
+            className="text-xs gap-1.5 font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+          >
+            <IconFileText className="h-3.5 w-3.5" />
+            {reportCount} report{reportCount > 1 ? 's' : ''} available
+          </Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">None uploaded</span>
+        )}
+      </TableCell>
+
+      <TableCell data-label="Goals" className="hidden lg:table-cell">
+        {goals.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {goals.slice(0, 2).map((g: string) => (
+              <Badge key={g} variant="outline" className="text-[11px]">
+                {g}
+              </Badge>
+            ))}
+            {goals.length > 2 && (
+              <span className="text-xs text-muted-foreground">+{goals.length - 2}</span>
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </TableCell>
+
+      <TableCell data-hide-label className="text-right">
+        <Button
+          id={`client-profile-btn-${cid}`}
+          size="sm"
+          variant="default"
+          className="text-xs gap-1.5 w-full sm:w-auto sm:h-8"
+          onClick={() => onOpen(cid)}
+        >
+          <IconEye className="h-3.5 w-3.5" />
+          Client Profile
+        </Button>
+      </TableCell>
+    </TableRow>
   )
 }

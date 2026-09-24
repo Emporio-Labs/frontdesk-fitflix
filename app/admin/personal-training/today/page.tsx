@@ -34,6 +34,7 @@ import {
 import { EmptyState } from '@/components/empty-state'
 import { Skeleton } from '@/components/skeleton-loader'
 import { StatusBadge } from '@/components/status-badge'
+import { useHighlightRow } from '@/components/highlight-row'
 import { LogWorkoutDialog } from '@/components/personal-training/log-workout-dialog'
 import { NoShowDialog } from '@/components/personal-training/no-show-dialog'
 import { useAuth } from '@/hooks/use-auth'
@@ -354,8 +355,10 @@ function OneOnOneRowView({
       : null
   const isJoinDisabled = joinState?.state === 'too_early' || joinState?.state === 'ended'
 
+  const highlight = useHighlightRow<HTMLTableRowElement>(b._id)
+
   return (
-    <TableRow>
+    <TableRow ref={highlight.ref} className={highlight.className}>
       <TableCell data-label="Time" className="font-medium whitespace-nowrap">
         {b.startTime}
         {b.endTime ? ` – ${b.endTime}` : ''}
@@ -446,9 +449,11 @@ function ClassRowView({
       ? 'noshow'
       : 'confirmed'
 
+  const highlight = useHighlightRow<HTMLTableRowElement>(row.sessionId)
+
   return (
     <>
-      <TableRow>
+      <TableRow ref={highlight.ref} className={highlight.className}>
         <TableCell data-label="Time" className="font-medium whitespace-nowrap align-top">
           {row.startTime}
           {row.endTime ? ` – ${row.endTime}` : ''}
