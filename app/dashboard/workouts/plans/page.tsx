@@ -161,7 +161,7 @@ function PlansContent() {
                 <TableBody>
                   {filteredPlans.map((plan: WorkoutPlan) => (
                     <TableRow key={plan._id}>
-                      <TableCell className="font-medium">
+                      <TableCell data-label="Plan" className="font-medium">
                         <Link
                           href={`/dashboard/workouts/${plan._id}`}
                           className="hover:underline text-primary font-semibold"
@@ -174,16 +174,16 @@ function PlansContent() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell data-label="Difficulty">
                         <DifficultyBadge difficulty={plan.difficulty} />
                       </TableCell>
-                      <TableCell className="capitalize">{plan.splitType || '—'}</TableCell>
-                      <TableCell>{plan.duration || '—'}</TableCell>
-                      <TableCell>{plan.assignedUsers?.length ?? 0}</TableCell>
-                      <TableCell>
+                      <TableCell data-label="Split" className="capitalize">{plan.splitType || '—'}</TableCell>
+                      <TableCell data-label="Weeks">{plan.duration || '—'}</TableCell>
+                      <TableCell data-label="Assigned">{plan.assignedUsers?.length ?? 0}</TableCell>
+                      <TableCell data-label="Status">
                         <PlanStatusBadge status={plan.status} />
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
+                      <TableCell data-label="Created" className="text-muted-foreground text-xs">
                         {plan.createdAt
                           ? new Date(plan.createdAt).toLocaleDateString('en-US', {
                               month: 'short',
@@ -192,8 +192,8 @@ function PlansContent() {
                             })
                           : '—'}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button asChild size="sm" variant="outline">
+                      <TableCell data-hide-label className="text-right">
+                        <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
                           <Link href={`/dashboard/workouts/${plan._id}`}>View/Edit</Link>
                         </Button>
                       </TableCell>

@@ -84,6 +84,7 @@ import { LiveSessionsPanel } from '@/components/live-sessions/live-sessions-pane
 import { useLiveSessions, useAllScheduledSessions, useEndSession } from '@/hooks/use-live-sessions'
 import { resolveBookingWindow } from '@/lib/booking-window'
 import GroupClassBookingsPanel from './group-class-bookings-panel'
+import { useLocationScope } from '@/components/location-scope-provider'
 
 type ScheduleMode = 'one-time' | 'recurring'
 type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly'
@@ -563,6 +564,7 @@ export default function TherapiesPage() {
   const updateGroupClass = useUpdateGroupClass()
   const deleteGroupClass = useDeleteGroupClass()
   const togglePublishGroupClass = useTogglePublishGroupClass()
+  const { selectedLocationId } = useLocationScope()
 
   const handleTogglePublish = async (gc: GroupClass, targetStatus: boolean) => {
     if (targetStatus) {
@@ -892,7 +894,13 @@ export default function TherapiesPage() {
       }
       await updateGroupClass.mutateAsync({ id: editingGc.id, payload })
     } else {
-      await createGroupClass.mutateAsync(payload)
+      // Stamp the new class at the branch selected in the header. Backend
+      // resolves the sole active location when omitted, so single-branch
+      // clinics behave exactly as before.
+      await createGroupClass.mutateAsync({
+        ...payload,
+        locationId: selectedLocationId ?? undefined,
+      })
     }
 
     setGcDialogOpen(false)

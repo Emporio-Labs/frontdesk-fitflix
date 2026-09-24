@@ -645,6 +645,8 @@ export default function UserDetailPage() {
             open={reportsOpen}
             onOpenChange={setReportsOpen}
             reports={profile.reports}
+            userId={userId}
+            member={user || { id: userId, _id: userId }}
           />
         </>
       )}

@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   Card,
@@ -84,6 +84,7 @@ export default function GroupClassBookingsPanel({
   onClearClassFilter,
 }: GroupClassBookingsPanelProps = {}) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
   const [activeFilter, setActiveFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'No-Show'>('All')
   const [selectedDate, setSelectedDate] = useState<string>('')
@@ -105,6 +106,24 @@ export default function GroupClassBookingsPanel({
     })
     return m
   }, [groupClasses])
+
+  // FX-25 deep-link: when a push notification opened this page with ?highlight=<sessionId>,
+  // scroll the first card that belongs to that session into view and pulse it.
+  const highlightId = searchParams?.get('highlight') || null
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!highlightId || isLoading || !containerRef.current) return
+    const node = containerRef.current.querySelector<HTMLElement>(
+      `[data-highlight-id="${CSS.escape(highlightId)}"]`
+    )
+    if (!node) return
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    node.classList.add('ring-2', 'ring-primary')
+    const t = window.setTimeout(() => {
+      node.classList.remove('ring-2', 'ring-primary')
+    }, 3200)
+    return () => window.clearTimeout(t)
+  }, [highlightId, isLoading, bookings])
 
   // Filter only Group Class & Live Session bookings (exclude physical clinic therapies)
   const groupClassBookingsOnly = useMemo(() => {
@@ -357,7 +376,7 @@ export default function GroupClassBookingsPanel({
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div ref={containerRef} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {filteredBookings.length === 0 ? (
                 <Card className="sm:col-span-2 xl:col-span-3 border-dashed">
                   <CardContent className="py-10 text-center text-muted-foreground">
@@ -406,9 +425,14 @@ export default function GroupClassBookingsPanel({
                     statusNormalized === 'unattended'
                   const isCancelled = statusNormalized === 'cancelled'
 
+                  const sessionRefId =
+                    typeof booking.sessionId === 'object'
+                      ? booking.sessionId?._id
+                      : booking.sessionId
                   return (
                     <Card
                       key={booking._id}
+                      data-highlight-id={sessionRefId || booking._id}
                       className="overflow-hidden rounded-2xl border border-slate-200/85 hover:shadow-md transition-shadow cursor-pointer group flex flex-col justify-between"
                       onClick={() => handleRowClick(booking)}
                     >

@@ -18,6 +18,7 @@ import { Lead } from '@/lib/services/lead.service'
 import { MembershipPlan } from '@/lib/services/membership-plan.service'
 import { useMembershipPlans } from '@/hooks/use-membership-plans'
 import { useCreateInvoice } from '@/hooks/use-invoices'
+import { useOptionalLocationScope } from '@/components/location-scope-provider'
 
 const TAX_RATE = 0.18
 
@@ -38,6 +39,10 @@ export function CreateInvoiceSheet({ lead, open, onOpenChange, onSuccess }: Prop
 
   const { data: plans = [], isLoading: plansLoading } = useMembershipPlans()
   const createInvoice = useCreateInvoice()
+  // Read the currently selected branch so the invoice is stamped correctly.
+  // Tolerant accessor: this sheet can render outside a strict scope subtree.
+  const scope = useOptionalLocationScope()
+  const selectedLocationId = scope?.selectedLocationId ?? undefined
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null
 
@@ -68,6 +73,7 @@ export function CreateInvoiceSheet({ lead, open, onOpenChange, onSuccess }: Prop
         ],
         discount: discountAmount,
         tax: taxAmount,
+        locationId: selectedLocationId,
       })
 
       setSelectedPlanId('')

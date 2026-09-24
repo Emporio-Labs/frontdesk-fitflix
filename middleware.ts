@@ -50,33 +50,45 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Role workspace guards
-  if (isAuthed && role) {
-    if (role === 'trainer') {
-      const isAllowedAdmin = TRAINER_ALLOWED_ADMIN_ROUTES.some((route) => pathname.startsWith(route))
-      if (pathname.startsWith('/admin') && !isAllowedAdmin) {
-        return NextResponse.redirect(new URL(ROLE_START_PAGES.trainer, request.url))
-      }
-      // Trainers may only access /dashboard/workouts*
-      if (pathname.startsWith('/dashboard') && !pathname.startsWith('/dashboard/workouts')) {
-        return NextResponse.redirect(new URL(ROLE_START_PAGES.trainer, request.url))
-      }
-    } else if (role === 'nutritionist') {
-      const isAllowedAdmin = NUTRITIONIST_ALLOWED_ADMIN_ROUTES.some((route) => pathname.startsWith(route))
-      if (pathname.startsWith('/admin') && !isAllowedAdmin) {
-        return NextResponse.redirect(new URL(ROLE_START_PAGES.nutritionist, request.url))
-      }
-      if (pathname.startsWith('/dashboard')) {
-        return NextResponse.redirect(new URL(ROLE_START_PAGES.nutritionist, request.url))
-      }
-    } else if (role === 'sports_scientist') {
-      const isAllowedAdmin = SPORTS_SCIENTIST_ALLOWED_ADMIN_ROUTES.some((route) => pathname.startsWith(route))
-      if (pathname.startsWith('/admin') && !isAllowedAdmin) {
-        return NextResponse.redirect(new URL(ROLE_START_PAGES.sports_scientist, request.url))
-      }
-      if (pathname.startsWith('/dashboard')) {
-        return NextResponse.redirect(new URL(ROLE_START_PAGES.sports_scientist, request.url))
-      }
+  // Trainer role access: Trainers can access Personal Training hub and live session rooms
+  const TRAINER_ALLOWED_ADMIN_ROUTES = [
+    '/admin/personal-training',
+    '/admin/live-session',
+    '/admin/slots',
+    '/admin/me/notifications',
+  ]
+
+  if (isAuthed && role === 'trainer') {
+    const isAllowedAdmin = TRAINER_ALLOWED_ADMIN_ROUTES.some((route) => pathname.startsWith(route))
+    if (pathname.startsWith('/admin') && !isAllowedAdmin) {
+      return NextResponse.redirect(new URL('/dashboard/workouts/members', request.url))
+    }
+    if (pathname === '/dashboard') {
+      return NextResponse.redirect(new URL('/admin/personal-training/today', request.url))
+    }
+  }
+
+  // Nutritionist role access: nutritionists can only see their own client workspace.
+  const NUTRITIONIST_ALLOWED_ADMIN_ROUTES = [
+    '/admin/nutrition/my-clients',  // "My Clients" list + profile pages
+    '/admin/nutrition/members',     // individual client profiles
+    '/admin/nutritionist',          // availability editor
+    '/admin/nutrition/diet-plans',  // diet-plan templates (read)
+    '/admin/nutrition/foods',       // food catalog (read)
+    '/admin/me/notifications',      // FX-25 push settings
+  ]
+  // Allow /admin/nutrition only when going to the appointments / food-catalog tabs;
+  // block bare /admin/nutrition (would show full admin workspace).
+  // We redirect bare /admin/nutrition to /admin/nutrition/my-clients.
+  if (isAuthed && role === 'nutritionist') {
+    const isAllowedAdmin = NUTRITIONIST_ALLOWED_ADMIN_ROUTES.some((route) =>
+      pathname.startsWith(route)
+    )
+    if (pathname.startsWith('/admin') && !isAllowedAdmin) {
+      return NextResponse.redirect(new URL('/admin/nutrition/my-clients', request.url))
+    }
+    if (pathname === '/dashboard') {
+      return NextResponse.redirect(new URL('/admin/nutrition/my-clients', request.url))
     }
   }
 

@@ -39,10 +39,14 @@ import {
   IconSparkles,
   IconSalad,
   IconActivity,
+  IconEye,
+  IconLock,
 } from '@tabler/icons-react'
 import { useUser } from '@/hooks/use-users'
 import { useNutritionPlans } from '@/hooks/use-nutrition'
 import { useNutritionistWorkspace } from '@/stores/nutritionist-workspace-store'
+import { useCanAccessMemberReports } from '@/hooks/use-can-access-reports'
+import { MedicalReportViewerModal } from '@/components/medical-report-viewer-modal'
 import type { ExpertAppointment, MedicalReport } from '@/lib/services/onboarding.service'
 
 interface ClinicalUserDialogProps {
@@ -86,6 +90,8 @@ export function ClinicalUserDialog({
   const { selectUser, setDraftNote, draftNotes } = useNutritionistWorkspace()
   const persistedNote = userId ? draftNotes[userId] ?? '' : ''
   const [note, setNote] = useState(persistedNote)
+  const [selectedReport, setSelectedReport] = useState<MedicalReport | null>(null)
+  const reportAccess = useCanAccessMemberReports(user)
 
   useEffect(() => {
     setNote(persistedNote)
@@ -230,9 +236,17 @@ export function ClinicalUserDialog({
                 )}
               </Section>
 
-              {/* 4. Uploaded Reports */}
+              {/* 4. Uploaded Reports (AC FX-07.1, FX-07.2, FX-07.3) */}
               <Section icon={IconFileText} title="Uploaded Reports">
-                {reports.length === 0 ? (
+                {!reportAccess.allowed ? (
+                  <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
+                    <IconLock className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    <div>
+                      <p className="font-semibold">Access Restricted</p>
+                      <p className="mt-0.5">{reportAccess.reason || 'You can only view medical reports for members you look after.'}</p>
+                    </div>
+                  </div>
+                ) : reports.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No reports uploaded.
                   </p>
@@ -240,44 +254,47 @@ export function ClinicalUserDialog({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">Name</TableHead>
+                        <TableHead className="text-xs">Report Name</TableHead>
                         <TableHead className="text-xs">Type</TableHead>
-                        <TableHead className="text-xs">Uploaded</TableHead>
-                        <TableHead className="text-right text-xs">
-                          Open
-                        </TableHead>
+                        <TableHead className="text-xs">Upload Date</TableHead>
+                        <TableHead className="text-right text-xs">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {reports.map((r: MedicalReport) => (
-                        <TableRow key={r._id}>
-                          <TableCell className="text-sm font-medium">
+                        <TableRow key={r._id || r.id}>
+                          <TableCell className="text-sm font-medium break-all">
                             {r.reportName}
                           </TableCell>
-                          <TableCell className="text-sm">
-                            {r.reportType}
+                          <TableCell className="text-sm capitalize">
+                            {r.reportType || 'Medical'}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {r.uploadedAt
-                              ? new Date(r.uploadedAt).toLocaleDateString()
+                              ? new Date(r.uploadedAt).toLocaleDateString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })
+                              : r.createdAt
+                              ? new Date(r.createdAt).toLocaleDateString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })
                               : '—'}
                           </TableCell>
                           <TableCell className="text-right">
-                            {r.reportUrl ? (
-                              <a
-                                href={r.reportUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                              >
-                                <IconExternalLink className="h-3.5 w-3.5" />
-                                View
-                              </a>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">
-                                —
-                              </span>
-                            )}
+                            <Button
+                              id={`read-report-btn-${r._id || r.id}`}
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1 hover:bg-primary hover:text-primary-foreground"
+                              onClick={() => setSelectedReport(r)}
+                            >
+                              <IconEye className="h-3.5 w-3.5" />
+                              Read
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -414,6 +431,16 @@ export function ClinicalUserDialog({
             </Button>
           </div>
         </div>
+
+        {/* In-Page Medical Report Viewer Modal (AC FX-07.2, FX-07.4) */}
+        <MedicalReportViewerModal
+          report={selectedReport}
+          userId={userId || ''}
+          open={!!selectedReport}
+          onOpenChange={(open) => {
+            if (!open) setSelectedReport(null)
+          }}
+        />
       </DialogContent>
     </Dialog>
   )

@@ -118,11 +118,13 @@ const navGroups = [
 const navTrainerGroup = [
   {
     items: [
+      { title: "Today", url: "/admin/personal-training/today", icon: IconCalendarEvent },
       { title: "Personal Training", url: "/admin/personal-training", icon: IconDumbbell },
       { title: "My Members", url: "/dashboard/workouts/members", icon: IconUsers },
       { title: "Workout Plans", url: "/dashboard/workouts/plans", icon: IconBarbell },
       { title: "Exercise Library", url: "/dashboard/workouts/exercises", icon: IconActivity },
       { title: "Live Sessions", url: "/dashboard/workouts/sessions", icon: IconClock },
+      { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
     ],
   },
 ]
@@ -135,17 +137,8 @@ const navNutritionistGroup = [
       { title: "Diet Plans", url: "/admin/nutrition/diet-plans", icon: IconTemplate },
       { title: "Food Catalog", url: "/admin/nutrition/foods", icon: IconApple },
       { title: "Availability", url: "/admin/nutritionist", icon: IconClock },
-    ],
-  },
-]
-
-const navSportsScientistGroup = [
-  {
-    items: [
-      { title: "Sports Scientist", url: "/admin/sports-scientist", icon: IconStethoscope },
-      { title: "Bookings", url: "/admin/sports-scientist?tab=bookings", icon: IconCalendarEvent },
-      { title: "Active Users", url: "/admin/sports-scientist?tab=active-users", icon: IconUsers },
-      { title: "Availability", url: "/admin/sports-scientist?tab=availability", icon: IconClock },
+      { title: "Food Catalog", url: "/admin/nutrition?tab=food-catalog", icon: IconSalad },
+      { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
     ],
   },
 ]
@@ -159,17 +152,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: '/placeholder-user.jpg',
   }
 
-  const role = user?.role
-  let groups = navGroups
-  if (role === 'trainer') {
-    groups = navTrainerGroup
-  } else if (role === 'nutritionist') {
-    groups = navNutritionistGroup
-  } else if (role === 'sports_scientist') {
-    groups = navSportsScientistGroup
-  }
-
-  const brandHref = getRoleStartPage(role)
+  const isTrainer = user?.role === 'trainer'
+  const isNutritionist = user?.role === 'nutritionist'
+  const groups = isTrainer ? navTrainerGroup : isNutritionist ? navNutritionistGroup : navGroups
+  const brandHref = isTrainer
+    ? '/admin/personal-training/today'
+    : isNutritionist
+    ? '/admin/nutrition/my-clients'
+    : '/dashboard'
 
   return (
     // "icon" (not "none") so callers that omit the prop still get the mobile Sheet;
