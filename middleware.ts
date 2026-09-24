@@ -27,6 +27,7 @@ export function middleware(request: NextRequest) {
     '/admin/personal-training',
     '/admin/live-session',
     '/admin/slots',
+    '/admin/me/notifications',
   ]
 
   if (isAuthed && role === 'trainer') {
@@ -35,7 +36,7 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard/workouts/members', request.url))
     }
     if (pathname === '/dashboard') {
-      return NextResponse.redirect(new URL('/admin/personal-training', request.url))
+      return NextResponse.redirect(new URL('/admin/personal-training/today', request.url))
     }
   }
 
@@ -46,6 +47,7 @@ export function middleware(request: NextRequest) {
     '/admin/nutritionist',          // availability editor
     '/admin/nutrition/diet-plans',  // diet-plan templates (read)
     '/admin/nutrition/foods',       // food catalog (read)
+    '/admin/me/notifications',      // FX-25 push settings
   ]
   // Allow /admin/nutrition only when going to the appointments / food-catalog tabs;
   // block bare /admin/nutrition (would show full admin workspace).

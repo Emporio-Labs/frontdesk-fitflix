@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Hard redirect — ensures middleware sees the new cookie immediately
     if (typeof window !== 'undefined') {
       let target = '/dashboard'
-      if (userData?.role === 'trainer') target = '/admin/personal-training'
+      if (userData?.role === 'trainer') target = '/admin/personal-training/today'
       else if (userData?.role === 'nutritionist') target = '/admin/nutrition/my-clients'
       window.location.href = target
     }

@@ -6,10 +6,10 @@
  * (except /offline) and /api responses are NEVER cached — doing so could serve
  * one staff member's data to the next person picking up the device.
  */
-// Bumped v2 -> v3 so the `activate` handler evicts the previous static cache
-// (which did not know about /offline) and forces a fresh precache. Change this
-// on every SW behavioural change.
-const CACHE = 'fitflix-static-v3'
+// Bumped v3 -> v4 (FX-25) so the `activate` handler evicts the previous static
+// cache and forces this build's push + notificationclick handlers to install.
+// Change this on every SW behavioural change.
+const CACHE = 'fitflix-static-v4'
 
 // Sole cached HTML document. Rendered by app/offline/page.tsx as a static route,
 // so it survives without any live API call. Served by the fetch handler below
@@ -80,5 +80,66 @@ self.addEventListener('fetch', (event) => {
         return response
       })
     }),
+  )
+})
+
+// -----------------------------------------------------------------------------
+// FX-25 · Web Push handlers.
+//
+// SECURITY: the shared-device rule in the header still applies. Push payload is
+// used to render one notification and to remember the deep-link URL for the
+// click handler — nothing is written to the CACHE and nothing is persisted
+// beyond a single notification's lifetime.
+// -----------------------------------------------------------------------------
+
+self.addEventListener('push', (event) => {
+  let payload = {}
+  if (event.data) {
+    try {
+      payload = event.data.json()
+    } catch {
+      payload = { title: 'Fitflix', body: event.data.text() }
+    }
+  }
+  const title = payload.title || 'Fitflix'
+  const options = {
+    body: payload.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: payload.tag || 'fitflix-push',
+    renotify: true,
+    data: {
+      url: typeof payload.url === 'string' ? payload.url : '/',
+    },
+  }
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const target =
+    (event.notification.data && event.notification.data.url) || '/'
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windows) => {
+        for (const client of windows) {
+          if (
+            'focus' in client &&
+            typeof client.url === 'string' &&
+            client.url.startsWith(self.location.origin)
+          ) {
+            client.focus()
+            if ('navigate' in client) {
+              return client.navigate(target).catch(() => undefined)
+            }
+            return undefined
+          }
+        }
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(target)
+        }
+        return undefined
+      }),
   )
 })
