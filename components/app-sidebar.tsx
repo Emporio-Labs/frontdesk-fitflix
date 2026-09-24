@@ -29,13 +29,14 @@ import {
   IconDumbbell,
   IconBellRinging,
   IconStethoscope,
-  IconLayoutList,
+  IconApple,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
 import { NavMain } from '@/components/nav-main'
 import { NavUser } from '@/components/nav-user'
 import { useAuth } from '@/hooks/use-auth'
+import { getRoleStartPage } from '@/app/context/auth-context'
 import {
   Sidebar,
   SidebarContent,
@@ -131,8 +132,10 @@ const navTrainerGroup = [
 const navNutritionistGroup = [
   {
     items: [
-      { title: "My Clients", url: "/admin/nutrition/my-clients", icon: IconUsers },
-      { title: "Appointments", url: "/admin/nutrition", icon: IconCalendarEvent },
+      { title: "Nutrition", url: "/admin/nutrition", icon: IconSalad },
+      { title: "Appointments", url: "/admin/nutrition?tab=appointments", icon: IconCalendarEvent },
+      { title: "Diet Plans", url: "/admin/nutrition/diet-plans", icon: IconTemplate },
+      { title: "Food Catalog", url: "/admin/nutrition/foods", icon: IconApple },
       { title: "Availability", url: "/admin/nutritionist", icon: IconClock },
       { title: "Food Catalog", url: "/admin/nutrition?tab=food-catalog", icon: IconSalad },
       { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
