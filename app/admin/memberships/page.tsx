@@ -36,6 +36,7 @@ import {
   useUpdateMembership,
   useDeleteMembership,
 } from '@/hooks/use-memberships'
+import { useLocationScope } from '@/components/location-scope-provider'
 
 function formatDateToInput(value?: string) {
   if (!value) return ''
@@ -88,6 +89,7 @@ function MembershipsPageContent() {
   const createMembership = useCreateMembership()
   const updateMembership = useUpdateMembership()
   const deleteMembership = useDeleteMembership()
+  const { selectedLocationId } = useLocationScope()
 
   const assignUserId = searchParams.get('assignUserId') || ''
 
@@ -305,7 +307,13 @@ function MembershipsPageContent() {
     if (editingMembership) {
       await updateMembership.mutateAsync({ id: editingMembership.id, payload })
     } else {
-      await createMembership.mutateAsync(payload)
+      // Stamp new memberships at the branch selected in the header. On edit we
+      // deliberately don't send it, so an admin viewing a different branch can
+      // still fix a note without moving the membership between branches.
+      await createMembership.mutateAsync({
+        ...payload,
+        locationId: selectedLocationId ?? undefined,
+      })
     }
 
     resetForm()

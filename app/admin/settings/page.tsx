@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,19 +15,11 @@ export default function SettingsPage() {
   const [address, setAddress] = useState('123 Main St, City, State 12345')
   const [timezone, setTimezone] = useState('UTC-8')
 
-  const [emailNotifications, setEmailNotifications] = useState(true)
-  const [bookingNotifications, setBookingNotifications] = useState(true)
-  const [reportNotifications, setReportNotifications] = useState(false)
-
   const [darkMode, setDarkMode] = useState(false)
   const [language, setLanguage] = useState('english')
 
   const handleSaveClinicInfo = () => {
     alert('Clinic information saved successfully!')
-  }
-
-  const handleSaveNotifications = () => {
-    alert('Notification preferences saved!')
   }
 
   const handleSavePreferences = () => {
@@ -114,54 +107,20 @@ export default function SettingsPage() {
             <IconBell className="w-5 h-5" />
             <div>
               <CardTitle>Notifications</CardTitle>
-              <CardDescription>Manage notification preferences</CardDescription>
+              <CardDescription>
+                Push alerts for trainers, nutritionists and other staff live on the
+                per-user page.
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Email Notifications</p>
-              <p className="text-sm text-gray-500">Receive email updates about system events</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={emailNotifications}
-              onChange={(e) => setEmailNotifications(e.target.checked)}
-              className="w-5 h-5 cursor-pointer"
-            />
-          </div>
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Booking Notifications</p>
-                <p className="text-sm text-gray-500">Get notified when new bookings are made</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={bookingNotifications}
-                onChange={(e) => setBookingNotifications(e.target.checked)}
-                className="w-5 h-5 cursor-pointer"
-              />
-            </div>
-          </div>
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Report Notifications</p>
-                <p className="text-sm text-gray-500">Receive notifications for completed reports</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={reportNotifications}
-                onChange={(e) => setReportNotifications(e.target.checked)}
-                className="w-5 h-5 cursor-pointer"
-              />
-            </div>
-          </div>
-          <Button onClick={handleSaveNotifications} className="mt-4">
-            Save Notification Settings
-          </Button>
+        <CardContent>
+          <Link
+            href="/admin/me/notifications"
+            className="text-sm font-medium text-primary underline underline-offset-4"
+          >
+            Open my notification settings →
+          </Link>
         </CardContent>
       </Card>
 

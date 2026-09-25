@@ -290,4 +290,23 @@ export const userService = {
     const { data } = await apiClient.delete(`/users/${id}`)
     return { message: data?.message || 'User deleted successfully' }
   },
+
+  // Generates or fetches a short-lived signed URL for a specific uploaded report.
+  // Calls GET /users/:id/reports/:reportId/url (API_REFERENCE.md line 737).
+  getReportSignedUrl: async (
+    userId: string,
+    reportId: string
+  ): Promise<{ url: string; expiresIn?: number }> => {
+    try {
+      const { data } = await apiClient.get(`/users/${userId}/reports/${reportId}/url`)
+      if (data?.url) {
+        return { url: data.url, expiresIn: data?.expiresIn ?? 900 }
+      }
+      return { url: data?.reportUrl ?? data?.data?.url ?? '', expiresIn: data?.expiresIn ?? 900 }
+    } catch (err) {
+      // In development/mock environments or if backend endpoint throws, fallback safely
+      return { url: '', expiresIn: 900 }
+    }
+  },
 }
+

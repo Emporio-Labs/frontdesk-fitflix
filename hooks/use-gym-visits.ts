@@ -5,6 +5,7 @@ import {
   type CheckInPayload,
   type CheckOutPayload,
   type GymVisitFilters,
+  type QrCheckInPayload,
 } from '@/lib/services/gym-visit.service'
 import { queryKeys } from '@/lib/query-keys'
 
@@ -70,7 +71,7 @@ export function useCheckIn() {
 export function useQrCheckIn() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (token: string) => gymVisitService.qrCheckIn(token),
+    mutationFn: (payload: QrCheckInPayload) => gymVisitService.qrCheckIn(payload),
     onSuccess: (data) => {
       invalidateAll(qc)
       toast.success(data.message)

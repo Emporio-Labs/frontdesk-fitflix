@@ -90,6 +90,107 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * FX-09 — installed-PWA / phone treatment.
+ *
+ * Scope: <= 640px viewport ONLY. Desktop admin (FX-09.5) stays byte-identical.
+ * Everything below is layered on top of Tailwind, so a page can still opt out
+ * with a more specific rule if a table genuinely needs a different treatment.
+ * ------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  /* FX-09.3 — every button and link is at least 44px tall on a phone.
+   * Radix + shadcn buttons all carry data-slot="button" or role="button", and
+   * plain <button> elements are covered directly. min-height is used (not
+   * height) so small variants can still grow to 44px without being locked
+   * shorter by a Tailwind h-8/h-9 class. */
+  button:not([aria-hidden='true']):not([data-mobile-tap-exempt]),
+  [role='button']:not([aria-hidden='true']):not([data-mobile-tap-exempt]),
+  [data-slot='button']:not([aria-hidden='true']):not([data-mobile-tap-exempt]),
+  a[href][data-mobile-tap]:not([aria-hidden='true']) {
+    min-height: 44px;
+  }
+
+  /* Nav rows in the mobile sidebar Sheet are already ~44px tall via padding,
+   * but the sidebar-menu-sub items collapse tighter — bump them too. */
+  [data-sidebar='menu-button'],
+  [data-sidebar='menu-sub-button'] {
+    min-height: 44px;
+  }
+
+  /* FX-09.2 — opt-in table-to-card treatment.
+   *
+   * Any page that adds data-mobile-cards="tables" to a wrapper will render
+   * every descendant <table> as a stack of cards on phones. Cells lay out as
+   * "label · value" pairs, so add data-label="…" on each <TableCell> for the
+   * label to show. Cells with data-hide-label suppress the label (e.g. the
+   * action cell holding a button).
+   *
+   * The table itself keeps its DOM structure so React Query + row-click
+   * handlers keep working; only the visual layout changes. */
+  [data-mobile-cards='tables'] table {
+    display: block;
+    width: 100%;
+  }
+  [data-mobile-cards='tables'] thead {
+    /* Off-screen instead of display:none so screen readers can still announce
+     * column headers via the data-label pair on each cell below. */
+    position: absolute;
+    left: -9999px;
+    top: -9999px;
+    height: 1px;
+    width: 1px;
+    overflow: hidden;
+  }
+  [data-mobile-cards='tables'] tbody,
+  [data-mobile-cards='tables'] tr {
+    display: block;
+    width: 100%;
+  }
+  [data-mobile-cards='tables'] tr {
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    background: hsl(var(--card));
+  }
+  [data-mobile-cards='tables'] td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.375rem 0;
+    border: 0;
+    text-align: left;
+    min-width: 0;
+    word-break: break-word;
+    white-space: normal;
+  }
+  [data-mobile-cards='tables'] td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Some pages wrap tables in .overflow-x-auto to keep desktop tables from
+   * blowing out. That wrapper now conflicts with the block layout above, so
+   * neutralise the horizontal scroll inside a mobile-card container. */
+  [data-mobile-cards='tables'] .overflow-x-auto {
+    overflow-x: visible;
+  }
+
+  /* Belt-and-braces guard against pages that lay out with hard pixel widths.
+   * Only applied to the trainer/nutritionist wrappers so admin desktop pages
+   * seen on a phone are unaffected. */
+  [data-mobile-cards='tables'] {
+    overflow-x: hidden;
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * Portrait tiles for phone participants in the ZEGOCLOUD group-class grid.
  *
