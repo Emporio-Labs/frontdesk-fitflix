@@ -9,3 +9,11 @@ export function useGroupClassBookings() {
     select: (data) => data.bookings,
   })
 }
+
+export function useGroupClassWaitlist(params?: { classId?: string; sessionId?: string; status?: string }) {
+  return useQuery({
+    queryKey: [...queryKeys.groupClassBookings.all(), 'waitlist', params ?? {}],
+    queryFn: () => groupClassBookingService.getWaitlist(params),
+    select: (data) => data.waitlist ?? [],
+  })
+}
