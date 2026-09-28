@@ -80,7 +80,29 @@ export function QrScannerDialog() {
       scanner
         .start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          {
+            fps: 24,
+            qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+              const size = Math.floor(minEdge * 0.85)
+              return { width: size, height: size }
+            },
+            aspectRatio: 1.7778,
+            disableFlip: false,
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true,
+            },
+            videoConstraints: {
+              facingMode: 'environment',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              focusMode: 'continuous',
+              advanced: [
+                { focusMode: 'continuous' },
+                { zoom: 1 },
+              ],
+            } as MediaTrackConstraints,
+          } as any,
           (decodedText) => {
             if (pausedRef.current) return
             pausedRef.current = true
