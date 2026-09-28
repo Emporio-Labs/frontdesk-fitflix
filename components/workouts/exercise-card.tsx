@@ -1,11 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { IconAlertTriangle, IconGripVertical, IconTrash } from '@tabler/icons-react'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { IconAlertTriangle, IconGripVertical, IconLoader2, IconTrash } from '@tabler/icons-react'
 import { MuscleGroupIcon } from '@/components/workouts/muscle-group-icon'
+import { ExerciseDetailsDialog } from '@/components/workouts/exercise-details-dialog'
+import { useExercise } from '@/hooks/use-exercises'
 import type { WorkoutExercise, MuscleGroup } from '@/types/workout'
 
 export function ExerciseCard({
@@ -23,6 +27,7 @@ export function ExerciseCard({
   // nested exercise at all — both mean the library row is gone.
   const isMissing = exercise.exerciseMissing === true || !exercise.exercise
   const sortableId = `exercise-${exercise.orderIndex}`
+  const [infoOpen, setInfoOpen] = useState(false)
   const {
     attributes,
     listeners,
@@ -52,6 +57,14 @@ export function ExerciseCard({
         <IconGripVertical className="w-4 h-4" />
       </button>
 
+      {/* Icon + name open the full exercise details */}
+      <button
+        type="button"
+        disabled={isMissing}
+        onClick={() => setInfoOpen(true)}
+        className="flex items-center gap-2 flex-1 min-w-0 text-left rounded-md -m-1 p-1 enabled:cursor-pointer enabled:hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        title={isMissing ? undefined : 'View exercise details'}
+      >
       <div
         className={`flex items-center justify-center w-8 h-8 rounded-md shrink-0 ${
           isMissing ? 'bg-destructive/10' : 'bg-muted'
@@ -83,6 +96,7 @@ export function ExerciseCard({
                 .join(' · ')}
         </p>
       </div>
+      </button>
 
       <div className="flex items-center gap-1.5">
         <InlineInput
@@ -117,7 +131,47 @@ export function ExerciseCard({
       >
         <IconTrash className="w-3.5 h-3.5" />
       </Button>
+
+      {infoOpen && (
+        <PlanExerciseDetails
+          exerciseId={exercise.exerciseId}
+          onClose={() => setInfoOpen(false)}
+        />
+      )}
     </div>
+  )
+}
+
+// Plan rows only carry a trimmed exercise summary, so fetch the full library
+// record (images, instructions, tips) when the details are opened.
+function PlanExerciseDetails({
+  exerciseId,
+  onClose,
+}: {
+  exerciseId: string
+  onClose: () => void
+}) {
+  const { data, isLoading, isError } = useExercise(exerciseId)
+
+  if (data) {
+    return <ExerciseDetailsDialog open onOpenChange={(o) => !o && onClose()} exercise={data} />
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogTitle className="sr-only">Exercise details</DialogTitle>
+        <DialogDescription className="text-sm text-center py-6">
+          {isLoading ? (
+            <span className="inline-flex items-center gap-2 text-muted-foreground">
+              <IconLoader2 className="w-4 h-4 animate-spin" /> Loading exercise…
+            </span>
+          ) : isError ? (
+            <span className="text-destructive">Couldn&apos;t load this exercise.</span>
+          ) : null}
+        </DialogDescription>
+      </DialogContent>
+    </Dialog>
   )
 }
 
