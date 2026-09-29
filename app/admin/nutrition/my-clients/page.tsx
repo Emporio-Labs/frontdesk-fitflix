@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
+import Link from 'next/link'
 import {
   Card,
   CardContent,
@@ -21,61 +22,29 @@ import {
 } from '@/components/ui/table'
 import {
   IconSearch,
-  IconUser,
   IconFileText,
   IconEye,
   IconUsers,
   IconCalendarEvent,
-  IconCheck,
 } from '@tabler/icons-react'
-import { useAuth } from '@/hooks/use-auth'
 import { useMyNutritionistClients } from '@/hooks/use-nutritionist-clients'
-import { useUsers } from '@/hooks/use-users'
-import { ClinicalUserDialog } from '@/components/nutrition/clinical-user-dialog'
 import { EmptyState } from '@/components/empty-state'
 import { Skeleton } from '@/components/skeleton-loader'
 import { useHighlightRow } from '@/components/highlight-row'
 
 export default function NutritionistMyClientsPage() {
-  const { user: currentUser } = useAuth()
-  const { data: myClients = [], isLoading: clientsLoading, refetch } = useMyNutritionistClients()
-  const { data: allUsers = [], isLoading: allUsersLoading } = useUsers()
+  const {
+    data: myClients = [],
+    isLoading,
+    refetch,
+  } = useMyNutritionistClients()
 
   const [search, setSearch] = useState('')
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
 
-  // Consolidate clients: prioritize useMyNutritionistClients, fallback to appointment matches
-  const clientsList = useMemo(() => {
-    if (Array.isArray(myClients) && myClients.length > 0) {
-      return myClients
-    }
-
-    // Fallback if backend endpoint /nutritionist/me/members returns empty in dev
-    const currentId = currentUser?.id || ''
-    const currentName = currentUser?.name?.toLowerCase() || ''
-    const currentUserEmail = currentUser?.email?.toLowerCase() || ''
-
-    if (!Array.isArray(allUsers)) return []
-
-    return allUsers.filter((u: any) => {
-      // Check appointments assigned to this nutritionist
-      const hasAppt = (u.expertAppointments || []).some((a: any) => {
-        if (a.expertType !== 'nutritionist') return false
-        const nutId = String(a.assignedNutritionistId || a.assignedNutritionist || '')
-        const nutName = String(a.assignedNutritionistName || '').toLowerCase()
-        if (currentId && nutId === currentId) return true
-        if (currentName && nutName.includes(currentName)) return true
-        return false
-      })
-      if (hasAppt) return true
-
-      const assignedNutri = String(u.assignedNutritionistId || u.assignedNutritionist || '')
-      if (currentId && assignedNutri === currentId) return true
-
-      return false
-    })
-  }, [myClients, allUsers, currentUser])
+  // AC FX-06.1: only members the backend returns as assigned to the signed-in
+  // nutritionist. No client-side roster fallback — the whole /users list must
+  // not travel to a nutritionist's browser.
+  const clientsList = Array.isArray(myClients) ? myClients : []
 
   const filteredClients = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -89,14 +58,6 @@ export default function NutritionistMyClientsPage() {
     })
   }, [clientsList, search])
 
-  const handleOpenClient = (userId: string) => {
-    setSelectedUserId(userId)
-    setDialogOpen(true)
-  }
-
-  const isLoading = clientsLoading && allUsersLoading
-
-  // Calculate stats
   const totalClients = clientsList.length
   const clientsWithReports = clientsList.filter(
     (c: any) => Array.isArray(c.reports) && c.reports.length > 0
@@ -111,7 +72,7 @@ export default function NutritionistMyClientsPage() {
             My Clients
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Members assigned to your nutrition roster. Read medical reports and manage clinical care plans.
+            Members assigned to your nutrition roster. Open a profile to review their plan, meal log, adherence, hydration and progress.
           </p>
         </div>
         <div className="flex items-center gap-2 mt-2 sm:mt-0">
@@ -172,7 +133,7 @@ export default function NutritionistMyClientsPage() {
             <div>
               <CardTitle className="text-base sm:text-lg">Client Directory</CardTitle>
               <CardDescription className="text-xs">
-                Select a client to review their uploaded medical reports, health markers, and diet plan.
+                Select a client to review their nutrition plan, meal log, adherence, hydration and progress.
               </CardDescription>
             </div>
             <div className="relative w-full sm:w-72">
@@ -234,7 +195,6 @@ export default function NutritionistMyClientsPage() {
                         displayName={displayName}
                         reportCount={reportCount}
                         goals={goals}
-                        onOpen={handleOpenClient}
                       />
                     )
                   })}
@@ -244,16 +204,6 @@ export default function NutritionistMyClientsPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Clinical User Dialog containing the medical reports reader */}
-      <ClinicalUserDialog
-        userId={selectedUserId}
-        open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open)
-          if (!open) setSelectedUserId(null)
-        }}
-      />
     </div>
   )
 }
@@ -264,14 +214,12 @@ function HighlightableClientRow({
   displayName,
   reportCount,
   goals,
-  onOpen,
 }: {
   cid: string
   client: any
   displayName: string
   reportCount: number
   goals: string[]
-  onOpen: (id: string) => void
 }) {
   const highlight = useHighlightRow<HTMLTableRowElement>(cid)
   return (
@@ -331,14 +279,16 @@ function HighlightableClientRow({
 
       <TableCell data-hide-label className="text-right">
         <Button
+          asChild
           id={`client-profile-btn-${cid}`}
           size="sm"
           variant="default"
           className="text-xs gap-1.5 w-full sm:w-auto sm:h-8"
-          onClick={() => onOpen(cid)}
         >
-          <IconEye className="h-3.5 w-3.5" />
-          Client Profile
+          <Link href={`/admin/nutrition/my-clients/${cid}`}>
+            <IconEye className="h-3.5 w-3.5" />
+            Client Profile
+          </Link>
         </Button>
       </TableCell>
     </TableRow>
