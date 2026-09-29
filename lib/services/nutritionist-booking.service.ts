@@ -77,11 +77,40 @@ function normalizeBooking(raw: any): NutritionistBooking {
   }
 }
 
+// ── Typed error for ownership guard (AC FX-06.3) ─────────────────────────────
+export class NotYourClientError extends Error {
+  constructor() {
+    super('not_your_client')
+    this.name = 'NotYourClientError'
+  }
+}
+
 export const nutritionistBookingService = {
   getAll: async (): Promise<NutritionistBookingsResponse> => {
     const { data } = await apiClient.get('/nutritionist/bookings')
     const bookings = Array.isArray(data?.bookings) ? data.bookings : []
     return { bookings: bookings.map(normalizeBooking) }
+  },
+
+  // ── My-clients endpoints (FX-06.1) ─────────────────────────────────────────
+  // Mirrors the trainer pattern: GET /nutritionist/me/members
+  // Backend is expected to filter by the signed-in nutritionist's assignedNutritionistId.
+  getMyClients: async (): Promise<{ members: any[] }> => {
+    const { data } = await apiClient.get('/nutritionist/me/members')
+    return { members: Array.isArray(data?.members) ? data.members : [] }
+  },
+
+  // Returns a single client — throws NotYourClientError on 403 (AC FX-06.3).
+  getMyClientById: async (userId: string): Promise<{ member: any }> => {
+    try {
+      const { data } = await apiClient.get(`/nutritionist/me/members/${userId}`)
+      return { member: data?.member ?? data?.user ?? data }
+    } catch (e: any) {
+      if (e?.response?.status === 403) {
+        throw new NotYourClientError()
+      }
+      throw e
+    }
   },
   accept: async (id: string): Promise<NutritionistBookingActionResponse> => {
     const { data } = await apiClient.patch(`/nutritionist/bookings/${id}/accept`)

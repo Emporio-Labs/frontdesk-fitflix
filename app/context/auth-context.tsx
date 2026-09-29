@@ -88,7 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(userData?.role ?? 'clinic_admin')
     // Hard redirect — ensures middleware sees the new cookie immediately
     if (typeof window !== 'undefined') {
-      const target = userData?.role === 'trainer' ? '/admin/personal-training' : '/dashboard'
+      let target = '/dashboard'
+      if (userData?.role === 'trainer') target = '/admin/personal-training'
+      else if (userData?.role === 'nutritionist') target = '/admin/nutrition/my-clients'
       window.location.href = target
     }
   }

@@ -39,6 +39,29 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // Nutritionist role access: nutritionists can only see their own client workspace.
+  const NUTRITIONIST_ALLOWED_ADMIN_ROUTES = [
+    '/admin/nutrition/my-clients',  // "My Clients" list + profile pages
+    '/admin/nutrition/members',     // individual client profiles
+    '/admin/nutritionist',          // availability editor
+    '/admin/nutrition/diet-plans',  // diet-plan templates (read)
+    '/admin/nutrition/foods',       // food catalog (read)
+  ]
+  // Allow /admin/nutrition only when going to the appointments / food-catalog tabs;
+  // block bare /admin/nutrition (would show full admin workspace).
+  // We redirect bare /admin/nutrition to /admin/nutrition/my-clients.
+  if (isAuthed && role === 'nutritionist') {
+    const isAllowedAdmin = NUTRITIONIST_ALLOWED_ADMIN_ROUTES.some((route) =>
+      pathname.startsWith(route)
+    )
+    if (pathname.startsWith('/admin') && !isAllowedAdmin) {
+      return NextResponse.redirect(new URL('/admin/nutrition/my-clients', request.url))
+    }
+    if (pathname === '/dashboard') {
+      return NextResponse.redirect(new URL('/admin/nutrition/my-clients', request.url))
+    }
+  }
+
   // Authed, trying to access login → redirect to dashboard
   if (isAuthRoute && isAuthed) {
     const target = role === 'trainer' ? '/dashboard/workouts/members' : '/dashboard'

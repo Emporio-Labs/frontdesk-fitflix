@@ -23,7 +23,7 @@ import { IconPlus, IconMoodEmpty, IconChevronDown } from '@tabler/icons-react'
 import { useWorkoutStore } from '@/stores/workout-store'
 import { DayTabBar } from '@/components/workouts/day-tab-bar'
 import { ExerciseCard } from '@/components/workouts/exercise-card'
-import { ExerciseLibrarySidebar } from '@/components/workouts/exercise-library-sidebar'
+import { ExerciseLibraryDialog } from '@/components/workouts/exercise-library-dialog'
 import type { WorkoutSection } from '@/types/workout'
 
 const SECTIONS: Array<{ key: WorkoutSection; label: string; emoji: string }> = [
@@ -240,7 +240,7 @@ export function DayBuilderPanel() {
         </>
       )}
 
-      <ExerciseLibrarySidebar
+      <ExerciseLibraryDialog
         open={libraryOpen}
         onOpenChange={setLibraryOpen}
         targetSection={targetSection}

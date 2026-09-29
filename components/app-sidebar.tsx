@@ -29,6 +29,7 @@ import {
   IconDumbbell,
   IconBellRinging,
   IconStethoscope,
+  IconLayoutList,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -125,6 +126,17 @@ const navTrainerGroup = [
   },
 ]
 
+const navNutritionistGroup = [
+  {
+    items: [
+      { title: "My Clients", url: "/admin/nutrition/my-clients", icon: IconUsers },
+      { title: "Appointments", url: "/admin/nutrition", icon: IconCalendarEvent },
+      { title: "Availability", url: "/admin/nutritionist", icon: IconClock },
+      { title: "Food Catalog", url: "/admin/nutrition?tab=food-catalog", icon: IconSalad },
+    ],
+  },
+]
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth()
 
@@ -135,8 +147,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   const isTrainer = user?.role === 'trainer'
-  const groups = isTrainer ? navTrainerGroup : navGroups
-  const brandHref = isTrainer ? '/dashboard/workouts/members' : '/dashboard'
+  const isNutritionist = user?.role === 'nutritionist'
+  const groups = isTrainer ? navTrainerGroup : isNutritionist ? navNutritionistGroup : navGroups
+  const brandHref = isTrainer
+    ? '/dashboard/workouts/members'
+    : isNutritionist
+    ? '/admin/nutrition/my-clients'
+    : '/dashboard'
 
   return (
     // "icon" (not "none") so callers that omit the prop still get the mobile Sheet;
