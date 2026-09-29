@@ -289,7 +289,7 @@ function ExerciseFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>
                 Difficulty <span className="text-destructive">*</span>
@@ -539,7 +539,7 @@ function ExerciseGridCard({
           )}
         </div>
         {!exercise.isSystem && (
-          <div className="flex gap-1.5 pt-1 border-t opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex gap-1.5 pt-1 border-t [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity">
             <Button
               size="sm"
               variant="outline"
@@ -649,7 +649,7 @@ export default function ExercisesPage() {
             </Button>
             <span className="text-xs text-muted-foreground">Workouts / Exercises</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Exercise Library</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Exercise Library</h1>
           <p className="text-muted-foreground text-sm">
             Browse, create, and manage all exercises — categorised by Warm Up, Workout, and Stretching
           </p>
@@ -666,7 +666,7 @@ export default function ExercisesPage() {
       </div>
 
       {/* Section stat cards — click to filter */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {WORKOUT_SECTIONS.map((section) => {
           const meta = SECTION_META[section]
           const active = sectionTab === section
@@ -677,21 +677,21 @@ export default function ExercisesPage() {
                 setSectionTab((prev) => (prev === section ? 'all' : section))
                 setPage(1)
               }}
-              className={`rounded-xl border-2 p-4 text-left transition-all hover:shadow-sm ${
+              className={`rounded-xl border-2 p-2.5 sm:p-4 text-left transition-all hover:shadow-sm ${
                 active
                   ? `${meta.bg} ${meta.color} border-current`
                   : 'bg-card border-border hover:border-muted-foreground/30'
               }`}
             >
               <div
-                className={`flex items-center gap-2 font-semibold text-sm mb-1 ${
+                className={`flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2 font-semibold text-xs sm:text-sm sm:mb-1 ${
                   active ? meta.color : ''
                 }`}
               >
                 {meta.icon}
                 {meta.label}
               </div>
-              <p className="text-xs text-muted-foreground">{meta.description}</p>
+              <p className="hidden sm:block text-xs text-muted-foreground">{meta.description}</p>
             </button>
           )
         })}
@@ -707,7 +707,7 @@ export default function ExercisesPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-3">
-            <div className="relative flex-1 min-w-[240px]">
+            <div className="relative w-full sm:flex-1 sm:min-w-[240px]">
               <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search exercises by name..."
@@ -716,7 +716,7 @@ export default function ExercisesPage() {
                 className="pl-9"
               />
             </div>
-            <div className="w-[180px]">
+            <div className="flex-1 min-w-0 sm:flex-none sm:w-[180px]">
               <Select value={muscleGroup} onValueChange={(v) => { setMuscleGroup(v); setPage(1) }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Muscle Group" />
@@ -729,7 +729,7 @@ export default function ExercisesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-[180px]">
+            <div className="flex-1 min-w-0 sm:flex-none sm:w-[180px]">
               <Select value={difficulty} onValueChange={(v) => { setDifficulty(v); setPage(1) }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Difficulty" />
@@ -751,7 +751,7 @@ export default function ExercisesPage() {
           </div>
 
           {/* Section tabs */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground font-medium">Category:</span>
             <div className="flex gap-1.5 flex-wrap">
               {SECTION_TABS.map((tab) => (
@@ -825,7 +825,7 @@ export default function ExercisesPage() {
             </div>
           ) : (
             <>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {exercises.map((ex: Exercise) => (
                   <ExerciseGridCard
                     key={ex._id}
@@ -837,7 +837,7 @@ export default function ExercisesPage() {
                 ))}
               </div>
               {pagination && pagination.totalPages > 1 && (
-                <div className="flex items-center justify-end gap-2 pt-6">
+                <div className="flex items-center justify-center sm:justify-end gap-2 pt-6">
                   <Button
                     variant="outline"
                     size="sm"

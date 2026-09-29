@@ -107,7 +107,7 @@ export function ExerciseLibrarySidebar({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[420px] sm:w-[480px] p-0 flex flex-col">
+      <SheetContent className="w-full sm:w-[480px] sm:max-w-[480px] p-0 flex flex-col">
         <SheetHeader className="p-4 pb-0">
           <SheetTitle>Exercise Library</SheetTitle>
         </SheetHeader>
@@ -283,7 +283,7 @@ function ExerciseRow({
           )}
         </div>
       </div>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+      <div className="flex gap-1 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity flex-shrink-0">
         <Button
           size="icon"
           variant="ghost"

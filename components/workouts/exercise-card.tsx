@@ -42,7 +42,7 @@ export function ExerciseCard({
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors group"
+      className="flex flex-wrap sm:flex-nowrap items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors group"
     >
       <button
         className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground"
@@ -84,7 +84,8 @@ export function ExerciseCard({
         </p>
       </div>
 
-      <div className="flex items-center gap-1.5">
+      {/* Wraps onto its own row on phones so the exercise name keeps its width. */}
+      <div className="order-last flex w-full items-center justify-end gap-1.5 sm:order-none sm:w-auto">
         <InlineInput
           label="Sets"
           value={exercise.targetSets}
@@ -112,7 +113,7 @@ export function ExerciseCard({
       <Button
         size="icon"
         variant="ghost"
-        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+        className="h-7 w-7 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity text-destructive"
         onClick={() => onRemove(index)}
       >
         <IconTrash className="w-3.5 h-3.5" />

@@ -65,7 +65,7 @@ function PlansContent() {
             </Button>
             <span className="text-xs text-muted-foreground">Workouts / Plans</span>
           </div>
-          <h2 className="text-3xl font-bold tracking-tight">Workout Plans</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Workout Plans</h2>
           <p className="text-muted-foreground text-sm">
             All workout plans created for members and templates
           </p>
@@ -85,7 +85,7 @@ function PlansContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-3">
-            <div className="relative flex-1 min-w-[240px]">
+            <div className="relative w-full sm:flex-1 sm:min-w-[240px]">
               <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search plans by name..."
@@ -95,7 +95,7 @@ function PlansContent() {
               />
             </div>
             
-            <div className="w-[180px]">
+            <div className="flex-1 min-w-0 sm:flex-none sm:w-[180px]">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by Status" />
@@ -109,7 +109,7 @@ function PlansContent() {
               </Select>
             </div>
 
-            <div className="w-[180px]">
+            <div className="flex-1 min-w-0 sm:flex-none sm:w-[180px]">
               <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by Difficulty" />
@@ -144,7 +144,38 @@ function PlansContent() {
               No workout plans found matching the filters.
             </div>
           ) : (
-            <div className="overflow-x-auto border rounded-lg">
+            <>
+            {/* Phones: stacked cards instead of an 8-column table. */}
+            <div className="space-y-2 md:hidden">
+              {filteredPlans.map((plan: WorkoutPlan) => (
+                <Link
+                  key={plan._id}
+                  href={`/dashboard/workouts/${plan._id}`}
+                  className="block rounded-lg border p-3 hover:bg-muted/50"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-primary break-words">
+                        {plan.name || 'Untitled Plan'}
+                      </p>
+                      {plan.isTemplate && (
+                        <span className="mt-1 inline-block bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+                          TEMPLATE
+                        </span>
+                      )}
+                    </div>
+                    <PlanStatusBadge status={plan.status} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <DifficultyBadge difficulty={plan.difficulty} />
+                    {plan.splitType && <span className="capitalize">{plan.splitType}</span>}
+                    {plan.duration ? <span>{plan.duration} weeks</span> : null}
+                    <span>{plan.assignedUsers?.length ?? 0} assigned</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <div className="hidden md:block overflow-x-auto border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -202,6 +233,7 @@ function PlansContent() {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>

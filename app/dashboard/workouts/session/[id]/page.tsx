@@ -90,8 +90,8 @@ export default function WorkoutSessionPage() {
             </Button>
             <span className="text-xs text-muted-foreground">Workouts / Sessions / Detail</span>
           </div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-3xl font-bold tracking-tight">Workout Session</h2>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Workout Session</h2>
             {session && <Badge className={STATUS_CLASSES[session.status]}>{session.status.toUpperCase()}</Badge>}
           </div>
           <p className="text-muted-foreground text-sm">
@@ -101,7 +101,7 @@ export default function WorkoutSessionPage() {
           </p>
         </div>
         {isActive && (
-          <div className="flex gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
             <Button
               variant="outline"
               size="sm"
@@ -133,7 +133,7 @@ export default function WorkoutSessionPage() {
 
       {isLoading ? (
         <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-3">
             {[...Array(3)].map((_, i) => (
               <Skeleton key={i} className="h-24 w-full" />
             ))}
@@ -142,7 +142,7 @@ export default function WorkoutSessionPage() {
         </div>
       ) : session ? (
         <>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Exercises</CardTitle>
