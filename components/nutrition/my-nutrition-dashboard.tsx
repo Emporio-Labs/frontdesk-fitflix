@@ -650,7 +650,7 @@ function MealTimelineRow({ meal, log }: { meal: StoredMeal; log?: MealLog }) {
 
 // ── Workspace ─────────────────────────────────────────────────────────────────
 
-function NutritionWorkspace({
+export function NutritionWorkspace({
   userId,
   selectedUser,
 }: {
