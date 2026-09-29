@@ -52,6 +52,42 @@ export interface GroupClassBooking {
   updatedAt: string
 }
 
+export interface ClassWaitlistEntry {
+  _id: string
+  status: 'WAITING' | 'PROMOTED' | 'SKIPPED_INSUFFICIENT_CREDITS' | 'LEFT' | 'EXPIRED'
+  position: number | null
+  creditCostSnapshot: number
+  joinedAt: string
+  promotedAt?: string
+  promotedBookingId?: string
+  skippedAt?: string
+  skipReason?: string
+  leftAt?: string
+  user?: {
+    _id: string
+    username?: string
+    email?: string
+    phone?: string
+  }
+  classId?: {
+    _id: string
+    name?: string
+    instructor?: string
+    creditCost?: number
+  }
+  sessionId?: {
+    _id: string
+    sessionDate?: string
+    startTime?: string
+    endTime?: string
+    deliveryType?: string
+    maxParticipants?: number
+    bookedParticipants?: number
+  }
+  createdAt?: string
+  updatedAt?: string
+}
+
 export const groupClassBookingService = {
   getAll: async (): Promise<{ bookings: GroupClassBooking[] }> => {
     try {
@@ -63,6 +99,24 @@ export const groupClassBookingService = {
         return data
       } catch {
         const { data } = await apiClient.get('/bookings')
+        return data
+      }
+    }
+  },
+  getWaitlist: async (params?: {
+    classId?: string
+    sessionId?: string
+    status?: string
+  }): Promise<{ waitlist: ClassWaitlistEntry[]; totalWaiting: number; totalCount: number }> => {
+    try {
+      const { data } = await apiClient.get('/api/v1/admin/bookings/waitlist/admin', { params })
+      return data
+    } catch {
+      try {
+        const { data } = await apiClient.get('/api/v1/bookings/waitlist/admin', { params })
+        return data
+      } catch {
+        const { data } = await apiClient.get('/bookings/waitlist/admin', { params })
         return data
       }
     }
@@ -102,7 +156,7 @@ export const groupClassBookingService = {
     } catch {
       try {
         const { data } = await apiClient.patch(`/api/v1/admin/bookings/${id}`, payload)
-        return data
+      return data
       } catch {
         const { data } = await apiClient.patch(`/api/v1/bookings/${id}`, payload)
         return data

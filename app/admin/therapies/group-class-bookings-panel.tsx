@@ -27,9 +27,9 @@ import {
   IconCopy,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
-import { useGroupClassBookings } from '@/hooks/use-group-class-bookings'
+import { useGroupClassBookings, useGroupClassWaitlist } from '@/hooks/use-group-class-bookings'
 import { useGroupClasses } from '@/hooks/use-group-classes'
-import { GroupClassBooking, groupClassBookingService } from '@/lib/services/group-class-booking.service'
+import { ClassWaitlistEntry, GroupClassBooking, groupClassBookingService } from '@/lib/services/group-class-booking.service'
 import type { GroupClass } from '@/lib/services/group-class.service'
 import { BookingDetailsDialog } from '@/components/bookings/booking-details-dialog'
 import { CancelBookingDialog } from '@/components/bookings/cancel-booking-dialog'
@@ -49,6 +49,9 @@ const STATUS_COLORS: Record<string, string> = {
   noshow: 'bg-gray-100 text-gray-800 hover:bg-gray-100 border-transparent dark:bg-gray-800/30 dark:text-gray-300',
   'no-show': 'bg-gray-100 text-gray-800 hover:bg-gray-100 border-transparent dark:bg-gray-800/30 dark:text-gray-300',
   unattended: 'bg-gray-100 text-gray-800 hover:bg-gray-100 border-transparent dark:bg-gray-800/30 dark:text-gray-300',
+  waiting: 'bg-purple-100 text-purple-800 hover:bg-purple-100 border-transparent dark:bg-purple-900/30 dark:text-purple-300',
+  promoted: 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-transparent dark:bg-emerald-900/30 dark:text-emerald-300',
+  skipped_insufficient_credits: 'bg-amber-100 text-amber-800 hover:bg-amber-100 border-transparent dark:bg-amber-900/30 dark:text-amber-300',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -62,6 +65,9 @@ const STATUS_LABELS: Record<string, string> = {
   noshow: 'No-Show',
   'no-show': 'No-Show',
   unattended: 'No-Show',
+  waiting: 'Waitlisted',
+  promoted: 'Auto-Promoted',
+  skipped_insufficient_credits: 'Skipped (No Credits)',
 }
 
 function formatStatus(statusStr: string): string {
@@ -86,13 +92,18 @@ export default function GroupClassBookingsPanel({
   const router = useRouter()
   const searchParams = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
-  const [activeFilter, setActiveFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'No-Show'>('All')
+  const [activeFilter, setActiveFilter] = useState<'All' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'No-Show' | 'Waitlist'>('All')
   const [selectedDate, setSelectedDate] = useState<string>('')
   const [selectedBooking, setSelectedBooking] = useState<GroupClassBooking | null>(null)
   const [isCancelOpen, setIsCancelOpen] = useState(false)
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
 
   const { data: bookings = [], isLoading, isError, refetch } = useGroupClassBookings()
+  const {
+    data: waitlistEntries = [],
+    isLoading: isWaitlistLoading,
+    refetch: refetchWaitlist,
+  } = useGroupClassWaitlist()
   const { data: groupClasses = [] } = useGroupClasses()
   const queryClient = useQueryClient()
 
@@ -156,8 +167,39 @@ export default function GroupClassBookingsPanel({
       return s === 'confirmed' || s === 'booked'
     }).length
     const pending = groupClassBookingsOnly.filter(b => (b.status || '').toLowerCase().trim() === 'pending').length
-    return { total, confirmed, pending }
-  }, [groupClassBookingsOnly])
+    const waiting = waitlistEntries.filter((w: ClassWaitlistEntry) => w.status === 'WAITING').length
+    return { total, confirmed, pending, waiting }
+  }, [groupClassBookingsOnly, waitlistEntries])
+
+  const filteredWaitlistEntries = useMemo(() => {
+    return waitlistEntries.filter((w: ClassWaitlistEntry) => {
+      if (selectedClassFilter) {
+        const rawClassRef: any = w.classId
+        const classRefId = typeof rawClassRef === 'string' ? rawClassRef : rawClassRef?._id
+        const className = (w.classId?.name || (classRefId ? classNameById.get(classRefId) : '') || '').toLowerCase()
+        const matchesId = classRefId === selectedClassFilter.id
+        const matchesName = className === selectedClassFilter.name.toLowerCase()
+        if (!matchesId && !matchesName) return false
+      }
+
+      const username = (w.user?.username || '').toLowerCase()
+      const email = (w.user?.email || '').toLowerCase()
+      const search = searchTerm.toLowerCase().trim()
+      if (search && !username.includes(search) && !email.includes(search)) return false
+
+      if (selectedDate) {
+        const rawDate = w.sessionId?.sessionDate || w.joinedAt
+        if (rawDate) {
+          const parsed = new Date(rawDate).toISOString().slice(0, 10)
+          if (parsed !== selectedDate) return false
+        } else {
+          return false
+        }
+      }
+
+      return w.status !== 'LEFT'
+    })
+  }, [waitlistEntries, selectedClassFilter, searchTerm, selectedDate, classNameById])
 
   const filteredBookings = useMemo(() => {
     return groupClassBookingsOnly.filter((b: GroupClassBooking) => {
@@ -212,15 +254,17 @@ export default function GroupClassBookingsPanel({
 
   const handleRefresh = () => {
     refetch()
+    refetchWaitlist()
   }
 
-  const filters: Array<'All' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'No-Show'> = [
+  const filters: Array<'All' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'No-Show' | 'Waitlist'> = [
     'All',
     'Pending',
     'Confirmed',
     'Completed',
     'Cancelled',
     'No-Show',
+    'Waitlist',
   ]
 
   return (
@@ -238,7 +282,7 @@ export default function GroupClassBookingsPanel({
                 Monitor registration list, search members, and filter booking states from a single dashboard.
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-2xl bg-white/15 p-4 backdrop-blur-sm">
               <div>
                 <p className="text-xs text-indigo-50/90">Total</p>
                 <p className="text-xl font-semibold">{stats.total}</p>
@@ -251,12 +295,15 @@ export default function GroupClassBookingsPanel({
                 <p className="text-xs text-indigo-50/90">Pending</p>
                 <p className="text-xl font-semibold">{stats.pending}</p>
               </div>
+              <div>
+                <p className="text-xs text-indigo-50/90">Waitlist</p>
+                <p className="text-xl font-semibold">{stats.waiting}</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 2. Heading Section */}
       {/* 2. Heading Section */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -353,19 +400,121 @@ export default function GroupClassBookingsPanel({
         </CardContent>
       </Card>
 
-      {/* 4. Bookings Outer List Container */}
+      {/* 4. Bookings / Waitlist Outer List Container */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <IconCalendarEvent className="h-4 w-4 text-indigo-600" />
-            Active Bookings
+            {activeFilter === 'Waitlist' ? 'Class Waitlist Queue' : 'Active Bookings'}
           </CardTitle>
           <CardDescription>
-            {isLoading ? 'Loading...' : `${filteredBookings.length} bookings found`}
+            {activeFilter === 'Waitlist'
+              ? isWaitlistLoading
+                ? 'Loading waitlist queue...'
+                : `${filteredWaitlistEntries.length} waitlist entries found (${stats.waiting} currently waiting)`
+              : isLoading
+              ? 'Loading...'
+              : `${filteredBookings.length} bookings found`}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isError ? (
+          {activeFilter === 'Waitlist' ? (
+            isWaitlistLoading ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {[...Array(6)].map((_, i) => (
+                  <Skeleton key={i} className="h-48 w-full rounded-2xl" />
+                ))}
+              </div>
+            ) : filteredWaitlistEntries.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="py-10 text-center text-muted-foreground">
+                  No waitlist entries found matching your current search/filter.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {filteredWaitlistEntries.map((entry: ClassWaitlistEntry) => {
+                  const dateVal = entry.sessionId?.sessionDate || entry.joinedAt
+                  const dateFormatted = dateVal
+                    ? new Date(dateVal).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
+                    : '-'
+                  const timeRange =
+                    entry.sessionId?.startTime && entry.sessionId?.endTime
+                      ? `${entry.sessionId.startTime} - ${entry.sessionId.endTime}`
+                      : 'Scheduled Time'
+                  const rawClassRef: any = entry.classId
+                  const classRefId = typeof rawClassRef === 'string' ? rawClassRef : rawClassRef?._id
+                  const className =
+                    entry.classId?.name ||
+                    (classRefId ? classNameById.get(classRefId) : undefined) ||
+                    'Group Class Session'
+                  const instructorName = entry.classId?.instructor || 'Staff Instructor'
+                  const creditsCost = entry.creditCostSnapshot ?? entry.classId?.creditCost ?? 0
+
+                  return (
+                    <Card
+                      key={entry._id}
+                      className="overflow-hidden rounded-2xl border border-slate-200/85 hover:shadow-md transition-shadow flex flex-col justify-between"
+                    >
+                      <div className="bg-gradient-to-r from-purple-500/15 to-indigo-500/10 p-4">
+                        <div className="mb-2 flex items-center justify-between">
+                          <Badge
+                            className={cn(
+                              'text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-full border',
+                              getStatusBadgeClass(entry.status)
+                            )}
+                          >
+                            {entry.status === 'WAITING' && entry.position != null
+                              ? `#${entry.position} in Queue`
+                              : formatStatus(entry.status)}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            Joined {new Date(entry.joinedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <h4 className="text-base font-semibold tracking-tight text-foreground">
+                          {entry.user?.username || 'Unknown Member'}
+                        </h4>
+                        <p className="text-xs text-muted-foreground">{entry.user?.email || '-'}</p>
+                      </div>
+
+                      <CardContent className="space-y-3 p-4 flex-1 flex flex-col justify-between">
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-sm font-semibold text-foreground/90">{className}</span>
+                            <span className="text-sm font-medium text-foreground shrink-0 flex items-center gap-0.5">
+                              <IconCoins className="h-3.5 w-3.5 text-muted-foreground" /> {creditsCost} cr
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground font-medium text-slate-500">
+                            Instructor: {instructorName}
+                          </p>
+                          {entry.status === 'SKIPPED_INSUFFICIENT_CREDITS' && entry.skipReason && (
+                            <p className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 rounded-lg px-2.5 py-1.5 mt-1.5 border border-amber-200 dark:border-amber-800/50">
+                              {entry.skipReason}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="border-t border-slate-100 dark:border-slate-800 pt-2 mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1 font-medium">
+                            <IconCalendarEvent className="h-3.5 w-3.5" /> {dateFormatted}
+                          </span>
+                          <span className="flex items-center gap-1 font-medium">
+                            <IconClock className="h-3.5 w-3.5" /> {timeRange}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )
+          ) : isError ? (
             <div className="py-8 text-center text-red-500">
               Failed to load group class bookings. Please check API connectivity.
             </div>
@@ -605,6 +754,7 @@ export default function GroupClassBookingsPanel({
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: queryKeys.slots.all() })
             refetch()
+            refetchWaitlist()
             setSelectedBooking(null)
           }}
         />
@@ -654,6 +804,7 @@ export default function GroupClassBookingsPanel({
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: queryKeys.slots.all() })
             refetch()
+            refetchWaitlist()
             setSelectedBooking(null)
           }}
         />
