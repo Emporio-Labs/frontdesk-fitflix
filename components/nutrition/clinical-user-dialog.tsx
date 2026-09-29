@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/skeleton-loader'
 import { StatusBadge } from '@/components/status-badge'
 import {
@@ -47,6 +48,8 @@ import { useNutritionPlans } from '@/hooks/use-nutrition'
 import { useNutritionistWorkspace } from '@/stores/nutritionist-workspace-store'
 import { useCanAccessMemberReports } from '@/hooks/use-can-access-reports'
 import { MedicalReportViewerModal } from '@/components/medical-report-viewer-modal'
+import { NutritionistClientGate } from '@/components/nutrition/nutritionist-client-gate'
+import { ClientNutritionWorkspace } from '@/components/nutrition/client-nutrition-workspace'
 import type { ExpertAppointment, MedicalReport } from '@/lib/services/onboarding.service'
 
 interface ClinicalUserDialogProps {
@@ -92,6 +95,20 @@ export function ClinicalUserDialog({
   const [note, setNote] = useState(persistedNote)
   const [selectedReport, setSelectedReport] = useState<MedicalReport | null>(null)
   const reportAccess = useCanAccessMemberReports(user)
+
+  // Default tab: nutrition when a plan exists, else clinical. Pick once per
+  // opened dialog session so the user's manual switch isn't overridden.
+  const [tab, setTab] = useState<string>('nutrition')
+  const [initialTabPicked, setInitialTabPicked] = useState(false)
+  useEffect(() => {
+    if (!open) {
+      setInitialTabPicked(false)
+      return
+    }
+    if (initialTabPicked || plansLoading) return
+    setTab(previousPlans.length > 0 ? 'nutrition' : 'clinical')
+    setInitialTabPicked(true)
+  }, [open, initialTabPicked, plansLoading, previousPlans.length])
 
   useEffect(() => {
     setNote(persistedNote)
@@ -150,23 +167,48 @@ export function ClinicalUserDialog({
         <DialogHeader className="shrink-0 border-b px-6 py-4">
           <DialogTitle className="text-lg">Clinical Review</DialogTitle>
           <DialogDescription className="text-xs">
-            Primary workspace for reviewing onboarding and creating a personalized plan
+            Primary workspace for reviewing nutrition, onboarding and clinical care
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-5 space-y-5">
-          {!userId || userLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-40 w-full" />
-            </div>
-          ) : !user ? (
+        {!userId || userLoading ? (
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : !user ? (
+          <div className="flex-1 overflow-y-auto px-6 py-5">
             <p className="py-12 text-center text-muted-foreground">
               User not found.
             </p>
-          ) : (
-            <>
+          </div>
+        ) : (
+          <Tabs
+            value={tab}
+            onValueChange={setTab}
+            className="flex-1 flex flex-col overflow-hidden"
+          >
+            <div className="shrink-0 border-b px-6 pt-3 pb-2">
+              <TabsList>
+                <TabsTrigger value="nutrition">Nutrition</TabsTrigger>
+                <TabsTrigger value="clinical">Clinical</TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent
+              value="nutrition"
+              className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-5 mt-0"
+            >
+              <NutritionistClientGate userId={userId}>
+                <ClientNutritionWorkspace userId={userId} />
+              </NutritionistClientGate>
+            </TabsContent>
+
+            <TabsContent
+              value="clinical"
+              className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-5 mt-0 space-y-5"
+            >
               {/* 1. User Profile Summary */}
               <Section icon={IconUser} title="User Profile">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -403,9 +445,9 @@ export function ClinicalUserDialog({
                   </Table>
                 )}
               </Section>
-            </>
-          )}
-        </div>
+            </TabsContent>
+          </Tabs>
+        )}
 
         {/* Modal footer */}
         <div className="shrink-0 border-t border-gray-200 px-6 py-4 flex flex-wrap items-center justify-between gap-3 bg-white">
