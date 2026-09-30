@@ -41,6 +41,8 @@ import {
   IconDroplet,
   IconEdit,
   IconPlayerStop,
+  IconPlayerPause,
+  IconPlayerPlay,
   IconPlus,
   IconRefresh,
   IconSparkles,
@@ -1529,12 +1531,37 @@ export default function TherapiesPage() {
                 </Card>
               ) : (
                 filteredItems.map((item) => (
-                  <Card key={item.id} className="overflow-hidden rounded-2xl border border-slate-200/80">
-                    <div className="bg-gradient-to-r from-teal-500/15 to-cyan-500/10 p-4">
-                      <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/20 text-teal-700">
-                        <IconDroplet className="h-4 w-4" />
+                  <Card
+                    key={item.id}
+                    className={cn(
+                      'overflow-hidden rounded-2xl border border-slate-200/80',
+                      item.isPaused && 'border-amber-300 dark:border-amber-800'
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'bg-gradient-to-r from-teal-500/15 to-cyan-500/10 p-4',
+                        item.isPaused && 'from-amber-500/15 to-amber-500/5'
+                      )}
+                    >
+                      <div className="mb-3 flex items-start justify-between gap-2">
+                        <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/20 text-teal-700">
+                          <IconDroplet className="h-4 w-4" />
+                        </div>
+                        {item.isPaused && (
+                          <Badge className="rounded-full border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                            <IconPlayerPause className="mr-1 h-3 w-3" /> Paused
+                          </Badge>
+                        )}
                       </div>
-                      <h4 className="text-base font-semibold tracking-tight">{item.name}</h4>
+                      <h4 className={cn('text-base font-semibold tracking-tight', item.isPaused && 'text-muted-foreground')}>
+                        {item.name}
+                      </h4>
+                      {item.isPaused && (
+                        <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                          Visible to members but unavailable for new bookings.
+                        </p>
+                      )}
                       <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <IconClock className="h-3.5 w-3.5" /> {item.time} mins
@@ -1563,7 +1590,26 @@ export default function TherapiesPage() {
                         {item.description || 'No description added yet.'}
                       </p>
 
-                      <div className="flex justify-end gap-2">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            updateTherapy.mutate({ id: item.id, payload: { isPaused: !item.isPaused } })
+                          }
+                          disabled={isPending}
+                          className={item.isPaused ? 'text-teal-700 hover:text-teal-800' : 'text-amber-700 hover:text-amber-800'}
+                        >
+                          {item.isPaused ? (
+                            <>
+                              <IconPlayerPlay className="mr-1 h-4 w-4" /> Resume
+                            </>
+                          ) : (
+                            <>
+                              <IconPlayerPause className="mr-1 h-4 w-4" /> Pause
+                            </>
+                          )}
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => openEditDialog(item)}>
                           <IconEdit className="mr-1 h-4 w-4" /> Edit
                         </Button>

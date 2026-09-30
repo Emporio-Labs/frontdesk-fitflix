@@ -8,6 +8,7 @@ export interface TherapyCatalogItem {
   description: string
   tags: string[]
   slots: string[]
+  isPaused: boolean
 }
 
 export interface CreateTherapyPayload {
@@ -26,6 +27,7 @@ export interface UpdateTherapyPayload {
   description?: string
   tags?: string[]
   slots?: string[]
+  isPaused?: boolean
 }
 
 function parseCreditCost(value: unknown): number {
@@ -44,6 +46,7 @@ function normalizeTherapy(raw: any): TherapyCatalogItem {
     slots: Array.isArray(raw?.slots)
       ? raw.slots.map((slot: unknown) => String((slot as any)?._id || slot || ''))
       : [],
+    isPaused: raw?.isPaused === true,
   }
 }
 
@@ -85,6 +88,7 @@ export const therapyService = {
       ...(payload.description !== undefined ? { description: payload.description } : {}),
       ...(payload.tags !== undefined ? { tags: payload.tags } : {}),
       ...(payload.slots !== undefined ? { slots: payload.slots } : {}),
+      ...(payload.isPaused !== undefined ? { isPaused: payload.isPaused } : {}),
     }
 
     const { data } = await apiClient.patch(`/therapies/${id}`, apiPayload)

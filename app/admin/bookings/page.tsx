@@ -48,6 +48,7 @@ interface BookableItemOption {
   creditCost: number
   slots: string[]
   kind: BookableKind
+  isPaused?: boolean
 }
 
 interface BookingWithNames extends Booking {
@@ -180,6 +181,7 @@ export default function BookingsPage() {
       creditCost: therapy.creditCost,
       slots: therapy.slots,
       kind: 'therapy',
+      isPaused: therapy.isPaused,
     }))
 
     return [...serviceItems, ...therapyItems]
@@ -589,8 +591,8 @@ export default function BookingsPage() {
                   <SelectContent>
                     <SelectItem value="__none__">Select item</SelectItem>
                     {visibleBookableItems.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.creditCost} cr)
+                      <SelectItem key={item.id} value={item.id} disabled={item.isPaused}>
+                        {item.name} ({item.creditCost} cr){item.isPaused ? ' · Paused' : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
