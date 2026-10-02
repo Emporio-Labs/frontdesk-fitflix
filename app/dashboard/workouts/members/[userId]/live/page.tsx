@@ -181,7 +181,7 @@ export default function MemberLiveWorkoutPage() {
   return (
     <div className="max-w-md mx-auto min-h-screen bg-background pb-32 font-sans text-foreground">
       {/* Header bar */}
-      <div className="sticky top-0 z-30 flex items-center justify-between p-4 bg-background/90 backdrop-blur border-b">
+      <div className="sticky top-12 sm:top-14 z-30 flex items-center justify-between gap-2 p-3 sm:p-4 bg-background/90 backdrop-blur border-b">
         <Button variant="ghost" size="sm" onClick={() => router.back()} className="h-10 px-2">
           <IconChevronLeft className="w-5 h-5 mr-1" />
           Back

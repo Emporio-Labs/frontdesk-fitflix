@@ -79,7 +79,7 @@ export default function SessionsPage() {
             </Button>
             <span className="text-xs text-muted-foreground">Workouts / Sessions</span>
           </div>
-          <h2 className="text-3xl font-bold tracking-tight">Workout Sessions</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Workout Sessions</h2>
           <p className="text-muted-foreground text-sm">
             History of workout sessions completed, sets logged, and streak metrics
           </p>
@@ -87,7 +87,7 @@ export default function SessionsPage() {
       </div>
 
       {/* Mini Stats Summary */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Weekly Sessions</CardTitle>
@@ -178,7 +178,39 @@ export default function SessionsPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto border rounded-lg">
+              {/* Phones: one card per session instead of an 8-column table. */}
+              <div className="space-y-2 md:hidden">
+                {workouts.map((w: WorkoutHistoryEntry) => (
+                  <div key={w.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-sm">{formatDate(w.date)}</span>
+                      <Badge className={sessionStatusClass(w.status)}>
+                        {w.status?.toUpperCase() || 'UNKNOWN'}
+                      </Badge>
+                    </div>
+                    {w.muscleGroups && w.muscleGroups.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {w.muscleGroups.map((g) => (
+                          <Badge key={g} variant="outline" className="text-[10px] uppercase">
+                            {g}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>Duration: {formatDuration(w.duration)}</span>
+                      <span>{w.exerciseCount ?? 0} exercises</span>
+                      <span>{w.totalSets ?? 0} sets · {w.totalReps ?? 0} reps</span>
+                      <span>
+                        {w.totalVolumeKg ? `${w.totalVolumeKg.toLocaleString()} kg` : '0 kg'}
+                        {w.caloriesBurned ? ` · ${w.caloriesBurned} kcal` : ''}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden md:block overflow-x-auto border rounded-lg">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -194,12 +226,7 @@ export default function SessionsPage() {
                   </TableHeader>
                   <TableBody>
                     {workouts.map((w: WorkoutHistoryEntry) => {
-                      const isCompleted = w.status === 'Completed'
-                      const statusCls = isCompleted
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-transparent'
-                        : w.status === 'Active'
-                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-transparent'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-transparent'
+                      const statusCls = sessionStatusClass(w.status)
 
                       return (
                         <TableRow key={w.id}>
@@ -244,7 +271,7 @@ export default function SessionsPage() {
 
               {/* Pagination Controls */}
               {pagination && pagination.totalPages > 1 && (
-                <div className="flex items-center justify-end gap-2 pt-2">
+                <div className="flex items-center justify-center sm:justify-end gap-2 pt-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -272,4 +299,12 @@ export default function SessionsPage() {
       </Card>
     </div>
   )
+}
+
+function sessionStatusClass(status: WorkoutHistoryEntry['status']) {
+  if (status === 'Completed')
+    return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-transparent'
+  if (status === 'Active')
+    return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-transparent'
+  return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-transparent'
 }
