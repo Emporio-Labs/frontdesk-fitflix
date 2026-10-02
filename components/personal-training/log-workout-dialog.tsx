@@ -102,7 +102,7 @@ export function LogWorkoutDialog({
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <label className="text-sm font-medium">Exercises Completed</label>
               <Button size="sm" variant="ghost" onClick={handleAddExercise}>
                 <IconPlus className="h-3.5 w-3.5 mr-1" />
@@ -113,34 +113,40 @@ export function LogWorkoutDialog({
             {exercises.map((ex, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-12 gap-2 items-center bg-muted/40 p-2.5 rounded-md"
+                className="grid grid-cols-4 sm:grid-cols-12 gap-2 items-end sm:items-center bg-muted/40 p-2.5 rounded-md"
               >
-                <div className="col-span-5">
+                <div className="col-span-4 sm:col-span-5">
                   <Input
                     placeholder="Exercise Name (e.g. Barbell Squat)"
                     value={ex.name}
                     onChange={(e) => handleExerciseChange(idx, 'name', e.target.value)}
                   />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
+                  <span className="mb-0.5 block text-[10px] text-muted-foreground sm:hidden">Sets</span>
                   <Input
                     type="number"
+                    aria-label="Sets"
                     placeholder="Sets"
                     value={ex.sets}
                     onChange={(e) => handleExerciseChange(idx, 'sets', Number(e.target.value))}
                   />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
+                  <span className="mb-0.5 block text-[10px] text-muted-foreground sm:hidden">Reps</span>
                   <Input
                     type="number"
+                    aria-label="Reps"
                     placeholder="Reps"
                     value={ex.reps}
                     onChange={(e) => handleExerciseChange(idx, 'reps', Number(e.target.value))}
                   />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
+                  <span className="mb-0.5 block text-[10px] text-muted-foreground sm:hidden">Weight (kg)</span>
                   <Input
                     type="number"
+                    aria-label="Weight (kg)"
                     placeholder="Weight (kg)"
                     value={ex.weight}
                     onChange={(e) => handleExerciseChange(idx, 'weight', Number(e.target.value))}
@@ -162,7 +168,7 @@ export function LogWorkoutDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

@@ -98,7 +98,7 @@ export function WorkoutStatsCards() {
   ]
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {stats.map((s) => (
         <Link key={s.title} href={s.href} className="block">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">

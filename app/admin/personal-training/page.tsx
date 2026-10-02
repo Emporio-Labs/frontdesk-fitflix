@@ -93,11 +93,11 @@ export default function PersonalTrainingAdminPage() {
   )
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-4 p-4 sm:gap-6 sm:p-6">
       {/* Top Banner & KPI Stats */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
             {isTrainer ? 'My 1-on-1 Personal Training Hub' : 'Personal Training Management'}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -124,7 +124,7 @@ export default function PersonalTrainingAdminPage() {
 
       {/* KPI Cards */}
       {isTrainer ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">My Sessions Today</CardTitle>
@@ -149,19 +149,19 @@ export default function PersonalTrainingAdminPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="col-span-2 md:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Coach Account</CardTitle>
               <IconUserCheck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{currentTrainer?.name || user?.name || 'Coach'}</div>
-              <p className="text-xs text-muted-foreground">{user?.email || 'Certified Personal Trainer'}</p>
+              <div className="text-xl sm:text-2xl font-bold truncate">{currentTrainer?.name || user?.name || 'Coach'}</div>
+              <p className="text-xs text-muted-foreground truncate">{user?.email || 'Certified Personal Trainer'}</p>
             </CardContent>
           </Card>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Today&apos;s Sessions</CardTitle>
@@ -210,13 +210,17 @@ export default function PersonalTrainingAdminPage() {
 
       {/* Main Tabs */}
       <Tabs defaultValue="sessions" className="w-full">
-        <TabsList className={isTrainer ? "grid grid-cols-2 max-w-md" : "grid grid-cols-2 lg:grid-cols-4 max-w-2xl"}>
-          <TabsTrigger value="sessions">Live & Scheduled Sessions</TabsTrigger>
-          <TabsTrigger value="schedule">
-            {isTrainer ? 'My Weekly Schedule' : 'Trainer Schedules'}
+        <TabsList className={isTrainer ? "grid h-auto w-full grid-cols-2 sm:max-w-md" : "grid h-auto w-full grid-cols-2 lg:grid-cols-4 sm:max-w-2xl"}>
+          <TabsTrigger value="sessions" className="whitespace-normal">
+            <span className="sm:hidden">Sessions</span>
+            <span className="hidden sm:inline">Live & Scheduled Sessions</span>
+          </TabsTrigger>
+          <TabsTrigger value="schedule" className="whitespace-normal">
+            <span className="sm:hidden">{isTrainer ? 'My Schedule' : 'Schedules'}</span>
+            <span className="hidden sm:inline">{isTrainer ? 'My Weekly Schedule' : 'Trainer Schedules'}</span>
           </TabsTrigger>
           {!isTrainer && (
-            <TabsTrigger value="requests">
+            <TabsTrigger value="requests" className="whitespace-normal">
               Change Requests
               {pendingRequests.length > 0 && (
                 <Badge variant="destructive" className="ml-2 h-5 px-1.5 text-xs">
@@ -226,7 +230,7 @@ export default function PersonalTrainingAdminPage() {
             </TabsTrigger>
           )}
           {!isTrainer && (
-            <TabsTrigger value="inquiries">Callback Inquiries</TabsTrigger>
+            <TabsTrigger value="inquiries" className="whitespace-normal">Callback Inquiries</TabsTrigger>
           )}
         </TabsList>
 
@@ -240,12 +244,12 @@ export default function PersonalTrainingAdminPage() {
                   Host enters up to 30 minutes before start. Member lobby opens 5 minutes before.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
                 <Input
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-40"
+                  className="w-full sm:w-40"
                 />
                 {!isTrainer && (
                   <select
@@ -276,124 +280,97 @@ export default function PersonalTrainingAdminPage() {
                   No personal training sessions booked for this date.
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Member</TableHead>
-                      <TableHead>Trainer</TableHead>
-                      <TableHead>Mode</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  {/* Phones: one card per session so actions stay reachable without sideways scrolling. */}
+                  <div className="space-y-3 md:hidden">
                     {(bookings || []).map((b, idx) => {
-                      const user =
-                        typeof b.userId === 'object' && b.userId !== null
-                          ? (b.userId as { username?: string; phone?: string; email?: string })
-                          : { username: 'Member', phone: '' }
-                      const expert =
-                        typeof b.expertId === 'object' && b.expertId !== null
-                          ? (b.expertId as { trainerName?: string; imageUrl?: string })
-                          : { trainerName: 'Trainer' }
-                      const bookingId =
-                        (typeof b._id === 'object' && b._id !== null
-                          ? (b._id as any).$oid || (b._id as any).toString()
-                          : b._id) || (b as any).id || ''
-
+                      const row = describeBooking(b)
                       return (
-                        <TableRow key={bookingId || `booking-${idx}-${b.startTime}`}>
-                          <TableCell data-label="Time" className="font-medium">
-                            {b.startTime} – {b.endTime}
-                          </TableCell>
-                          <TableCell data-label="Member">
-                            <div className="font-medium">{user.username || 'Member'}</div>
-                            <div className="text-xs text-muted-foreground">{user.phone}</div>
-                          </TableCell>
-                          <TableCell data-label="Trainer">{expert.trainerName || b.assignedExpertName}</TableCell>
-                          <TableCell data-label="Mode">
-                            <Badge variant={b.appointmentMode === 'ONLINE' ? 'default' : 'outline'}>
-                              {b.appointmentMode === 'ONLINE' ? (
-                                <IconVideo className="h-3 w-3 mr-1" />
-                              ) : (
-                                <IconDumbbell className="h-3 w-3 mr-1" />
+                        <div
+                          key={row.bookingId || `booking-${idx}-${b.startTime}`}
+                          className="rounded-lg border p-3 space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold">
+                                {b.startTime} – {b.endTime}
+                              </div>
+                              <div className="font-medium truncate">{row.member.username || 'Member'}</div>
+                              {row.member.phone && (
+                                <div className="text-xs text-muted-foreground">{row.member.phone}</div>
                               )}
-                              {b.appointmentMode}
-                            </Badge>
-                          </TableCell>
-                          <TableCell data-label="Status">
-                            <Badge
-                              variant={
-                                b.status === 'CONFIRMED'
-                                  ? 'default'
-                                  : b.status === 'COMPLETED'
-                                  ? 'secondary'
-                                  : 'destructive'
-                              }
-                            >
-                              {b.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell data-hide-label className="text-right space-x-2 flex flex-wrap justify-end gap-2">
-                            {b.appointmentMode === 'ONLINE' && b.status === 'CONFIRMED' && (() => {
-                              const joinState = getBookingJoinState(b, new Date(), {
-                                leadMinutes: 30,
-                                graceMinutes: 30,
-                              })
-                              const isJoinDisabled =
-                                joinState.state === 'too_early' || joinState.state === 'ended'
-
-                              if (isJoinDisabled) {
-                                return (
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    disabled
-                                    className="gap-1 bg-gray-400 text-gray-200 cursor-not-allowed opacity-60"
-                                    title={joinState.label ?? 'Session video call window closed'}
-                                  >
-                                    <IconVideo className="h-3.5 w-3.5" />
-                                    Start Video Call
-                                  </Button>
-                                )
-                              }
-
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  className="gap-1"
-                                  onClick={() =>
-                                    startCall({
-                                      sessionId: bookingId,
-                                      roomID: (b as any).zegoRoomId || bookingId,
-                                      sessionTitle: `${user.username || 'Member'} — PT Session`,
-                                      mode: 'GroupCall',
-                                      joinMuted: true,
-                                    })
-                                  }
-                                >
-                                  <IconVideo className="h-3.5 w-3.5" />
-                                  Start Video Call
-                                </Button>
-                              )
-                            })()}
-                            {b.status === 'CONFIRMED' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setCompletingBooking(b)}
-                              >
-                                Log Workout
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
+                              {!isTrainer && (
+                                <div className="text-xs text-muted-foreground">
+                                  Trainer: {row.expert.trainerName || b.assignedExpertName}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-1.5">
+                              <ModeBadge mode={b.appointmentMode} />
+                              <StatusBadge status={b.status} />
+                            </div>
+                          </div>
+                          <SessionActions
+                            booking={b}
+                            bookingId={row.bookingId}
+                            memberName={row.member.username}
+                            onStartCall={startCall}
+                            onLogWorkout={setCompletingBooking}
+                            className="grid grid-cols-1 gap-2 [&>button]:w-full"
+                          />
+                        </div>
                       )
                     })}
-                  </TableBody>
-                </Table>
+                  </div>
+
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Time</TableHead>
+                          <TableHead>Member</TableHead>
+                          <TableHead>Trainer</TableHead>
+                          <TableHead>Mode</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(bookings || []).map((b, idx) => {
+                          const row = describeBooking(b)
+                          return (
+                            <TableRow key={row.bookingId || `booking-${idx}-${b.startTime}`}>
+                              <TableCell className="font-medium whitespace-nowrap">
+                                {b.startTime} – {b.endTime}
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-medium">{row.member.username || 'Member'}</div>
+                                <div className="text-xs text-muted-foreground">{row.member.phone}</div>
+                              </TableCell>
+                              <TableCell>{row.expert.trainerName || b.assignedExpertName}</TableCell>
+                              <TableCell>
+                                <ModeBadge mode={b.appointmentMode} />
+                              </TableCell>
+                              <TableCell>
+                                <StatusBadge status={b.status} />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <SessionActions
+                                  booking={b}
+                                  bookingId={row.bookingId}
+                                  memberName={row.member.username}
+                                  onStartCall={startCall}
+                                  onLogWorkout={setCompletingBooking}
+                                  className="flex flex-wrap justify-end gap-2"
+                                />
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -607,6 +584,114 @@ export default function PersonalTrainingAdminPage() {
         open={Boolean(completingBooking)}
         onOpenChange={(open) => !open && setCompletingBooking(null)}
       />
+    </div>
+  )
+}
+
+function describeBooking(b: UnifiedBookingDto) {
+  const member =
+    typeof b.userId === 'object' && b.userId !== null
+      ? (b.userId as { username?: string; phone?: string; email?: string })
+      : { username: 'Member', phone: '' }
+  const expert =
+    typeof b.expertId === 'object' && b.expertId !== null
+      ? (b.expertId as { trainerName?: string; imageUrl?: string })
+      : { trainerName: 'Trainer' }
+  const bookingId: string =
+    (typeof b._id === 'object' && b._id !== null
+      ? (b._id as any).$oid || (b._id as any).toString()
+      : b._id) || (b as any).id || ''
+  return { member, expert, bookingId }
+}
+
+function ModeBadge({ mode }: { mode: UnifiedBookingDto['appointmentMode'] }) {
+  return (
+    <Badge variant={mode === 'ONLINE' ? 'default' : 'outline'}>
+      {mode === 'ONLINE' ? (
+        <IconVideo className="h-3 w-3 mr-1" />
+      ) : (
+        <IconDumbbell className="h-3 w-3 mr-1" />
+      )}
+      {mode}
+    </Badge>
+  )
+}
+
+function StatusBadge({ status }: { status: UnifiedBookingDto['status'] }) {
+  return (
+    <Badge
+      variant={
+        status === 'CONFIRMED' ? 'default' : status === 'COMPLETED' ? 'secondary' : 'destructive'
+      }
+    >
+      {status}
+    </Badge>
+  )
+}
+
+function SessionActions({
+  booking: b,
+  bookingId,
+  memberName,
+  onStartCall,
+  onLogWorkout,
+  className,
+}: {
+  booking: UnifiedBookingDto
+  bookingId: string
+  memberName?: string
+  onStartCall: ReturnType<typeof useVideoConference>['startCall']
+  onLogWorkout: (b: UnifiedBookingDto) => void
+  className?: string
+}) {
+  if (b.status !== 'CONFIRMED') return null
+
+  let callButton: React.ReactNode = null
+  if (b.appointmentMode === 'ONLINE') {
+    const joinState = getBookingJoinState(b, new Date(), {
+      leadMinutes: 30,
+      graceMinutes: 30,
+    })
+    const isJoinDisabled = joinState.state === 'too_early' || joinState.state === 'ended'
+
+    callButton = isJoinDisabled ? (
+      <Button
+        size="sm"
+        variant="default"
+        disabled
+        className="gap-1 bg-gray-400 text-gray-200 cursor-not-allowed opacity-60"
+        title={joinState.label ?? 'Session video call window closed'}
+      >
+        <IconVideo className="h-3.5 w-3.5" />
+        Start Video Call
+      </Button>
+    ) : (
+      <Button
+        size="sm"
+        variant="default"
+        className="gap-1"
+        onClick={() =>
+          onStartCall({
+            sessionId: bookingId,
+            roomID: (b as any).zegoRoomId || bookingId,
+            sessionTitle: `${memberName || 'Member'} — PT Session`,
+            mode: 'GroupCall',
+            joinMuted: true,
+          })
+        }
+      >
+        <IconVideo className="h-3.5 w-3.5" />
+        Start Video Call
+      </Button>
+    )
+  }
+
+  return (
+    <div className={className}>
+      {callButton}
+      <Button size="sm" variant="outline" onClick={() => onLogWorkout(b)}>
+        Log Workout
+      </Button>
     </div>
   )
 }

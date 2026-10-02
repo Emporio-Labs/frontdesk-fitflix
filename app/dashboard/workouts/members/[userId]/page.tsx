@@ -387,14 +387,14 @@ export default function MemberSchedulePage() {
   return (
     <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       {/* Header Navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.back()}>
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="-ml-2 sm:ml-0">
             <IconArrowLeft className="w-4 h-4 mr-2" />
             Back to Roster
           </Button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
           <Button
             id="trainer-medical-reports-btn"
             variant="outline"
@@ -420,15 +420,17 @@ export default function MemberSchedulePage() {
           </Button>
           <Button
             onClick={() => setAssignOrCreateModalOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 sm:px-4"
           >
-            <IconPlus className="w-4 h-4 mr-2" />
-            Assign / Create Plan
+            <IconPlus className="w-4 h-4 mr-1.5 sm:mr-2" />
+            <span className="sm:hidden">Assign Plan</span>
+            <span className="hidden sm:inline">Assign / Create Plan</span>
           </Button>
-          <Button asChild variant="default" className="bg-amber-600 hover:bg-amber-700">
+          <Button asChild variant="default" className="bg-amber-600 hover:bg-amber-700 px-3 sm:px-4">
             <Link href={`/dashboard/workouts/members/${userId}/live`}>
-              <IconFlame className="w-4 h-4 mr-2" />
-              Start Live Session
+              <IconFlame className="w-4 h-4 mr-1.5 sm:mr-2" />
+              <span className="sm:hidden">Live Session</span>
+              <span className="hidden sm:inline">Start Live Session</span>
             </Link>
           </Button>
         </div>
@@ -436,20 +438,20 @@ export default function MemberSchedulePage() {
 
       {/* Member Profile & Active Plan Hero Header */}
       <Card className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border-none shadow-xl">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center text-2xl font-bold text-emerald-400 border border-emerald-500/30">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 sm:gap-6">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div className="h-12 w-12 shrink-0 sm:h-16 sm:w-16 rounded-full bg-primary/20 flex items-center justify-center text-lg sm:text-2xl font-bold text-emerald-400 border border-emerald-500/30">
                 {user?.username?.slice(0, 2).toUpperCase() || 'MB'}
               </div>
-              <div>
-                <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-bold">{user?.username}</h2>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <h2 className="text-xl sm:text-2xl font-bold break-words">{user?.username}</h2>
                   <Badge variant="outline" className="border-emerald-400 text-emerald-300">
                     Active Member
                   </Badge>
                 </div>
-                <p className="text-sm text-slate-300 mt-1">{user?.email}</p>
+                <p className="text-sm text-slate-300 mt-1 break-all">{user?.email}</p>
                 {trainerObj && (
                   <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
                     <IconUserCheck className="w-4 h-4 text-emerald-400" />
@@ -461,7 +463,7 @@ export default function MemberSchedulePage() {
 
             {planObj ? (
               isPlanExpired ? (
-                <div className="bg-amber-950/70 p-4 rounded-xl border border-amber-500/50 flex flex-col gap-1.5 min-w-[280px]">
+                <div className="bg-amber-950/70 p-4 rounded-xl border border-amber-500/50 flex flex-col gap-1.5 w-full md:w-auto md:min-w-[280px]">
                   <div className="flex items-center justify-between gap-2">
                     <Badge variant="outline" className="border-amber-400 text-amber-300 bg-amber-500/10 text-[10px] uppercase tracking-wider font-bold">
                       Plan Expired / Passed
@@ -481,7 +483,7 @@ export default function MemberSchedulePage() {
                   </p>
                 </div>
               ) : (
-                <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/60 flex flex-col gap-1 min-w-[260px]">
+                <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/60 flex flex-col gap-1 w-full md:w-auto md:min-w-[260px]">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Active Prescribed Plan</span>
                     <Button
@@ -511,8 +513,8 @@ export default function MemberSchedulePage() {
                 </div>
               )
             ) : (
-              <div className="flex flex-col items-end gap-2">
-                <Badge variant="destructive">No Active Plan Assigned</Badge>
+              <div className="flex flex-row md:flex-col items-center md:items-end justify-between gap-2">
+                <Badge variant="destructive" className="whitespace-nowrap">No Active Plan</Badge>
                 <Button
                   size="sm"
                   onClick={() => setAssignOrCreateModalOpen(true)}
@@ -529,7 +531,7 @@ export default function MemberSchedulePage() {
 
       {/* Whole Schedule View & Days Editor */}
       {!assignment || (isPlanExpired && !showExpiredSchedule) ? (
-        <Card className="p-10 text-center bg-gradient-to-b from-amber-500/5 to-transparent border-amber-500/30 shadow-md">
+        <Card className="p-6 sm:p-10 text-center bg-gradient-to-b from-amber-500/5 to-transparent border-amber-500/30 shadow-md">
           <div className="max-w-md mx-auto space-y-3">
             <div className="h-12 w-12 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto border border-amber-500/20">
               <IconCalendar className="w-6 h-6" />
@@ -565,7 +567,7 @@ export default function MemberSchedulePage() {
         </Card>
       ) : (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <IconCalendar className="w-5 h-5 text-primary" />
@@ -578,7 +580,7 @@ export default function MemberSchedulePage() {
             <Button
               onClick={handleSaveDaySchedule}
               disabled={updateDayMutation.isPending}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="w-full sm:w-auto shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               <IconCheck className="w-4 h-4 mr-2" />
               {updateDayMutation.isPending ? 'Saving Schedule...' : `Save Day ${activeDayNumber} Schedule`}
@@ -610,7 +612,7 @@ export default function MemberSchedulePage() {
                   onValueChange={(val) => setActiveDayNumber(Number(val))}
                   className="w-full"
                 >
-                  <TabsList className="flex flex-wrap h-auto gap-2 bg-muted/50 p-1.5 rounded-xl items-center">
+                  <TabsList className="flex w-full flex-nowrap justify-start overflow-x-auto sm:flex-wrap h-auto gap-2 bg-muted/50 p-1.5 rounded-xl items-center">
                     {dayListToRender.map((day: PlanDayItem) => {
                       const isCurrentDayRest = !!restDays[day.dayNumber] || day.isRestDay === true
                       const dayInfo = getScheduledDayInfo(
@@ -623,7 +625,7 @@ export default function MemberSchedulePage() {
                         <TabsTrigger
                           key={day.dayNumber}
                           value={String(day.dayNumber)}
-                          className="px-4 py-2.5 rounded-lg text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1.5"
+                          className="shrink-0 px-3 sm:px-4 py-2.5 rounded-lg text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1.5"
                         >
                           <span>{dayInfo.tabLabel}</span>
                           {isCurrentDayRest && (
@@ -643,7 +645,7 @@ export default function MemberSchedulePage() {
                       variant="outline"
                       size="sm"
                       onClick={handleAddNewDay}
-                      className="h-9 px-3 text-xs border-dashed border-emerald-500/50 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium"
+                      className="shrink-0 h-9 px-3 text-xs border-dashed border-emerald-500/50 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium"
                     >
                       <IconPlus className="w-3.5 h-3.5 mr-1" />
                       Add Day
@@ -662,7 +664,7 @@ export default function MemberSchedulePage() {
                       <TabsContent key={day.dayNumber} value={String(day.dayNumber)} className="mt-6 space-y-4">
                         <div className="flex flex-wrap items-center justify-between border-b pb-4 gap-3">
                           <div>
-                            <h3 className="text-lg font-bold flex items-center gap-2">
+                            <h3 className="text-lg font-bold flex flex-wrap items-center gap-2">
                               {dayInfo.headerTitle}
                               {isCurrentDayRest && (
                                 <Badge className="bg-amber-500 text-white text-xs font-semibold flex items-center gap-1">
@@ -680,7 +682,7 @@ export default function MemberSchedulePage() {
                                 : `${currentDayExercises.length} prescribed exercises scheduled for ${dayInfo.dateString || `Day ${day.dayNumber}`}`}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                             <Button
                               variant={isCurrentDayRest ? 'default' : 'outline'}
                               size="sm"
@@ -752,7 +754,7 @@ export default function MemberSchedulePage() {
                           key={`${ex.exerciseId}-${index}`}
                           className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 rounded-xl border bg-card hover:border-primary/40 transition-colors gap-4"
                         >
-                          <div className="flex items-center gap-3 min-w-[200px]">
+                          <div className="flex w-full md:w-auto items-center gap-3 md:min-w-[200px]">
                             <div className="flex flex-col gap-1">
                               <Button
                                 variant="ghost"
@@ -773,9 +775,9 @@ export default function MemberSchedulePage() {
                                 <IconArrowDown className="w-3.5 h-3.5" />
                               </Button>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <p
-                                className={`font-bold text-sm ${
+                                className={`font-bold text-sm break-words ${
                                   ex.exerciseMissing ? 'text-destructive' : ''
                                 }`}
                               >
@@ -792,7 +794,7 @@ export default function MemberSchedulePage() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+                          <div className="grid w-full md:w-auto grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
                             <div>
                               <Label className="text-[10px] text-muted-foreground uppercase">Target Sets</Label>
                               <Input
@@ -801,7 +803,7 @@ export default function MemberSchedulePage() {
                                 onChange={(e) =>
                                   updateExerciseField(index, 'targetSets', Number(e.target.value))
                                 }
-                                className="h-8 text-xs font-semibold"
+                                className="h-9 sm:h-8 text-sm sm:text-xs font-semibold"
                               />
                             </div>
                             <div>
@@ -812,7 +814,7 @@ export default function MemberSchedulePage() {
                                 onChange={(e) =>
                                   updateExerciseField(index, 'targetReps', Number(e.target.value))
                                 }
-                                className="h-8 text-xs font-semibold"
+                                className="h-9 sm:h-8 text-sm sm:text-xs font-semibold"
                               />
                             </div>
                             <div>
@@ -823,7 +825,7 @@ export default function MemberSchedulePage() {
                                 onChange={(e) =>
                                   updateExerciseField(index, 'targetWeightKg', Number(e.target.value))
                                 }
-                                className="h-8 text-xs font-semibold"
+                                className="h-9 sm:h-8 text-sm sm:text-xs font-semibold"
                               />
                             </div>
                             <div>
@@ -834,7 +836,7 @@ export default function MemberSchedulePage() {
                                 onChange={(e) =>
                                   updateExerciseField(index, 'restSeconds', Number(e.target.value))
                                 }
-                                className="h-8 text-xs font-semibold"
+                                className="h-9 sm:h-8 text-sm sm:text-xs font-semibold"
                               />
                             </div>
                           </div>
@@ -885,18 +887,18 @@ export default function MemberSchedulePage() {
             {filteredExercises.map((ex) => (
               <div
                 key={ex._id}
-                className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
+                className="flex items-center justify-between gap-3 p-3 rounded-lg border hover:bg-accent transition-colors"
               >
-                <div>
-                  <p className="font-semibold text-sm">{ex.name}</p>
-                  <div className="flex items-center gap-2 mt-1">
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm break-words">{ex.name}</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
                     <Badge variant="outline" className="text-[10px]">
                       {ex.muscleGroups?.join(', ') || 'FullBody'}
                     </Badge>
                     <span className="text-xs text-muted-foreground">Difficulty: {ex.difficulty || 'Intermediate'}</span>
                   </div>
                 </div>
-                <Button size="sm" onClick={() => handleAddExercise(ex)}>
+                <Button size="sm" className="shrink-0" onClick={() => handleAddExercise(ex)}>
                   <IconPlus className="w-4 h-4 mr-1" />
                   Add
                 </Button>
@@ -940,7 +942,7 @@ export default function MemberSchedulePage() {
                 return (
                   <div
                     key={dNum}
-                    className="flex items-center justify-between p-3.5 rounded-xl border bg-card hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between gap-3 p-3.5 rounded-xl border bg-card hover:bg-muted/50 transition-colors"
                   >
                     <div>
                       <p className="font-bold text-sm">Day {dNum}</p>
@@ -951,7 +953,7 @@ export default function MemberSchedulePage() {
                       variant="secondary"
                       disabled={count === 0}
                       onClick={() => handleCopyDayExercises(dNum)}
-                      className="text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                      className="shrink-0 text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
                     >
                       <IconCopy className="w-3.5 h-3.5 mr-1" />
                       Copy {count} Exercises
