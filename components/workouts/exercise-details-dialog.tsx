@@ -26,10 +26,10 @@ export function ExerciseDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 sm:p-0 gap-0">
+        <DialogHeader className="px-4 sm:px-6 py-4 pr-10 border-b text-left">
           <div className="flex items-center gap-2">
-            <DialogTitle className="text-xl">{exercise.name}</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">{exercise.name}</DialogTitle>
             {exercise.isSystem && (
               <Badge variant="secondary" className="text-[10px]">System</Badge>
             )}
@@ -43,7 +43,7 @@ export function ExerciseDetailsDialog({
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 p-6">
+        <ScrollArea className="flex-1 min-h-0 p-4 sm:p-6">
           <div className="space-y-6">
             {(exercise.imageUrls?.length || exercise.imageUrl) && (
               <ExerciseAnimation

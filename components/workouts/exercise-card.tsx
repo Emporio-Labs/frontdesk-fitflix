@@ -47,7 +47,7 @@ export function ExerciseCard({
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors group"
+      className="flex flex-wrap sm:flex-nowrap items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors group"
     >
       <button
         className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground"
@@ -98,7 +98,7 @@ export function ExerciseCard({
       </div>
       </button>
 
-      <div className="flex items-center gap-1.5">
+      <div className="order-last sm:order-none basis-full sm:basis-auto flex items-center justify-between sm:justify-start gap-1.5 pl-6 sm:pl-0">
         <InlineInput
           label="Sets"
           value={exercise.targetSets}
@@ -126,7 +126,7 @@ export function ExerciseCard({
       <Button
         size="icon"
         variant="ghost"
-        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+        className="h-8 w-8 shrink-0 sm:h-7 sm:w-7 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-destructive"
         onClick={() => onRemove(index)}
       >
         <IconTrash className="w-3.5 h-3.5" />
@@ -187,7 +187,7 @@ function InlineInput({
   suffix?: string
 }) {
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center flex-1 sm:flex-none min-w-0">
       <span className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">
         {label}
       </span>
@@ -195,7 +195,7 @@ function InlineInput({
         type="number"
         value={value}
         onChange={(e) => onChange(Number(e.target.value) || 0)}
-        className="w-14 h-7 text-center text-xs px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        className="w-full min-w-0 sm:w-14 h-9 sm:h-7 text-center text-xs px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />
     </div>
   )

@@ -9,6 +9,8 @@ import {
   ResizableHandle,
 } from '@/components/ui/resizable'
 import { Button } from '@/components/ui/button'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
 import { IconArrowLeft, IconDeviceFloppy, IconPlayerPlay, IconLoader2 } from '@tabler/icons-react'
 import { useWorkoutStore } from '@/stores/workout-store'
 import { PlanConfigPanel } from '@/components/workouts/plan-config-panel'
@@ -80,6 +82,8 @@ export function PlanBuilderLayout({
     assignmentStartDate,
   } = useWorkoutStore()
   const [assignOpen, setAssignOpen] = useState(false)
+  const isMobile = useIsMobile()
+  const [mobileTab, setMobileTab] = useState<'plan' | 'days' | 'preview'>('days')
   const createMutation = useCreateWorkoutPlan()
   const updateMutation = useUpdateWorkoutPlan()
   const assignMutation = useAssignWorkoutPlan()
@@ -162,23 +166,23 @@ export function PlanBuilderLayout({
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-var(--header-height))]">
       {/* Toolbar */}
-      <div className="border-b px-4 py-2 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="border-b px-3 sm:px-4 py-2 flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
             <Link href="/dashboard/workouts">
               <IconArrowLeft className="w-4 h-4" />
             </Link>
           </Button>
-          <div>
-            <h3 className="text-sm font-semibold">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold truncate">
               {mode === 'create' ? 'New Workout Plan' : currentPlan.name || 'Edit Plan'}
             </h3>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-[10px] text-muted-foreground hidden sm:block">
               {mode === 'create' ? 'Design a new workout plan' : 'Editing plan'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
@@ -191,7 +195,8 @@ export function PlanBuilderLayout({
             ) : (
               <IconDeviceFloppy className="w-3.5 h-3.5 mr-1" />
             )}
-            Save Draft
+            <span className="sm:hidden">Save</span>
+            <span className="hidden sm:inline">Save Draft</span>
           </Button>
           <Button
             size="sm"
@@ -209,7 +214,39 @@ export function PlanBuilderLayout({
         </div>
       </div>
 
-      {/* 3-Panel Layout */}
+      {isMobile ? (
+        // Phones: one panel at a time behind a segmented switcher
+        <>
+          <div className="grid grid-cols-3 gap-1 p-1 m-2 rounded-lg bg-muted shrink-0">
+            {(
+              [
+                ['plan', 'Plan'],
+                ['days', 'Exercises'],
+                ['preview', 'Preview'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMobileTab(key)}
+                className={cn(
+                  'h-8 rounded-md text-xs font-medium transition-colors',
+                  mobileTab === key
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground'
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 min-h-0">
+            {mobileTab === 'plan' && <PlanConfigPanel onOpenAssign={() => setAssignOpen(true)} />}
+            {mobileTab === 'days' && <DayBuilderPanel />}
+            {mobileTab === 'preview' && <MobilePreviewPanel />}
+          </div>
+        </>
+      ) : (
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={25} minSize={18} maxSize={35}>
           <PlanConfigPanel onOpenAssign={() => setAssignOpen(true)} />
@@ -223,6 +260,7 @@ export function PlanBuilderLayout({
           <MobilePreviewPanel />
         </ResizablePanel>
       </ResizablePanelGroup>
+      )}
 
       <AssignUsersDialog
         open={assignOpen}
