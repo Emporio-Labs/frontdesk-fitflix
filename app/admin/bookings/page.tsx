@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useMemo, useState } from 'react'
+import Link from 'next/link'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,49 +22,45 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Switch } from '@/components/ui/switch'
-import { IconTrash, IconRefresh, IconCalendar } from '@tabler/icons-react'
-import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useBookings, useCreateBooking, useDeleteBooking, useChangeBookingStatus } from '@/hooks/use-bookings'
+import { Calendar } from '@/components/ui/calendar'
+import {
+  IconCalendar,
+  IconCalendarEvent,
+  IconCalendarStats,
+  IconCheck,
+  IconX,
+  IconClock,
+  IconCirclePlus,
+  IconArrowRight,
+  IconRefresh,
+  IconSearch,
+  IconFilter,
+  IconDownload,
+  IconEye,
+  IconPencil,
+  IconTrash,
+  IconDotsVertical,
+  IconChevronLeft,
+  IconChevronRight,
+} from '@tabler/icons-react'
+import {
+  useBookings,
+  useDeleteBooking,
+  useChangeBookingStatus,
+} from '@/hooks/use-bookings'
 import { useSlots } from '@/hooks/use-slots'
 import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
-import { useGroupClasses } from '@/hooks/use-group-classes'
 import { useUsers } from '@/hooks/use-users'
-import { useMemberships } from '@/hooks/use-memberships'
-import { useTopUpUserCredits, useUserCreditBalance } from '@/hooks/use-credits'
-import { BOOKING_STATUS, BookingStatusValue, Booking } from '@/lib/services/booking.service'
+import {
+  BOOKING_STATUS,
+  BookingStatusValue,
+  Booking,
+} from '@/lib/services/booking.service'
 import { getBookingServiceName, getBookingTimeSlotLabel } from '@/lib/populated'
 import { cn, toUtcDateKey } from '@/lib/utils'
 import { toast } from 'sonner'
-
-type BookableMode = 'all' | 'services' | 'therapies'
-type BookableKind = 'service' | 'therapy'
-
-interface BookableItemOption {
-  id: string
-  name: string
-  time: number
-  creditCost: number
-  slots: string[]
-  kind: BookableKind
-  isPaused?: boolean
-}
-
-interface BookingWithNames extends Booking {
-  userName: string
-  serviceName: string
-}
-
-const STATUS_COLORS: Record<number, string> = {
-  0: 'bg-blue-100 text-blue-800 hover:bg-blue-100 border-transparent whitespace-nowrap',
-  1: 'bg-green-100 text-green-800 hover:bg-green-100 border-transparent whitespace-nowrap',
-  2: 'bg-red-100 text-red-800 hover:bg-red-100 border-transparent whitespace-nowrap',
-  3: 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-transparent whitespace-nowrap',
-  4: 'bg-gray-100 text-gray-800 hover:bg-gray-100 border-transparent whitespace-nowrap',
-}
-
 
 const UTC_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -78,968 +75,733 @@ function getTodayDateKey() {
   return local.toISOString().slice(0, 10)
 }
 
-function toUtcStartOfDayIso(dateKey: string) {
-  if (!dateKey) return ''
-
-  const parsed = new Date(`${dateKey}T00:00:00.000Z`)
-  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString()
-}
-
 function formatDateForDisplay(value?: string) {
   if (!value) return '-'
-
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime()) ? value : UTC_DATE_FORMATTER.format(parsed)
 }
 
 function formatDateKey(value: string) {
   if (!value) return '-'
-
   return formatDateForDisplay(`${value}T00:00:00.000Z`)
 }
 
-function formatSlotWindowLabel(slot: {
-  date?: string
-  isDaily?: boolean
-  startTime: string
-  endTime: string
-  remainingCapacity: number
-  capacity: number
-}) {
-  const scheduleLabel =
-    slot.isDaily || !slot.date
-      ? 'Daily'
-      : (() => {
-          const parsed = new Date(slot.date)
-          return Number.isNaN(parsed.getTime()) ? 'Daily' : UTC_DATE_FORMATTER.format(parsed)
-        })()
-
-  return `${scheduleLabel} - ${slot.startTime} to ${slot.endTime} (${slot.remainingCapacity}/${slot.capacity})`
-}
-
 export default function BookingsPage() {
+  const [activeTab, setActiveTab] = useState<'today' | 'all'>('today')
+  const [selectedDateKey, setSelectedDateKey] = useState(getTodayDateKey())
   const [searchTerm, setSearchTerm] = useState('')
-  const [mode, setMode] = useState<BookableMode>('all')
-  const [showFullSlots, setShowFullSlots] = useState(false)
-  const [showTopUp, setShowTopUp] = useState(false)
-  const [topUpAmount, setTopUpAmount] = useState(1)
-  const [topUpMembershipId, setTopUpMembershipId] = useState('')
-  const [formData, setFormData] = useState(() => ({
-    bookingDate: '',
-    userId: '',
-    slotId: '',
-    serviceId: '',
-    bypassCredits: false,
-  }))
+  const [todaySearchTerm, setTodaySearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 12
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null)
 
   const { data: bookings = [], isLoading, isError, refetch } = useBookings()
   const { data: slots = [] } = useSlots()
   const { data: services = [] } = useServices()
   const { data: therapies = [] } = useTherapies()
-  const { data: groupClasses = [] } = useGroupClasses()
   const { data: users = [] } = useUsers()
-  const { data: allMemberships = [] } = useMemberships()
-  const {
-    data: userBalance,
-    isLoading: isUserBalanceLoading,
-    isFetching: isUserBalanceFetching,
-    refetch: refetchUserBalance,
-  } = useUserCreditBalance(formData.userId, Boolean(formData.userId))
-  const createBooking = useCreateBooking()
+
   const deleteBooking = useDeleteBooking()
   const changeStatus = useChangeBookingStatus()
-  const topUpCredits = useTopUpUserCredits()
 
-  useEffect(() => {
-    setFormData((prev) => {
-      if (prev.bookingDate) return prev
-      return { ...prev, bookingDate: getTodayDateKey() }
-    })
-  }, [])
+  const selectedCalendarDate = useMemo(() => {
+    if (!selectedDateKey) return undefined
+    const parsed = new Date(`${selectedDateKey}T00:00:00.000Z`)
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed
+  }, [selectedDateKey])
 
-  const selectedUser = useMemo(
-    () => users.find((user) => user._id === formData.userId),
-    [users, formData.userId]
-  )
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    setSelectedDateKey(local.toISOString().slice(0, 10))
+  }
 
-  const allBookableItems = useMemo(() => {
-    const serviceItems: BookableItemOption[] = services.map((service) => ({
-      id: service.id,
-      name: service.name,
-      time: service.time,
-      creditCost: service.creditCost,
-      slots: service.slots,
-      kind: 'service',
-    }))
-
-    const therapyItems: BookableItemOption[] = therapies.map((therapy) => ({
-      id: therapy.id,
-      name: therapy.name,
-      time: therapy.time,
-      creditCost: therapy.creditCost,
-      slots: therapy.slots,
-      kind: 'therapy',
-      isPaused: therapy.isPaused,
-    }))
-
-    return [...serviceItems, ...therapyItems]
-  }, [services, therapies])
-
-  const visibleBookableItems = useMemo(() => {
-    const byMode = allBookableItems.filter((item) => {
-      if (mode === 'services') return item.kind === 'service'
-      if (mode === 'therapies') return item.kind === 'therapy'
-      return true
-    })
-
-    return byMode.sort((a, b) => a.name.localeCompare(b.name))
-  }, [allBookableItems, mode])
-
-  const selectedItem = useMemo(
-    () => allBookableItems.find((item) => item.id === formData.serviceId),
-    [allBookableItems, formData.serviceId]
-  )
-
-  const selectedSlotRefs = useMemo(
-    () => selectedItem?.slots || [],
-    [selectedItem]
-  )
-
-  const matchedSlots = useMemo(() => {
-    if (!formData.bookingDate || !formData.serviceId || selectedSlotRefs.length === 0) {
-      return [] as typeof slots
-    }
-
-    return slots
-      .filter((slot) => {
-        const matchesBookableSlots =
-          selectedSlotRefs.includes(slot._id) ||
-          (slot.parentTemplate ? selectedSlotRefs.includes(slot.parentTemplate) : false)
-
-        if (!matchesBookableSlots) return false
-
-        const slotDateKey = toUtcDateKey(slot.date)
-        return slot.isDaily || slotDateKey === formData.bookingDate
-      })
-      .sort((a, b) => {
-        const startCompare = a.startTime.localeCompare(b.startTime)
-        if (startCompare !== 0) return startCompare
-        return a.endTime.localeCompare(b.endTime)
-      })
-  }, [formData.bookingDate, formData.serviceId, selectedSlotRefs, slots])
-
-  const availableSlots = useMemo(
-    () => matchedSlots.filter((slot) => slot.remainingCapacity > 0),
-    [matchedSlots]
-  )
-
-  const displayedSlots = useMemo(
-    () => (showFullSlots ? matchedSlots : availableSlots),
-    [showFullSlots, matchedSlots, availableSlots]
-  )
-
-  const selectedSlot = useMemo(
-    () => slots.find((slot) => slot._id === formData.slotId),
-    [slots, formData.slotId]
-  )
-
-  useEffect(() => {
-    if (!formData.slotId) return
-
-    const selectedStillVisible = displayedSlots.some((slot) => slot._id === formData.slotId)
-    if (!selectedStillVisible) {
-      setFormData((prev) => ({ ...prev, slotId: '' }))
-    }
-  }, [displayedSlots, formData.slotId])
-
-  const estimatedCredits = selectedItem?.creditCost ?? 0
-  const currentCredits = userBalance?.totalRemaining ?? 0
-  const hasBalance = typeof userBalance?.totalRemaining === 'number'
-  const creditShortfall = hasBalance ? Math.max(0, estimatedCredits - currentCredits) : 0
-  const projectedCredits = hasBalance ? currentCredits - estimatedCredits : null
-  const isLowCredit = Boolean(
-    formData.userId &&
-      selectedItem &&
-      !formData.bypassCredits &&
-      hasBalance &&
-      creditShortfall > 0
-  )
-  const isCheckingCredits = Boolean(
-    formData.userId &&
-      selectedItem &&
-      !formData.bypassCredits &&
-      !hasBalance &&
-      (isUserBalanceLoading || isUserBalanceFetching)
-  )
-
-  // Active memberships from the credit ledger (accurate remaining counts for the balance panel).
-  const memberships = userBalance?.memberships || []
-
-  // ALL memberships for the selected user (including future ones), used in the top-up
-  // target dropdown so admins can explicitly credit a not-yet-active bucket.
-  const allUserMemberships = useMemo(
-    () => allMemberships.filter((m) => m.userId === formData.userId),
-    [allMemberships, formData.userId]
-  )
-
-  const userNameById = useMemo(
-    () => new Map(users.map((user) => [user._id, user.username || user.email || 'Unknown User'])),
+  // Lookups
+  const userById = useMemo(
+    () => new Map(users.map((u) => [u._id, u.username || u.email || 'Member'])),
     [users]
   )
 
-  const itemNameById = useMemo(
+  const serviceById = useMemo(
     () =>
       new Map([
-        ...services.map((service) => [service.id, service.name] as const),
-        ...therapies.map((therapy) => [therapy.id, therapy.name] as const),
+        ...services.map((s) => [s.id, s.name] as const),
+        ...therapies.map((t) => [t.id, t.name] as const),
       ]),
     [services, therapies]
   )
 
-  const classNameById = useMemo(
-    () => new Map(groupClasses.map((c) => [c.id, c.name] as const)),
-    [groupClasses]
-  )
+  const slotById = useMemo(() => new Map(slots.map((s) => [s._id, s])), [slots])
 
-  const slotById = useMemo(() => new Map(slots.map((slot) => [slot._id, slot] as const)), [slots])
+  // Normalized bookings with names and dates
+  const enrichedBookings = useMemo(() => {
+    return bookings.map((b) => {
+      const uRef = b.user
+      const uId = typeof uRef === 'object' && uRef !== null ? uRef._id : (typeof uRef === 'string' ? uRef : '')
+      const userName =
+        (uId ? userById.get(uId) : null) ||
+        (typeof uRef === 'object' && uRef !== null ? uRef.username || uRef.email : null) ||
+        'Member'
 
-  const enrichedBookings = useMemo<BookingWithNames[]>(
-    () =>
-      bookings
-        .map((booking) => ({
-          ...booking,
-          userName:
-            booking.user?.username ||
-            userNameById.get(booking.user?._id ?? '') ||
-            'Unknown User',
-          serviceName: getBookingServiceName(
-            booking,
-            classNameById,
-            itemNameById,
-            'Unknown Service'
-          ),
-        }))
-        .sort((a, b) => {
-          const aTime = new Date(a.createdAt || a.bookingDate).getTime()
-          const bTime = new Date(b.createdAt || b.bookingDate).getTime()
-          return bTime - aTime
-        }),
-    [bookings, userNameById, itemNameById, classNameById]
-  )
+      const sRef = b.service
+      const sId = typeof sRef === 'object' && sRef !== null ? sRef._id : (typeof sRef === 'string' ? sRef : '')
+      const serviceName =
+        (sId ? serviceById.get(sId) : null) ||
+        (typeof sRef === 'object' && sRef !== null ? sRef.serviceName : null) ||
+        getBookingServiceName(b, undefined, serviceById, 'Service')
 
-  const filtered = useMemo(
-    () =>
-      enrichedBookings.filter((booking) => {
-        const query = searchTerm.toLowerCase()
-        return (
-          booking._id.toLowerCase().includes(query) ||
-          booking.userName.toLowerCase().includes(query) ||
-          booking.serviceName.toLowerCase().includes(query)
-        )
-      }),
-    [enrichedBookings, searchTerm]
-  )
-
-  const totalPages = Math.ceil(filtered.length / itemsPerPage)
-  const activePage = Math.max(1, Math.min(currentPage, totalPages || 1))
-  const startIndex = (activePage - 1) * itemsPerPage
-  const paginatedBookings = filtered.slice(startIndex, startIndex + itemsPerPage)
-
-  const todayDateKey = getTodayDateKey()
-
-  const todaysUpcomingBookings = useMemo(
-    () =>
-      enrichedBookings
-        .filter((booking) => toUtcDateKey(booking.bookingDate) === todayDateKey)
-        .filter((booking) => Number(booking.status) === 0 || Number(booking.status) === 1)
-        .sort((a, b) => {
-          const aStart =
-            a.slot?.startTime ?? slotById.get(a.slot?._id ?? '')?.startTime ?? '99:99'
-          const bStart =
-            b.slot?.startTime ?? slotById.get(b.slot?._id ?? '')?.startTime ?? '99:99'
-          return aStart.localeCompare(bStart)
-        }),
-    [enrichedBookings, todayDateKey, slotById]
-  )
-
-  const selectedDate = useMemo(() => {
-    if (!formData.bookingDate) return undefined
-    const parsed = new Date(`${formData.bookingDate}T00:00:00.000Z`)
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed
-  }, [formData.bookingDate])
-
-  const handleDateSelect = (date: Date | undefined) => {
-    if (!date) return
-    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-    const dateKey = localDate.toISOString().slice(0, 10)
-    setFormData((prev) => ({
-      ...prev,
-      bookingDate: dateKey,
-      slotId: '',
-    }))
-  }
-
-  const canCreateBooking =
-    Boolean(formData.bookingDate && formData.userId && formData.slotId && formData.serviceId) &&
-    !createBooking.isPending &&
-    !isCheckingCredits &&
-    !isLowCredit
-
-  const handleRefreshBoard = async () => {
-    await refetch()
-    if (formData.userId) {
-      await refetchUserBalance()
-    }
-  }
-
-  const handleOpenTopUp = () => {
-    setShowTopUp(true)
-    setTopUpAmount(Math.max(1, creditShortfall || estimatedCredits || 1))
-  }
-
-  const handleTopUp = async () => {
-    if (!formData.userId) {
-      toast.error('Select a member before topping up credits.')
-      return
-    }
-
-    if (!Number.isFinite(topUpAmount) || topUpAmount <= 0) {
-      toast.error('Top-up amount must be greater than 0.')
-      return
-    }
-
-    await topUpCredits.mutateAsync({
-      userId: formData.userId,
-      payload: {
-        amount: topUpAmount,
-        membershipId: topUpMembershipId || undefined,
-        reason: selectedItem
-          ? `Spot booking top-up for ${selectedItem.name}`
-          : 'Spot booking top-up',
-      },
+      const timeLabel = getBookingTimeSlotLabel(b, slotById, '10:00 AM')
+      const dateKey = toUtcDateKey(b.bookingDate)
+      return {
+        ...b,
+        userName,
+        serviceName,
+        timeLabel,
+        dateKey,
+      }
     })
+  }, [bookings, userById, serviceById, slotById])
 
-    setShowTopUp(false)
-    setTopUpAmount(1)
-  }
+  // Metric counts
+  const totalCount = enrichedBookings.length
 
-  const handleCreate = async () => {
-    if (!formData.bookingDate || !formData.userId || !formData.slotId || !formData.serviceId) {
-      toast.error('Select date, member, item, and slot before creating a booking.')
-      return
-    }
+  const todayBookings = useMemo(() => {
+    return enrichedBookings.filter((b) => b.dateKey === selectedDateKey)
+  }, [enrichedBookings, selectedDateKey])
 
-    const bookingDateIso = toUtcStartOfDayIso(formData.bookingDate)
-    if (!bookingDateIso) {
-      toast.error('Invalid booking date selected.')
-      return
-    }
+  const attendedCount = useMemo(
+    () => enrichedBookings.filter((b) => b.status === 1 || b.status === 3).length,
+    [enrichedBookings]
+  )
 
-    const selectedSlot = slots.find((slot) => slot._id === formData.slotId)
-    if (selectedSlot && selectedSlot.remainingCapacity <= 0) {
-      toast.error('Selected slot is already full. Please choose another slot.')
-      return
-    }
+  const bookedCount = useMemo(
+    () => enrichedBookings.filter((b) => b.status === 0).length,
+    [enrichedBookings]
+  )
 
-    if (isLowCredit) {
-      toast.error('Not enough credits for this booking. Top up or enable bypass credits.')
-      return
-    }
+  const cancelledCount = useMemo(
+    () => enrichedBookings.filter((b) => b.status === 2).length,
+    [enrichedBookings]
+  )
 
-    try {
-      await createBooking.mutateAsync({
-        bookingDate: bookingDateIso,
-        userId: formData.userId,
-        slotId: formData.slotId,
-        serviceId: formData.serviceId,
-        bypassCredits: formData.bypassCredits,
-      })
-      setFormData((prev) => ({ ...prev, slotId: '' }))
-    } catch {
-      // Error states are handled by mutation hooks.
-    }
-  }
+  const noShowCount = useMemo(
+    () => enrichedBookings.filter((b) => b.status === 4).length,
+    [enrichedBookings]
+  )
+
+  const attendedPct = totalCount > 0 ? Math.round((attendedCount / totalCount) * 100) : 0
+  const bookedPct = totalCount > 0 ? Math.round((bookedCount / totalCount) * 100) : 0
+  const cancelledPct = totalCount > 0 ? Math.round((cancelledCount / totalCount) * 100) : 0
+  const noShowPct = totalCount > 0 ? Math.round((noShowCount / totalCount) * 100) : 0
+
+  // Filtered Today's Bookings
+  const filteredTodayBookings = useMemo(() => {
+    if (!todaySearchTerm.trim()) return todayBookings
+    const q = todaySearchTerm.toLowerCase()
+    return todayBookings.filter(
+      (b) =>
+        b.userName.toLowerCase().includes(q) ||
+        b.serviceName.toLowerCase().includes(q) ||
+        b._id.toLowerCase().includes(q)
+    )
+  }, [todayBookings, todaySearchTerm])
+
+  // Filtered All Bookings
+  const filteredAllBookings = useMemo(() => {
+    return enrichedBookings.filter((b) => {
+      if (statusFilter !== 'all' && String(b.status) !== statusFilter) {
+        return false
+      }
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase()
+        const matches =
+          b.userName.toLowerCase().includes(q) ||
+          b.serviceName.toLowerCase().includes(q) ||
+          b._id.toLowerCase().includes(q)
+        if (!matches) return false
+      }
+      return true
+    })
+  }, [enrichedBookings, statusFilter, searchTerm])
+
+  // Pagination for All Bookings
+  const totalPages = Math.max(1, Math.ceil(filteredAllBookings.length / rowsPerPage))
+  const paginatedAllBookings = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage
+    return filteredAllBookings.slice(start, start + rowsPerPage)
+  }, [filteredAllBookings, currentPage, rowsPerPage])
 
   const handleStatusChange = (id: string, status: string) => {
     changeStatus.mutate({ id, status: Number(status) as BookingStatusValue })
   }
 
+  const handleDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this booking?')) {
+      deleteBooking.mutate(id)
+    }
+  }
+
+  const handleExportCsv = () => {
+    if (filteredAllBookings.length === 0) {
+      toast.error('No bookings to export')
+      return
+    }
+    const headers = ['Booking ID', 'Member', 'Service', 'Date', 'Time', 'Credits', 'Status']
+    const rows = filteredAllBookings.map((b) => [
+      b._id,
+      `"${b.userName}"`,
+      `"${b.serviceName}"`,
+      formatDateForDisplay(b.bookingDate),
+      b.timeLabel,
+      b.creditCostSnapshot ?? 0,
+      BOOKING_STATUS[b.status as keyof typeof BOOKING_STATUS] ?? b.status,
+    ])
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement('a')
+    link.setAttribute('href', encodedUri)
+    link.setAttribute('download', `fitflix_bookings_${selectedDateKey}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast.success('Bookings exported to CSV')
+  }
+
+  const getStatusBadge = (status: number) => {
+    switch (status) {
+      case 1:
+      case 3:
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100/80 text-emerald-700">
+            Attended
+          </span>
+        )
+      case 0:
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100/80 text-blue-700">
+            Booked
+          </span>
+        )
+      case 2:
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100/80 text-rose-700">
+            Cancelled
+          </span>
+        )
+      case 4:
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100/80 text-amber-700">
+            No Show
+          </span>
+        )
+      default:
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+            {BOOKING_STATUS[status as keyof typeof BOOKING_STATUS] ?? status}
+          </span>
+        )
+    }
+  }
+
   return (
-    <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
+    <div className="flex-1 space-y-5 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6 bg-slate-50/50 min-h-screen">
+      {/* Top Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Bookings</h2>
-          <p className="text-muted-foreground">Spot-booking desk and scheduling board with credit-aware actions</p>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Bookings</h2>
+          <p className="text-sm text-slate-500 mt-0.5">
+            View and manage all bookings, today's schedule, and booking history.
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefreshBoard}>
-            <IconRefresh className="w-4 h-4 mr-1" /> Refresh
+        <div className="flex items-center gap-2.5">
+          {/* Date Picker Button */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 px-3 text-xs font-medium bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-xs"
+              >
+                <IconCalendar className="w-4 h-4 mr-2 text-slate-500" />
+                {formatDateKey(selectedDateKey)}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedCalendarDate}
+                onSelect={handleDateSelect}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* Refresh Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            className="h-9 px-3 text-xs font-medium bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-xs"
+          >
+            <IconRefresh className="w-4 h-4 mr-1.5 text-slate-500" /> Refresh
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)_340px] items-start w-full">
-        <Card>
-          <CardHeader>
-            <CardTitle>Date-First Panel</CardTitle>
-            <CardDescription>Set the day, member, and item before selecting a slot</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 border border-border rounded-lg overflow-hidden bg-background shadow-sm">
-              <div className="p-3 space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Booking Day</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className={cn(
-                        "w-full justify-start text-left font-normal h-8 bg-transparent border-0 shadow-none p-0 text-xs hover:bg-transparent focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none",
-                        !formData.bookingDate && "text-muted-foreground"
-                      )}
-                    >
-                      <IconCalendar className="mr-1.5 h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      {formData.bookingDate ? (
-                        formatDateKey(formData.bookingDate)
-                      ) : (
-                        <span className="text-muted-foreground">Pick date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={handleDateSelect}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="p-3 border-l border-border space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Member</label>
-                <Select
-                  value={formData.userId || '__none__'}
-                  onValueChange={(value) => {
-                    const nextUserId = value === '__none__' ? '' : value
-                    setFormData((prev) => ({
-                      ...prev,
-                      userId: nextUserId,
-                      serviceId: '',
-                      slotId: '',
-                      bypassCredits: false,
-                    }))
-                    setTopUpMembershipId('')
-                    setShowTopUp(false)
-                  }}
-                >
-                  <SelectTrigger className="h-8 pl-0 pr-6 text-xs border-0 shadow-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none bg-transparent hover:bg-transparent [&>span]:truncate w-full">
-                    <SelectValue placeholder="Select member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Select member</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user._id} value={user._id}>
-                        {user.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      {/* 6 KPI Stat Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        {/* 1. Today's Bookings */}
+        <Card className="bg-white border-slate-200 shadow-xs hover:border-slate-300 transition-colors">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center shrink-0">
+              <IconCalendarEvent className="w-5 h-5" />
             </div>
-
-            <div className="grid grid-cols-2 border border-border rounded-lg overflow-hidden bg-background shadow-sm">
-              <div className="p-3 space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Item Mode</label>
-                <Select
-                  value={mode}
-                  onValueChange={(value) => {
-                    setMode(value as BookableMode)
-                    setFormData((prev) => ({ ...prev, serviceId: '', slotId: '' }))
-                  }}
-                  disabled={!formData.userId}
-                >
-                  <SelectTrigger className="h-8 pl-0 pr-6 text-xs border-0 shadow-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none bg-transparent hover:bg-transparent [&>span]:truncate w-full disabled:opacity-50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="services">Services</SelectItem>
-                    <SelectItem value="therapies">Therapies</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="p-3 border-l border-border space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Bookable Item</label>
-                <Select
-                  value={formData.serviceId || '__none__'}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      serviceId: value === '__none__' ? '' : value,
-                      slotId: '',
-                    }))
-                  }
-                  disabled={!formData.userId || visibleBookableItems.length === 0}
-                >
-                  <SelectTrigger className="h-8 pl-0 pr-6 text-xs border-0 shadow-none focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none bg-transparent hover:bg-transparent [&>span]:truncate w-full disabled:opacity-50">
-                    <SelectValue placeholder="Select item" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Select item</SelectItem>
-                    {visibleBookableItems.map((item) => (
-                      <SelectItem key={item.id} value={item.id} disabled={item.isPaused}>
-                        {item.name} ({item.creditCost} cr){item.isPaused ? ' · Paused' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between rounded-md border p-2 px-3 text-xs bg-muted/5">
-              <span className="font-semibold text-muted-foreground">Show Full Slots</span>
-              <Switch checked={showFullSlots} onCheckedChange={setShowFullSlots} className="scale-90" />
-            </div>
-
-            <div className="rounded-md border p-2.5 px-3 text-xs text-muted-foreground space-y-1 bg-muted/10">
-              <div className="flex justify-between border-b pb-1 last:border-0 last:pb-0">
-                <span>Day</span>
-                <span className="font-medium text-foreground">{formatDateKey(formData.bookingDate)}</span>
-              </div>
-              <div className="flex justify-between border-b pb-1 last:border-0 last:pb-0">
-                <span>Matched Windows</span>
-                <span className="font-medium text-foreground">{matchedSlots.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Available Now</span>
-                <span className="font-medium text-foreground">{availableSlots.length}</span>
-              </div>
+            <div>
+              <p className="text-[11px] font-medium text-slate-500">Today's Bookings</p>
+              <h3 className="text-xl font-bold text-slate-900 leading-tight mt-0.5">{todayBookings.length}</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">{formatDateKey(selectedDateKey)}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Scheduling Board</CardTitle>
-            <CardDescription>
-              {formData.userId
-                ? selectedItem
-                  ? `Choose a slot for ${selectedItem.name} on ${formatDateKey(formData.bookingDate)}`
-                  : 'Select a service or therapy to load matching slots'
-                : 'Select a member first to start spot booking'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!formData.userId ? (
-              <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-                Pick a member in the left panel. Spot booking requires explicit member selection first.
-              </div>
-            ) : !formData.serviceId ? (
-              <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-                Choose a service or therapy in the left panel to view eligible windows.
-              </div>
-            ) : displayedSlots.length === 0 ? (
-              <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-                No slot windows match this date and item. Adjust date, item, or enable full-slot view.
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
-                {displayedSlots.map((slot) => {
-                  const isSelected = formData.slotId === slot._id
-                  const isFull = slot.remainingCapacity <= 0
-
-                  return (
-                    <button
-                      key={slot._id}
-                      type="button"
-                      disabled={isFull}
-                      onClick={() => setFormData((prev) => ({ ...prev, slotId: slot._id }))}
-                      className={cn(
-                        'rounded-lg border p-3 text-left transition-colors w-full',
-                        isSelected && 'border-primary bg-primary/5',
-                        isFull && 'cursor-not-allowed border-muted bg-muted/40 opacity-70',
-                        !isSelected && !isFull && 'hover:border-primary/40 hover:bg-accent/40'
-                      )}
-                    >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between gap-3 w-full">
-                          <span className="font-semibold text-sm whitespace-nowrap">{slot.startTime} to {slot.endTime}</span>
-                          <Badge variant={isFull ? 'secondary' : 'default'} className="text-[10px] h-5 px-1.5 shrink-0">
-                            {slot.remainingCapacity}/{slot.capacity}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {slot.isDaily || !slot.date
-                            ? 'Daily template window'
-                              : `Dated window: ${formatDateForDisplay(slot.date)}`}
-                        </p>
-                      </div>
-                      {slot.parentTemplate ? (
-                        <p className="text-[11px] text-muted-foreground mt-1.5">Template-linked inventory slot</p>
-                      ) : null}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+        {/* 2. Total Bookings */}
+        <Card className="bg-white border-slate-200 shadow-xs hover:border-slate-300 transition-colors">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+              <IconCalendarStats className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-slate-500">Total Bookings</p>
+              <h3 className="text-xl font-bold text-slate-900 leading-tight mt-0.5">{totalCount}</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">All time</p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Credit Impact Drawer</CardTitle>
-            <CardDescription>Review balance impact before confirming the spot booking</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-md border p-2.5 space-y-2 bg-muted/20 text-xs">
-              <div className="flex justify-between items-start gap-2 border-b pb-1.5 last:border-b-0 last:pb-0">
-                <span className="text-muted-foreground font-medium shrink-0">Member</span>
-                <span className="font-semibold text-right truncate">
-                  {selectedUser ? `${selectedUser.username}` : 'None selected'}
-                </span>
-              </div>
-              <div className="flex justify-between items-start gap-2 border-b pb-1.5 last:border-b-0 last:pb-0">
-                <span className="text-muted-foreground font-medium shrink-0">Item</span>
-                <span className="font-semibold text-right truncate">
-                  {selectedItem ? `${selectedItem.name} (${selectedItem.time}m)` : 'None selected'}
-                </span>
-              </div>
-              <div className="flex justify-between items-start gap-2">
-                <span className="text-muted-foreground font-medium shrink-0">Slot</span>
-                <span className="font-semibold text-right truncate" title={selectedSlot ? formatSlotWindowLabel(selectedSlot) : undefined}>
-                  {selectedSlot ? `${selectedSlot.startTime} - ${selectedSlot.endTime}` : 'None selected'}
-                </span>
-              </div>
+        {/* 3. Attended */}
+        <Card className="bg-white border-slate-200 shadow-xs hover:border-slate-300 transition-colors">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <IconCheck className="w-5 h-5" />
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
-              <div className="rounded-md border p-2 text-center bg-muted/10">
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Current</p>
-                <p className="text-sm font-semibold mt-0.5">
-                  {formData.userId
-                    ? isUserBalanceLoading || isUserBalanceFetching
-                      ? '...'
-                      : hasBalance
-                        ? currentCredits
-                        : '-'
-                    : '-'}
-                </p>
-              </div>
-              <div className="rounded-md border p-2 text-center bg-muted/10">
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Deduct</p>
-                <p className="text-sm font-semibold mt-0.5">{estimatedCredits || '-'}</p>
-              </div>
-              <div className="rounded-md border p-2 text-center bg-primary/5 border-primary/20">
-                <p className="text-[10px] uppercase tracking-wide text-primary">Projected</p>
-                <p className="text-sm font-semibold mt-0.5 text-primary">
-                  {projectedCredits === null ? '-' : projectedCredits}
-                </p>
-              </div>
+            <div>
+              <p className="text-[11px] font-medium text-slate-500">Attended</p>
+              <h3 className="text-xl font-bold text-slate-900 leading-tight mt-0.5">{attendedCount}</h3>
+              <p className="text-[10px] text-emerald-600 font-medium mt-0.5">{attendedPct}% of total</p>
             </div>
+          </CardContent>
+        </Card>
 
-            {isLowCredit ? (
-              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
-                <p className="text-sm font-medium text-amber-900">Low credit balance</p>
-                <p className="text-xs text-amber-900/80">
-                  This member is short by {creditShortfall} credit{creditShortfall === 1 ? '' : 's'} for this booking.
-                </p>
-                <Button size="sm" variant="outline" onClick={handleOpenTopUp}>
-                  Top up now
-                </Button>
-              </div>
-            ) : null}
-
-            {showTopUp ? (
-              <div className="rounded-md border p-3 space-y-3">
-                <p className="text-sm font-medium">Admin Top-Up</p>
-                <div className="space-y-2">
-                  <label className="text-xs font-medium">Amount</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={topUpAmount}
-                    onChange={(e) => {
-                      const parsed = Number.parseInt(e.target.value, 10)
-                      if (Number.isNaN(parsed)) {
-                        setTopUpAmount(1)
-                        return
-                      }
-                      setTopUpAmount(Math.max(1, parsed))
-                    }}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-medium">Membership target</label>
-                  <Select
-                    value={topUpMembershipId || '__auto__'}
-                    onValueChange={(value) => setTopUpMembershipId(value === '__auto__' ? '' : value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__auto__">Auto (earliest eligible active)</SelectItem>
-                      {allUserMemberships.map((membership) => {
-                        const now = new Date()
-                        const start = membership.startDate ? new Date(membership.startDate) : null
-                        const isFuture = start && start > now
-                        const statusLabel = isFuture
-                          ? `Future – starts ${start.toLocaleDateString()}`
-                          : membership.status !== 'Active'
-                            ? membership.status
-                            : null
-                        return (
-                          <SelectItem key={membership.id} value={membership.id}>
-                            {membership.planName}
-                            {statusLabel ? ` [${statusLabel}]` : ''}
-                            {' '}({membership.creditsRemaining} credits)
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleTopUp}
-                    disabled={topUpCredits.isPending || !formData.userId}
-                  >
-                    {topUpCredits.isPending ? 'Applying...' : 'Apply Top-Up'}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setShowTopUp(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="flex items-center justify-between rounded-md border p-2 px-3 text-xs">
-              <span className="font-medium text-muted-foreground">Bypass Credits Override</span>
-              <Switch
-                checked={formData.bypassCredits}
-                onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, bypassCredits: checked }))}
-                className="scale-90"
-              />
+        {/* 4. Booked */}
+        <Card className="bg-white border-slate-200 shadow-xs hover:border-slate-300 transition-colors">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center shrink-0">
+              <IconCalendar className="w-5 h-5" />
             </div>
+            <div>
+              <p className="text-[11px] font-medium text-slate-500">Booked</p>
+              <h3 className="text-xl font-bold text-slate-900 leading-tight mt-0.5">{bookedCount}</h3>
+              <p className="text-[10px] text-slate-600 font-medium mt-0.5">{bookedPct}% of total</p>
+            </div>
+          </CardContent>
+        </Card>
 
-            <Button onClick={handleCreate} disabled={!canCreateBooking} className="w-full">
-              {createBooking.isPending ? 'Booking spot...' : 'Create Spot Booking'}
-            </Button>
+        {/* 5. Cancelled */}
+        <Card className="bg-white border-slate-200 shadow-xs hover:border-slate-300 transition-colors">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <IconX className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-slate-500">Cancelled</p>
+              <h3 className="text-xl font-bold text-slate-900 leading-tight mt-0.5">{cancelledCount}</h3>
+              <p className="text-[10px] text-rose-600 font-medium mt-0.5">{cancelledPct}% of total</p>
+            </div>
+          </CardContent>
+        </Card>
 
-            <p className="text-[10px] text-muted-foreground text-center leading-tight">
-              If the last seat is taken during submit, slot availability refreshes automatically.
-            </p>
+        {/* 6. No Show */}
+        <Card className="bg-white border-slate-200 shadow-xs hover:border-slate-300 transition-colors">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <IconClock className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-slate-500">No Show</p>
+              <h3 className="text-xl font-bold text-slate-900 leading-tight mt-0.5">{noShowCount}</h3>
+              <p className="text-[10px] text-amber-600 font-medium mt-0.5">{noShowPct}% of total</p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Today's Upcoming Bookings</CardTitle>
-          <CardDescription>
-            {isLoading ? 'Loading...' : `${todaysUpcomingBookings.length} upcoming for ${formatDateKey(todayDateKey)}`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-            </div>
-          ) : todaysUpcomingBookings.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-2">No upcoming bookings for today.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {todaysUpcomingBookings.map((booking) => {
-                    const timeLabel = getBookingTimeSlotLabel(booking, slotById, 'Time TBD')
-
-                    return (
-                      <TableRow key={`today-${booking._id}`}>
-                        <TableCell>{timeLabel}</TableCell>
-                        <TableCell className="font-medium text-sm">{booking.userName}</TableCell>
-                        <TableCell className="text-sm">{booking.serviceName}</TableCell>
-                        <TableCell>
-                          <Badge className={STATUS_COLORS[booking.status as number] || 'bg-gray-100 text-gray-800'}>
-                            {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS] ?? booking.status}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+      {/* Tabs */}
+      <div className="border-b border-slate-200 flex gap-6 text-sm font-medium">
+        <button
+          type="button"
+          onClick={() => setActiveTab('today')}
+          className={cn(
+            'pb-3 font-semibold transition-all relative flex items-center gap-2',
+            activeTab === 'today'
+              ? 'text-slate-900 border-b-2 border-slate-900'
+              : 'text-slate-500 hover:text-slate-800'
           )}
-        </CardContent>
-      </Card>
+        >
+          <span>Today's Bookings</span>
+          <span className={cn(
+            'text-xs px-2 py-0.5 rounded-full font-bold',
+            activeTab === 'today' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+          )}>
+            {todayBookings.length}
+          </span>
+        </button>
 
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <CardTitle>All Bookings</CardTitle>
-            <CardDescription>{isLoading ? 'Loading...' : `${filtered.length} bookings (newest first)`}</CardDescription>
+        <button
+          type="button"
+          onClick={() => setActiveTab('all')}
+          className={cn(
+            'pb-3 font-semibold transition-all relative flex items-center gap-2',
+            activeTab === 'all'
+              ? 'text-slate-900 border-b-2 border-slate-900'
+              : 'text-slate-500 hover:text-slate-800'
+          )}
+        >
+          <span>All Bookings</span>
+          <span className={cn(
+            'text-xs px-2 py-0.5 rounded-full font-bold',
+            activeTab === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+          )}>
+            {totalCount}
+          </span>
+        </button>
+      </div>
+
+      {/* Promotional / Action Callout Banner */}
+      <div className="rounded-xl border border-slate-200 bg-slate-100/70 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <IconCirclePlus className="w-6 h-6" />
           </div>
-          <Input
-            placeholder="Search by booking ID, user name, or service..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value)
-              setCurrentPage(1)
-            }}
-            className="max-w-sm"
-          />
-        </CardHeader>
-        <CardContent>
-          {isError && (
-            <div className="text-center py-8 text-red-500">
-              Failed to load bookings. Check credentials and API connectivity.
+          <div>
+            <h4 className="text-sm font-bold text-slate-900">Need to create a new spot booking?</h4>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Go to Spot Booking to select member, service, and slot with credit-aware actions.
+            </p>
+          </div>
+        </div>
+        <Link href="/admin/spot-booking">
+          <Button className="h-9 px-4 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-xs shrink-0 flex items-center gap-1.5">
+            <span>Go to Spot Booking</span>
+            <IconArrowRight className="w-4 h-4" />
+          </Button>
+        </Link>
+      </div>
+
+      {/* Main Table Content */}
+      {activeTab === 'today' ? (
+        /* Today's Bookings Table Card */
+        <Card className="bg-white border-slate-200 shadow-xs">
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Today's Bookings</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {todayBookings.length} booking{todayBookings.length === 1 ? '' : 's'} for {formatDateKey(selectedDateKey)}
+              </p>
             </div>
-          )}
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            <div className="flex items-center gap-2">
+              <div className="relative w-full sm:w-72">
+                <IconSearch className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  placeholder="Search member, service, or booking ID..."
+                  value={todaySearchTerm}
+                  onChange={(e) => setTodaySearchTerm(e.target.value)}
+                  className="pl-9 h-9 text-xs bg-slate-50 border-slate-200 focus:bg-white"
+                />
+              </div>
             </div>
-          ) : (
-            <>
+          </div>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-6 space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : filteredTodayBookings.length === 0 ? (
+              <div className="text-center py-12 text-sm text-slate-400">
+                No bookings scheduled for {formatDateKey(selectedDateKey)}.
+              </div>
+            ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="hidden lg:table-cell">Booking ID</TableHead>
-                      <TableHead>Member</TableHead>
-                      <TableHead>Service</TableHead>
-                      <TableHead className="hidden md:table-cell">Date</TableHead>
-                      <TableHead className="hidden lg:table-cell">Credits</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="hidden md:table-cell">Change Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                    <TableRow className="border-b border-slate-100 bg-slate-50/60 hover:bg-slate-50/60">
+                      <TableHead className="text-xs font-semibold text-slate-500 pl-6">Time</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-500">Member</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-500">Service</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-500">Credits</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-500">Status</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-500 text-right pr-6">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedBookings.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                          No bookings found
+                    {filteredTodayBookings.map((b) => (
+                      <TableRow key={b._id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                        <TableCell className="pl-6 text-xs font-medium text-slate-700 whitespace-nowrap">
+                          {b.timeLabel}
                         </TableCell>
-                      </TableRow>
-                    ) : (
-                      paginatedBookings.map((booking) => (
-                        <TableRow key={booking._id}>
-                          <TableCell className="hidden font-mono text-xs lg:table-cell">{booking._id.slice(-6)}</TableCell>
-                          <TableCell className="font-medium text-sm">{booking.userName}</TableCell>
-                          <TableCell className="text-sm">{booking.serviceName}</TableCell>
-                          <TableCell className="hidden md:table-cell">{formatDateForDisplay(booking.bookingDate)}</TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs">
-                                {typeof booking.creditCostSnapshot === 'number'
-                                  ? `${booking.creditCostSnapshot} cr`
-                                  : '-'}
-                              </span>
-                              {booking.creditsBypassed ? (
-                                <Badge variant="outline" className="text-[10px]">
-                                  Bypassed
-                                </Badge>
-                              ) : null}
+                        <TableCell>
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center shrink-0">
+                              {b.userName.charAt(0).toUpperCase()}
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={STATUS_COLORS[booking.status as number] || 'bg-gray-100 text-gray-800'}>
-                              {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS] ?? booking.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            <Select onValueChange={(v) => handleStatusChange(booking._id, v)}>
-                              <SelectTrigger className="w-36 h-8 text-xs">
-                                <SelectValue placeholder="Change status" />
+                            <span className="font-semibold text-xs text-slate-800">{b.userName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs font-semibold text-slate-700 uppercase tracking-tight">
+                          {b.serviceName}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-600 font-medium">
+                          {b.creditCostSnapshot ?? 0} cr
+                        </TableCell>
+                        <TableCell>{getStatusBadge(b.status)}</TableCell>
+                        <TableCell className="text-right pr-6">
+                          <div className="flex items-center justify-end gap-1 text-slate-400">
+                            {/* Action: Quick Status Select */}
+                            <Select onValueChange={(v) => handleStatusChange(b._id, v)}>
+                              <SelectTrigger className="h-7 w-28 text-[11px] border-slate-200 bg-white">
+                                <SelectValue placeholder="Status" />
                               </SelectTrigger>
                               <SelectContent>
                                 {Object.entries(BOOKING_STATUS).map(([key, label]) => (
-                                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                                  <SelectItem key={key} value={key} className="text-xs">
+                                    {label}
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
+
+                            {/* Action: Delete */}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                              onClick={() => handleDelete(b._id)}
+                              title="Delete booking"
+                            >
+                              <IconTrash className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        /* All Bookings Table Card */
+        <Card className="bg-white border-slate-200 shadow-xs">
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">All Bookings</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {filteredAllBookings.length} booking{filteredAllBookings.length === 1 ? '' : 's'} (newest first)
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative w-full sm:w-64">
+                <IconSearch className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  placeholder="Search by ID, member, or service..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value)
+                    setCurrentPage(1)
+                  }}
+                  className="pl-9 h-9 text-xs bg-slate-50 border-slate-200 focus:bg-white"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1) }}>
+                <SelectTrigger className="h-9 w-32 text-xs border-slate-200 bg-white">
+                  <IconFilter className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                  <SelectValue placeholder="Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="0">Booked</SelectItem>
+                  <SelectItem value="1">Attended</SelectItem>
+                  <SelectItem value="2">Cancelled</SelectItem>
+                  <SelectItem value="4">No Show</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Export Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportCsv}
+                className="h-9 px-3 text-xs font-medium bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+              >
+                <IconDownload className="w-4 h-4 mr-1 text-slate-500" /> Export
+              </Button>
+            </div>
+          </div>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-6 space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : paginatedAllBookings.length === 0 ? (
+              <div className="text-center py-12 text-sm text-slate-400">
+                No bookings match your search filters.
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-b border-slate-100 bg-slate-50/60 hover:bg-slate-50/60">
+                        <TableHead className="text-xs font-semibold text-slate-500 pl-6">Booking ID</TableHead>
+                        <TableHead className="text-xs font-semibold text-slate-500">Member</TableHead>
+                        <TableHead className="text-xs font-semibold text-slate-500">Service</TableHead>
+                        <TableHead className="text-xs font-semibold text-slate-500">Date & Time</TableHead>
+                        <TableHead className="text-xs font-semibold text-slate-500">Credits</TableHead>
+                        <TableHead className="text-xs font-semibold text-slate-500">Status</TableHead>
+                        <TableHead className="text-xs font-semibold text-slate-500 text-right pr-6">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedAllBookings.map((b) => (
+                        <TableRow key={b._id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                          <TableCell className="pl-6 font-mono text-xs text-slate-500">
+                            {b._id.slice(-6)}
                           </TableCell>
-                          <TableCell className="text-right py-2 pr-6">
-                            <div className="flex justify-end items-center gap-1.5">
+                          <TableCell>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center shrink-0">
+                                {b.userName.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-semibold text-xs text-slate-800">{b.userName}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs font-semibold text-slate-700 uppercase tracking-tight">
+                            {b.serviceName}
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                            <span className="font-medium">{formatDateForDisplay(b.bookingDate)}</span>
+                            <span className="text-slate-400 ml-1.5">{b.timeLabel}</span>
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-600 font-medium">
+                            {b.creditCostSnapshot ?? 0} cr
+                          </TableCell>
+                          <TableCell>{getStatusBadge(b.status)}</TableCell>
+                          <TableCell className="text-right pr-6">
+                            <div className="flex items-center justify-end gap-1 text-slate-400">
+                              <Select onValueChange={(v) => handleStatusChange(b._id, v)}>
+                                <SelectTrigger className="h-7 w-28 text-[11px] border-slate-200 bg-white">
+                                  <SelectValue placeholder="Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Object.entries(BOOKING_STATUS).map(([key, label]) => (
+                                    <SelectItem key={key} value={key} className="text-xs">
+                                      {label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                onClick={() => { if (confirm('Delete booking?')) deleteBooking.mutate(booking._id) }}
-                                disabled={deleteBooking.isPending}
-                                title="Delete Booking"
+                                className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                onClick={() => handleDelete(b._id)}
+                                title="Delete booking"
                               >
                                 <IconTrash className="w-4 h-4" />
                               </Button>
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              {totalPages > 1 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 mt-2 border-t">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filtered.length)} of {filtered.length} bookings
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Pagination */}
+                <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+                  <div className="flex items-center gap-2">
+                    <span>Rows per page</span>
+                    <Select
+                      value={String(rowsPerPage)}
+                      onValueChange={(v) => {
+                        setRowsPerPage(Number(v))
+                        setCurrentPage(1)
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-16 text-xs bg-white border-slate-200">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="ml-2">
+                      {(currentPage - 1) * rowsPerPage + 1}-
+                      {Math.min(currentPage * rowsPerPage, filteredAllBookings.length)} of {filteredAllBookings.length}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+
+                  <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9 px-3"
+                      className="h-8 w-8 p-0"
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={activePage === 1}
+                      disabled={currentPage === 1}
                     >
-                      Previous
+                      <IconChevronLeft className="w-4 h-4" />
                     </Button>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map((pg) => (
                       <Button
-                        key={page}
-                        variant={activePage === page ? 'default' : 'outline'}
+                        key={pg}
+                        variant={currentPage === pg ? 'default' : 'outline'}
                         size="sm"
-                        className="w-9 h-9 p-0 font-medium"
-                        onClick={() => setCurrentPage(page)}
+                        className={cn(
+                          'h-8 w-8 p-0 text-xs font-semibold',
+                          currentPage === pg && 'bg-slate-900 hover:bg-slate-800 text-white'
+                        )}
+                        onClick={() => setCurrentPage(pg)}
                       >
-                        {page}
+                        {pg}
                       </Button>
                     ))}
+                    {totalPages > 5 && <span className="px-1 text-slate-400">...</span>}
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9 px-3"
+                      className="h-8 w-8 p-0"
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={activePage === totalPages}
+                      disabled={currentPage === totalPages}
                     >
-                      Next page
+                      <IconChevronRight className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
