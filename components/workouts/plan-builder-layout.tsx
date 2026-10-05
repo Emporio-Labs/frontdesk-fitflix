@@ -9,8 +9,8 @@ import {
   ResizableHandle,
 } from '@/components/ui/resizable'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
 import { IconArrowLeft, IconDeviceFloppy, IconPlayerPlay, IconLoader2 } from '@tabler/icons-react'
 import { useWorkoutStore } from '@/stores/workout-store'
 import { PlanConfigPanel } from '@/components/workouts/plan-config-panel'
@@ -83,6 +83,7 @@ export function PlanBuilderLayout({
     assignmentStartDate,
   } = useWorkoutStore()
   const [assignOpen, setAssignOpen] = useState(false)
+  const [mobileTab, setMobileTab] = useState<'plan' | 'days' | 'preview'>('days')
   const createMutation = useCreateWorkoutPlan()
   const updateMutation = useUpdateWorkoutPlan()
   const assignMutation = useAssignWorkoutPlan()
@@ -176,12 +177,12 @@ export function PlanBuilderLayout({
             <h3 className="text-sm font-semibold truncate">
               {mode === 'create' ? 'New Workout Plan' : currentPlan.name || 'Edit Plan'}
             </h3>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-[10px] text-muted-foreground hidden sm:block">
               {mode === 'create' ? 'Design a new workout plan' : 'Editing plan'}
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
@@ -213,24 +214,38 @@ export function PlanBuilderLayout({
         </div>
       </div>
 
-      {/* Phones get the three panels as tabs; side-by-side panels don't fit. */}
       {isMobile ? (
-        <Tabs defaultValue="days" className="flex flex-1 flex-col">
-          <TabsList className="mx-3 mt-2 grid grid-cols-3">
-            <TabsTrigger value="setup">Setup</TabsTrigger>
-            <TabsTrigger value="days">Days</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
-          </TabsList>
-          <TabsContent value="setup" className="flex-1">
-            <PlanConfigPanel onOpenAssign={() => setAssignOpen(true)} />
-          </TabsContent>
-          <TabsContent value="days" className="flex-1">
-            <DayBuilderPanel />
-          </TabsContent>
-          <TabsContent value="preview" className="flex-1">
-            <MobilePreviewPanel />
-          </TabsContent>
-        </Tabs>
+        // Phones: one panel at a time behind a segmented switcher
+        <>
+          <div className="grid grid-cols-3 gap-1 p-1 m-2 rounded-lg bg-muted shrink-0">
+            {(
+              [
+                ['plan', 'Plan'],
+                ['days', 'Exercises'],
+                ['preview', 'Preview'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMobileTab(key)}
+                className={cn(
+                  'h-8 rounded-md text-xs font-medium transition-colors',
+                  mobileTab === key
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground'
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 min-h-0">
+            {mobileTab === 'plan' && <PlanConfigPanel onOpenAssign={() => setAssignOpen(true)} />}
+            {mobileTab === 'days' && <DayBuilderPanel />}
+            {mobileTab === 'preview' && <MobilePreviewPanel />}
+          </div>
+        </>
       ) : (
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={25} minSize={18} maxSize={35}>
