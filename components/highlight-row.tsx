@@ -14,7 +14,7 @@ const PULSE_MS = 3200
  */
 export function useHighlightRow<T extends HTMLElement = HTMLElement>(rowId: string | undefined) {
   const params = useSearchParams()
-  const highlightId = params?.get('highlight') || null
+  const highlightId = params?.get('highlight') || params?.get('alertId') || null
   const [pulsing, setPulsing] = useState(false)
   const done = useRef(false)
 

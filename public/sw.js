@@ -6,10 +6,9 @@
  * (except /offline) and /api responses are NEVER cached — doing so could serve
  * one staff member's data to the next person picking up the device.
  */
-// Bumped v3 -> v4 (FX-25) so the `activate` handler evicts the previous static
-// cache and forces this build's push + notificationclick handlers to install.
-// Change this on every SW behavioural change.
-const CACHE = 'fitflix-static-v4'
+// Bumped v4 -> v5 (FX-39) for critical operational alert Web Push,
+// desktop requireInteraction, and multi-device notification clearing.
+const CACHE = 'fitflix-static-v5'
 
 // Sole cached HTML document. Rendered by app/offline/page.tsx as a static route,
 // so it survives without any live API call. Served by the fetch handler below
@@ -101,24 +100,76 @@ self.addEventListener('push', (event) => {
       payload = { title: 'Fitflix', body: event.data.text() }
     }
   }
+
+  // FX-39.4: Acknowledging clears the device notification on other devices
+  const isClearAction =
+    payload.action === 'clear' ||
+    payload.action === 'close' ||
+    payload.data?.action === 'clear'
+
+  if (isClearAction) {
+    const targetTag =
+      payload.tag ||
+      (payload.alertId ? `alert:${payload.alertId}` : null) ||
+      (payload.data?.alertId ? `alert:${payload.data.alertId}` : null)
+
+    if (targetTag) {
+      event.waitUntil(
+        self.registration.getNotifications({ tag: targetTag }).then((notifications) => {
+          notifications.forEach((n) => n.close())
+        })
+      )
+      return
+    }
+  }
+
   const title = payload.title || 'Fitflix'
+  const isCritical =
+    payload.severity === 'critical' ||
+    payload.data?.severity === 'critical' ||
+    payload.requireInteraction === true ||
+    payload.data?.requireInteraction === true
+
+  const alertTag =
+    payload.tag ||
+    (payload.alertId ? `alert:${payload.alertId}` : null) ||
+    (payload.data?.alertId ? `alert:${payload.data.alertId}` : null) ||
+    'fitflix-push'
+
+  const targetUrl =
+    typeof payload.url === 'string'
+      ? payload.url
+      : payload.alertId
+      ? `/admin/overview?alertId=${payload.alertId}`
+      : '/'
+
   const options = {
     body: payload.body || '',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    tag: payload.tag || 'fitflix-push',
+    tag: alertTag,
     renotify: true,
+    // FX-39.2: On desktop the notification stays on screen until it's clicked or closed
+    requireInteraction: isCritical,
     data: {
-      url: typeof payload.url === 'string' ? payload.url : '/',
+      url: targetUrl,
+      alertId: payload.alertId || payload.data?.alertId,
     },
   }
+
   event.waitUntil(self.registration.showNotification(title, options))
 })
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
+  const notifData = event.notification.data || {}
   const target =
-    (event.notification.data && event.notification.data.url) || '/'
+    typeof notifData.url === 'string'
+      ? notifData.url
+      : notifData.alertId
+      ? `/admin/overview?alertId=${notifData.alertId}`
+      : '/'
+
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
@@ -142,4 +193,13 @@ self.addEventListener('notificationclick', (event) => {
         return undefined
       }),
   )
+})
+
+// FX-39.4: Local client message handler to clear notifications by tag
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'CLEAR_NOTIFICATION' && event.data.tag) {
+    self.registration.getNotifications({ tag: event.data.tag }).then((notifications) => {
+      notifications.forEach((n) => n.close())
+    })
+  }
 })
