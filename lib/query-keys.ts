@@ -197,4 +197,8 @@ export const queryKeys = {
     funnels: (type: 'signup' | 'booking', params?: Record<string, any>) =>
       ['analytics', 'funnels', type, params ?? {}] as const,
   },
+  operationalAlerts: {
+    all: (params?: Record<string, any>) => ['operational-alerts', params ?? {}] as const,
+    active: (branchId?: string | null) => ['operational-alerts', 'active', branchId ?? 'all'] as const,
+  },
 }

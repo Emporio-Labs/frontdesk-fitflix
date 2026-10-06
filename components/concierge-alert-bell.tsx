@@ -12,6 +12,9 @@ import {
   IconArrowRight,
   IconVolume,
   IconVolumeOff,
+  IconUserCheck,
+  IconShield,
+  IconChecklist,
 } from '@tabler/icons-react'
 import { useLeads, useUpdateLead, useRecordLeadContactAttempt } from '@/hooks/use-leads'
 import { Lead } from '@/lib/services/lead.service'
@@ -22,26 +25,45 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useOptionalLocationScope } from '@/components/location-scope-provider'
+import { useOperationalAlerts } from '@/hooks/use-operational-alerts'
 import { toast } from 'sonner'
 
 const SLA_MINUTES = 15
 
 export function ConciergeAlertBell() {
   const [open, setOpen] = useState(false)
-  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [activeTab, setActiveTab] = useState<'alerts' | 'leads'>('alerts')
   const [now, setNow] = useState<number>(() => Date.now())
 
+  const locationScope = useOptionalLocationScope()
+  const branchId = locationScope?.selectedLocationId ?? null
+
+  // Operational alerts via live socket + DB persistence (FX-35)
+  const {
+    alerts: operationalAlerts,
+    openAlerts,
+    acknowledgedAlerts,
+    soundEnabled,
+    setSoundEnabled,
+    acknowledgeAlert,
+    resolveAlert,
+    isAcknowledging,
+    isResolving,
+  } = useOperationalAlerts(branchId)
+
+  // In-app purchase and concierge leads
   const { data: leads = [] } = useLeads()
   const updateLead = useUpdateLead()
   const recordContact = useRecordLeadContactAttempt()
 
-  // Keep a 1-second interval for real-time SLA countdown clocks
+  // Keep a 1-second interval for countdown timers
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // Filter high-priority callback inquiries (source APP_PAYMENT_FALLBACK or notes containing fallback or status 'new' with phone)
+  // Filter high-priority callback inquiries
   const activeCallbacks = useMemo(() => {
     return leads
       .filter((lead) => {
@@ -55,68 +77,34 @@ export function ConciergeAlertBell() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }, [leads])
 
-  // SLA calculations
-  const callbackStats = useMemo(() => {
-    let breached = 0
-    let urgent = 0
-
-    activeCallbacks.forEach((lead) => {
-      const created = new Date(lead.createdAt).getTime()
-      const elapsedMins = (now - created) / (1000 * 60)
-      if (elapsedMins > SLA_MINUTES) {
-        breached++
-      } else if (elapsedMins > SLA_MINUTES - 5) {
-        urgent++
-      }
-    })
-
-    return { total: activeCallbacks.length, breached, urgent }
-  }, [activeCallbacks, now])
+  const totalUrgentCount = openAlerts.length + activeCallbacks.length
 
   const handleMarkContacted = async (lead: Lead) => {
     try {
-      await updateLead.mutateAsync({
-        id: lead.id,
-        payload: { status: 'contacted' },
-      })
       await recordContact.mutateAsync({
         id: lead.id,
         channel: 'call',
       })
-      toast.success(`Marked ${lead.name} as Contacted`)
+      await updateLead.mutateAsync({
+        id: lead.id,
+        payload: {
+          status: 'contacted',
+        },
+      })
+      toast.success(`Contact recorded for ${lead.name}`)
     } catch {
       toast.error('Failed to update lead status')
     }
   }
 
-  const formatCountdown = (createdAtStr: string) => {
-    const created = new Date(createdAtStr).getTime()
-    const deadline = created + SLA_MINUTES * 60 * 1000
-    const diffSec = Math.floor((deadline - now) / 1000)
-
-    if (diffSec <= 0) {
-      const overSec = Math.abs(diffSec)
-      const overMin = Math.floor(overSec / 60)
-      const overS = overSec % 60
-      return {
-        text: `BREACHED +${overMin}m ${overS < 10 ? '0' : ''}${overS}s`,
-        isBreached: true,
-        isUrgent: true,
-      }
+  const formatTime = (iso?: string) => {
+    if (!iso) return ''
+    try {
+      const d = new Date(iso)
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    } catch {
+      return ''
     }
-
-    const min = Math.floor(diffSec / 60)
-    const sec = diffSec % 60
-    return {
-      text: `${min}:${sec < 10 ? '0' : ''}${sec} left`,
-      isBreached: false,
-      isUrgent: min < 5,
-    }
-  }
-
-  const parsePlanName = (notes: string) => {
-    const match = notes.match(/Inquiring about plan:\s*([^.]+)/i)
-    return match ? match[1].trim() : 'Custom Protocol'
   }
 
   return (
@@ -125,186 +113,246 @@ export function ConciergeAlertBell() {
         <Button
           variant="outline"
           size="sm"
-          className="relative h-9 gap-1.5 border-border/80 px-2.5 shadow-sm transition-all hover:bg-accent/40"
-          aria-label="Concierge Alerts"
+          className={`relative h-9 gap-1.5 px-3 rounded-full border transition-all ${
+            openAlerts.length > 0
+              ? 'border-rose-400 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300 animate-pulse'
+              : totalUrgentCount > 0
+              ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+              : 'border-border/60 hover:bg-accent'
+          }`}
         >
           <IconBellRinging
             className={`h-4 w-4 ${
-              callbackStats.breached > 0
-                ? 'animate-bounce text-red-500'
-                : callbackStats.total > 0
-                ? 'animate-pulse text-amber-500'
+              openAlerts.length > 0
+                ? 'text-rose-600 dark:text-rose-400'
+                : totalUrgentCount > 0
+                ? 'text-amber-600 dark:text-amber-400'
                 : 'text-muted-foreground'
             }`}
           />
-          <span className="hidden text-xs font-semibold sm:inline">Concierge</span>
+          <span className="font-semibold text-xs tracking-tight">Alerts</span>
 
-          {callbackStats.total > 0 && (
-            <span
-              className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold text-white shadow-sm ${
-                callbackStats.breached > 0
-                  ? 'bg-red-600 animate-pulse'
-                  : callbackStats.urgent > 0
-                  ? 'bg-amber-600'
-                  : 'bg-emerald-600'
-              }`}
+          {totalUrgentCount > 0 && (
+            <Badge
+              variant="destructive"
+              className="h-4 min-w-[16px] px-1 text-[10px] font-bold rounded-full flex items-center justify-center -mr-1"
             >
-              {callbackStats.total}
-            </span>
+              {totalUrgentCount}
+            </Badge>
           )}
         </Button>
       </PopoverTrigger>
 
       <PopoverContent
         align="end"
-        className="w-96 rounded-2xl border border-border/80 p-0 shadow-2xl backdrop-blur-xl bg-background/95"
+        sideOffset={8}
+        className="w-[420px] p-0 shadow-2xl rounded-xl border border-border/80 overflow-hidden"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 bg-muted/40">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between border-b border-border/60 p-3 bg-muted/40">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
-              <IconBellRinging className="h-4 w-4" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                Concierge Action Center
-              </h4>
-              <p className="text-[11px] text-muted-foreground">
-                15-Minute High-Ticket Callbacks
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            title={soundEnabled ? 'Mute Chimes' : 'Unmute Chimes'}
-          >
-            {soundEnabled ? (
-              <IconVolume className="h-3.5 w-3.5" />
-            ) : (
-              <IconVolumeOff className="h-3.5 w-3.5" />
+            <h4 className="font-bold text-sm tracking-tight">Operational Alerts</h4>
+            {openAlerts.length > 0 && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 uppercase">
+                {openAlerts.length} Unacknowledged
+              </Badge>
             )}
-          </Button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              title={soundEnabled ? 'Mute alert chime' : 'Enable alert chime'}
+            >
+              {soundEnabled ? (
+                <IconVolume className="h-4 w-4 text-emerald-600" />
+              ) : (
+                <IconVolumeOff className="h-4 w-4 text-muted-foreground" />
+              )}
+            </Button>
+          </div>
         </div>
 
-        {/* Callback Items List */}
-        <div className="max-h-[380px] overflow-y-auto divide-y divide-border/40">
-          {activeCallbacks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 mb-3">
-                <IconCheck className="h-6 w-6" />
+        {/* Tab Selector */}
+        <div className="flex border-b border-border/60 bg-muted/20 text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => setActiveTab('alerts')}
+            className={`flex-1 py-2 text-center border-b-2 transition-colors ${
+              activeTab === 'alerts'
+                ? 'border-primary font-bold text-primary bg-background'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Staff Alerts ({operationalAlerts.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('leads')}
+            className={`flex-1 py-2 text-center border-b-2 transition-colors ${
+              activeTab === 'leads'
+                ? 'border-primary font-bold text-primary bg-background'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Hot Callbacks ({activeCallbacks.length})
+          </button>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="max-h-[380px] overflow-y-auto divide-y divide-border/40 p-2 space-y-2">
+          {activeTab === 'alerts' ? (
+            operationalAlerts.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">
+                <IconCheck className="mx-auto h-8 w-8 text-emerald-500 mb-2 opacity-60" />
+                No active operational alerts. Everything is running smoothly.
               </div>
-              <p className="text-sm font-semibold text-foreground">All Caught Up!</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-[220px]">
-                No pending high-ticket callback requests right now.
-              </p>
-            </div>
-          ) : (
-            activeCallbacks.map((lead) => {
-              const countdown = formatCountdown(lead.createdAt)
-              const plan = parsePlanName(lead.notes)
+            ) : (
+              operationalAlerts.map((alert) => {
+                const isOpen = alert.status === 'open'
+                const isAck = alert.status === 'acknowledged'
 
-              return (
-                <div
-                  key={lead.id}
-                  className={`p-3.5 transition-colors hover:bg-muted/30 ${
-                    countdown.isBreached
-                      ? 'bg-red-500/[0.04]'
-                      : countdown.isUrgent
-                      ? 'bg-amber-500/[0.04]'
-                      : ''
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
+                return (
+                  <div
+                    key={alert._id}
+                    className={`p-3 rounded-lg border transition-all ${
+                      isOpen
+                        ? 'border-rose-300 bg-rose-50/50 dark:border-rose-900 dark:bg-rose-950/20'
+                        : 'border-border bg-card'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-sm text-foreground">
-                          {lead.name}
-                        </span>
                         <Badge
-                          variant="secondary"
-                          className="h-4 text-[10px] px-1.5 font-bold uppercase tracking-wider bg-primary/10 text-primary border-0"
+                          variant={
+                            alert.severity === 'critical'
+                              ? 'destructive'
+                              : alert.severity === 'warning'
+                              ? 'secondary'
+                              : 'outline'
+                          }
+                          className="text-[10px] font-bold uppercase"
                         >
-                          {plan}
+                          {alert.severity}
                         </Badge>
+                        <span className="font-semibold text-xs text-foreground truncate max-w-[220px]">
+                          {alert.title}
+                        </span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                        {lead.phone}
-                      </p>
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {formatTime(alert.createdAt)}
+                      </span>
                     </div>
 
-                    {/* Live SLA Countdown Badge */}
-                    <div
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                        countdown.isBreached
-                          ? 'bg-red-600 text-white animate-pulse'
-                          : countdown.isUrgent
-                          ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30'
-                          : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
-                      }`}
-                    >
-                      {countdown.isBreached ? (
-                        <IconAlertTriangle className="h-3 w-3" />
-                      ) : (
-                        <IconClock className="h-3 w-3" />
-                      )}
-                      <span>{countdown.text}</span>
-                    </div>
-                  </div>
-
-                  {lead.notes && (
-                    <p className="text-xs text-muted-foreground/90 mt-2 line-clamp-2 bg-muted/40 p-2 rounded-lg border border-border/40">
-                      {lead.notes}
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {alert.message}
                     </p>
-                  )}
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5 mt-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs flex-1 gap-1"
-                      asChild
-                    >
-                      <a href={`tel:${lead.phone}`}>
-                        <IconPhone className="h-3.5 w-3.5 text-blue-600" />
-                        Call
-                      </a>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs flex-1 gap-1"
-                      asChild
-                    >
-                      <a
-                        href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=Hi%20${encodeURIComponent(
-                          lead.name
-                        )},%20this%20is%20FitFlix%20Concierge%20reaching%20out%20regarding%20your%20${encodeURIComponent(
-                          plan
-                        )}%20membership%20protocol.`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <IconBrandWhatsapp className="h-3.5 w-3.5 text-emerald-600" />
-                        WhatsApp
-                      </a>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className="h-7 text-xs px-2.5 gap-1 bg-foreground text-background hover:bg-foreground/90"
-                      onClick={() => handleMarkContacted(lead)}
-                    >
-                      <IconCheck className="h-3.5 w-3.5" />
-                      Done
-                    </Button>
+                    {alert.relatedEntity?.summary && (
+                      <p className="text-[11px] font-medium text-foreground/80 mt-1 bg-muted/40 px-2 py-1 rounded">
+                        Target: {alert.relatedEntity.summary}
+                      </p>
+                    )}
+
+                    {/* Status & Action Buttons */}
+                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/40 text-xs">
+                      {isOpen ? (
+                        <div className="flex items-center justify-between w-full gap-2">
+                          <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                            <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping inline-block" />
+                            Unacknowledged
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-7 text-xs px-3 font-semibold shadow-sm"
+                            disabled={isAcknowledging}
+                            onClick={() => acknowledgeAlert(alert._id)}
+                          >
+                            <IconUserCheck className="h-3.5 w-3.5 mr-1" />
+                            Acknowledge
+                          </Button>
+                        </div>
+                      ) : isAck ? (
+                        <div className="flex items-center justify-between w-full gap-2">
+                          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                            ✓ Ack by {alert.acknowledgedBy?.name || 'Staff'} ({formatTime(alert.acknowledgedAt)})
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-[11px] px-2 text-muted-foreground hover:text-foreground"
+                            disabled={isResolving}
+                            onClick={() => resolveAlert(alert._id, 'Manually resolved')}
+                          >
+                            Resolve
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">Resolved</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )
-            })
+                )
+              })
+            )
+          ) : (
+            // Leads Callbacks view
+            activeCallbacks.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">
+                <IconCheck className="mx-auto h-8 w-8 text-emerald-500 mb-2 opacity-60" />
+                All callback requests have been handled.
+              </div>
+            ) : (
+              activeCallbacks.map((lead) => {
+                const plan = lead.interestedIn || 'General'
+                return (
+                  <div key={lead.id} className="p-3 rounded-lg border bg-card">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-semibold text-xs text-foreground">{lead.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{lead.phone} • {plan}</p>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {formatTime(lead.createdAt)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 mt-2.5">
+                      <Button size="sm" variant="outline" className="h-6 text-xs flex-1 gap-1" asChild>
+                        <a href={`tel:${lead.phone}`}>
+                          <IconPhone className="h-3 w-3 text-blue-600" />
+                          Call
+                        </a>
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-6 text-xs flex-1 gap-1" asChild>
+                        <a
+                          href={`https://wa.me/${lead.phone.replace(/\D/g, '')}?text=Hi%20${encodeURIComponent(
+                            lead.name
+                          )},%20this%20is%20FitFlix%20re%20your%20callback%20request.`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <IconBrandWhatsapp className="h-3 w-3 text-emerald-600" />
+                          WhatsApp
+                        </a>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-6 text-xs px-2 gap-1"
+                        onClick={() => handleMarkContacted(lead)}
+                      >
+                        <IconCheck className="h-3 w-3" />
+                        Done
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })
+            )
           )}
         </div>
 
@@ -318,7 +366,7 @@ export function ConciergeAlertBell() {
             onClick={() => setOpen(false)}
           >
             <Link href="/admin/alerts">
-              <span>Open Concierge Command Center</span>
+              <span>Open Operational Alerts Center</span>
               <IconArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>
