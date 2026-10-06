@@ -8,18 +8,19 @@ import { queryKeys } from '@/lib/query-keys'
 import {
   operationalAlertService,
   type OperationalAlert,
-  type QueryAlertsParams,
 } from '@/lib/services/operational-alert.service'
 import {
-  playAlertChime,
+  playSingleWarningChime,
   startContinuousAlertNoise,
   stopContinuousAlertNoise,
+  type SoundType,
 } from '@/lib/audio-chime'
 import { toast } from 'sonner'
 
 export function useOperationalAlerts(branchId?: string | null) {
   const queryClient = useQueryClient()
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set())
   const socketRef = useRef<Socket | null>(null)
 
   const effectiveBranchId = branchId && branchId !== 'all' ? branchId : undefined
@@ -35,25 +36,57 @@ export function useOperationalAlerts(branchId?: string | null) {
     refetchInterval: 15000, // Background polling fallback in case socket drops
   })
 
+  // Open alerts (unacknowledged)
   const openAlerts = useMemo(
     () => alerts.filter((a) => a.status === 'open'),
     [alerts]
   )
 
+  // Unacknowledged Critical alerts (must repeat sound until ack - FX-38.1)
+  const criticalOpenAlerts = useMemo(
+    () => openAlerts.filter((a) => a.severity === 'critical'),
+    [openAlerts]
+  )
+
+  // Acknowledged alerts (under fix)
   const acknowledgedAlerts = useMemo(
     () => alerts.filter((a) => a.status === 'acknowledged'),
     [alerts]
   )
 
-  // FX-35.4: Noise control — chime rings while any alert is OPEN; stops when all are ACKNOWLEDGED
+  // Active alerts for pinned stack, sorted by severity and age (FX-38.5)
+  // Severity order: critical (1) -> warning (2) -> info (3)
+  // Age order within same severity: oldest first (earliest createdAt)
+  const pinnedAlerts = useMemo(() => {
+    const severityRank: Record<string, number> = {
+      critical: 1,
+      warning: 2,
+      info: 3,
+    }
+
+    return openAlerts
+      .filter((a) => !dismissedAlertIds.has(a._id))
+      .sort((a, b) => {
+        const rankA = severityRank[a.severity] ?? 99
+        const rankB = severityRank[b.severity] ?? 99
+        if (rankA !== rankB) return rankA - rankB
+        // Oldest first so overdue alerts stay on top
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      })
+  }, [openAlerts, dismissedAlertIds])
+
+  // FX-38.1 & FX-38.2: Noise control
+  // - Critical alerts play repeating sound until acknowledged
+  // - When no critical alerts are open, noise stops immediately (FX-38.4)
   useEffect(() => {
     if (!soundEnabled) {
       stopContinuousAlertNoise()
       return
     }
 
-    if (openAlerts.length > 0) {
-      startContinuousAlertNoise()
+    if (criticalOpenAlerts.length > 0) {
+      const topSound = (criticalOpenAlerts[0] as any).sound || 'siren'
+      startContinuousAlertNoise(topSound as SoundType)
     } else {
       stopContinuousAlertNoise()
     }
@@ -61,9 +94,9 @@ export function useOperationalAlerts(branchId?: string | null) {
     return () => {
       stopContinuousAlertNoise()
     }
-  }, [openAlerts.length, soundEnabled])
+  }, [criticalOpenAlerts.length, soundEnabled, criticalOpenAlerts])
 
-  // Live Socket.IO connection (FX-35.1, FX-35.3, FX-35.5)
+  // Live Socket.IO connection (FX-35.1, FX-35.3, FX-38.4)
   useEffect(() => {
     const token = getStoredToken()
     if (!token) return
@@ -91,15 +124,21 @@ export function useOperationalAlerts(branchId?: string | null) {
       queryClient.invalidateQueries({
         queryKey: queryKeys.operationalAlerts.active(effectiveBranchId),
       })
+
+      // FX-38.2: Warning plays single chime; info is silent; critical starts repeating loop
       if (soundEnabled) {
-        playAlertChime()
+        if (newAlert.severity === 'warning') {
+          playSingleWarningChime(((newAlert as any).sound || 'chime') as SoundType)
+        }
       }
+
       toast.error(`Urgent Alert: ${newAlert.title}`, {
         description: newAlert.message,
         duration: 8000,
       })
     })
 
+    // FX-38.4: Acknowledging on one screen silences it on EVERY screen
     socket.on('operational_alert:acknowledged', () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.operationalAlerts.active(effectiveBranchId),
@@ -118,7 +157,7 @@ export function useOperationalAlerts(branchId?: string | null) {
     }
   }, [effectiveBranchId, queryClient, soundEnabled])
 
-  // FX-35.2: Named acknowledgment mutation
+  // FX-35.2 & FX-38.4: Named acknowledgment mutation
   const acknowledgeMutation = useMutation({
     mutationFn: (alertId: string) =>
       operationalAlertService.acknowledgeAlert(alertId),
@@ -154,14 +193,22 @@ export function useOperationalAlerts(branchId?: string | null) {
     },
   })
 
+  // FX-38.2: Dismiss warning alert from pinned screen
+  const dismissAlert = (alertId: string) => {
+    setDismissedAlertIds((prev) => new Set([...prev, alertId]))
+  }
+
   return {
     alerts,
     openAlerts,
+    criticalOpenAlerts,
     acknowledgedAlerts,
+    pinnedAlerts,
     isLoading,
     refetch,
     soundEnabled,
     setSoundEnabled,
+    dismissAlert,
     acknowledgeAlert: (id: string) => acknowledgeMutation.mutateAsync(id),
     resolveAlert: (id: string, reason?: string) =>
       resolveMutation.mutateAsync({ alertId: id, reason }),

@@ -76,12 +76,14 @@ export function AlertRulesSettingsCard() {
   const [draftRole, setDraftRole] = useState<string | null>(null)
   const [draftSound, setDraftSound] = useState<AlertSound | null>(null)
   const [draftLadder, setDraftLadder] = useState<EscalationStep[] | null>(null)
+  const [draftGracePeriod, setDraftGracePeriod] = useState<number | null>(null)
 
   // Sync draft when selected rule changes
   const activeSeverity = draftSeverity ?? currentRule?.severity ?? 'warning'
   const activeRole = draftRole ?? currentRule?.firstResponderRole ?? 'frontdesk'
   const activeSound = draftSound ?? currentRule?.sound ?? 'chime'
   const activeLadder = draftLadder ?? currentRule?.escalationLadder ?? []
+  const activeGracePeriod = draftGracePeriod ?? currentRule?.gracePeriodMinutes ?? 2
 
   const handleSelectRule = (type: string) => {
     setSelectedType(type)
@@ -89,6 +91,7 @@ export function AlertRulesSettingsCard() {
     setDraftRole(null)
     setDraftSound(null)
     setDraftLadder(null)
+    setDraftGracePeriod(null)
   }
 
   // Escalation step handlers
@@ -126,6 +129,7 @@ export function AlertRulesSettingsCard() {
         firstResponderRole: activeRole,
         sound: activeSound,
         escalationLadder: activeLadder,
+        gracePeriodMinutes: activeGracePeriod,
       })
     },
     onSuccess: (updated) => {
@@ -135,6 +139,7 @@ export function AlertRulesSettingsCard() {
       setDraftRole(null)
       setDraftSound(null)
       setDraftLadder(null)
+      setDraftGracePeriod(null)
     },
     onError: (err: any) => {
       toast.error('Failed to save alert rule', {
@@ -338,6 +343,33 @@ export function AlertRulesSettingsCard() {
                   Plays in browser until acknowledged by a named staff member.
                 </p>
               </div>
+
+              {/* Grace Period (FX-40.1) */}
+              {(currentRule.alertType === 'session_starting_no_host' ||
+                currentRule.alertType === 'trainer_missing' ||
+                currentRule.gracePeriodMinutes !== undefined) && (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                    <IconClock className="h-3.5 w-3.5 text-indigo-500" />
+                    Grace Period (Minutes)
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={60}
+                    value={activeGracePeriod}
+                    onChange={(e) =>
+                      setDraftGracePeriod(
+                        Math.max(0, parseInt(e.target.value, 10) || 0)
+                      )
+                    }
+                    className="text-xs h-9"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Wait window past scheduled start time before raising alarm.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Escalation Ladder Builder (FX-36.1) */}

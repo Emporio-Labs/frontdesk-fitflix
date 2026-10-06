@@ -1,5 +1,7 @@
 'use client'
 
+import { AudioPermissionBanner } from '@/components/alerts/audio-permission-banner'
+import { PinnedAlertStack } from '@/components/alerts/pinned-alert-stack'
 import { AppSidebar } from '@/components/app-sidebar'
 import { LocationScopeProvider } from '@/components/location-scope-provider'
 import { MobileStaffScope } from '@/components/mobile-staff-scope'
@@ -21,6 +23,7 @@ export default function AdminLayout({
         <SidebarRouteSync />
         <AppSidebar variant="inset" collapsible="icon" />
         <SidebarInset>
+          <AudioPermissionBanner />
           <SiteHeader />
           {/* min-w-0 lets this flex child shrink below its content width, so wide
               tables scroll inside their own container instead of being clipped.
@@ -29,6 +32,7 @@ export default function AdminLayout({
           <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
             <MobileStaffScope>{children}</MobileStaffScope>
           </div>
+          <PinnedAlertStack />
         </SidebarInset>
       </LocationScopeProvider>
     </SidebarProvider>

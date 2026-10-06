@@ -17,6 +17,7 @@ export interface AlertRule {
   firstResponderRole: string
   escalationLadder: EscalationStep[]
   sound: AlertSound
+  gracePeriodMinutes?: number
   isDefault?: boolean
   updatedBy?: {
     userId: string
@@ -41,6 +42,7 @@ export const alertRuleService = {
       firstResponderRole?: string
       escalationLadder?: EscalationStep[]
       sound?: AlertSound
+      gracePeriodMinutes?: number
       title?: string
       description?: string
     }
