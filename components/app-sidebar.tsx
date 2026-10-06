@@ -94,6 +94,7 @@ const navGroups = [
     label: "Insights",
     items: [
       { title: "Concierge Alerts", url: "/admin/alerts", icon: IconBellRinging },
+      { title: "Funnels & Drop-offs", url: "/admin/analytics/funnels", icon: IconActivity },
       { title: "Leads", url: "/admin/leads", icon: IconTarget },
       { title: "Promotions", url: "/admin/promotions", icon: IconSpeakerphone },
       { title: "App Copy", url: "/admin/content", icon: IconArticle },

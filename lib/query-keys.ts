@@ -193,4 +193,8 @@ export const queryKeys = {
   content: {
     all: () => ['content'] as const,
   },
+  analytics: {
+    funnels: (type: 'signup' | 'booking', params?: Record<string, any>) =>
+      ['analytics', 'funnels', type, params ?? {}] as const,
+  },
 }
