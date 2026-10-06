@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf, IconEye, IconEyeOff } from '@tabler/icons-react'
+import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf, IconEye, IconEyeOff, IconSend, IconBan, IconCircleCheck, IconCopy } from '@tabler/icons-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
-import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '@/hooks/use-admins'
+import { useAdmins, useInviteAdmin, useResendInvite, useUpdateAdmin, useDeleteAdmin, useSetAdminStatus } from '@/hooks/use-admins'
 import { useMemberships } from '@/hooks/use-memberships'
 import { User, CreateUserPayload } from '@/lib/services/user.service'
 import { Admin } from '@/lib/services/admin.service'
@@ -88,11 +88,21 @@ function clearMemberDraft() {
 
 const ADMIN_DRAFT_KEY = 'create_admin_form_draft'
 
+// The shared login being phased out (FX-30.3). Matched case-insensitively.
+const SHARED_LOGIN_EMAIL = 'frontdesk@fitflix.in'
+
+// Staff-role options for an invited account. The backend is the authority on the
+// actual role; 'frontdesk' maps to the `staff` UI role (see login roleMap).
+const STAFF_ROLE_OPTIONS = [
+  { value: 'frontdesk', label: 'Front Desk' },
+  { value: 'admin', label: 'Admin' },
+]
+
 type AdminFormState = {
   adminName: string
   email: string
   phone: string
-  password: string
+  staffRole: string
 }
 
 function defaultAdminForm(): AdminFormState {
@@ -100,7 +110,7 @@ function defaultAdminForm(): AdminFormState {
     adminName: '',
     email: '',
     phone: '',
-    password: '',
+    staffRole: 'frontdesk',
   }
 }
 
@@ -220,10 +230,15 @@ export default function UsersPage() {
   const [adminSearch, setAdminSearch] = useState('')
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false)
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null)
-  const [adminForm, setAdminForm] = useState({ adminName: '', email: '', phone: '', password: '' })
+  const [adminForm, setAdminForm] = useState<AdminFormState>(defaultAdminForm())
   const [adminPage, setAdminPage] = useState(1)
-  const [showAdminPassword, setShowAdminPassword] = useState(false)
   const [showAdminUnsavedConfirm, setShowAdminUnsavedConfirm] = useState(false)
+  // Shown when the backend returns the invite link instead of emailing it.
+  const [inviteLinkDialog, setInviteLinkDialog] = useState<{ open: boolean; link: string; email: string }>({
+    open: false,
+    link: '',
+    email: '',
+  })
 
   // Auto-persist admin form draft to sessionStorage while filling in Create mode
   useEffect(() => {
@@ -238,14 +253,13 @@ export default function UsersPage() {
         adminForm.adminName !== (editingAdmin.adminName || '') ||
         adminForm.email !== (editingAdmin.email || '') ||
         adminForm.phone !== (editingAdmin.phone || '') ||
-        adminForm.password !== ''
+        adminForm.staffRole !== (editingAdmin.staffRole || 'frontdesk')
       )
     }
     return Boolean(
       adminForm.adminName.trim() ||
       adminForm.email.trim() ||
-      adminForm.phone.trim() ||
-      adminForm.password.trim()
+      adminForm.phone.trim()
     )
   }, [adminForm, editingAdmin])
 
@@ -263,11 +277,10 @@ export default function UsersPage() {
 
   const openCreateAdminModal = () => {
     setEditingAdmin(null)
-    setShowAdminPassword(false)
     setShowAdminUnsavedConfirm(false)
     const draft = loadAdminDraft()
     if (draft) {
-      setAdminForm(draft)
+      setAdminForm({ ...defaultAdminForm(), ...draft })
     } else {
       setAdminForm(defaultAdminForm())
     }
@@ -282,9 +295,11 @@ export default function UsersPage() {
   const { data: memberships = [] } = useMemberships()
 
   const { data: admins = [], isLoading: adminsLoading, isError: adminsError, refetch: refetchAdmins } = useAdmins()
-  const createAdmin = useCreateAdmin()
+  const inviteAdmin = useInviteAdmin()
+  const resendInvite = useResendInvite()
   const updateAdmin = useUpdateAdmin()
   const deleteAdmin = useDeleteAdmin()
+  const setAdminStatus = useSetAdminStatus()
 
   const membershipsByUserKey = useMemo(() => {
     const mapping = new Map<string, (typeof memberships)[number]>()
@@ -445,15 +460,19 @@ export default function UsersPage() {
   const paginatedAdmins = filteredAdmins.slice(adminStartIndex, adminStartIndex + itemsPerPage)
 
   const resetAdminForm = () => {
-    setAdminForm({ adminName: '', email: '', phone: '', password: '' })
+    setAdminForm(defaultAdminForm())
     setEditingAdmin(null)
-    setShowAdminPassword(false)
     setShowAdminUnsavedConfirm(false)
   }
 
   const handleOpenEditAdmin = (admin: Admin) => {
     setEditingAdmin(admin)
-    setAdminForm({ adminName: admin.adminName, email: admin.email, phone: admin.phone, password: '' })
+    setAdminForm({
+      adminName: admin.adminName,
+      email: admin.email,
+      phone: admin.phone,
+      staffRole: admin.staffRole || 'frontdesk',
+    })
     setIsAdminDialogOpen(true)
   }
 
@@ -462,15 +481,69 @@ export default function UsersPage() {
     if (editingAdmin) {
       await updateAdmin.mutateAsync({
         id: editingAdmin._id,
-        payload: { adminName: adminForm.adminName, email: adminForm.email, phone: adminForm.phone },
+        payload: {
+          adminName: adminForm.adminName,
+          email: adminForm.email,
+          phone: adminForm.phone,
+          staffRole: adminForm.staffRole,
+        },
       })
     } else {
-      if (!adminForm.password) return
-      await createAdmin.mutateAsync(adminForm)
+      // FX-30.2 — invite: no password is sent; backend emails a first-sign-in link.
+      const result = await inviteAdmin.mutateAsync({
+        adminName: adminForm.adminName,
+        email: adminForm.email,
+        phone: adminForm.phone,
+        staffRole: adminForm.staffRole,
+      })
       clearAdminDraft()
+      // If the backend returned the link instead of emailing it, surface a copyable fallback.
+      if (result.inviteLink) {
+        setInviteLinkDialog({ open: true, link: result.inviteLink, email: adminForm.email })
+      }
     }
     setIsAdminDialogOpen(false)
     resetAdminForm()
+  }
+
+  const handleResendInvite = async (admin: Admin) => {
+    const result = await resendInvite.mutateAsync(admin._id)
+    if (result.inviteLink) {
+      setInviteLinkDialog({ open: true, link: result.inviteLink, email: admin.email })
+    }
+  }
+
+  // FX-30.3 — shared-login migration. The shared account can only be disabled once
+  // every personal account has migrated: each is active and has signed in at least once.
+  const sharedAccount = admins.find((a) => a.email.toLowerCase() === SHARED_LOGIN_EMAIL)
+  const personalAccounts = admins.filter((a) => a.email.toLowerCase() !== SHARED_LOGIN_EMAIL)
+  const allMigrated =
+    personalAccounts.length > 0 &&
+    personalAccounts.every((a) => a.status === 'active' && !!a.lastLoginAt)
+
+  const handleToggleStatus = async (admin: Admin) => {
+    const next = admin.status === 'disabled' ? 'active' : 'disabled'
+    if (next === 'disabled' && !confirm(`Disable ${admin.adminName}'s account? They will no longer be able to sign in.`)) {
+      return
+    }
+    await setAdminStatus.mutateAsync({ id: admin._id, status: next })
+  }
+
+  const handleDisableSharedLogin = async () => {
+    if (!sharedAccount) return
+    if (!confirm('Disable the shared frontdesk@fitflix.in login? Make sure everyone has signed in with their own account first.')) {
+      return
+    }
+    await setAdminStatus.mutateAsync({ id: sharedAccount._id, status: 'disabled' })
+  }
+
+  const copyInviteLink = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLinkDialog.link)
+      toast.success('Invite link copied')
+    } catch {
+      toast.error('Could not copy — select and copy the link manually')
+    }
   }
 
   return (
@@ -835,7 +908,7 @@ export default function UsersPage() {
               <Dialog open={isAdminDialogOpen} onOpenChange={(o) => { if (!o) handleCloseAdminDialog() }}>
                 <DialogTrigger asChild>
                   <Button onClick={openCreateAdminModal} size="sm" className="h-9 px-3 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
-                    <IconPlus className="w-4 h-4 mr-1.5" /> Add Admin
+                    <IconPlus className="w-4 h-4 mr-1.5" /> Invite Staff
                   </Button>
                 </DialogTrigger>
                 <DialogContent
@@ -859,9 +932,11 @@ export default function UsersPage() {
                   }}
                 >
                   <DialogHeader>
-                    <DialogTitle>{editingAdmin ? 'Edit Admin' : 'Create Admin'}</DialogTitle>
+                    <DialogTitle>{editingAdmin ? 'Edit Staff Account' : 'Invite Staff Member'}</DialogTitle>
                     <DialogDescription>
-                      {editingAdmin ? 'Update admin details below.' : 'Fill in the details to add a new admin.'}
+                      {editingAdmin
+                        ? 'Update this staff account below.'
+                        : 'We’ll email a first-sign-in link so they can set their own password. No password is set here.'}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-3 pt-2">
@@ -877,32 +952,21 @@ export default function UsersPage() {
                       <label className="text-sm font-medium">Phone *</label>
                       <Input autoComplete="off" value={adminForm.phone} onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })} placeholder="+1234567890" />
                     </div>
-                    {!editingAdmin && (
-                      <div>
-                        <label className="text-sm font-medium">Password *</label>
-                        <div className="relative">
-                          <Input
-                            type={showAdminPassword ? 'text' : 'password'}
-                            autoComplete="new-password"
-                            value={adminForm.password}
-                            onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
-                            className="pr-10"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowAdminPassword(!showAdminPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
-                            tabIndex={-1}
-                          >
-                            {showAdminPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    <div>
+                      <label className="text-sm font-medium">Role</label>
+                      <Select value={adminForm.staffRole} onValueChange={(v) => setAdminForm({ ...adminForm, staffRole: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {STAFF_ROLE_OPTIONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="flex gap-2 pt-2">
                       <Button variant="outline" onClick={handleCloseAdminDialog}>Cancel</Button>
-                      <Button onClick={handleAdminSubmit} disabled={createAdmin.isPending || updateAdmin.isPending}>
-                        {createAdmin.isPending || updateAdmin.isPending ? 'Saving...' : editingAdmin ? 'Save Changes' : 'Create Admin'}
+                      <Button onClick={handleAdminSubmit} disabled={inviteAdmin.isPending || updateAdmin.isPending}>
+                        {inviteAdmin.isPending || updateAdmin.isPending
+                          ? 'Saving...'
+                          : editingAdmin ? 'Save Changes' : 'Send Invite'}
                       </Button>
                     </div>
                   </div>
@@ -940,6 +1004,40 @@ export default function UsersPage() {
             </div>
           </div>
 
+          {/* FX-30.3 — shared-login migration control */}
+          {sharedAccount && (
+            <Card className={sharedAccount.status === 'disabled' ? 'border-emerald-500/30 bg-emerald-500/[0.03]' : 'border-amber-500/30 bg-amber-500/[0.04]'}>
+              <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    Shared login — {SHARED_LOGIN_EMAIL}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {sharedAccount.status === 'disabled'
+                      ? 'Disabled. Everyone now signs in with their own account.'
+                      : allMigrated
+                        ? 'All personal accounts have signed in — safe to disable the shared login.'
+                        : 'Keep enabled until every personal account below is Active and has signed in at least once.'}
+                  </p>
+                </div>
+                {sharedAccount.status === 'disabled' ? (
+                  <StatusBadge status="disabled" size="sm" />
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-9 px-3 text-xs font-semibold shrink-0"
+                    onClick={handleDisableSharedLogin}
+                    disabled={!allMigrated || setAdminStatus.isPending}
+                    title={allMigrated ? 'Disable the shared login' : 'All personal accounts must be Active and have signed in first'}
+                  >
+                    <IconBan className="w-4 h-4 mr-1.5" /> Disable shared login
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-border shadow-sm bg-card overflow-hidden">
             <CardHeader className="py-4 px-6 border-b border-border/60">
               <CardTitle className="text-lg font-bold text-foreground">Staff Admins</CardTitle>
@@ -955,48 +1053,75 @@ export default function UsersPage() {
                     <Table>
                       <TableHeader className="bg-muted/30 border-b border-border/60">
                         <TableRow className="hover:bg-transparent">
-                          <TableHead className="w-[200px] pl-6 font-semibold">Name</TableHead>
-                          <TableHead className="w-[250px] font-semibold">Email</TableHead>
-                          <TableHead className="w-[150px] font-semibold">Phone</TableHead>
-                          <TableHead className="w-[150px] font-semibold">Created</TableHead>
-                          <TableHead className="text-right pr-6 w-[120px] font-semibold">Actions</TableHead>
+                          <TableHead className="w-[180px] pl-6 font-semibold">Name</TableHead>
+                          <TableHead className="w-[220px] font-semibold">Email</TableHead>
+                          <TableHead className="hidden w-[130px] font-semibold lg:table-cell">Phone</TableHead>
+                          <TableHead className="w-[110px] font-semibold">Status</TableHead>
+                          <TableHead className="hidden w-[140px] font-semibold md:table-cell">Last Sign-in</TableHead>
+                          <TableHead className="text-right pr-6 w-[150px] font-semibold">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredAdmins.length === 0 ? (
-                          <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No admins found</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No staff accounts found</TableCell></TableRow>
                         ) : (
-                          paginatedAdmins.map((admin, index) => (
+                          paginatedAdmins.map((admin, index) => {
+                            const isShared = admin.email.toLowerCase() === SHARED_LOGIN_EMAIL
+                            return (
                             <TableRow key={admin._id || index} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
                               <TableCell className="pl-6 font-semibold text-foreground">{admin.adminName}</TableCell>
                               <TableCell className="text-muted-foreground">{admin.email}</TableCell>
-                              <TableCell>{admin.phone}</TableCell>
-                              <TableCell className="text-muted-foreground whitespace-nowrap">{formatJoinedDate(admin.createdAt)}</TableCell>
+                              <TableCell className="hidden lg:table-cell">{admin.phone}</TableCell>
+                              <TableCell className="py-2"><StatusBadge status={admin.status} size="sm" /></TableCell>
+                              <TableCell className="hidden text-muted-foreground whitespace-nowrap md:table-cell">
+                                {admin.lastLoginAt ? formatJoinedDate(admin.lastLoginAt) : <span className="text-muted-foreground/60">Never</span>}
+                              </TableCell>
                               <TableCell className="text-right py-2 pr-6">
                                 <div className="flex justify-end items-center gap-1.5">
                                   <Button
                                     size="sm"
                                     variant="ghost"
                                     className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    onClick={() => handleResendInvite(admin)}
+                                    disabled={resendInvite.isPending}
+                                    title={admin.invitePending ? 'Resend first-sign-in link' : 'Send password reset link'}
+                                  >
+                                    <IconSend className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className={`h-8 w-8 p-0 flex items-center justify-center rounded-md transition-colors ${admin.status === 'disabled' ? 'text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10' : 'text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10'}`}
+                                    onClick={() => handleToggleStatus(admin)}
+                                    disabled={setAdminStatus.isPending}
+                                    title={admin.status === 'disabled' ? 'Enable account' : 'Disable account'}
+                                  >
+                                    {admin.status === 'disabled' ? <IconCircleCheck className="w-4 h-4" /> : <IconBan className="w-4 h-4" />}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                                     onClick={() => handleOpenEditAdmin(admin)}
-                                    title="Edit Admin"
+                                    title="Edit account"
                                   >
                                     <IconEdit className="w-4 h-4" />
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                    onClick={() => { if (confirm('Delete this admin?')) deleteAdmin.mutate(admin._id) }}
-                                    disabled={deleteAdmin.isPending}
-                                    title="Delete Admin"
+                                    className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40"
+                                    onClick={() => { if (confirm('Delete this account?')) deleteAdmin.mutate(admin._id) }}
+                                    disabled={deleteAdmin.isPending || isShared}
+                                    title={isShared ? 'Disable the shared login instead of deleting it' : 'Delete account'}
                                   >
                                     <IconTrash className="w-4 h-4" />
                                   </Button>
                                 </div>
                               </TableCell>
                             </TableRow>
-                          ))
+                            )
+                          })
                         )}
                       </TableBody>
                     </Table>
@@ -1052,6 +1177,24 @@ export default function UsersPage() {
         open={isDetailDialogOpen}
         onOpenChange={setIsDetailDialogOpen}
       />
+
+      {/* FX-30.2 — fallback when the backend returns the invite link instead of emailing it */}
+      <Dialog open={inviteLinkDialog.open} onOpenChange={(o) => setInviteLinkDialog((d) => ({ ...d, open: o }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>First-sign-in link</DialogTitle>
+            <DialogDescription>
+              Share this one-time link with {inviteLinkDialog.email || 'the new staff member'} so they can set their own password. It was not sent by email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2 pt-2">
+            <Input readOnly value={inviteLinkDialog.link} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+            <Button size="sm" onClick={copyInviteLink} className="shrink-0">
+              <IconCopy className="w-4 h-4 mr-1.5" /> Copy
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

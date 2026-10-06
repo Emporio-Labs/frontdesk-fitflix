@@ -1,5 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { adminService, CreateAdminPayload, UpdateAdminPayload } from '@/lib/services/admin.service'
+import {
+  adminService,
+  InviteAdminPayload,
+  UpdateAdminPayload,
+  AdminStatus,
+} from '@/lib/services/admin.service'
 import { queryKeys } from '@/lib/query-keys'
 import { toast } from 'sonner'
 
@@ -20,16 +25,32 @@ export function useAdmin(id: string) {
   })
 }
 
-export function useCreateAdmin() {
+// FX-30.1/30.2 — invite a new staff account. No password is sent; the backend
+// emails a first-sign-in link. Replaces the old plaintext-password create path.
+export function useInviteAdmin() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (payload: CreateAdminPayload) => adminService.create(payload),
+    mutationFn: (payload: InviteAdminPayload) => adminService.invite(payload),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.admins.all() })
-      toast.success(data.message || 'Admin created successfully')
+      toast.success(data.message || 'Invite sent')
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to create admin')
+      toast.error(err?.response?.data?.message || 'Failed to send invite')
+    },
+  })
+}
+
+export function useResendInvite() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => adminService.resendInvite(id),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.admins.all() })
+      toast.success(data.message || 'Invite link resent')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to resend invite')
     },
   })
 }
@@ -46,6 +67,23 @@ export function useUpdateAdmin() {
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to update admin')
+    },
+  })
+}
+
+// FX-30.3 — enable/disable an account, including disabling the shared login.
+export function useSetAdminStatus() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: AdminStatus }) =>
+      adminService.setStatus(id, status),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.admins.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.admins.detail(data.admin._id) })
+      toast.success(data.message || 'Account status updated')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to update account status')
     },
   })
 }

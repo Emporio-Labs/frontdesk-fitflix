@@ -12,6 +12,10 @@ export const queryKeys = {
     all: () => ['doctors'] as const,
     detail: (id: string) => ['doctors', id] as const,
   },
+  auditLogs: {
+    all: () => ['audit-logs'] as const,
+    list: (filters?: Record<string, unknown>) => ['audit-logs', 'list', filters ?? {}] as const,
+  },
   trainers: {
     all: () => ['trainers'] as const,
     detail: (id: string) => ['trainers', id] as const,

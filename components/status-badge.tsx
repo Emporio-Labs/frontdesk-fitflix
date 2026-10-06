@@ -55,6 +55,11 @@ const statusConfig: Record<string, StatusStyle> = {
     badge: 'bg-blue-50/60 text-blue-700 border-blue-200/50 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20',
     dot: 'bg-blue-500',
   },
+  // FX-30 — staff account lifecycle: invite outstanding (amber), account disabled (gray).
+  invited: {
+    badge: 'bg-amber-50/60 text-amber-700 border-amber-200/50 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20',
+    dot: 'bg-amber-500',
+  },
 
   // Pending/Yellow/Orange
   pending: {
@@ -130,6 +135,10 @@ const statusConfig: Record<string, StatusStyle> = {
     dot: 'bg-slate-400',
   },
   inactive: {
+    badge: 'bg-slate-50/60 text-slate-700 border-slate-200/60 dark:bg-slate-500/10 dark:text-slate-400 dark:border-slate-500/20',
+    dot: 'bg-slate-400',
+  },
+  disabled: {
     badge: 'bg-slate-50/60 text-slate-700 border-slate-200/60 dark:bg-slate-500/10 dark:text-slate-400 dark:border-slate-500/20',
     dot: 'bg-slate-400',
   },

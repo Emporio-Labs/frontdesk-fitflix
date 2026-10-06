@@ -22,121 +22,28 @@ import { Badge } from '@/components/ui/badge'
 import { IconEye } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useBookings } from '@/hooks/use-bookings'
-import { useUsers } from '@/hooks/use-users'
-import { useAppointments } from '@/hooks/use-appointments'
-import { BOOKING_STATUS } from '@/lib/services/booking.service'
+import { useAuditLogs } from '@/hooks/use-audit-logs'
+import type { AuditLog, AuditActor } from '@/lib/services/audit.service'
 
-type AuditLog = {
-  id: string
-  userId: string
-  action: string
-  entityType: string
-  entityId: string
-  changes: Record<string, { before: unknown; after: unknown }>
-  timestamp: string
+// FX-30.4 — render the real actor who performed each action (a person's name),
+// never the shared-login label "Frontdesk" or a hardcoded 'admin_operator'. When
+// the backend genuinely cannot resolve a name, fall back to the role or
+// "Unknown" — honest about missing data rather than inventing an identity.
+function actorLabel(actor: AuditActor): string {
+  if (actor?.name) return actor.name
+  if (actor?.email) return actor.email
+  if (actor?.role) return actor.role
+  return 'Unknown'
+}
+
+function formatTimestamp(ts: string): string {
+  if (!ts) return 'N/A'
+  const d = new Date(ts)
+  return Number.isNaN(d.getTime()) ? ts : d.toLocaleString()
 }
 
 export default function AuditLogsPage() {
-  const { data: bookings = [], isLoading: isBookingsLoading } = useBookings()
-  const { data: users = [], isLoading: isUsersLoading } = useUsers()
-  const { data: appointments = [], isLoading: isAppointmentsLoading } = useAppointments()
-
-  const isLoading = isBookingsLoading || isUsersLoading || isAppointmentsLoading
-
-  const logs = useMemo(() => {
-    const list: AuditLog[] = []
-
-    // 1. Map Users into real audit log entries
-    users.forEach((user) => {
-      const dateStr = user.createdAt ? new Date(user.createdAt).toLocaleString() : 'N/A'
-      list.push({
-        id: `log-usr-${user._id ? user._id.slice(-6) : user.id.slice(-6)}`,
-        userId: 'admin_system',
-        action: 'created',
-        entityType: 'user',
-        entityId: user._id || user.id,
-        changes: {
-          username: { before: null, after: user.username },
-          email: { before: null, after: user.email },
-          phone: { before: null, after: user.phone || 'N/A' }
-        },
-        timestamp: dateStr
-      })
-    })
-
-    // 2. Map Bookings into real audit log entries
-    bookings.forEach((booking) => {
-      const createdDateStr = booking.createdAt ? new Date(booking.createdAt).toLocaleString() : 'N/A'
-      // Booking Created Log
-      list.push({
-        id: `log-bk-new-${booking._id.slice(-6)}`,
-        userId: booking.user?.username || booking.user?.email || 'admin_operator',
-        action: 'created',
-        entityType: 'booking',
-        entityId: booking._id,
-        changes: {
-          bookingDate: { before: null, after: booking.bookingDate },
-          serviceName: { before: null, after: booking.service?.serviceName || 'Service' },
-          creditCostSnapshot: { before: null, after: booking.creditCostSnapshot || 0 }
-        },
-        timestamp: createdDateStr
-      })
-
-      // Booking Status Changed Log
-      if (booking.status !== 0) {
-        const updatedDateStr = booking.updatedAt ? new Date(booking.updatedAt).toLocaleString() : createdDateStr
-        list.push({
-          id: `log-bk-upd-${booking._id.slice(-6)}`,
-          userId: 'admin_operator',
-          action: 'updated',
-          entityType: 'booking',
-          entityId: booking._id,
-          changes: {
-            status: { before: 'Booked', after: BOOKING_STATUS[booking.status] || booking.status }
-          },
-          timestamp: updatedDateStr
-        })
-      }
-    })
-
-    // 3. Map Appointments into real audit log entries
-    appointments.forEach((appointment) => {
-      const createdDateStr = appointment.createdAt ? new Date(appointment.createdAt).toLocaleString() : 'N/A'
-      // Appointment Created Log
-      list.push({
-        id: `log-apt-new-${appointment._id.slice(-6)}`,
-        userId: 'admin_operator',
-        action: 'created',
-        entityType: 'appointment',
-        entityId: appointment._id,
-        changes: {
-          appointmentDate: { before: null, after: appointment.appointmentDate },
-          doctorId: { before: null, after: appointment.doctor?.doctorName || 'Doctor' }
-        },
-        timestamp: createdDateStr
-      })
-
-      // Appointment Status Changed Log
-      if (appointment.status !== 0) {
-        const updatedDateStr = appointment.updatedAt ? new Date(appointment.updatedAt).toLocaleString() : createdDateStr
-        list.push({
-          id: `log-apt-upd-${appointment._id.slice(-6)}`,
-          userId: 'admin_operator',
-          action: 'updated',
-          entityType: 'appointment',
-          entityId: appointment._id,
-          changes: {
-            status: { before: 'Booked', after: String(appointment.status) }
-          },
-          timestamp: updatedDateStr
-        })
-      }
-    })
-
-    // Sort by timestamp newest first
-    return list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-  }, [users, bookings, appointments])
+  const { data: logs = [], isLoading, isError } = useAuditLogs()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [filterAction, setFilterAction] = useState<string>('')
@@ -146,11 +53,21 @@ export default function AuditLogsPage() {
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
-  const filteredLogs = logs.filter(log => {
+  const sortedLogs = useMemo(
+    () =>
+      [...logs].sort(
+        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      ),
+    [logs]
+  )
+
+  const filteredLogs = sortedLogs.filter((log) => {
+    const term = searchTerm.toLowerCase()
     const matchesSearch =
-      log.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.entityId.toLowerCase().includes(searchTerm.toLowerCase())
+      !term ||
+      log.id.toLowerCase().includes(term) ||
+      actorLabel(log.actor).toLowerCase().includes(term) ||
+      log.entityId.toLowerCase().includes(term)
     const matchesAction = !filterAction || log.action === filterAction
     const matchesEntity = !filterEntity || log.entityType === filterEntity
     return matchesSearch && matchesAction && matchesEntity
@@ -160,8 +77,6 @@ export default function AuditLogsPage() {
   const activePage = Math.max(1, Math.min(currentPage, totalPages || 1))
   const startIndex = (activePage - 1) * itemsPerPage
   const paginatedLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage)
-
-  const getUserName = (userId: string) => userId
 
   const getActionColor = (action: string) => {
     switch (action) {
@@ -178,12 +93,13 @@ export default function AuditLogsPage() {
 
   const getEntityTypeColor = (type: string) => {
     const colors: Record<string, string> = {
-      'user': 'bg-purple-100 text-purple-800',
-      'membership': 'bg-pink-100 text-pink-800',
-      'therapy': 'bg-indigo-100 text-indigo-800',
-      'booking': 'bg-cyan-100 text-cyan-800',
+      user: 'bg-purple-100 text-purple-800',
+      membership: 'bg-pink-100 text-pink-800',
+      therapy: 'bg-indigo-100 text-indigo-800',
+      booking: 'bg-cyan-100 text-cyan-800',
+      appointment: 'bg-teal-100 text-teal-800',
       'dna-test': 'bg-lime-100 text-lime-800',
-      'lead': 'bg-amber-100 text-amber-800',
+      lead: 'bg-amber-100 text-amber-800',
     }
     return colors[type] || 'bg-gray-100 text-gray-800'
   }
@@ -200,7 +116,8 @@ export default function AuditLogsPage() {
         <CardHeader>
           <CardTitle className="text-blue-900">Audit Trail</CardTitle>
           <CardDescription className="text-blue-800">
-            All user actions and data changes are logged for compliance and security purposes
+            All user actions and data changes are logged for compliance and security purposes.
+            Each entry records the staff member who performed it.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -220,7 +137,7 @@ export default function AuditLogsPage() {
             <CardTitle className="text-sm font-medium">Created</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{logs.filter(l => l.action === 'created').length}</div>
+            <div className="text-2xl font-bold">{logs.filter((l) => l.action === 'created').length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -228,7 +145,7 @@ export default function AuditLogsPage() {
             <CardTitle className="text-sm font-medium">Updated</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{logs.filter(l => l.action === 'updated').length}</div>
+            <div className="text-2xl font-bold">{logs.filter((l) => l.action === 'updated').length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -236,7 +153,7 @@ export default function AuditLogsPage() {
             <CardTitle className="text-sm font-medium">Deleted</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{logs.filter(l => l.action === 'deleted').length}</div>
+            <div className="text-2xl font-bold">{logs.filter((l) => l.action === 'deleted').length}</div>
           </CardContent>
         </Card>
       </div>
@@ -249,7 +166,7 @@ export default function AuditLogsPage() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             <Input
-              placeholder="Search by log ID, user, or entity..."
+              placeholder="Search by person, log ID, or entity..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value)
@@ -302,7 +219,7 @@ export default function AuditLogsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Log ID</TableHead>
-                  <TableHead>User</TableHead>
+                  <TableHead>Performed By</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>Entity Type</TableHead>
                   <TableHead>Entity ID</TableHead>
@@ -319,6 +236,12 @@ export default function AuditLogsPage() {
                       </TableCell>
                     </TableRow>
                   ))
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-red-500 py-8">
+                      Failed to load audit logs.
+                    </TableCell>
+                  </TableRow>
                 ) : paginatedLogs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
@@ -328,20 +251,25 @@ export default function AuditLogsPage() {
                 ) : (
                   paginatedLogs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell className="font-medium">{log.id}</TableCell>
-                      <TableCell>{getUserName(log.userId)}</TableCell>
+                      <TableCell className="font-mono text-xs">{log.id}</TableCell>
                       <TableCell>
-                        <Badge className={getActionColor(log.action)}>
-                          {log.action}
-                        </Badge>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{actorLabel(log.actor)}</span>
+                          {log.actor?.role && (
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {log.actor.role.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getEntityTypeColor(log.entityType)}>
-                          {log.entityType}
-                        </Badge>
+                        <Badge className={getActionColor(log.action)}>{log.action}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getEntityTypeColor(log.entityType)}>{log.entityType}</Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{log.entityId}</TableCell>
-                      <TableCell>{log.timestamp}</TableCell>
+                      <TableCell>{formatTimestamp(log.timestamp)}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           size="sm"
@@ -412,8 +340,13 @@ export default function AuditLogsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">User</label>
-                  <p className="text-sm">{getUserName(selectedLog.userId)}</p>
+                  <label className="text-sm font-medium">Performed By</label>
+                  <p className="text-sm">{actorLabel(selectedLog.actor)}</p>
+                  {selectedLog.actor?.role && (
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {selectedLog.actor.role.replace(/_/g, ' ')}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm font-medium">Action</label>
@@ -432,7 +365,7 @@ export default function AuditLogsPage() {
               </div>
               <div>
                 <label className="text-sm font-medium">Timestamp</label>
-                <p className="text-sm">{selectedLog.timestamp}</p>
+                <p className="text-sm">{formatTimestamp(selectedLog.timestamp)}</p>
               </div>
               <div>
                 <label className="text-sm font-medium">Changes</label>
