@@ -201,4 +201,7 @@ export const queryKeys = {
     all: (params?: Record<string, any>) => ['operational-alerts', params ?? {}] as const,
     active: (branchId?: string | null) => ['operational-alerts', 'active', branchId ?? 'all'] as const,
   },
+  alertRules: {
+    all: () => ['alert-rules'] as const,
+  },
 }

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { IconSettings, IconBell, IconLock, IconPalette } from '@tabler/icons-react'
 import { ConferenceSettingsCard } from '@/components/settings/conference-settings-card'
+import { AlertRulesSettingsCard } from '@/components/settings/alert-rules-settings-card'
 
 export default function SettingsPage() {
   const [clinicName, setClinicName] = useState('Healing Heights Clinic')
@@ -99,6 +100,9 @@ export default function SettingsPage() {
 
       {/* Session Layout & Conference Configuration Defaults */}
       <ConferenceSettingsCard />
+
+      {/* Operational Alert Rules & Escalation Matrix (FX-36) */}
+      <AlertRulesSettingsCard />
 
       {/* Notification Settings */}
       <Card>
