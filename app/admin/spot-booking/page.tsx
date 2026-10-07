@@ -13,7 +13,16 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { IconCalendar, IconCheck, IconClock, IconUser, IconLayersLinked } from '@tabler/icons-react'
+import {
+  IconCalendar,
+  IconCheck,
+  IconClock,
+  IconUser,
+  IconLayersLinked,
+  IconSearch,
+  IconX,
+  IconChevronDown,
+} from '@tabler/icons-react'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useSlots } from '@/hooks/use-slots'
@@ -76,6 +85,8 @@ export default function SpotBookingPage() {
   const [showTopUp, setShowTopUp] = useState(false)
   const [topUpAmount, setTopUpAmount] = useState(1)
   const [topUpMembershipId, setTopUpMembershipId] = useState('')
+  const [memberSearchQuery, setMemberSearchQuery] = useState('')
+  const [isMemberSelectOpen, setIsMemberSelectOpen] = useState(false)
   const [formData, setFormData] = useState(() => ({
     bookingDate: '',
     userId: '',
@@ -89,6 +100,17 @@ export default function SpotBookingPage() {
   const { data: therapies = [] } = useTherapies()
   const { data: users = [] } = useUsers()
   const { data: allMemberships = [] } = useMemberships()
+
+  const filteredUsers = useMemo(() => {
+    const query = memberSearchQuery.trim().toLowerCase()
+    if (!query) return users
+    return users.filter((user) => {
+      const name = (user.username || '').toLowerCase()
+      const email = (user.email || '').toLowerCase()
+      const phone = (user.phone || '').toLowerCase()
+      return name.includes(query) || phone.includes(query) || email.includes(query)
+    })
+  }, [users, memberSearchQuery])
 
   const {
     data: userBalance,
@@ -421,34 +443,139 @@ export default function SpotBookingPage() {
 
             {/* Member */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-600 block">Member</label>
-              <Select
-                value={formData.userId || '__none__'}
-                onValueChange={(value) => {
-                  const nextUserId = value === '__none__' ? '' : value
-                  setFormData((prev) => ({
-                    ...prev,
-                    userId: nextUserId,
-                    serviceId: '',
-                    slotId: '',
-                    bypassCredits: false,
-                  }))
-                  setTopUpMembershipId('')
-                  setShowTopUp(false)
-                }}
-              >
-                <SelectTrigger className="h-9 text-xs border-slate-200 bg-white">
-                  <SelectValue placeholder="Select member..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectItem value="__none__">Select member...</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user._id} value={user._id}>
-                      {user.username || user.email || 'Unnamed Member'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-600 block">Member</label>
+                {formData.userId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        userId: '',
+                        serviceId: '',
+                        slotId: '',
+                        bypassCredits: false,
+                      }))
+                      setTopUpMembershipId('')
+                      setShowTopUp(false)
+                    }}
+                    className="text-[11px] text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-0.5"
+                  >
+                    <IconX className="w-3 h-3" />
+                    <span>Clear</span>
+                  </button>
+                )}
+              </div>
+
+              <Popover open={isMemberSelectOpen} onOpenChange={setIsMemberSelectOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={isMemberSelectOpen}
+                    className={cn(
+                      'w-full justify-between text-left font-normal h-9 bg-white border-slate-200 text-xs hover:bg-slate-50 px-3',
+                      !selectedUser && 'text-slate-400'
+                    )}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <IconSearch className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      {selectedUser ? (
+                        <div className="truncate flex items-center gap-2">
+                          <span className="font-medium text-slate-800 truncate">
+                            {selectedUser.username || selectedUser.email || 'Unnamed Member'}
+                          </span>
+                          {selectedUser.phone && (
+                            <span className="text-[11px] text-slate-400 shrink-0">
+                              ({selectedUser.phone})
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span>Select member...</span>
+                      )}
+                    </div>
+                    <IconChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] min-w-[320px] p-2 bg-white border-slate-200 shadow-md"
+                  align="start"
+                >
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <IconSearch className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                      <Input
+                        placeholder="Search by name, phone, or email..."
+                        value={memberSearchQuery}
+                        onChange={(e) => setMemberSearchQuery(e.target.value)}
+                        className="h-8 pl-8 pr-7 text-xs bg-slate-50 border-slate-200 focus-visible:bg-white"
+                        autoFocus
+                      />
+                      {memberSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setMemberSearchQuery('')}
+                          className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                        >
+                          <IconX className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                      {filteredUsers.length === 0 ? (
+                        <div className="py-6 text-center text-xs text-slate-400">
+                          No members found
+                        </div>
+                      ) : (
+                        filteredUsers.map((user) => {
+                          const isSelected = user._id === formData.userId
+                          return (
+                            <button
+                              key={user._id}
+                              type="button"
+                              onClick={() => {
+                                const nextUserId = isSelected ? '' : user._id
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  userId: nextUserId,
+                                  serviceId: '',
+                                  slotId: '',
+                                  bypassCredits: false,
+                                }))
+                                setTopUpMembershipId('')
+                                setShowTopUp(false)
+                                setIsMemberSelectOpen(false)
+                                setMemberSearchQuery('')
+                              }}
+                              className={cn(
+                                'w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors flex items-center justify-between gap-2',
+                                isSelected
+                                  ? 'bg-slate-900 text-white'
+                                  : 'hover:bg-slate-100 text-slate-700'
+                              )}
+                            >
+                              <div className="truncate">
+                                <div className={cn('font-medium truncate', isSelected ? 'text-white' : 'text-slate-800')}>
+                                  {user.username || 'Unnamed Member'}
+                                </div>
+                                <div className={cn('text-[11px] truncate flex items-center gap-1.5', isSelected ? 'text-slate-300' : 'text-slate-400')}>
+                                  {user.phone && <span>{user.phone}</span>}
+                                  {user.phone && user.email && <span>•</span>}
+                                  {user.email && <span>{user.email}</span>}
+                                </div>
+                              </div>
+                              {isSelected && <IconCheck className="w-3.5 h-3.5 shrink-0 text-white" />}
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Separator / Item Details */}
