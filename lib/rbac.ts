@@ -6,12 +6,16 @@
 export type UserRole =
   | 'super_admin'
   | 'clinic_admin'
+  | 'manager'
   | 'staff'
   | 'clinician'
   | 'sales'
   | 'trainer'
   | 'nutritionist'
   | 'sports_scientist'
+  // FX-31.4 — a signed-in staff account that has not been given a role yet.
+  // No permissions; the UI shows a "waiting for an admin" page and nothing else.
+  | 'unassigned'
 
 export interface Permission {
   resource: string
@@ -95,6 +99,25 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'attendance', action: 'update' },
     { resource: 'settings', action: 'read' },
   ],
+  // FX-31.1 — branch manager: branch-ops read/update + leads, no org-admin
+  // surfaces (no settings/audit/DNA, no expert-console management).
+  manager: [
+    { resource: 'users', action: 'read' },
+    { resource: 'users', action: 'update' },
+    { resource: 'memberships', action: 'create' },
+    { resource: 'memberships', action: 'read' },
+    { resource: 'memberships', action: 'update' },
+    { resource: 'therapies', action: 'read' },
+    { resource: 'bookings', action: 'create' },
+    { resource: 'bookings', action: 'read' },
+    { resource: 'bookings', action: 'update' },
+    { resource: 'reports', action: 'read' },
+    { resource: 'leads', action: 'read' },
+    { resource: 'leads', action: 'update' },
+    { resource: 'attendance', action: 'read' },
+    { resource: 'attendance', action: 'create' },
+    { resource: 'attendance', action: 'update' },
+  ],
   staff: [
     { resource: 'users', action: 'read' },
     { resource: 'memberships', action: 'read' },
@@ -150,6 +173,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   sports_scientist: [
     { resource: 'users', action: 'read' },
   ],
+  // FX-31.4 — no role assigned yet: no access to anything.
+  unassigned: [],
 }
 
 /**

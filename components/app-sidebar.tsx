@@ -145,6 +145,67 @@ const navNutritionistGroup = [
   },
 ]
 
+// FX-31.1 — branch manager: branch-ops pages only (incl. Leads); no org-admin
+// surfaces (settings, locations, audit logs, app copy, DNA) or expert consoles.
+const navManagerGroup = [
+  {
+    items: [
+      { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      { title: "Members", url: "/admin/users", icon: IconUsers },
+      { title: "Leads", url: "/admin/leads", icon: IconTarget },
+    ],
+  },
+  {
+    label: "Scheduling",
+    items: [
+      { title: "Services", url: "/admin/therapies", icon: IconListDetails },
+      { title: "Bookings", url: "/admin/bookings", icon: IconCalendarEvent },
+      { title: "Spot Booking", url: "/admin/spot-booking", icon: IconCalendarPlus },
+      { title: "Slots", url: "/admin/slots", icon: IconClock },
+      { title: "Attendance", url: "/admin/attendance", icon: IconCalendarStats },
+    ],
+  },
+  {
+    label: "Commerce",
+    items: [
+      { title: "Memberships", url: "/admin/memberships", icon: IconHeartHandshake },
+      { title: "Membership Plans", url: "/admin/membership-plans", icon: IconCards },
+      { title: "Credits", url: "/admin/credits", icon: IconCreditCard },
+      { title: "Invoices", url: "/admin/invoices", icon: IconFileInvoice },
+    ],
+  },
+  {
+    label: "Insights",
+    items: [
+      { title: "Concierge Alerts", url: "/admin/alerts", icon: IconBellRinging },
+      { title: "Promotions", url: "/admin/promotions", icon: IconSpeakerphone },
+      { title: "Reports", url: "/admin/reports", icon: IconReport },
+    ],
+  },
+  {
+    label: "Me",
+    items: [
+      { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
+    ],
+  },
+]
+
+// FX-31.2 — sales: the lead queue and the memberships they can read.
+const navSalesGroup = [
+  {
+    items: [
+      { title: "Leads", url: "/admin/leads", icon: IconTarget },
+      { title: "Memberships", url: "/admin/memberships", icon: IconHeartHandshake },
+      { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
+    ],
+  },
+]
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth()
 
@@ -156,11 +217,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const isTrainer = user?.role === 'trainer'
   const isNutritionist = user?.role === 'nutritionist'
-  const groups = isTrainer ? navTrainerGroup : isNutritionist ? navNutritionistGroup : navGroups
+  const isManager = user?.role === 'manager'
+  const isSales = user?.role === 'sales'
+  const groups = isTrainer
+    ? navTrainerGroup
+    : isNutritionist
+    ? navNutritionistGroup
+    : isManager
+    ? navManagerGroup
+    : isSales
+    ? navSalesGroup
+    : navGroups
   const brandHref = isTrainer
     ? '/admin/personal-training/today'
     : isNutritionist
     ? '/admin/nutrition/my-clients'
+    : isSales
+    ? '/admin/leads'
     : '/dashboard'
 
   return (

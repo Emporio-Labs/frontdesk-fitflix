@@ -51,6 +51,8 @@ export default function LoginPage() {
         admin: 'clinic_admin',
         clinic_admin: 'clinic_admin',
         super_admin: 'super_admin',
+        // FX-31.1 — branch manager (issued as Admin.staffRole = 'manager').
+        manager: 'manager',
         frontdesk: 'staff',
         staff: 'staff',
         doctor: 'clinician',
@@ -67,7 +69,12 @@ export default function LoginPage() {
         .trim()
         .toLowerCase()
 
-      const mappedRole = roleMap[rawRole]
+      // FX-31.4 — a staff account with no role yet (empty role) is signed in as
+      // `unassigned` and lands on the waiting page, rather than being refused. A
+      // non-empty but unrecognised role is still refused (likely a member or a
+      // misconfigured account, not "awaiting assignment").
+      const mappedRole: UserRole | undefined =
+        roleMap[rawRole] ?? (rawRole === '' ? 'unassigned' : undefined)
 
       if (!mappedRole) {
         clearToken()

@@ -3,19 +3,12 @@
 import React, { createContext, useState, ReactNode, useEffect } from 'react'
 import { UserRole } from '@/lib/rbac'
 import { storeCredentials, clearCredentials, clearToken, getStoredCredentials, getStoredToken } from '@/lib/api-client'
+import { getRoleStartPage } from '@/lib/role-workspaces'
 
-export function getRoleStartPage(role?: UserRole): string {
-  switch (role) {
-    case 'trainer':
-      return '/admin/personal-training'
-    case 'nutritionist':
-      return '/admin/nutrition'
-    case 'sports_scientist':
-      return '/admin/sports-scientist'
-    default:
-      return '/dashboard'
-  }
-}
+// Re-exported from the shared role-workspaces module (the single source of truth
+// for role→start-page) so existing importers (app/page.tsx, app-sidebar.tsx)
+// keep working without change.
+export { getRoleStartPage }
 
 // Helpers for auth cookie (read by Next.js middleware for route protection).
 // Note: this is a presence-only indicator cookie, NOT the auth token.
@@ -72,12 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const validRoles: UserRole[] = [
           'super_admin',
           'clinic_admin',
+          'manager',
           'staff',
           'clinician',
           'sales',
           'trainer',
           'nutritionist',
           'sports_scientist',
+          'unassigned',
         ]
         if (!validRoles.includes(parsedUser.role)) {
           clearCredentials()
@@ -122,9 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(userData)
     setRole(userData?.role ?? 'clinic_admin')
-    // Hard redirect — ensures middleware sees the new cookie immediately
+    // Hard redirect — ensures middleware sees the new cookie immediately.
+    // Start page comes from the shared role map; trainer/nutritionist keep their
+    // existing deep landing pages (hub roots would just bounce once in middleware).
     if (typeof window !== 'undefined') {
-      let target = '/dashboard'
+      let target = getRoleStartPage(userData?.role)
       if (userData?.role === 'trainer') target = '/admin/personal-training/today'
       else if (userData?.role === 'nutritionist') target = '/admin/nutrition/my-clients'
       window.location.href = target

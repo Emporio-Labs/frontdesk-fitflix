@@ -312,3 +312,108 @@ follow-up frontend ticket needed for fields 1, 4, 5, 6, and 7. For #3, the
 frontend will need a tiny hook switch (one-line per service).
 
 ================================================================================
+ FX-31 — Manager / sales workspaces & server-checked page access
+================================================================================
+
+Context
+-------
+FX-31 gives branch managers and sales staff their own scoped staff consoles, a
+"waiting for an admin to assign your role" page for unassigned staff, and asks
+that page access be driven by the signed-in session rather than an editable
+cookie.
+
+SHIPPED on the backend (D:\FITFLIX_BACKEND):
+  - Admin.staffRole: a sub-role on the Admin model — "admin" | "frontdesk" |
+    "manager" | "sales" | null (null = full admin). Set via POST/PATCH /admins
+    (createAdminBodySchema / updateAdminBodySchema accept `staffRole`).
+  - Login now issues that sub-role two ways: as a signed JWT claim `staffRole`,
+    and on the login-response `user.staffRole`. The API-authorization `role`
+    stays "admin" for every Admin-family account, so no route guard changes and
+    nothing existing regresses; the sub-role only narrows the *web app* workspace.
+
+The web app maps `user.staffRole` ("manager" → manager console, "sales" → lead
+queue) via the login roleMap, and gates routes with middleware.ts.
+
+REMAINING backend dependency — FX-31.5 (server-checked, non-forgeable role)
+---------------------------------------------------------------------------
+Today middleware.ts reads the role from the `hh_role` cookie, which the client
+writes and a user could edit. The JWT (the real, signed credential) lives in
+localStorage, which Edge middleware cannot read. To make page access genuinely
+server-checked:
+
+  1. On login/refresh, ALSO set the access token as an httpOnly, Secure,
+     SameSite cookie (e.g. `hh_session`) readable by the Next.js server, in
+     addition to the JSON body. (httpOnly means JS — and thus an attacker in the
+     page — cannot read or forge it.)
+  2. The Next server verifies that cookie's signature (jose + JWKS, or the shared
+     JWT secret made available to the Next runtime) and reads role/staffRole from
+     its claims.
+
+The frontend seam is ready: middleware.ts resolves the role through a single
+`resolveRole(request)` function — point it at the verified `hh_session` cookie
+once (1) ships and the forgeable `hh_role` path can be dropped, with no other
+frontend change. Until then, routing works via `hh_role` as a UX gate.
+
+================================================================================
+ FX-32 — Admin creates, edits and disables staff accounts  (SHIPPED backend)
+================================================================================
+
+Context
+-------
+The club owner manages every staff account from the Frontdesk UI (Users → Staff /
+Admins) instead of running scripts/create-admin.ts. All staff logins are unified
+into the Admin collection; `staffRole` distinguishes the workspace and now spans
+the expert roles too. The following shipped in D:\FITFLIX_BACKEND alongside this
+frontend — recorded here for the backend team / future readers.
+
+Admin model (src/models/Admin.ts)
+  - staffRole enum widened to: admin | frontdesk | manager | sales | trainer |
+    nutritionist | sports_scientist | null  (null = full admin).
+  - passwordHash is no longer required (an invited account has none until it sets
+    one via the set-password link).
+  - branchIds: [ObjectId→Location]  — branches a scoped role works at.
+  - allBranches: Boolean             — experts (and any explicitly all-branch role)
+                                       work across every branch; branchIds ignored.
+  - status: 'invited' | 'active' | 'disabled'  (default 'active').
+  - lastLoginAt: Date.
+  - inviteTokenHash / inviteTokenExpiresAt (select:false) — one-time set-password
+    token (only the sha256 hash is stored).
+
+Endpoints
+  - POST   /admins                     invite (no password): creates `invited`,
+                                       returns { admin, inviteLink }. Branch rule:
+                                       experts → allBranches; admin/null → global;
+                                       manager/sales/frontdesk → ≥1 branch unless
+                                       allBranches.
+  - PATCH  /admins/:id                 edit name/email/phone/role/branches. Clears
+                                       the staff-context cache so FX-32.2 is
+                                       immediate. 409 if it would demote the last
+                                       full admin.
+  - PATCH  /admins/:id/status          { status: 'active'|'disabled' }. 409 if it
+                                       would disable the last full admin. Clears
+                                       the cache (FX-32.3 refused on next action).
+  - POST   /admins/:id/resend-invite   (re)issues the one-time link — first-invite
+                                       resend AND password reset (FX-32.4).
+  - DELETE /admins/:id                 409 if it would delete the last full admin.
+  - GET    /auth/invite/:token         PUBLIC — validates a token, returns
+                                       { valid, email, name, expiresAt }.
+  - POST   /auth/set-password          PUBLIC — { token, password } → sets the
+                                       password and marks the account active.
+
+Login (src/controllers/auth.controller.ts)
+  - A disabled Admin is refused with 403 at sign-in (FX-32.3).
+  - A successful Admin login records lastLoginAt and promotes invited → active.
+
+Branch scope (src/services/staffContext.service.ts)
+  - A full admin (staffRole admin/null) or an allBranches account is GLOBAL; any
+    other scoped Admin is BRANCH-scoped to its branchIds — the same gate that
+    governs trainers. Only enforced when STAFF_RBAC_ENFORCE is on (FX-17.6).
+
+Notes
+  - There is no mailer in the repo, so the invite/reset endpoints return the link
+    in the response body; the UI shows a copyable fallback dialog.
+  - WEB_APP_URL (default http://localhost:3001) is the set-password link base.
+  - "Full admin" for the last-admin guard = status != disabled AND staffRole in
+    { admin, null }.
+
+================================================================================

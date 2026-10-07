@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf, IconEye, IconEyeOff, IconSend, IconBan, IconCircleCheck, IconCopy } from '@tabler/icons-react'
+import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf, IconEye, IconEyeOff, IconSend, IconBan, IconCircleCheck, IconCopy, IconMapPin } from '@tabler/icons-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +31,7 @@ import {
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
 import { useAdmins, useInviteAdmin, useResendInvite, useUpdateAdmin, useDeleteAdmin, useSetAdminStatus } from '@/hooks/use-admins'
 import { useMemberships } from '@/hooks/use-memberships'
+import { useLocations } from '@/hooks/use-locations'
 import { User, CreateUserPayload } from '@/lib/services/user.service'
 import { Admin } from '@/lib/services/admin.service'
 import { StatusBadge } from '@/components/status-badge'
@@ -93,16 +94,45 @@ const SHARED_LOGIN_EMAIL = 'frontdesk@fitflix.in'
 
 // Staff-role options for an invited account. The backend is the authority on the
 // actual role; 'frontdesk' maps to the `staff` UI role (see login roleMap).
+// FX-32.1 — every staff role can now be created here (admin-family + experts).
 const STAFF_ROLE_OPTIONS = [
-  { value: 'frontdesk', label: 'Front Desk' },
   { value: 'admin', label: 'Admin' },
+  { value: 'manager', label: 'Branch Manager' },
+  { value: 'sales', label: 'Sales' },
+  { value: 'frontdesk', label: 'Front Desk' },
+  { value: 'trainer', label: 'Trainer' },
+  { value: 'nutritionist', label: 'Nutritionist' },
+  { value: 'sports_scientist', label: 'Sports Scientist' },
 ]
+
+// FX-32.1 — experts work across every branch; the branch picker is hidden and
+// `allBranches` is set for them. Full admins (admin / no role) are global too.
+const EXPERT_STAFF_ROLES = ['trainer', 'nutritionist', 'sports_scientist']
+const isExpertRole = (role?: string) => !!role && EXPERT_STAFF_ROLES.includes(role)
+// A "full admin" (complete dashboard) is staffRole 'admin' or none — the role
+// FX-32.5 protects from being disabled/demoted/deleted when it's the last one.
+const isFullAdminRole = (role?: string | null) => !role || role === 'admin'
+
+const STAFF_ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  frontdesk: 'Front Desk',
+  manager: 'Branch Manager',
+  sales: 'Sales',
+  trainer: 'Trainer',
+  nutritionist: 'Nutritionist',
+  sports_scientist: 'Sports Scientist',
+}
+const staffRoleLabel = (role?: string | null) =>
+  role ? STAFF_ROLE_LABELS[role] ?? role : 'Needs role'
 
 type AdminFormState = {
   adminName: string
   email: string
   phone: string
   staffRole: string
+  // FX-32.1 — branches for a scoped role; ignored when allBranches/expert/admin.
+  branchIds: string[]
+  allBranches: boolean
 }
 
 function defaultAdminForm(): AdminFormState {
@@ -111,6 +141,8 @@ function defaultAdminForm(): AdminFormState {
     email: '',
     phone: '',
     staffRole: 'frontdesk',
+    branchIds: [],
+    allBranches: false,
   }
 }
 
@@ -253,13 +285,16 @@ export default function UsersPage() {
         adminForm.adminName !== (editingAdmin.adminName || '') ||
         adminForm.email !== (editingAdmin.email || '') ||
         adminForm.phone !== (editingAdmin.phone || '') ||
-        adminForm.staffRole !== (editingAdmin.staffRole || 'frontdesk')
+        adminForm.staffRole !== (editingAdmin.staffRole || 'frontdesk') ||
+        adminForm.allBranches !== Boolean(editingAdmin.allBranches) ||
+        adminForm.branchIds.join(',') !== (editingAdmin.branchIds || []).join(',')
       )
     }
     return Boolean(
       adminForm.adminName.trim() ||
       adminForm.email.trim() ||
-      adminForm.phone.trim()
+      adminForm.phone.trim() ||
+      adminForm.branchIds.length > 0
     )
   }, [adminForm, editingAdmin])
 
@@ -278,6 +313,7 @@ export default function UsersPage() {
   const openCreateAdminModal = () => {
     setEditingAdmin(null)
     setShowAdminUnsavedConfirm(false)
+    setAdminFormError('')
     const draft = loadAdminDraft()
     if (draft) {
       setAdminForm({ ...defaultAdminForm(), ...draft })
@@ -300,6 +336,28 @@ export default function UsersPage() {
   const updateAdmin = useUpdateAdmin()
   const deleteAdmin = useDeleteAdmin()
   const setAdminStatus = useSetAdminStatus()
+  const { data: locations = [] } = useLocations()
+
+  // FX-32.1 — branch picker validation error (scoped role with no branch chosen).
+  const [adminFormError, setAdminFormError] = useState('')
+
+  // FX-32.5 — the full admins (complete dashboard) who can still sign in. When
+  // only one remains, the UI blocks disabling/demoting/deleting it; the backend
+  // returns 409 as the real authority.
+  const activeFullAdmins = useMemo(
+    () => admins.filter((a) => isFullAdminRole(a.staffRole) && a.status !== 'disabled'),
+    [admins],
+  )
+  const isLastFullAdmin = (admin: Admin) =>
+    isFullAdminRole(admin.staffRole) &&
+    admin.status !== 'disabled' &&
+    activeFullAdmins.length <= 1
+
+  const branchNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    locations.forEach((loc) => map.set(loc._id, loc.name))
+    return map
+  }, [locations])
 
   const membershipsByUserKey = useMemo(() => {
     const mapping = new Map<string, (typeof memberships)[number]>()
@@ -454,56 +512,108 @@ export default function UsersPage() {
       a.email.toLowerCase().includes(adminSearch.toLowerCase())
   )
 
-  const totalAdminPages = Math.ceil(filteredAdmins.length / itemsPerPage)
+  // FX-32.6 — accounts still waiting for a role surface at the top so they're
+  // not forgotten, then invited (first sign-in pending) accounts, then the rest.
+  // Stable within each rank (keeps the backend's createdAt ordering).
+  const adminSortRank = (a: Admin) => (!a.staffRole ? 0 : a.status === 'invited' ? 1 : 2)
+  const sortedAdmins = useMemo(() => {
+    return filteredAdmins
+      .map((a, i) => ({ a, i }))
+      .sort((x, y) => adminSortRank(x.a) - adminSortRank(y.a) || x.i - y.i)
+      .map(({ a }) => a)
+  }, [filteredAdmins])
+
+  const totalAdminPages = Math.ceil(sortedAdmins.length / itemsPerPage)
   const activeAdminPage = Math.max(1, Math.min(adminPage, totalAdminPages || 1))
   const adminStartIndex = (activeAdminPage - 1) * itemsPerPage
-  const paginatedAdmins = filteredAdmins.slice(adminStartIndex, adminStartIndex + itemsPerPage)
+  const paginatedAdmins = sortedAdmins.slice(adminStartIndex, adminStartIndex + itemsPerPage)
 
   const resetAdminForm = () => {
     setAdminForm(defaultAdminForm())
     setEditingAdmin(null)
     setShowAdminUnsavedConfirm(false)
+    setAdminFormError('')
   }
 
   const handleOpenEditAdmin = (admin: Admin) => {
     setEditingAdmin(admin)
+    setAdminFormError('')
     setAdminForm({
       adminName: admin.adminName,
       email: admin.email,
       phone: admin.phone,
       staffRole: admin.staffRole || 'frontdesk',
+      branchIds: admin.branchIds || [],
+      allBranches: Boolean(admin.allBranches),
     })
     setIsAdminDialogOpen(true)
   }
 
+  // FX-32.1 — resolve the branch fields for the chosen role, validating that a
+  // branch-scoped role actually names a branch. Returns null (with an inline
+  // error set) when invalid. Experts / all-branches → allBranches; full admins →
+  // neither (they are global).
+  const resolveAdminBranchPayload = (): { branchIds: string[]; allBranches: boolean } | null => {
+    const role = adminForm.staffRole
+    if (isFullAdminRole(role)) return { branchIds: [], allBranches: false }
+    if (isExpertRole(role) || adminForm.allBranches) return { branchIds: [], allBranches: true }
+    if (adminForm.branchIds.length === 0) {
+      setAdminFormError('Select at least one branch, or mark this role as working across all branches.')
+      return null
+    }
+    return { branchIds: adminForm.branchIds, allBranches: false }
+  }
+
   const handleAdminSubmit = async () => {
+    setAdminFormError('')
     if (!adminForm.adminName || !adminForm.email || !adminForm.phone) return
-    if (editingAdmin) {
-      await updateAdmin.mutateAsync({
-        id: editingAdmin._id,
-        payload: {
+
+    // FX-32.5 — don't let the last full admin be demoted away from admin.
+    if (
+      editingAdmin &&
+      isLastFullAdmin(editingAdmin) &&
+      !isFullAdminRole(adminForm.staffRole)
+    ) {
+      setAdminFormError("This is the last remaining admin — assign another admin before changing this one's role.")
+      return
+    }
+
+    const branch = resolveAdminBranchPayload()
+    if (!branch) return
+
+    try {
+      if (editingAdmin) {
+        await updateAdmin.mutateAsync({
+          id: editingAdmin._id,
+          payload: {
+            adminName: adminForm.adminName,
+            email: adminForm.email,
+            phone: adminForm.phone,
+            staffRole: adminForm.staffRole,
+            ...branch,
+          },
+        })
+      } else {
+        // FX-30.2 — invite: no password is sent; backend returns a first-sign-in link.
+        const result = await inviteAdmin.mutateAsync({
           adminName: adminForm.adminName,
           email: adminForm.email,
           phone: adminForm.phone,
           staffRole: adminForm.staffRole,
-        },
-      })
-    } else {
-      // FX-30.2 — invite: no password is sent; backend emails a first-sign-in link.
-      const result = await inviteAdmin.mutateAsync({
-        adminName: adminForm.adminName,
-        email: adminForm.email,
-        phone: adminForm.phone,
-        staffRole: adminForm.staffRole,
-      })
-      clearAdminDraft()
-      // If the backend returned the link instead of emailing it, surface a copyable fallback.
-      if (result.inviteLink) {
-        setInviteLinkDialog({ open: true, link: result.inviteLink, email: adminForm.email })
+          ...branch,
+        })
+        clearAdminDraft()
+        // If the backend returned the link instead of emailing it, surface a copyable fallback.
+        if (result.inviteLink) {
+          setInviteLinkDialog({ open: true, link: result.inviteLink, email: adminForm.email })
+        }
       }
+      setIsAdminDialogOpen(false)
+      resetAdminForm()
+    } catch (err: any) {
+      // Surface a server-side rejection (e.g. FX-32.5 last-admin 409) inline.
+      setAdminFormError(err?.response?.data?.message || 'Could not save the account.')
     }
-    setIsAdminDialogOpen(false)
-    resetAdminForm()
   }
 
   const handleResendInvite = async (admin: Admin) => {
@@ -954,13 +1064,83 @@ export default function UsersPage() {
                     </div>
                     <div>
                       <label className="text-sm font-medium">Role</label>
-                      <Select value={adminForm.staffRole} onValueChange={(v) => setAdminForm({ ...adminForm, staffRole: v })}>
+                      <Select
+                        value={adminForm.staffRole}
+                        onValueChange={(v) => setAdminForm({ ...adminForm, staffRole: v })}
+                      >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {STAFF_ROLE_OPTIONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* FX-32.1 — branch allocation. Experts work across all branches
+                        (no picker). Full admins are global. Front-desk / manager /
+                        sales are branch-scoped and must name at least one branch. */}
+                    {isExpertRole(adminForm.staffRole) ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <IconMapPin className="w-3.5 h-3.5" />
+                        {staffRoleLabel(adminForm.staffRole)}s work across all branches.
+                      </p>
+                    ) : isFullAdminRole(adminForm.staffRole) ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <IconMapPin className="w-3.5 h-3.5" />
+                        Admins have access to every branch.
+                      </p>
+                    ) : (
+                      <div className="rounded-lg border p-3">
+                        <label className="text-sm font-medium">Branches *</label>
+                        <p className="text-xs text-muted-foreground mb-2">Which branches this account works at.</p>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer mb-2">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-input"
+                            checked={adminForm.allBranches}
+                            onChange={(e) =>
+                              setAdminForm((prev) => ({
+                                ...prev,
+                                allBranches: e.target.checked,
+                                branchIds: e.target.checked ? [] : prev.branchIds,
+                              }))
+                            }
+                          />
+                          <span>Works across all branches</span>
+                        </label>
+                        {!adminForm.allBranches && (
+                          locations.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">No branches found. Add a location first.</p>
+                          ) : (
+                            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                              {locations.map((loc) => {
+                                const checked = adminForm.branchIds.includes(loc._id)
+                                return (
+                                  <label key={loc._id} className="flex items-center gap-2 text-sm cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border-input"
+                                      checked={checked}
+                                      onChange={(e) =>
+                                        setAdminForm((prev) => ({
+                                          ...prev,
+                                          branchIds: e.target.checked
+                                            ? [...prev.branchIds, loc._id]
+                                            : prev.branchIds.filter((id) => id !== loc._id),
+                                        }))
+                                      }
+                                    />
+                                    <span>{loc.name}{loc.isActive === false ? ' (inactive)' : ''}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    {adminFormError && <p className="text-xs text-red-500">{adminFormError}</p>}
+
                     <div className="flex gap-2 pt-2">
                       <Button variant="outline" onClick={handleCloseAdminDialog}>Cancel</Button>
                       <Button onClick={handleAdminSubmit} disabled={inviteAdmin.isPending || updateAdmin.isPending}>
@@ -1054,24 +1234,45 @@ export default function UsersPage() {
                       <TableHeader className="bg-muted/30 border-b border-border/60">
                         <TableRow className="hover:bg-transparent">
                           <TableHead className="w-[180px] pl-6 font-semibold">Name</TableHead>
-                          <TableHead className="w-[220px] font-semibold">Email</TableHead>
-                          <TableHead className="hidden w-[130px] font-semibold lg:table-cell">Phone</TableHead>
+                          <TableHead className="w-[200px] font-semibold">Email</TableHead>
+                          <TableHead className="w-[140px] font-semibold">Role</TableHead>
+                          <TableHead className="hidden w-[180px] font-semibold lg:table-cell">Branches</TableHead>
+                          <TableHead className="hidden w-[120px] font-semibold xl:table-cell">Phone</TableHead>
                           <TableHead className="w-[110px] font-semibold">Status</TableHead>
-                          <TableHead className="hidden w-[140px] font-semibold md:table-cell">Last Sign-in</TableHead>
+                          <TableHead className="hidden w-[130px] font-semibold md:table-cell">Last Sign-in</TableHead>
                           <TableHead className="text-right pr-6 w-[150px] font-semibold">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredAdmins.length === 0 ? (
-                          <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No staff accounts found</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No staff accounts found</TableCell></TableRow>
                         ) : (
                           paginatedAdmins.map((admin, index) => {
                             const isShared = admin.email.toLowerCase() === SHARED_LOGIN_EMAIL
+                            const lastAdmin = isLastFullAdmin(admin)
+                            const branchLabel =
+                              admin.allBranches || isFullAdminRole(admin.staffRole)
+                                ? 'All branches'
+                                : (admin.branchIds || [])
+                                    .map((id) => branchNameById.get(id) || '…')
+                                    .join(', ') || '—'
                             return (
                             <TableRow key={admin._id || index} className="hover:bg-muted/20 border-b border-border/40 transition-colors">
                               <TableCell className="pl-6 font-semibold text-foreground">{admin.adminName}</TableCell>
-                              <TableCell className="text-muted-foreground">{admin.email}</TableCell>
-                              <TableCell className="hidden lg:table-cell">{admin.phone}</TableCell>
+                              <TableCell className="text-muted-foreground truncate max-w-[200px]" title={admin.email}>{admin.email}</TableCell>
+                              <TableCell className="py-2">
+                                {admin.staffRole ? (
+                                  <Badge variant="outline" className="font-medium px-2 py-0.5 text-xs rounded-full border-border/80 text-foreground bg-background whitespace-nowrap">
+                                    {staffRoleLabel(admin.staffRole)}
+                                  </Badge>
+                                ) : (
+                                  <Badge className="font-semibold px-2 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30 whitespace-nowrap">
+                                    Needs role
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="hidden lg:table-cell text-muted-foreground text-xs max-w-[180px] truncate" title={branchLabel}>{branchLabel}</TableCell>
+                              <TableCell className="hidden xl:table-cell">{admin.phone}</TableCell>
                               <TableCell className="py-2"><StatusBadge status={admin.status} size="sm" /></TableCell>
                               <TableCell className="hidden text-muted-foreground whitespace-nowrap md:table-cell">
                                 {admin.lastLoginAt ? formatJoinedDate(admin.lastLoginAt) : <span className="text-muted-foreground/60">Never</span>}
@@ -1091,10 +1292,16 @@ export default function UsersPage() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className={`h-8 w-8 p-0 flex items-center justify-center rounded-md transition-colors ${admin.status === 'disabled' ? 'text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10' : 'text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10'}`}
+                                    className={`h-8 w-8 p-0 flex items-center justify-center rounded-md transition-colors disabled:opacity-40 ${admin.status === 'disabled' ? 'text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10' : 'text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10'}`}
                                     onClick={() => handleToggleStatus(admin)}
-                                    disabled={setAdminStatus.isPending}
-                                    title={admin.status === 'disabled' ? 'Enable account' : 'Disable account'}
+                                    disabled={setAdminStatus.isPending || (admin.status !== 'disabled' && lastAdmin)}
+                                    title={
+                                      admin.status === 'disabled'
+                                        ? 'Enable account'
+                                        : lastAdmin
+                                          ? "Can't disable the last remaining admin"
+                                          : 'Disable account'
+                                    }
                                   >
                                     {admin.status === 'disabled' ? <IconCircleCheck className="w-4 h-4" /> : <IconBan className="w-4 h-4" />}
                                   </Button>
@@ -1112,8 +1319,14 @@ export default function UsersPage() {
                                     variant="ghost"
                                     className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40"
                                     onClick={() => { if (confirm('Delete this account?')) deleteAdmin.mutate(admin._id) }}
-                                    disabled={deleteAdmin.isPending || isShared}
-                                    title={isShared ? 'Disable the shared login instead of deleting it' : 'Delete account'}
+                                    disabled={deleteAdmin.isPending || isShared || lastAdmin}
+                                    title={
+                                      isShared
+                                        ? 'Disable the shared login instead of deleting it'
+                                        : lastAdmin
+                                          ? "Can't delete the last remaining admin"
+                                          : 'Delete account'
+                                    }
                                   >
                                     <IconTrash className="w-4 h-4" />
                                   </Button>

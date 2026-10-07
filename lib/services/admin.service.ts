@@ -25,6 +25,12 @@ export interface Admin {
   lastLoginAt?: string
   /** Optional backend role string (e.g. 'frontdesk'); maps to the `staff` UI role. */
   staffRole?: string
+  /** FX-32.1 — branches this account works at (Location ids). Empty for experts
+   * and full admins (who are global / all-branches). */
+  branchIds?: string[]
+  /** FX-32.1 — true when the account works across every branch (experts, or a
+   * scoped role explicitly marked all-branches). */
+  allBranches?: boolean
 }
 
 /**
@@ -52,6 +58,8 @@ function normalizeAdmin(raw: any): Admin {
     invitePending,
     lastLoginAt: raw?.lastLoginAt ? String(raw.lastLoginAt) : undefined,
     staffRole: raw?.staffRole ? String(raw.staffRole) : undefined,
+    branchIds: Array.isArray(raw?.branchIds) ? raw.branchIds.map(String) : [],
+    allBranches: Boolean(raw?.allBranches),
   }
 }
 
@@ -63,8 +71,12 @@ export interface InviteAdminPayload {
   adminName: string
   email: string
   phone: string
-  /** Optional backend role; defaults to a front-desk role server-side. */
+  /** Optional backend role; defaults to a full admin (null) server-side. */
   staffRole?: string
+  /** FX-32.1 — branches for a scoped role. Ignored for experts / full admins. */
+  branchIds?: string[]
+  /** FX-32.1 — mark the account as working across every branch. */
+  allBranches?: boolean
 }
 
 export interface UpdateAdminPayload {
@@ -72,6 +84,8 @@ export interface UpdateAdminPayload {
   email?: string
   phone?: string
   staffRole?: string
+  branchIds?: string[]
+  allBranches?: boolean
 }
 
 export const adminService = {
