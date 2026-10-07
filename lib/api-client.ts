@@ -47,6 +47,19 @@ export function clearToken() {
   if (typeof window !== 'undefined') localStorage.removeItem('hh_token')
 }
 
+// FX-17.3 — the branch the front desk currently has selected. Owned by
+// components/location-scope-provider.tsx (localStorage key 'hh_selected_location').
+// Sent on every request as X-Location-Id so staff never have to attach it by
+// hand; absent ("all branches") means the backend resolves/refuses on its own.
+function getSelectedLocationId(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return localStorage.getItem('hh_selected_location')
+  } catch {
+    return null
+  }
+}
+
 // Inject Authorization (prefer Bearer, fall back to Basic)
 apiClient.interceptors.request.use((config) => {
   const requestPath = config.url ?? ''
@@ -63,6 +76,15 @@ apiClient.interceptors.request.use((config) => {
         reason: 'auth endpoint',
       })
       return config
+    }
+
+    // FX-17.3 — attach the selected branch to every non-auth request. Set here,
+    // before the Bearer/Basic early returns below, so it is never skipped.
+    const selectedLocationId = getSelectedLocationId()
+    if (selectedLocationId) {
+      const headers = AxiosHeaders.from(config.headers)
+      headers.set('X-Location-Id', selectedLocationId)
+      config.headers = headers
     }
 
     let hasAuthHeader = false

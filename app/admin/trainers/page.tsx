@@ -25,6 +25,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { IconPlus, IconEdit, IconTrash, IconRefresh, IconEye, IconEyeOff } from '@tabler/icons-react'
 import { useTrainers, useCreateTrainer, useUpdateTrainer, useDeleteTrainer } from '@/hooks/use-trainers'
+import { useLocations } from '@/hooks/use-locations'
 import { Trainer } from '@/lib/services/trainer.service'
 
 const TRAINER_DRAFT_KEY = 'add_trainer_form_draft'
@@ -39,6 +40,8 @@ type TrainerFormState = {
   imageUrl: string
   keySentence: string
   isActive: boolean
+  // FX-17 — branches this coach may act on.
+  branchIds: string[]
 }
 
 function defaultTrainerForm(): TrainerFormState {
@@ -52,6 +55,7 @@ function defaultTrainerForm(): TrainerFormState {
     imageUrl: '',
     keySentence: '',
     isActive: true,
+    branchIds: [],
   }
 }
 
@@ -105,7 +109,13 @@ export default function TrainersPage() {
         formData.specialitiesInput !== (editingTrainer.specialities?.join(', ') || '') ||
         formData.imageUrl !== (editingTrainer.imageUrl || '') ||
         formData.keySentence !== (editingTrainer.keySentence || '') ||
-        formData.isActive !== (editingTrainer.isActive !== false)
+        formData.isActive !== (editingTrainer.isActive !== false) ||
+        formData.branchIds.join(',') !==
+          ((editingTrainer.branchIds && editingTrainer.branchIds.length > 0
+            ? editingTrainer.branchIds
+            : editingTrainer.locationId
+              ? [editingTrainer.locationId]
+              : []).join(','))
       )
     }
     return Boolean(
@@ -122,6 +132,7 @@ export default function TrainersPage() {
   }, [formData, editingTrainer])
 
   const { data: trainers = [], isLoading, isError, refetch } = useTrainers()
+  const { data: locations = [] } = useLocations()
   const createTrainer = useCreateTrainer()
   const updateTrainer = useUpdateTrainer()
   const deleteTrainer = useDeleteTrainer()
@@ -188,6 +199,13 @@ export default function TrainersPage() {
       imageUrl: trainer.imageUrl || '',
       keySentence: trainer.keySentence || '',
       isActive: trainer.isActive !== false,
+      // Fall back to the legacy single branch when branchIds isn't set yet.
+      branchIds:
+        trainer.branchIds && trainer.branchIds.length > 0
+          ? trainer.branchIds
+          : trainer.locationId
+            ? [trainer.locationId]
+            : [],
     })
     setIsDialogOpen(true)
   }
@@ -230,6 +248,7 @@ export default function TrainersPage() {
             imageUrl: formData.imageUrl,
             keySentence: formData.keySentence,
             isActive: formData.isActive,
+            branchIds: formData.branchIds,
           },
         })
       } else {
@@ -237,6 +256,7 @@ export default function TrainersPage() {
           trainerName: formData.trainerName, email: formData.email, phone: cleanPhone,
           password: formData.password, description: formData.description, specialities,
           imageUrl: formData.imageUrl, keySentence: formData.keySentence, isActive: formData.isActive,
+          branchIds: formData.branchIds,
         })
         clearTrainerDraft()
       }
@@ -352,6 +372,38 @@ export default function TrainersPage() {
                   </div>
                   <Switch checked={formData.isActive} onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })} />
                 </div>
+                {/* FX-17 — branches this coach may act on. Checked branches are
+                    the only ones the backend lets them operate once enforcement
+                    is on. */}
+                {locations.length > 0 && (
+                  <div className="rounded-lg border p-3 shadow-xs">
+                    <label className="text-sm font-medium">Branches</label>
+                    <p className="text-xs text-muted-foreground mb-2">Which branches this trainer works at.</p>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {locations.map((loc) => {
+                        const checked = formData.branchIds.includes(loc._id)
+                        return (
+                          <label key={loc._id} className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-input"
+                              checked={checked}
+                              onChange={(e) => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  branchIds: e.target.checked
+                                    ? [...prev.branchIds, loc._id]
+                                    : prev.branchIds.filter((id) => id !== loc._id),
+                                }))
+                              }}
+                            />
+                            <span>{loc.name}{loc.isActive === false ? ' (inactive)' : ''}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" onClick={handleCloseTrainerDialog}>Cancel</Button>
                   <Button onClick={handleSubmit} disabled={isPending}>
