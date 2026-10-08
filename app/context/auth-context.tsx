@@ -40,6 +40,13 @@ export interface AuthContextType {
     name: string
     email: string
     role: UserRole
+    // FX-18 — the signed-in staffer's branch scope, used to restrict the branch
+    // switcher. `scope: 'branch'` / `allBranches: false` means "only branchIds";
+    // a global admin is `scope: 'global'` / `allBranches: true`. Absent for
+    // members and legacy sessions (treated as unrestricted).
+    branchIds?: string[]
+    allBranches?: boolean
+    scope?: 'global' | 'branch'
   } | null
   isAuthenticated: boolean
   setRole: (role: UserRole) => void

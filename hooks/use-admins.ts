@@ -8,11 +8,12 @@ import {
 import { queryKeys } from '@/lib/query-keys'
 import { toast } from 'sonner'
 
-export function useAdmins() {
+export function useAdmins(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.admins.all(),
     queryFn: adminService.getAll,
     select: (data) => data.admins,
+    enabled: options?.enabled ?? true,
   })
 }
 

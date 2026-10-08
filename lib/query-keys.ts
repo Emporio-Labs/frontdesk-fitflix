@@ -73,6 +73,7 @@ export const queryKeys = {
   leads: {
     all: () => ['leads'] as const,
     detail: (id: string) => ['leads', id] as const,
+    teamPerformance: () => ['leads', 'team-performance'] as const,
   },
   gymVisits: {
     all: (filters?: Record<string, unknown>) =>

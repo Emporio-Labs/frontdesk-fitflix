@@ -212,6 +212,80 @@ export function useDeleteLead() {
   })
 }
 
+export function useClaimLead() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => leadService.claim(id),
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.leads.all(), (current) =>
+        setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
+      )
+      qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })
+      toast.success(data.message || 'Lead claimed')
+    },
+    onError: (err: any) => {
+      // FX-33.3 — someone claimed it first. Tell this user it's taken and refresh
+      // so the card flips to show the new owner.
+      if (err?.response?.status === 409) {
+        const data = err?.response?.data
+        // Backend nests the holder's name under `details` (survives the error
+        // normalizer); fall back to the message string, which also names them.
+        const claimedByName = data?.details?.claimedByName || data?.claimedByName
+        toast.error(
+          claimedByName
+            ? `This lead was just claimed by ${claimedByName}`
+            : data?.error || data?.message || 'This lead was just claimed by someone else'
+        )
+        qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
+        return
+      }
+      toast.error(err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to claim lead')
+    },
+  })
+}
+
+// FX-34.1/.3 — reassign a lead to another staff member, or release it to the
+// queue (assigneeId null). The server is the authority on who may do what; a
+// sales caller releasing someone else's lead (or reassigning at all) gets a 403
+// whose message we surface verbatim.
+export function useReassignLead() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, assigneeId }: { id: string; assigneeId: string | null }) =>
+      leadService.reassign(id, assigneeId),
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.leads.all(), (current) =>
+        setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
+      )
+      qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })
+      qc.invalidateQueries({ queryKey: queryKeys.leads.teamPerformance() })
+      toast.success(data.message)
+    },
+    onError: (err: any) => {
+      toast.error(
+        err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to reassign lead'
+      )
+    },
+  })
+}
+
+// FX-34.4 — the branch manager's team-performance table. Gated by `enabled` so
+// only the manager view fetches it.
+export function useLeadTeamPerformance(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.leads.teamPerformance(),
+    queryFn: () => leadService.getTeamPerformance(),
+    select: (data) => data.members,
+    enabled: options?.enabled ?? true,
+    staleTime: 10000,
+    refetchOnWindowFocus: true,
+  })
+}
+
 export function useConvertLead() {
   const qc = useQueryClient()
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { IconBuildingStore, IconMapPin } from '@tabler/icons-react'
 import {
   Select,
@@ -10,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useOptionalLocationScope } from '@/components/location-scope-provider'
+import { useAuth } from '@/hooks/use-auth'
 
 const ALL_BRANCHES = '__all__'
 
@@ -25,6 +27,7 @@ export function LocationSwitcher() {
   // Tolerant: this header is shared across layouts, and chrome must never be
   // able to crash a page just because its subtree has no scope provider.
   const scope = useOptionalLocationScope()
+  const { user } = useAuth()
   if (!scope) return null
 
   const {
@@ -35,6 +38,25 @@ export function LocationSwitcher() {
     setSelectedLocationId,
     isSingleLocation,
   } = scope
+
+  // FX-18 — a branch-scoped staffer only ever works at their own branches, so
+  // they are never offered "All branches": they view one branch at a time. A
+  // global admin (or a legacy session with no scope) keeps the "All branches"
+  // option. The backend scopes data regardless; this is the matching UI.
+  const branchScoped = user?.scope === 'branch' && !user?.allBranches
+
+  // A branch-scoped staffer must always have a concrete branch selected (there
+  // is no "All branches" for them), so default to their first branch once the
+  // list is known. Members/global admins are unaffected.
+  useEffect(() => {
+    if (
+      branchScoped &&
+      !selectedLocationId &&
+      locations.length > 0
+    ) {
+      setSelectedLocationId(locations[0]._id)
+    }
+  }, [branchScoped, selectedLocationId, locations, setSelectedLocationId])
 
   if (isLoading) {
     return <Skeleton className="h-8 w-32" />
@@ -62,7 +84,9 @@ export function LocationSwitcher() {
 
   return (
     <Select
-      value={selectedLocationId ?? ALL_BRANCHES}
+      value={
+        selectedLocationId ?? (branchScoped ? locations[0]?._id : ALL_BRANCHES)
+      }
       onValueChange={(value) =>
         setSelectedLocationId(value === ALL_BRANCHES ? null : value)
       }
@@ -72,7 +96,10 @@ export function LocationSwitcher() {
         <SelectValue placeholder="Select branch" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={ALL_BRANCHES}>All branches</SelectItem>
+        {/* FX-18 — branch-scoped staff never get "All branches". */}
+        {!branchScoped && (
+          <SelectItem value={ALL_BRANCHES}>All branches</SelectItem>
+        )}
         {locations.map((location) => (
           <SelectItem key={location._id} value={location._id}>
             {location.name}

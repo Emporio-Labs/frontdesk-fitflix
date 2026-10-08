@@ -92,6 +92,15 @@ export default function LoginPage() {
         name: apiUser?.email ?? email,
         email: apiUser?.email ?? email,
         role: mappedRole,
+        // FX-18 — carry the backend's branch scope so the switcher can be
+        // restricted to the branches this staffer works at.
+        branchIds: Array.isArray(apiUser?.branchIds)
+          ? apiUser.branchIds.map(String)
+          : [],
+        allBranches: Boolean(apiUser?.allBranches),
+        scope: apiUser?.scope === 'branch' || apiUser?.scope === 'global'
+          ? apiUser.scope
+          : undefined,
       })
       toast.success('Welcome back!')
       // Redirect is handled inside login() via window.location.href
