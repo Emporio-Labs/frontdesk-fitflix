@@ -8,6 +8,7 @@ import {
   type QrCheckInPayload,
 } from '@/lib/services/gym-visit.service'
 import { queryKeys } from '@/lib/query-keys'
+import { useLocationScope } from '@/components/location-scope-provider'
 
 function extractApiError(err: any, fallback: string): string {
   const msg = err?.response?.data?.message
@@ -16,16 +17,20 @@ function extractApiError(err: any, fallback: string): string {
 }
 
 export function useGymVisits(filters: GymVisitFilters = {}) {
+  // FX-19 — key on the selected branch so attendance follows the header picker.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.gymVisits.all(filters as Record<string, unknown>),
+    queryKey: scopedKey(queryKeys.gymVisits.all(filters as Record<string, unknown>)),
     queryFn: () => gymVisitService.list(filters),
     staleTime: 15_000,
   })
 }
 
 export function useCurrentlyIn() {
+  // FX-19 — "who is in the building" is per-branch; key on the selected branch.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.gymVisits.currentlyIn(),
+    queryKey: scopedKey(queryKeys.gymVisits.currentlyIn()),
     queryFn: gymVisitService.currentlyIn,
     select: (data) => data.items,
     staleTime: 10_000,
@@ -43,8 +48,10 @@ export function useMyGymVisits(limit = 50) {
 }
 
 export function useGymVisitAnalytics(range: { from?: string; to?: string } = {}) {
+  // FX-19 — key on the selected branch so analytics follow the header picker.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.gymVisits.analytics(range as Record<string, unknown>),
+    queryKey: scopedKey(queryKeys.gymVisits.analytics(range as Record<string, unknown>)),
     queryFn: () => gymVisitService.getAnalytics(range),
     staleTime: 30_000,
   })

@@ -11,12 +11,15 @@ import {
   buildDailyDigest,
 } from '@/lib/services/lead.service'
 import { queryKeys } from '@/lib/query-keys'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { toast } from 'sonner'
 
 export function useLeads(options?: { enabled?: boolean }) {
   const isEnabled = options?.enabled ?? true
+  // FX-19 — key on the selected branch so the lead queue follows the header picker.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.leads.all(),
+    queryKey: scopedKey(queryKeys.leads.all()),
     queryFn: () => leadService.getAll(10),
     select: (data) => data.leads,
     enabled: isEnabled,
@@ -37,14 +40,16 @@ export function useLead(id: string) {
   })
 }
 
-// These three hooks share queryKeys.leads.all() — the same key as useLeads().
+// These three hooks share the SAME scoped key as useLeads() — scopedKey() is
+// deterministic for a given branch, so all four produce ['leads', <branch>].
 // React Query deduplicates the HTTP request: only one GET /leads fires even when
 // all four hooks are mounted simultaneously. `select` transforms the shared
 // cache entry locally without storing the derived value in a separate cache key.
 
 export function useLeadReminders() {
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.leads.all(),
+    queryKey: scopedKey(queryKeys.leads.all()),
     queryFn: () => leadService.getAll(10),
     select: (data) => buildReminderSummary(data.leads),
     staleTime: 0,
@@ -54,8 +59,9 @@ export function useLeadReminders() {
 }
 
 export function useLeadAnalytics() {
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.leads.all(),
+    queryKey: scopedKey(queryKeys.leads.all()),
     queryFn: () => leadService.getAll(10),
     select: (data) => buildLeadAnalytics(data.leads),
     staleTime: 0,
@@ -65,8 +71,9 @@ export function useLeadAnalytics() {
 }
 
 export function useLeadDigest() {
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.leads.all(),
+    queryKey: scopedKey(queryKeys.leads.all()),
     queryFn: () => leadService.getAll(10),
     select: (data) => buildDailyDigest(buildReminderSummary(data.leads)),
     staleTime: 0,
@@ -144,13 +151,17 @@ function extractLeadErrorMessage(err: any, fallback: string): string {
 
 export function useUpdateLead() {
   const qc = useQueryClient()
+  // FX-19 — the optimistic cache read/write must target the active branch's entry,
+  // the same ['leads', <branch>] key the read hooks use.
+  const { scopedKey } = useLocationScope()
+  const leadsKey = scopedKey(queryKeys.leads.all())
 
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: UpdateLeadPayload }) =>
       leadService.update(id, payload),
     onMutate: async ({ id, payload }) => {
-      await qc.cancelQueries({ queryKey: queryKeys.leads.all() })
-      const prev = qc.getQueryData(queryKeys.leads.all())
+      await qc.cancelQueries({ queryKey: leadsKey })
+      const prev = qc.getQueryData(leadsKey)
 
       const prevLeads = getLeadListCache(prev)
       if (prevLeads.length > 0) {
@@ -178,7 +189,7 @@ export function useUpdateLead() {
             updatedAt: new Date().toISOString(),
           }
         })
-        qc.setQueryData(queryKeys.leads.all(), { leads: next })
+        qc.setQueryData(leadsKey, { leads: next })
       }
 
       return { prev }
@@ -190,7 +201,7 @@ export function useUpdateLead() {
     },
     onError: (err: any, _vars, ctx) => {
       if (ctx?.prev) {
-        qc.setQueryData(queryKeys.leads.all(), ctx.prev)
+        qc.setQueryData(leadsKey, ctx.prev)
       }
       toast.error(extractLeadErrorMessage(err, 'Failed to update lead'))
     },
@@ -214,11 +225,13 @@ export function useDeleteLead() {
 
 export function useClaimLead() {
   const qc = useQueryClient()
+  const { scopedKey } = useLocationScope()
+  const leadsKey = scopedKey(queryKeys.leads.all())
 
   return useMutation({
     mutationFn: (id: string) => leadService.claim(id),
     onSuccess: (data) => {
-      qc.setQueryData(queryKeys.leads.all(), (current) =>
+      qc.setQueryData(leadsKey, (current) =>
         setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
       )
       qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
@@ -252,12 +265,14 @@ export function useClaimLead() {
 // whose message we surface verbatim.
 export function useReassignLead() {
   const qc = useQueryClient()
+  const { scopedKey } = useLocationScope()
+  const leadsKey = scopedKey(queryKeys.leads.all())
 
   return useMutation({
     mutationFn: ({ id, assigneeId }: { id: string; assigneeId: string | null }) =>
       leadService.reassign(id, assigneeId),
     onSuccess: (data) => {
-      qc.setQueryData(queryKeys.leads.all(), (current) =>
+      qc.setQueryData(leadsKey, (current) =>
         setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
       )
       qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
@@ -304,12 +319,14 @@ export function useConvertLead() {
 
 export function useAddLeadInteraction() {
   const qc = useQueryClient()
+  const { scopedKey } = useLocationScope()
+  const leadsKey = scopedKey(queryKeys.leads.all())
 
   return useMutation({
     mutationFn: ({ id, note, type }: { id: string; note: string; type?: LeadInteraction['type'] }) =>
       leadService.addInteraction(id, { note, type }),
     onSuccess: (data) => {
-      qc.setQueryData(queryKeys.leads.all(), (current) =>
+      qc.setQueryData(leadsKey, (current) =>
         setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
       )
       qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })
@@ -323,12 +340,14 @@ export function useAddLeadInteraction() {
 
 export function useRecordLeadContactAttempt() {
   const qc = useQueryClient()
+  const { scopedKey } = useLocationScope()
+  const leadsKey = scopedKey(queryKeys.leads.all())
 
   return useMutation({
     mutationFn: ({ id, channel }: { id: string; channel: 'call' | 'whatsapp' | 'email' }) =>
       leadService.recordContactAttempt(id, { channel }),
     onSuccess: (data) => {
-      qc.setQueryData(queryKeys.leads.all(), (current) =>
+      qc.setQueryData(leadsKey, (current) =>
         setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
       )
       qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })

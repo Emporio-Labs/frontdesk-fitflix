@@ -39,24 +39,24 @@ export function LocationSwitcher() {
     isSingleLocation,
   } = scope
 
-  // FX-18 — a branch-scoped staffer only ever works at their own branches, so
-  // they are never offered "All branches": they view one branch at a time. A
-  // global admin (or a legacy session with no scope) keeps the "All branches"
-  // option. The backend scopes data regardless; this is the matching UI.
-  const branchScoped = user?.scope === 'branch' && !user?.allBranches
+  // FX-19.3 — only a super admin may read across every branch at once, so only
+  // they are offered "All branches". Everyone else (branch-scoped staff per
+  // FX-18, and clinic admins) views one branch at a time. The backend scopes
+  // data regardless; this is the matching UI.
+  const canSeeAllBranches = user?.role === 'super_admin'
 
-  // A branch-scoped staffer must always have a concrete branch selected (there
-  // is no "All branches" for them), so default to their first branch once the
-  // list is known. Members/global admins are unaffected.
+  // Anyone without the "All branches" option must always have a concrete branch
+  // selected, so default to the first available branch once the list is known.
+  // A super admin is unaffected — they default to "All branches".
   useEffect(() => {
     if (
-      branchScoped &&
+      !canSeeAllBranches &&
       !selectedLocationId &&
       locations.length > 0
     ) {
       setSelectedLocationId(locations[0]._id)
     }
-  }, [branchScoped, selectedLocationId, locations, setSelectedLocationId])
+  }, [canSeeAllBranches, selectedLocationId, locations, setSelectedLocationId])
 
   if (isLoading) {
     return <Skeleton className="h-8 w-32" />
@@ -85,7 +85,7 @@ export function LocationSwitcher() {
   return (
     <Select
       value={
-        selectedLocationId ?? (branchScoped ? locations[0]?._id : ALL_BRANCHES)
+        selectedLocationId ?? (canSeeAllBranches ? ALL_BRANCHES : locations[0]?._id)
       }
       onValueChange={(value) =>
         setSelectedLocationId(value === ALL_BRANCHES ? null : value)
@@ -96,8 +96,8 @@ export function LocationSwitcher() {
         <SelectValue placeholder="Select branch" />
       </SelectTrigger>
       <SelectContent>
-        {/* FX-18 — branch-scoped staff never get "All branches". */}
-        {!branchScoped && (
+        {/* FX-19.3 — only a super admin gets "All branches". */}
+        {canSeeAllBranches && (
           <SelectItem value={ALL_BRANCHES}>All branches</SelectItem>
         )}
         {locations.map((location) => (

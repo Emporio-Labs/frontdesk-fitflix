@@ -1,11 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { trainerService, CreateTrainerPayload, UpdateTrainerPayload } from '@/lib/services/trainer.service'
 import { queryKeys } from '@/lib/query-keys'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { toast } from 'sonner'
 
 export function useTrainers() {
+  // FX-19 — key on the selected branch so the roster follows the header picker.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.trainers.all(),
+    queryKey: scopedKey(queryKeys.trainers.all()),
     queryFn: trainerService.getAll,
     select: (data) => data.trainers,
   })
