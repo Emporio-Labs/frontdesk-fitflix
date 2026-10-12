@@ -5,17 +5,31 @@ import { useAuth } from '@/hooks/use-auth'
 /**
  * FX-09 — role-scoped mobile treatment.
  *
- * Trainers and nutritionists work from a phone. The layouts render this inside
- * the flex wrapper so its children get the `data-mobile-cards="tables"` hook
- * defined in `app/globals.css` when (and only when) one of those roles is
- * signed in. Admin roles never get the attribute, so a clinic admin looking
- * at admin pages on a phone still sees the wide-table layout with a
- * horizontal scroll (FX-09.5 is about desktop, but keeping admin phone
- * behaviour unchanged too avoids surprising anyone).
+ * Front-desk roles work from a phone. The layouts render this inside the flex
+ * wrapper so its children get the `data-mobile-cards="tables"` hook defined in
+ * `app/globals.css` when (and only when) one of those roles is signed in — their
+ * "Today" pages and reused list pages then render as cards instead of wide
+ * tables (FX-47.5).
+ *
+ * FX-47 widened the set from trainer/nutritionist to every role that now has a
+ * short, phone-oriented workspace: staff, sales, manager, clinician and sports
+ * scientist too. The org-admin roles (super_admin / clinic_admin) are
+ * deliberately excluded — they keep the wide-table layout with horizontal scroll
+ * on a phone, unchanged.
  */
+const MOBILE_CARD_ROLES = new Set([
+  'trainer',
+  'nutritionist',
+  'staff',
+  'sales',
+  'manager',
+  'clinician',
+  'sports_scientist',
+])
+
 export function MobileStaffScope({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const isStaffPhoneUser = user?.role === 'trainer' || user?.role === 'nutritionist'
+  const isStaffPhoneUser = !!user?.role && MOBILE_CARD_ROLES.has(user.role)
 
   return (
     <div

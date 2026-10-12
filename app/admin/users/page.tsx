@@ -52,6 +52,8 @@ type MemberFormState = {
   age: string
   gender: string
   healthGoalsInput: string
+  // FX-20.1 — the member's home club (a Location _id). '' = unassigned.
+  homeClubId: string
 }
 
 function defaultMemberForm(): MemberFormState {
@@ -63,6 +65,7 @@ function defaultMemberForm(): MemberFormState {
     age: '',
     gender: 'Male',
     healthGoalsInput: '',
+    homeClubId: '',
   }
 }
 
@@ -191,9 +194,9 @@ export default function UsersPage() {
   const [memberSearch, setMemberSearch] = useState('')
   const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
-  const [memberForm, setMemberForm] = useState({
+  const [memberForm, setMemberForm] = useState<MemberFormState>({
     username: '', email: '', phone: '', password: '',
-    age: '', gender: 'Male', healthGoalsInput: '',
+    age: '', gender: 'Male', healthGoalsInput: '', homeClubId: '',
   })
   const [memberFormErrors, setMemberFormErrors] = useState<Record<string, string>>({})
   const [memberPage, setMemberPage] = useState(1)
@@ -218,7 +221,8 @@ export default function UsersPage() {
         memberForm.password !== '' ||
         memberForm.age !== String(editingUser.age ?? '') ||
         memberForm.gender !== (editingUser.gender || 'Male') ||
-        memberForm.healthGoalsInput !== (editingUser.healthGoals?.join(', ') || '')
+        memberForm.healthGoalsInput !== (editingUser.healthGoals?.join(', ') || '') ||
+        memberForm.homeClubId !== (editingUser.homeClubId || '')
       )
     }
     return Boolean(
@@ -416,7 +420,7 @@ export default function UsersPage() {
   const paginatedUsers = filteredUsers.slice(memberStartIndex, memberStartIndex + itemsPerPage)
 
   const resetMemberForm = () => {
-    setMemberForm({ username: '', email: '', phone: '', password: '', age: '', gender: 'Male', healthGoalsInput: '' })
+    setMemberForm(defaultMemberForm())
     setMemberFormErrors({})
     setEditingUser(null)
     setShowPassword(false)
@@ -460,6 +464,7 @@ export default function UsersPage() {
       username: user.username, email: user.email || '', phone: user.phone,
       password: '', age: String(user.age ?? ''), gender: user.gender,
       healthGoalsInput: user.healthGoals.join(', '),
+      homeClubId: user.homeClubId || '',
     })
     setIsMemberDialogOpen(true)
   }
@@ -468,11 +473,15 @@ export default function UsersPage() {
     if (!validateMemberForm()) return
     const healthGoals = memberForm.healthGoalsInput.split(',').map(s => s.trim()).filter(Boolean)
     const cleanPhone = memberForm.phone.replace(/[\s\-()]/g, '')
+    // FX-20.1 — the member's home club. With a single branch the picker is hidden
+    // (FX-20.4), so default to the sole location; otherwise use the chosen value.
+    const homeClubId =
+      memberForm.homeClubId || (locations.length === 1 ? locations[0]?._id ?? '' : '')
     try {
       if (editingUser) {
         await updateUser.mutateAsync({
           id: editingUser._id,
-          payload: { username: memberForm.username, phone: cleanPhone, age: Number(memberForm.age), gender: memberForm.gender, healthGoals },
+          payload: { username: memberForm.username, phone: cleanPhone, age: Number(memberForm.age), gender: memberForm.gender, healthGoals, homeClubId: homeClubId || null },
         })
       } else {
         const payload: CreateUserPayload = {
@@ -481,6 +490,7 @@ export default function UsersPage() {
           age: Number(memberForm.age),
           gender: memberForm.gender,
           healthGoals,
+          homeClubId: homeClubId || null,
         }
         if (memberForm.email.trim()) {
           payload.email = memberForm.email.trim()
@@ -783,6 +793,25 @@ export default function UsersPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {/* FX-20.1 — home club picker; hidden with a single branch (FX-20.4). */}
+                    {locations.length > 1 && (
+                      <div>
+                        <label className="text-sm font-medium">Home Club</label>
+                        <Select
+                          value={memberForm.homeClubId || 'none'}
+                          onValueChange={(v) => setMemberForm({ ...memberForm, homeClubId: v === 'none' ? '' : v })}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Select a club" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No home club</SelectItem>
+                            {locations.map((loc) => (
+                              <SelectItem key={loc._id} value={loc._id}>{loc.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">The club whose in-person classes, offers and notifications this member sees.</p>
+                      </div>
+                    )}
                     <div>
                       <label className="text-sm font-medium">Health Goals (comma-separated)</label>
                       <Input value={memberForm.healthGoalsInput} onChange={(e) => setMemberForm({ ...memberForm, healthGoalsInput: e.target.value })} placeholder="Build muscle, Improve stamina" />
@@ -851,6 +880,9 @@ export default function UsersPage() {
                       <TableHead className="hidden w-[200px] font-semibold lg:table-cell">Health Goals</TableHead>
                       <TableHead className="hidden w-[110px] font-semibold md:table-cell">Joined</TableHead>
                       <TableHead className="hidden w-[125px] font-semibold md:table-cell">Onboarding</TableHead>
+                      {locations.length > 1 && (
+                        <TableHead className="hidden w-[150px] font-semibold lg:table-cell">Home Club</TableHead>
+                      )}
                       <TableHead className="w-[130px] font-semibold">Membership</TableHead>
                       <TableHead className="hidden w-[100px] font-semibold lg:table-cell">Plan Start</TableHead>
                       <TableHead className="hidden w-[100px] font-semibold lg:table-cell">Plan Expiry</TableHead>
@@ -859,7 +891,7 @@ export default function UsersPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredUsers.length === 0 ? (
-                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={locations.length > 1 ? 12 : 11} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
                     ) : (
                       paginatedUsers.map((user, index) => {
                         const membership = getUserMembership(user)
@@ -897,6 +929,13 @@ export default function UsersPage() {
                             <TableCell className="hidden py-2 md:table-cell">
                               <StatusBadge status={deriveOnboardingState(user)} size="sm" />
                             </TableCell>
+                            {locations.length > 1 && (
+                              <TableCell className="hidden text-muted-foreground whitespace-nowrap lg:table-cell">
+                                {user.homeClubId
+                                  ? (user.homeClubName || branchNameById.get(user.homeClubId) || '—')
+                                  : '—'}
+                              </TableCell>
+                            )}
                             <TableCell className="py-2">
                               {membership ? (
                                 <Badge variant="secondary" className="font-semibold px-2.5 py-0.5 text-xs rounded-full bg-secondary/80 text-secondary-foreground whitespace-nowrap">{membership.planName}</Badge>

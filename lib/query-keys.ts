@@ -189,6 +189,12 @@ export const queryKeys = {
       ['promotions', includeInactive ? 'with-inactive' : 'live'] as const,
     detail: (id: string) => ['promotions', id] as const,
   },
+  // FX-20.3 — club-wide member notifications. Per-branch, so callers pass these
+  // through `scopedKey` from the location scope provider before use.
+  memberNotifications: {
+    all: () => ['member-notifications'] as const,
+    detail: (id: string) => ['member-notifications', id] as const,
+  },
   // Deliberately not location-scoped: a person's in-app activity is theirs
   // wherever the staff member reading it happens to be sitting.
   activity: {

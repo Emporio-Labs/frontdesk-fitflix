@@ -10,12 +10,23 @@ export interface AuditActor {
   email?: string
 }
 
+// FX-45.1 — every entry records which branch the change happened in, so the
+// owner can answer "who did this, when, and where". May be absent on legacy
+// rows written before branch stamping, or on genuinely branch-less org actions.
+export interface AuditBranch {
+  id: string
+  name?: string
+}
+
 export interface AuditLog {
   id: string
   actor: AuditActor
+  // One of: created | updated | cancelled | deleted (FX-45.1 — the four kinds of
+  // change staff make). Lowercased; unknown values pass through untouched.
   action: string
   entityType: string
   entityId: string
+  branch: AuditBranch | null
   changes: Record<string, { before: unknown; after: unknown }>
   timestamp: string
 }
@@ -24,6 +35,13 @@ export interface AuditLogFilters {
   action?: string
   entityType?: string
   search?: string
+  // FX-45.2 — server-side narrowing seams. Branch is normally carried by the
+  // X-Location-Id header (location-scope-provider), so managers are confined to
+  // their own branch by the backend regardless of what the UI sends; these are
+  // here for an admin who wants to narrow a cross-branch view by date or branch.
+  branchId?: string
+  from?: string
+  to?: string
   [key: string]: unknown
 }
 
@@ -45,6 +63,21 @@ function normalizeActor(raw: any): AuditActor {
   }
 }
 
+function normalizeBranch(raw: any): AuditBranch | null {
+  // Accept a nested object (branch/location) or flat id/name fields, mirroring
+  // the actor normalisation. A missing branch stays null — honest about rows
+  // that predate branch stamping rather than inventing a location.
+  const branch = raw?.branch ?? raw?.location ?? null
+  const id = String(
+    branch?.id ?? branch?._id ?? raw?.branchId ?? raw?.locationId ?? ''
+  )
+  const name = String(
+    branch?.name ?? branch?.code ?? raw?.branchName ?? raw?.locationName ?? ''
+  ).trim()
+  if (!id && !name) return null
+  return { id, name: name || undefined }
+}
+
 function normalizeLog(raw: any): AuditLog {
   return {
     id: String(raw?.id ?? raw?._id ?? ''),
@@ -52,6 +85,7 @@ function normalizeLog(raw: any): AuditLog {
     action: String(raw?.action ?? '').toLowerCase(),
     entityType: String(raw?.entityType ?? raw?.entity ?? ''),
     entityId: String(raw?.entityId ?? raw?.entity?.id ?? ''),
+    branch: normalizeBranch(raw),
     changes: raw?.changes ?? {},
     timestamp: String(raw?.timestamp ?? raw?.createdAt ?? ''),
   }
@@ -67,9 +101,13 @@ function extractList(data: any): any[] {
 
 export const auditService = {
   // ASSUMPTION: GET /audit-logs returns { items: AuditLog[] } with a resolved
-  // actor (name) per entry. Filters are passed as query params. If the backend
-  // exposes this under a different path or shape, correct this service only —
-  // the hook and page stay stable.
+  // actor (name) and a branch per entry, covering every create/edit/cancel/
+  // delete across entity types (FX-45.1 — today only bookings emit rows). The
+  // backend scopes the response to the caller's branch via the X-Location-Id
+  // header, so a manager only ever receives their own branch's rows (FX-45.3).
+  // Filters are passed as query params. If the backend exposes this under a
+  // different path or shape, correct this service only — the hook and page
+  // stay stable.
   getAll: async (filters?: AuditLogFilters): Promise<{ items: AuditLog[] }> => {
     const { data } = await apiClient.get('/audit-logs', { params: filters })
     return { items: extractList(data).map(normalizeLog) }

@@ -29,6 +29,7 @@ import {
   IconMessage2,
   IconDumbbell,
   IconBellRinging,
+  IconBell,
   IconStethoscope,
   IconApple,
 } from "@tabler/icons-react"
@@ -96,6 +97,7 @@ const navGroups = [
       { title: "Concierge Alerts", url: "/admin/alerts", icon: IconBellRinging },
       { title: "Leads", url: "/admin/leads", icon: IconTarget },
       { title: "Promotions", url: "/admin/promotions", icon: IconSpeakerphone },
+      { title: "Announcements", url: "/admin/announcements", icon: IconBell },
       { title: "App Copy", url: "/admin/content", icon: IconArticle },
       { title: "DNA Testing", url: "/admin/dna", icon: IconDna },
       { title: "Reports", url: "/admin/reports", icon: IconReport },
@@ -139,18 +141,20 @@ const navNutritionistGroup = [
       { title: "Diet Plans", url: "/admin/nutrition/diet-plans", icon: IconTemplate },
       { title: "Food Catalog", url: "/admin/nutrition/foods", icon: IconApple },
       { title: "Availability", url: "/admin/nutritionist", icon: IconClock },
-      { title: "Food Catalog", url: "/admin/nutrition?tab=food-catalog", icon: IconSalad },
       { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
     ],
   },
 ]
 
 // FX-31.1 — branch manager: branch-ops pages only (incl. Leads); no org-admin
-// surfaces (settings, locations, audit logs, app copy, DNA) or expert consoles.
+// surfaces (settings, locations, app copy, DNA) or expert consoles.
+// FX-45.3 — plus the audit trail, scoped by the backend to their own branch.
 const navManagerGroup = [
   {
     items: [
-      { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
+      // FX-47.2 — land on "Today" (open alerts, staff on duty) rather than the
+      // generic ops /dashboard whose Quick Actions offered forbidden actions (F2).
+      { title: "Today", url: "/admin/today", icon: IconCalendarEvent },
     ],
   },
   {
@@ -185,6 +189,7 @@ const navManagerGroup = [
       { title: "Concierge Alerts", url: "/admin/alerts", icon: IconBellRinging },
       { title: "Promotions", url: "/admin/promotions", icon: IconSpeakerphone },
       { title: "Reports", url: "/admin/reports", icon: IconReport },
+      { title: "Audit Logs", url: "/admin/audit-logs", icon: IconHistory },
     ],
   },
   {
@@ -195,12 +200,59 @@ const navManagerGroup = [
   },
 ]
 
-// FX-31.2 — sales: the lead queue and the memberships they can read.
+// FX-31.2 / FX-47.2 — sales: land on "Today" (claimable leads + callbacks due),
+// then the lead queue and the memberships they can read.
 const navSalesGroup = [
   {
     items: [
+      { title: "Today", url: "/admin/today", icon: IconCalendarEvent },
       { title: "Leads", url: "/admin/leads", icon: IconTarget },
       { title: "Memberships", url: "/admin/memberships", icon: IconHeartHandshake },
+      { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
+    ],
+  },
+]
+
+// FX-47.1 — front desk (staff): land on "Today" (check-ins, payments due), then
+// the pages the desk actually uses. Previously staff fell through to the full
+// ~31-item admin menu (FX-46 F1). Order follows the daily flow: who's in → who to
+// check in → look someone up → bookings → sell/renew.
+const navStaffGroup = [
+  {
+    items: [
+      { title: "Today", url: "/admin/today", icon: IconCalendarEvent },
+      { title: "Attendance", url: "/admin/attendance", icon: IconCalendarStats },
+      { title: "Members", url: "/admin/users", icon: IconUsers },
+      { title: "Bookings", url: "/admin/bookings", icon: IconCalendarEvent },
+      { title: "Spot Booking", url: "/admin/spot-booking", icon: IconCalendarPlus },
+      { title: "Memberships", url: "/admin/memberships", icon: IconHeartHandshake },
+      { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
+    ],
+  },
+]
+
+// FX-47.1 — clinician: their appointments console + the clinical pages. Was
+// falling through to the full admin menu.
+const navClinicianGroup = [
+  {
+    items: [
+      { title: "Appointments", url: "/admin/bookings", icon: IconCalendarEvent },
+      { title: "Members", url: "/admin/users", icon: IconUsers },
+      { title: "DNA Testing", url: "/admin/dna", icon: IconDna },
+      { title: "Reports", url: "/admin/reports", icon: IconReport },
+      { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
+    ],
+  },
+]
+
+// FX-47.1 / FX-46 F3 — sports scientist: a direct link to their own console
+// (previously unreachable from the sidebar) plus member lookup. Their console is
+// their home surface.
+const navSportsScientistGroup = [
+  {
+    items: [
+      { title: "My Console", url: "/admin/sports-scientist", icon: IconStethoscope },
+      { title: "Members", url: "/admin/users", icon: IconUsers },
       { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
     ],
   },
@@ -215,26 +267,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: '/placeholder-user.jpg',
   }
 
-  const isTrainer = user?.role === 'trainer'
-  const isNutritionist = user?.role === 'nutritionist'
-  const isManager = user?.role === 'manager'
-  const isSales = user?.role === 'sales'
-  const groups = isTrainer
-    ? navTrainerGroup
-    : isNutritionist
-    ? navNutritionistGroup
-    : isManager
-    ? navManagerGroup
-    : isSales
-    ? navSalesGroup
-    : navGroups
-  const brandHref = isTrainer
-    ? '/admin/personal-training/today'
-    : isNutritionist
-    ? '/admin/nutrition/my-clients'
-    : isSales
-    ? '/admin/leads'
-    : '/dashboard'
+  const role = user?.role
+  const groups =
+    role === 'trainer'
+      ? navTrainerGroup
+      : role === 'nutritionist'
+      ? navNutritionistGroup
+      : role === 'manager'
+      ? navManagerGroup
+      : role === 'sales'
+      ? navSalesGroup
+      : role === 'staff'
+      ? navStaffGroup
+      : role === 'clinician'
+      ? navClinicianGroup
+      : role === 'sports_scientist'
+      ? navSportsScientistGroup
+      : navGroups
+  // FX-47 / FX-46 F5 — the brand link lands on the same page as the role's
+  // post-login start page, so clicking the logo never disagrees with where login
+  // dropped them. Nutritionist keeps its my-clients landing (middleware bounces
+  // bare /admin/nutrition there anyway).
+  const brandHref =
+    role === 'nutritionist' ? '/admin/nutrition/my-clients' : getRoleStartPage(role)
 
   return (
     // "icon" (not "none") so callers that omit the prop still get the mobile Sheet;

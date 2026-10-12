@@ -38,6 +38,8 @@ import { useHighlightRow } from '@/components/highlight-row'
 import { LogWorkoutDialog } from '@/components/personal-training/log-workout-dialog'
 import { NoShowDialog } from '@/components/personal-training/no-show-dialog'
 import { useAuth } from '@/hooks/use-auth'
+import { useMyMembers } from '@/hooks/use-my-members'
+import { useWorkoutPlans } from '@/hooks/use-workout-plans'
 import { usePtAdminBookings, usePtTrainers } from '@/hooks/use-personal-training'
 import {
   useGroupClassBookings,
@@ -85,6 +87,25 @@ export default function TrainerTodayPage() {
         t.name?.toLowerCase() === user?.name?.toLowerCase()
     ) || null
   const currentTrainerId = currentTrainer?._id || user?.id || ''
+
+  // FX-47.2 — "members needing plans": this trainer's roster cross-referenced
+  // against workout plans, keeping only members with no assigned plan. Mirrors
+  // the assignment match in components/workouts/active-users-grid.tsx.
+  const { data: myMembers = [] } = useMyMembers()
+  const { data: plansData } = useWorkoutPlans()
+  const membersNeedingPlans = useMemo(() => {
+    const plans = plansData?.plans ?? []
+    const toUserId = (item: any): string =>
+      typeof item === 'string' ? item : item?._id?.toString() ?? item?.id?.toString() ?? ''
+    return (myMembers as any[]).filter((m) => {
+      const uid = m?._id?.toString() ?? m?.id?.toString()
+      if (!uid) return false
+      const hasPlan = plans.some((p: any) =>
+        (p.assignedUsers ?? []).some((item: any) => toUserId(item) === uid)
+      )
+      return !hasPlan
+    })
+  }, [myMembers, plansData])
 
   const {
     data: ptBookings,
@@ -305,6 +326,74 @@ export default function TrainerTodayPage() {
                         }
                         pending={updateClassStatus.isPending}
                       />
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Members needing plans (FX-47.2) */}
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-3 space-y-0">
+          <div>
+            <CardTitle className="text-base sm:text-lg">Members needing plans</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              On your roster with no workout plan assigned yet
+            </p>
+          </div>
+          <Link href="/dashboard/workouts/members">
+            <Button variant="outline" size="sm">
+              <IconUsers className="h-4 w-4 mr-1.5" />
+              My roster
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent className="p-0 sm:p-6 sm:pt-0">
+          {membersNeedingPlans.length === 0 ? (
+            <div className="p-8">
+              <EmptyState
+                icon={<IconUsers className="h-10 w-10" />}
+                title="Everyone on your roster has a plan"
+                description="Members assigned to you without a workout plan show up here so none get missed."
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Member</TableHead>
+                    <TableHead className="hidden md:table-cell">Contact</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {membersNeedingPlans.map((m: any) => {
+                    const uid = m?._id?.toString() ?? m?.id?.toString() ?? ''
+                    const name = m?.name || m?.username || m?.email || 'Member'
+                    return (
+                      <TableRow key={uid}>
+                        <TableCell data-label="Member" className="font-medium">
+                          {name}
+                        </TableCell>
+                        <TableCell
+                          data-label="Contact"
+                          className="hidden md:table-cell text-sm text-muted-foreground"
+                        >
+                          {m?.email || m?.phone || '—'}
+                        </TableCell>
+                        <TableCell data-hide-label className="text-right">
+                          <Link href={`/dashboard/workouts/members/${uid}`}>
+                            <Button size="sm" variant="default" className="gap-1">
+                              <IconDumbbell className="h-3.5 w-3.5" />
+                              Build plan
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
                 </TableBody>

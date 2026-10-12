@@ -64,6 +64,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'attendance', action: 'read' },
     { resource: 'attendance', action: 'create' },
     { resource: 'attendance', action: 'update' },
+    // FX-20.3 — compose & send club-wide member notifications.
+    { resource: 'member_notifications', action: 'create' },
+    { resource: 'member_notifications', action: 'read' },
     { resource: 'settings', action: 'read' },
     { resource: 'settings', action: 'update' },
   ],
@@ -97,10 +100,16 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'attendance', action: 'read' },
     { resource: 'attendance', action: 'create' },
     { resource: 'attendance', action: 'update' },
+    // FX-20.3 — compose & send club-wide member notifications.
+    { resource: 'member_notifications', action: 'create' },
+    { resource: 'member_notifications', action: 'read' },
     { resource: 'settings', action: 'read' },
   ],
   // FX-31.1 — branch manager: branch-ops read/update + leads, no org-admin
-  // surfaces (no settings/audit/DNA, no expert-console management).
+  // surfaces (no settings/DNA, no expert-console management).
+  // FX-45.3 — may read the audit trail, but only for their own branch; the
+  // backend enforces the branch confinement via X-Location-Id, this only grants
+  // the page.
   manager: [
     { resource: 'users', action: 'read' },
     { resource: 'users', action: 'update' },
@@ -114,6 +123,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'reports', action: 'read' },
     { resource: 'leads', action: 'read' },
     { resource: 'leads', action: 'update' },
+    { resource: 'audit_logs', action: 'read' },
     { resource: 'attendance', action: 'read' },
     { resource: 'attendance', action: 'create' },
     { resource: 'attendance', action: 'update' },
