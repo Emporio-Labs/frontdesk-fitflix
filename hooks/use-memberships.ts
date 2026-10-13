@@ -114,7 +114,12 @@ export function usePauseMembership() {
       toast.success(data.message || 'Membership frozen')
     },
     onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Failed to freeze membership'),
+      toast.error(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to freeze membership'
+      ),
   })
 }
 
@@ -135,6 +140,11 @@ export function useResumeMembership() {
       }
     },
     onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Failed to resume membership'),
+      toast.error(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to resume membership'
+      ),
   })
 }

@@ -23,8 +23,19 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconPlus, IconTrash, IconEye, IconRefresh, IconEdit, IconPlayerPause, IconPlayerPlay } from '@tabler/icons-react'
+import {
+  IconPlus,
+  IconTrash,
+  IconEye,
+  IconRefresh,
+  IconEdit,
+  IconPlayerPause,
+  IconPlayerPlay,
+  IconSearch,
+  IconX,
+} from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Membership, MembershipStatus } from '@/lib/services/membership.service'
 import { useMembershipPlans } from '@/hooks/use-membership-plans'
 import { useUsers } from '@/hooks/use-users'
@@ -63,6 +74,7 @@ function MembershipsPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | MembershipStatus>('all')
   const [selectedMembership, setSelectedMembership] = useState<Membership | null>(null)
   const [editingMembership, setEditingMembership] = useState<Membership | null>(null)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -234,18 +246,52 @@ function MembershipsPageContent() {
     }
   }, [selectedPlan, formData.startDate, formData.endDate])
 
-  const filteredMemberships = useMemo(
-    () =>
-      memberships.filter(
-        (m) =>
-          m.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          m.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          m.planName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          m.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          m.notes.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [memberships, searchTerm]
-  )
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: memberships.length,
+      Active: 0,
+      Paused: 0,
+      Expired: 0,
+      Cancelled: 0,
+    }
+    for (const m of memberships) {
+      if (counts[m.status] !== undefined) {
+        counts[m.status] += 1
+      }
+    }
+    return counts
+  }, [memberships])
+
+  const filteredMemberships = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase()
+
+    return memberships.filter((m) => {
+      // 1. Status Filter Guard
+      if (statusFilter !== 'all' && m.status !== statusFilter) {
+        return false
+      }
+
+      // 2. Search Query Guard
+      if (!query) {
+        return true
+      }
+
+      const matchedUser = findMembershipUser(m)
+      const username = matchedUser?.username?.toLowerCase() || ''
+      const email = matchedUser?.email?.toLowerCase() || ''
+      const phone = matchedUser?.phone || ''
+
+      return (
+        m.id.toLowerCase().includes(query) ||
+        m.userId.toLowerCase().includes(query) ||
+        m.planName.toLowerCase().includes(query) ||
+        m.notes.toLowerCase().includes(query) ||
+        username.includes(query) ||
+        email.includes(query) ||
+        phone.includes(query)
+      )
+    })
+  }, [memberships, statusFilter, searchTerm, users])
 
   const sortedMemberships = useMemo(() => {
     return [...filteredMemberships].sort((a, b) => {
@@ -652,27 +698,102 @@ function MembershipsPageContent() {
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Filters and Search Bar */}
       <Card>
-        <CardHeader>
-          <Input
-            placeholder="Search memberships..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value)
-              setCurrentPage(1)
-            }}
-            className="max-w-sm"
-          />
-        </CardHeader>
+        <CardContent className="p-4 sm:p-5 flex flex-col gap-4">
+          {/* Status Tabs / Pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            {(['all', 'Active', 'Paused', 'Expired', 'Cancelled'] as const).map((status) => {
+              const isSelected = statusFilter === status
+              const count = statusCounts[status] ?? 0
+              return (
+                <Button
+                  key={status}
+                  type="button"
+                  variant={isSelected ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(
+                    'h-8 text-xs font-medium rounded-full px-3 transition-colors',
+                    isSelected
+                      ? 'bg-slate-900 text-white hover:bg-slate-800'
+                      : 'bg-white text-slate-700 hover:bg-slate-100'
+                  )}
+                  onClick={() => {
+                    setStatusFilter(status)
+                    setCurrentPage(1)
+                  }}
+                >
+                  <span>{status === 'all' ? 'All' : status}</span>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      'ml-1.5 px-1.5 py-0 text-[10px] rounded-full',
+                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                    )}
+                  >
+                    {count}
+                  </Badge>
+                </Button>
+              )
+            })}
+          </div>
+
+          {/* Search Input & Reset Filter */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative w-full sm:max-w-md">
+              <IconSearch className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                placeholder="Search by member, phone, plan, or notes..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="pl-9 pr-8"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('')
+                    setCurrentPage(1)
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  title="Clear search"
+                >
+                  <IconX className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {(statusFilter !== 'all' || searchTerm) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStatusFilter('all')
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground self-start sm:self-auto"
+              >
+                Reset filters
+              </Button>
+            )}
+          </div>
+        </CardContent>
       </Card>
 
       {/* Memberships Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Memberships</CardTitle>
+          <CardTitle>
+            {statusFilter === 'all' ? 'All Memberships' : `${statusFilter} Memberships`}
+          </CardTitle>
           <CardDescription>
-            {isLoading ? 'Loading memberships...' : `Total: ${sortedMemberships.length} memberships`}
+            {isLoading
+              ? 'Loading memberships...'
+              : `Showing ${sortedMemberships.length} ${statusFilter === 'all' ? '' : statusFilter.toLowerCase() + ' '}membership${sortedMemberships.length === 1 ? '' : 's'}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -709,7 +830,9 @@ function MembershipsPageContent() {
                     {sortedMemberships.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                          No memberships found
+                          {statusFilter !== 'all'
+                            ? `No ${statusFilter.toLowerCase()} memberships found`
+                            : 'No memberships found'}
                         </TableCell>
                       </TableRow>
                     ) : (
