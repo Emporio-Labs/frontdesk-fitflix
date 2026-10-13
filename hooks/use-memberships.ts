@@ -126,7 +126,12 @@ export function usePauseMembership() {
 export function useResumeMembership() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => membershipService.resume(id),
+    mutationFn: (params: string | { id: string; resumedAt?: string; reason?: string }) => {
+      const id = typeof params === 'string' ? params : params.id
+      const payload =
+        typeof params === 'string' ? undefined : { resumedAt: params.resumedAt, reason: params.reason }
+      return membershipService.resume(id, payload)
+    },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.memberships.all() })
       // Surface a capped credit explicitly — the member will otherwise notice

@@ -33,6 +33,7 @@ import {
   IconPlayerPlay,
   IconSearch,
   IconX,
+  IconInfoCircle,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -79,6 +80,8 @@ function MembershipsPageContent() {
   const [editingMembership, setEditingMembership] = useState<Membership | null>(null)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [resumingMembership, setResumingMembership] = useState<Membership | null>(null)
+  const [resumeDateInput, setResumeDateInput] = useState('')
   const [hasHandledAssignParam, setHasHandledAssignParam] = useState(false)
   const [isLockedMember, setIsLockedMember] = useState(false)
   const [formData, setFormData] = useState({
@@ -89,6 +92,7 @@ function MembershipsPageContent() {
     startDate: '',
     endDate: '',
     notes: '',
+    resumedAt: '',
   })
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12
@@ -105,19 +109,20 @@ function MembershipsPageContent() {
 
   const assignUserId = searchParams.get('assignUserId') || ''
 
-  const isStartDateDisabled = useMemo(() => {
-    if (!editingMembership) return false
-    const startDateStr = formatDateToInput(editingMembership.startDate)
-    if (!startDateStr) return false
-
+  const todayStr = useMemo(() => {
     const d = new Date()
     const year = d.getFullYear()
     const month = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
-    const todayStr = `${year}-${month}-${day}`
+    return `${year}-${month}-${day}`
+  }, [])
 
+  const isStartDateDisabled = useMemo(() => {
+    if (!editingMembership) return false
+    const startDateStr = formatDateToInput(editingMembership.startDate)
+    if (!startDateStr) return false
     return startDateStr < todayStr
-  }, [editingMembership])
+  }, [editingMembership, todayStr])
 
   const selectedPlan = useMemo(
     () => membershipPlans.find((plan) => plan.id === formData.planId),
@@ -335,7 +340,7 @@ function MembershipsPageContent() {
       return
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       userId: formData.userId.trim(),
       planId: selectedPlan.id,
       planName: selectedPlan.planName,
@@ -349,6 +354,10 @@ function MembershipsPageContent() {
       notes: formData.notes,
     }
 
+    if (editingMembership?.status === 'Paused' && formData.status === 'Active') {
+      payload.resumedAt = formData.resumedAt || todayStr
+    }
+
     const createdUserId = formData.userId
     if (editingMembership) {
       await updateMembership.mutateAsync({ id: editingMembership.id, payload })
@@ -359,7 +368,7 @@ function MembershipsPageContent() {
       await createMembership.mutateAsync({
         ...payload,
         locationId: selectedLocationId ?? undefined,
-      })
+      } as any)
     }
 
     resetForm()
@@ -406,6 +415,7 @@ function MembershipsPageContent() {
       startDate: formatDateToInput(membership.startDate),
       endDate: formatDateToInput(membership.endDate),
       notes: membership.notes,
+      resumedAt: todayStr,
     })
     setIsLockedMember(true)
     setIsAddDialogOpen(true)
@@ -424,6 +434,7 @@ function MembershipsPageContent() {
       startDate: '',
       endDate: '',
       notes: '',
+      resumedAt: '',
     })
     setIsLockedMember(false)
   }
@@ -640,6 +651,28 @@ function MembershipsPageContent() {
                     )}
                   </div>
                 </div>
+                {editingMembership?.status === 'Paused' && formData.status === 'Active' && (
+                  <div className="rounded-lg border bg-muted/30 p-3.5 text-sm space-y-2">
+                    <div className="flex items-center gap-2">
+                      <IconInfoCircle className="w-4 h-4 text-primary shrink-0" />
+                      <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                        Member Returned On (Effective Resume Date)
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      If the member actually returned to the gym earlier (e.g. last week), select that date. Frozen days up to that date will be credited back to push the expiry date forward, and days since will count as active gym use.
+                    </p>
+                    <div className="max-w-xs">
+                      <Input
+                        type="date"
+                        className="bg-background font-medium"
+                        value={formData.resumedAt}
+                        max={todayStr}
+                        onChange={(e) => setFormData({ ...formData, resumedAt: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">Start Date</label>
@@ -886,9 +919,10 @@ function MembershipsPageContent() {
                                   size="sm"
                                   variant="outline"
                                   title="Resume and credit the frozen days back"
-                                  onClick={() =>
-                                    resumeMembership.mutate(membership.id)
-                                  }
+                                  onClick={() => {
+                                    setResumingMembership(membership)
+                                    setResumeDateInput(todayStr)
+                                  }}
                                   disabled={resumeMembership.isPending}
                                 >
                                   <IconPlayerPlay className="w-4 h-4" />
@@ -953,6 +987,108 @@ function MembershipsPageContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Resume Confirmation Dialog */}
+      {resumingMembership && (
+        <Dialog
+          open={!!resumingMembership}
+          onOpenChange={(open) => {
+            if (!open) {
+              setResumingMembership(null)
+              setResumeDateInput('')
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <IconPlayerPlay className="w-5 h-5 text-primary" />
+                Resume Membership
+              </DialogTitle>
+              <DialogDescription>
+                Re-activate membership for <strong className="text-foreground">{getMembershipUsername(resumingMembership)}</strong>
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-1">
+              {/* Membership Summary Card */}
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-xs">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="font-semibold text-sm text-foreground">{resumingMembership.planName}</span>
+                  <Badge className={getStatusColor(resumingMembership.status)}>{resumingMembership.status}</Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-muted-foreground pt-0.5">
+                  <div>
+                    <span className="block font-medium text-foreground">Current Expiry</span>
+                    {formatDateOnly(resumingMembership.endDate)}
+                  </div>
+                  <div>
+                    <span className="block font-medium text-foreground">Credits Remaining</span>
+                    {resumingMembership.creditsRemaining} / {resumingMembership.creditsIncluded}
+                  </div>
+                </div>
+              </div>
+
+              {/* Effective Resume Date Input */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground flex items-center justify-between">
+                  <span>Member Returned On</span>
+                  <span className="text-xs text-muted-foreground font-normal">Effective Date</span>
+                </label>
+                <Input
+                  type="date"
+                  className="font-medium bg-background"
+                  value={resumeDateInput}
+                  max={todayStr}
+                  onChange={(e) => setResumeDateInput(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Defaults to today. If the member returned earlier (e.g. last week), select that date so their freeze credit is calculated accurately.
+                </p>
+              </div>
+
+              {/* Informative Explanation Banner */}
+              <div className="rounded-lg border border-border/80 bg-muted/40 p-3 text-xs text-muted-foreground flex items-start gap-2.5">
+                <IconInfoCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div className="space-y-1 leading-relaxed">
+                  <p className="font-medium text-foreground">How this works:</p>
+                  <ul className="list-disc list-inside space-y-0.5">
+                    <li>The freeze ends on the chosen date.</li>
+                    <li>Frozen days up to that date are credited back to extend the expiry date.</li>
+                    <li>Any days between the return date and today count as active workout days already used.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setResumingMembership(null)
+                    setResumeDateInput('')
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!resumingMembership) return
+                    await resumeMembership.mutateAsync({
+                      id: resumingMembership.id,
+                      resumedAt: resumeDateInput || todayStr,
+                    })
+                    setResumingMembership(null)
+                    setResumeDateInput('')
+                  }}
+                  disabled={resumeMembership.isPending}
+                >
+                  {resumeMembership.isPending ? 'Resuming...' : 'Confirm & Resume'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Details Dialog */}
       {selectedMembership && (
