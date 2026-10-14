@@ -23,6 +23,7 @@ import {
   IconRefresh,
   IconShield,
   IconBuildingStore,
+  IconCalendarEvent,
   IconChecklist,
   IconVolume,
   IconVolumeOff,
@@ -561,7 +562,46 @@ export default function ConciergeAlertsPage() {
                         </div>
 
                         {/* Action buttons */}
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          {/* FX-41.4: 1-Click Call Member */}
+                          {alert.relatedEntity?.entityType === 'booking' && (alert.relatedEntity?.metadata?.memberPhone || alert.relatedEntity?.summary?.match(/\+?[0-9]{10,13}/)?.[0]) && (
+                            <Button
+                              asChild
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 text-xs h-8 text-emerald-600 border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-700"
+                            >
+                              <a
+                                href={`tel:${alert.relatedEntity?.metadata?.memberPhone || alert.relatedEntity?.summary?.match(/\+?[0-9]{10,13}/)?.[0]}`}
+                                title="Call member directly"
+                              >
+                                <IconPhone className="h-3.5 w-3.5" />
+                                <span>Call</span>
+                              </a>
+                            </Button>
+                          )}
+
+                          {/* FX-41.4: 1-Click Rebook Straight to Booking */}
+                          {alert.relatedEntity?.entityType === 'booking' && alert.relatedEntity?.entityId && (
+                            <Button
+                              asChild
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 text-xs h-8 text-primary border-primary/40 hover:bg-primary/10"
+                            >
+                              <Link
+                                href={
+                                  alert.relatedEntity?.metadata?.deepLinkUrl ||
+                                  `/admin/personal-training?highlight=${alert.relatedEntity.entityId}&action=rebook`
+                                }
+                                title="Open booking to rebook"
+                              >
+                                <IconCalendarEvent className="h-3.5 w-3.5" />
+                                <span>Rebook</span>
+                              </Link>
+                            </Button>
+                          )}
+
                           {isOpen && (
                             <Button
                               size="sm"

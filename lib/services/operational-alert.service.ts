@@ -10,6 +10,8 @@ export type AlertType =
   | 'emergency_call'
   | 'operational_disruption'
   | 'manual_staff_alert'
+  | 'member_no_show'
+  | 'expert_unavailable'
 
 export interface OperationalAlert {
   _id: string
@@ -30,6 +32,7 @@ export interface OperationalAlert {
     entityType: 'lead' | 'session' | 'booking' | 'other'
     entityId: string
     summary?: string
+    metadata?: Record<string, any>
   }
   acknowledgedBy?: {
     userId: string

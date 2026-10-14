@@ -2,12 +2,15 @@
 
 import { Suspense, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import {
   IconAlertTriangle,
   IconBuildingStore,
+  IconCalendarEvent,
   IconClock,
   IconFlame,
   IconFocusCentered,
+  IconPhone,
   IconUserCheck,
   IconVolume,
   IconX,
@@ -240,7 +243,47 @@ function PinnedAlertCard({
           </span>
         </span>
 
-        <div className="flex items-center gap-2">
+        {/* Actions */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* FX-41.4: 1-Click Call Member */}
+          {alert.relatedEntity?.entityType === 'booking' && (alert.relatedEntity?.metadata?.memberPhone || alert.relatedEntity?.summary?.match(/\+?[0-9]{10,13}/)?.[0]) && (
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs px-2 gap-1 text-emerald-600 border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-700"
+            >
+              <a
+                href={`tel:${alert.relatedEntity?.metadata?.memberPhone || alert.relatedEntity?.summary?.match(/\+?[0-9]{10,13}/)?.[0]}`}
+                title="Call member directly"
+              >
+                <IconPhone className="h-3 w-3" />
+                <span>Call</span>
+              </a>
+            </Button>
+          )}
+
+          {/* FX-41.4: 1-Click Rebook Straight to Booking */}
+          {alert.relatedEntity?.entityType === 'booking' && alert.relatedEntity?.entityId && (
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs px-2 gap-1 text-primary border-primary/40 hover:bg-primary/10"
+            >
+              <Link
+                href={
+                  alert.relatedEntity?.metadata?.deepLinkUrl ||
+                  `/admin/personal-training?highlight=${alert.relatedEntity.entityId}&action=rebook`
+                }
+                title="Open booking to rebook"
+              >
+                <IconCalendarEvent className="h-3 w-3" />
+                <span>Rebook</span>
+              </Link>
+            </Button>
+          )}
+
           {isWarning && (
             <Button
               size="sm"

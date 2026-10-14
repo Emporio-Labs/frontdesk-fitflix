@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   IconCalendar,
   IconCheck,
@@ -44,7 +45,17 @@ import { ExpertAvailabilityEditor } from '@/components/expert-availability-edito
 import { LogWorkoutDialog } from '@/components/personal-training/log-workout-dialog'
 
 export default function PersonalTrainingAdminPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading PT Dashboard...</div>}>
+      <PersonalTrainingAdminPageInner />
+    </Suspense>
+  )
+}
+
+function PersonalTrainingAdminPageInner() {
   const { user } = useAuth()
+  const searchParams = useSearchParams()
+  const targetBookingId = searchParams?.get('highlight') || searchParams?.get('bookingId') || null
   const isTrainer = user?.role === 'trainer'
   // Hosted by VideoConferenceProvider (root layout): the session keeps running
   // if the trainer navigates elsewhere in Frontdesk mid-call.
@@ -338,8 +349,21 @@ export default function PersonalTrainingAdminPage() {
                       <TableBody>
                         {(bookings || []).map((b, idx) => {
                           const row = describeBooking(b)
+                          const isTarget = Boolean(
+                            targetBookingId &&
+                              (targetBookingId === row.bookingId ||
+                                targetBookingId === (b as any)._id ||
+                                targetBookingId === (b as any).id)
+                          )
                           return (
-                            <TableRow key={row.bookingId || `booking-${idx}-${b.startTime}`}>
+                            <TableRow
+                              key={row.bookingId || `booking-${idx}-${b.startTime}`}
+                              className={
+                                isTarget
+                                  ? 'bg-primary/10 border-2 border-primary ring-2 ring-primary/40 font-semibold transition-all'
+                                  : ''
+                              }
+                            >
                               <TableCell className="font-medium whitespace-nowrap">
                                 {b.startTime} – {b.endTime}
                               </TableCell>
