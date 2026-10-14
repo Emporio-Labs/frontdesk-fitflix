@@ -101,9 +101,12 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: UpdateUserPayload }) =>
       userService.update(id, payload),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       qc.invalidateQueries({ queryKey: queryKeys.users.all() })
-      qc.invalidateQueries({ queryKey: queryKeys.users.detail(data.user.id) })
+      const targetId = data?.user?.id || (data?.user as any)?._id || variables?.id
+      if (targetId) {
+        qc.invalidateQueries({ queryKey: queryKeys.users.detail(targetId) })
+      }
       toast.success(data.message || 'User updated successfully')
     },
     onError: (err: any) => {
