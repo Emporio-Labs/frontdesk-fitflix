@@ -31,6 +31,7 @@ import {
   IconBellRinging,
   IconStethoscope,
   IconApple,
+  IconVideo,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -79,6 +80,7 @@ const navGroups = [
       { title: "Spot Booking", url: "/admin/spot-booking", icon: IconCalendarPlus },
       { title: "Slots", url: "/admin/slots", icon: IconClock },
       { title: "Attendance", url: "/admin/attendance", icon: IconCalendarStats },
+      { title: "Livestream Replays", url: "/admin/recordings", icon: IconVideo },
     ],
   },
   {
