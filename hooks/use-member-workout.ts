@@ -1,6 +1,29 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { trainerWorkoutService } from '@/lib/services/trainer-workout.service'
+import {
+  trainerWorkoutService,
+  type MemberAssignment,
+} from '@/lib/services/trainer-workout.service'
 import { toast } from 'sonner'
+
+/**
+ * The member's current (or most recent) plan assignment; `null` when they've
+ * never had one (the endpoint 404s). Keyed under ['user-assignment', userId]
+ * so the existing invalidations after an assign refresh it too.
+ */
+export function useMemberAssignment(userId: string) {
+  return useQuery({
+    queryKey: ['user-assignment', userId, 'summary'],
+    queryFn: async (): Promise<MemberAssignment | null> => {
+      try {
+        return await trainerWorkoutService.getUserAssignment(userId)
+      } catch (err: any) {
+        if (err?.response?.status === 404) return null
+        throw err
+      }
+    },
+    enabled: !!userId,
+  })
+}
 
 export function useActiveMemberWorkoutSession(userId: string) {
   return useQuery({

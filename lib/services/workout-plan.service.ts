@@ -126,6 +126,19 @@ export interface PlanImportPreview {
   summary: PlanImportSummary | null
 }
 
+/**
+ * `POST /workout-plans/:id/assign`. `skipped` = the member was already on this
+ * plan (active — kept as is) or was put back on it; `failed` carries per-member
+ * errors. Assigning replaces any other active plan the member had.
+ */
+export interface AssignUsersResult {
+  planId: string
+  startDate: string
+  created: string[]
+  skipped: string[]
+  failed: Array<{ userId: string; error: string }>
+}
+
 export interface PlanImportResult {
   message: string
   plan: WorkoutPlan
@@ -147,6 +160,7 @@ export const workoutPlanService = {
       status?: string
       goal?: string
       difficulty?: string
+      isTemplate?: boolean
     }
   ): Promise<WorkoutPlanListResponse> => {
     const params: Record<string, string | number> = {}
@@ -155,6 +169,7 @@ export const workoutPlanService = {
     if (filters?.status) params.status = filters.status
     if (filters?.goal) params.goal = filters.goal
     if (filters?.difficulty) params.difficulty = filters.difficulty
+    if (filters?.isTemplate !== undefined) params.isTemplate = String(filters.isTemplate)
 
     const { data } = await apiClient.get('/workout-plans', { params })
     return data
@@ -219,7 +234,7 @@ export const workoutPlanService = {
       userIds: string[]
       startDate?: string
     }
-  ): Promise<WorkoutPlan> => {
+  ): Promise<AssignUsersResult> => {
     const { data } = await apiClient.post(`/workout-plans/${id}/assign`, payload)
     return data
   },

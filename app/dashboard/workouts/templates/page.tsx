@@ -6,12 +6,16 @@ import { useWorkoutPlans } from '@/hooks/use-workout-plans'
 import { PlanCard } from '@/components/workouts/plan-card'
 import { TemplateCategoryFilter } from '@/components/workouts/template-category-filter'
 import { ImportPlanDialog } from '@/components/workouts/import-plan-dialog'
+import { AssignTemplateDialog } from '@/components/workouts/assign-template-dialog'
 import type { WorkoutPlan } from '@/types/workout'
 
 export default function TemplatesPage() {
   const router = useRouter()
   const [category, setCategory] = useState('All')
-  const { data: plansData } = useWorkoutPlans()
+  const [assigning, setAssigning] = useState<WorkoutPlan | null>(null)
+  // Ask for templates only, at the API's max page size: the default page of 20
+  // mixed plans silently dropped templates once there were more than 20 plans.
+  const { data: plansData } = useWorkoutPlans({ isTemplate: true, limit: 100 })
   const plans = plansData?.plans ?? []
 
   const templates = plans.filter((p) => p.isTemplate)
@@ -60,10 +64,13 @@ export default function TemplatesPage() {
               plan={plan}
               showUseTemplate
               onUseTemplate={() => handleUseTemplate(plan)}
+              onAssign={() => setAssigning(plan)}
             />
           ))}
         </div>
       )}
+
+      <AssignTemplateDialog plan={assigning} onOpenChange={(open) => !open && setAssigning(null)} />
     </div>
   )
 }

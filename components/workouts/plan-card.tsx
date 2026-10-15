@@ -13,10 +13,12 @@ export function PlanCard({
   plan,
   showUseTemplate,
   onUseTemplate,
+  onAssign,
 }: {
   plan: WorkoutPlan
   showUseTemplate?: boolean
   onUseTemplate?: () => void
+  onAssign?: () => void
 }) {
   const goalLabel = PLAN_GOALS.find((g) => g.value === plan.goal)?.label ?? plan.goal
   const splitLabel = SPLIT_TYPES.find((s) => s.value === plan.splitType)?.label ?? plan.splitType
@@ -60,8 +62,18 @@ export function PlanCard({
         </div>
 
         <div className="flex gap-2 pt-1">
+          {onAssign && (
+            <Button size="sm" variant="default" className="flex-1" onClick={onAssign}>
+              Assign
+            </Button>
+          )}
           {showUseTemplate && onUseTemplate ? (
-            <Button size="sm" variant="default" className="flex-1" onClick={onUseTemplate}>
+            <Button
+              size="sm"
+              variant={onAssign ? 'outline' : 'default'}
+              className="flex-1"
+              onClick={onUseTemplate}
+            >
               Use Template
             </Button>
           ) : (

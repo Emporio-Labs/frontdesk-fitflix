@@ -80,6 +80,22 @@ export interface WorkoutStats {
   personalRecords: unknown[]
 }
 
+export type AssignmentDayStatus = 'pending' | 'completed' | 'missed'
+
+/**
+ * `GET /workout-plans/assignments/user/:userId` — the member's active
+ * assignment, or their most recent one when none is active (check `status`).
+ * `userDays` is the member's own copy of the plan's days.
+ */
+export interface MemberAssignment {
+  _id: string
+  status: string
+  startDate: string
+  planId: { _id: string; name: string; goal?: string; splitType?: string } | null
+  dayProgress: Array<{ dayNumber: number; scheduledDate: string; status: AssignmentDayStatus }>
+  userDays: Array<{ dayNumber: number; name: string; isRestDay?: boolean; exercises: any[] }>
+}
+
 export const trainerWorkoutService = {
   getActiveSession: async (userId: string): Promise<{ session: DetailedWorkoutSession | null; elapsedSeconds: number }> => {
     const { data } = await apiClient.get(`/trainers/me/members/${userId}/workouts/active`)

@@ -31,6 +31,7 @@ import {
 import { GrantGraceDialog } from '@/components/grant-grace-dialog'
 import { useUser } from '@/hooks/use-users'
 import { MemberWorkoutJourney } from '@/components/workouts/member-workout-journey'
+import { MemberWorkoutPlanCard } from '@/components/workouts/member-workout-plan-card'
 import { useTrainers, useAssignTrainerToUser } from '@/hooks/use-trainers'
 import {
   Select,
@@ -610,6 +611,9 @@ export default function UserDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* ─── WORKOUT PLAN ─── */}
+          <MemberWorkoutPlanCard member={user} />
 
           {/* ─── WORKOUT JOURNEY ─── */}
           <MemberWorkoutJourney userId={userId} />
