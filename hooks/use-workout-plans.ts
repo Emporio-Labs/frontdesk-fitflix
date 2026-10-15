@@ -83,6 +83,29 @@ export function useUpdateWorkoutPlan() {
   })
 }
 
+export function usePreviewWorkoutPlanImport() {
+  return useMutation({
+    mutationFn: (file: File) => workoutPlanService.previewImport(file),
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || 'Could not read the Excel file')
+    },
+  })
+}
+
+export function useImportWorkoutPlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => workoutPlanService.importFromExcel(file),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.workoutPlans.all() })
+      toast.success(data.message || 'Workout plan imported')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || 'Failed to import workout plan')
+    },
+  })
+}
+
 export function useDeleteWorkoutPlan() {
   const qc = useQueryClient()
   return useMutation({

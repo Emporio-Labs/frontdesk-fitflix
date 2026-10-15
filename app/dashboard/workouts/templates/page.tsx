@@ -6,6 +6,7 @@ import { useWorkoutStore } from '@/stores/workout-store'
 import { useWorkoutPlans } from '@/hooks/use-workout-plans'
 import { PlanCard } from '@/components/workouts/plan-card'
 import { TemplateCategoryFilter } from '@/components/workouts/template-category-filter'
+import { ImportPlanDialog } from '@/components/workouts/import-plan-dialog'
 import { toast } from 'sonner'
 import type { WorkoutPlan } from '@/types/workout'
 
@@ -43,11 +44,14 @@ export default function TemplatesPage() {
 
   return (
     <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Templates</h2>
-        <p className="text-muted-foreground">
-          Pre-built workout plans ready to customize and assign
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Templates</h2>
+          <p className="text-muted-foreground">
+            Pre-built workout plans ready to customize and assign
+          </p>
+        </div>
+        <ImportPlanDialog triggerVariant="default" />
       </div>
 
       <TemplateCategoryFilter value={category} onValueChange={setCategory} />
@@ -56,7 +60,7 @@ export default function TemplatesPage() {
         <div className="text-center py-16">
           <p className="text-sm text-muted-foreground">
             {templates.length === 0
-              ? 'No templates yet. Create a plan and mark it as a template.'
+              ? 'No templates yet. Create a plan and mark it as a template, or import one from Excel.'
               : 'No templates match this filter.'}
           </p>
         </div>

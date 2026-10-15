@@ -74,6 +74,71 @@ export interface BatchUpdateSchedulePayload {
   }>
 }
 
+/** One problem in an uploaded plan workbook. `row` is the 1-based Excel row. */
+export interface PlanImportIssue {
+  sheet: string
+  row?: number
+  column?: string
+  message: string
+}
+
+export interface PlanImportSummary {
+  days: number
+  trainingDays: number
+  restDays: number
+  exercises: number
+}
+
+/** Parsed plan returned by a dry-run import (exercise names already resolved). */
+export interface PlanImportPreviewPlan {
+  name: string
+  description: string
+  difficulty: string
+  duration: number
+  goal: string
+  splitType: string
+  status: string
+  isTemplate: boolean
+  templateCategory: string | null
+  days: Array<{
+    dayNumber: number
+    name: string
+    isRestDay: boolean
+    exercises: Array<{
+      exerciseId: string
+      exerciseName: string
+      section: string
+      targetSets: number
+      targetReps: number
+      targetWeightKg: number
+      restSeconds: number
+      durationSeconds: number | null
+      notes: string | null
+    }>
+  }>
+}
+
+export interface PlanImportPreview {
+  valid: boolean
+  plan: PlanImportPreviewPlan | null
+  errors: PlanImportIssue[]
+  warnings: PlanImportIssue[]
+  summary: PlanImportSummary | null
+}
+
+export interface PlanImportResult {
+  message: string
+  plan: WorkoutPlan
+  warnings: PlanImportIssue[]
+  summary: PlanImportSummary
+}
+
+const excelForm = (file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return form
+}
+
 export const workoutPlanService = {
   getAll: async (
     filters?: {
@@ -92,6 +157,31 @@ export const workoutPlanService = {
     if (filters?.difficulty) params.difficulty = filters.difficulty
 
     const { data } = await apiClient.get('/workout-plans', { params })
+    return data
+  },
+
+  /** Excel template (.xlsx) including the caller's exercise library. */
+  downloadImportTemplate: async (): Promise<Blob> => {
+    const { data } = await apiClient.get('/workout-plans/import/template', {
+      responseType: 'blob',
+    })
+    return data
+  },
+
+  /** Parse + validate an uploaded workbook without saving anything. */
+  previewImport: async (file: File): Promise<PlanImportPreview> => {
+    const { data } = await apiClient.post('/workout-plans/import', excelForm(file), {
+      params: { dryRun: 'true' },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
+  /** Create the plan from the workbook. 400 carries `details.errors`. */
+  importFromExcel: async (file: File): Promise<PlanImportResult> => {
+    const { data } = await apiClient.post('/workout-plans/import', excelForm(file), {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return data
   },
 
