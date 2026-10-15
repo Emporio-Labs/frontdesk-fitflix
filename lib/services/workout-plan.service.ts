@@ -168,6 +168,14 @@ export const workoutPlanService = {
     return data
   },
 
+  /** The saved plan as a filled import template (.xlsx). */
+  exportToExcel: async (id: string): Promise<Blob> => {
+    const { data } = await apiClient.get(`/workout-plans/${id}/export`, {
+      responseType: 'blob',
+    })
+    return data
+  },
+
   /** Parse + validate an uploaded workbook without saving anything. */
   previewImport: async (file: File): Promise<PlanImportPreview> => {
     const { data } = await apiClient.post('/workout-plans/import', excelForm(file), {

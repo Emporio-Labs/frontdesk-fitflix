@@ -11,7 +11,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-import { IconArrowLeft, IconDeviceFloppy, IconPlayerPlay, IconLoader2 } from '@tabler/icons-react'
+import {
+  IconArrowLeft,
+  IconDeviceFloppy,
+  IconFileSpreadsheet,
+  IconPlayerPlay,
+  IconLoader2,
+} from '@tabler/icons-react'
+import { workoutPlanService } from '@/lib/services/workout-plan.service'
+import { fileSlug, saveBlob } from '@/lib/download'
 import { useWorkoutStore } from '@/stores/workout-store'
 import { PlanConfigPanel } from '@/components/workouts/plan-config-panel'
 import { DayBuilderPanel } from '@/components/workouts/day-builder-panel'
@@ -163,6 +171,22 @@ export function PlanBuilderLayout({
     }
   }
 
+  const [isExporting, setIsExporting] = useState(false)
+  const savedPlanId = mode === 'edit' ? plan?._id : undefined
+
+  const handleExport = async () => {
+    if (!savedPlanId) return
+    setIsExporting(true)
+    try {
+      const blob = await workoutPlanService.exportToExcel(savedPlanId)
+      saveBlob(blob, `${fileSlug(plan?.name ?? '', 'workout-plan')}.xlsx`)
+    } catch {
+      toast.error('Failed to export the plan')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-var(--header-height))]">
       {/* Toolbar */}
@@ -183,6 +207,23 @@ export function PlanBuilderLayout({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {savedPlanId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs px-2.5 sm:px-3"
+              onClick={handleExport}
+              disabled={isExporting}
+              title="Download the last saved version as an Excel file you can edit and import as a new plan"
+            >
+              {isExporting ? (
+                <IconLoader2 className="w-3.5 h-3.5 sm:mr-1 animate-spin" />
+              ) : (
+                <IconFileSpreadsheet className="w-3.5 h-3.5 sm:mr-1" />
+              )}
+              <span className="hidden sm:inline">Export to Excel</span>
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

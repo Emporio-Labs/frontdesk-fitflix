@@ -37,6 +37,7 @@ import {
   type PlanImportPreview,
 } from '@/lib/services/workout-plan.service'
 import type { Difficulty } from '@/types/workout'
+import { saveBlob } from '@/lib/download'
 
 const SECTION_LABEL: Record<string, string> = {
   warmup: 'Warm-up',
@@ -167,15 +168,7 @@ export function ImportPlanDialog({ triggerVariant = 'outline' }: { triggerVarian
   const handleDownload = async () => {
     setDownloading(true)
     try {
-      const blob = await workoutPlanService.downloadImportTemplate()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'workout-plan-template.xlsx'
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      saveBlob(await workoutPlanService.downloadImportTemplate(), 'workout-plan-template.xlsx')
     } catch {
       toast.error('Failed to download the template')
     } finally {
@@ -227,9 +220,8 @@ export function ImportPlanDialog({ triggerVariant = 'outline' }: { triggerVarian
           <DialogTitle>Import workout plan from Excel</DialogTitle>
           <DialogDescription>
             Fill in the template&apos;s <strong>Plan Details</strong> and <strong>Workout</strong>{' '}
-            sheets, one row per exercise. Copy exercise names from the{' '}
-            <strong>Exercise Library</strong> sheet. You&apos;ll see a preview before anything is
-            saved.
+            sheets, one row per exercise. Most cells have a drop-down, including Exercise. You&apos;ll
+            see a preview before anything is saved.
           </DialogDescription>
         </DialogHeader>
 
@@ -237,7 +229,8 @@ export function ImportPlanDialog({ triggerVariant = 'outline' }: { triggerVarian
           <div className="rounded-md border p-3 space-y-2">
             <p className="text-sm font-medium">1. Get the template</p>
             <p className="text-xs text-muted-foreground">
-              Includes instructions, a filled example and the current exercise library.
+              Includes instructions, a filled example and drop-downs with the current exercise
+              library.
             </p>
             <Button variant="outline" size="sm" onClick={handleDownload} disabled={downloading}>
               <IconDownload className="mr-2 h-4 w-4" />

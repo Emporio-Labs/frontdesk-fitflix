@@ -218,3 +218,7 @@ instead of the drag-and-drop builder. Parsing and validation happen on the **bac
   `/dashboard/workouts/:id`. Mounted on `/dashboard/workouts/templates` and `/dashboard/workouts/plans`.
 - A rejected (non-dry-run) import returns 400 with the issue list under `err.response.data.details.errors`
   (the backend's 4xx normaliser keeps only `{ error, code, details }`).
+- **Export:** `workoutPlanService.exportToExcel(id)` (`GET /workout-plans/:id/export`) → "Export to Excel" button in
+  `components/workouts/plan-builder-layout.tsx` toolbar (edit mode only; exports the last *saved* version).
+- `lib/download.ts` — `saveBlob(blob, filename)` and `fileSlug(name)` helpers for blob downloads.
+- The template's drop-downs/validation are generated server-side; no spreadsheet library in the frontdesk.
