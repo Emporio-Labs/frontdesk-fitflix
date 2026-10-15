@@ -167,7 +167,7 @@ export function AlertRulesSettingsCard() {
           <div className="flex items-center gap-2">
             <IconAlertTriangle className="h-5 w-5 text-amber-500" />
             <CardTitle className="text-lg font-bold">
-              Operational Alert Rules & Escalation Matrix (FX-36)
+              Operational Alert Rules & Escalation Matrix
             </CardTitle>
             <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">
               Admin Config

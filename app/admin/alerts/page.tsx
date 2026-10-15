@@ -27,7 +27,9 @@ import {
   IconChecklist,
   IconVolume,
   IconVolumeOff,
+  IconFileSpreadsheet,
 } from '@tabler/icons-react'
+import { AlertSlaReportsView } from '@/components/alerts/alert-sla-reports-view'
 import {
   useLeads,
   useUpdateLead,
@@ -264,7 +266,7 @@ export default function ConciergeAlertsPage() {
               variant="outline"
               className="ml-2 font-mono uppercase tracking-widest text-[10px] bg-rose-500/10 text-rose-600 border-rose-500/30"
             >
-              FX-35 Live
+              Live Monitor
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
@@ -374,10 +376,10 @@ export default function ConciergeAlertsPage() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-11 bg-muted/60 p-1 rounded-xl">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 h-11 bg-muted/60 p-1 rounded-xl">
           <TabsTrigger value="operational" className="gap-2 text-xs font-semibold rounded-lg">
             <IconAlertTriangle className="h-4 w-4 text-rose-500" />
-            <span>Staff Alerts (FX-35)</span>
+            <span>Staff Alerts</span>
             {openAlerts.length > 0 && (
               <Badge variant="destructive" className="h-5 px-1.5 text-[10px] font-bold">
                 {openAlerts.length}
@@ -393,6 +395,11 @@ export default function ConciergeAlertsPage() {
                 {metrics.pending}
               </Badge>
             )}
+          </TabsTrigger>
+
+          <TabsTrigger value="sla-reports" className="gap-2 text-xs font-semibold rounded-lg">
+            <IconFileSpreadsheet className="h-4 w-4 text-emerald-500" />
+            <span>SLA & Escalation Reports</span>
           </TabsTrigger>
 
           <TabsTrigger value="reports" className="gap-2 text-xs font-semibold rounded-lg">
@@ -768,6 +775,11 @@ export default function ConciergeAlertsPage() {
               })
             )}
           </div>
+        </TabsContent>
+
+        {/* TAB: SLA & ESCALATION REPORTS (FX-44) */}
+        <TabsContent value="sla-reports" className="space-y-4">
+          <AlertSlaReportsView />
         </TabsContent>
 
         {/* TAB 3: REPORTS */}
