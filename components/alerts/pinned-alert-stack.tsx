@@ -1,7 +1,7 @@
 'use client'
 
-import { Suspense, useEffect, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
   IconAlertTriangle,
@@ -14,6 +14,9 @@ import {
   IconUserCheck,
   IconVolume,
   IconX,
+  IconChevronDown,
+  IconChevronUp,
+  IconBellRinging,
 } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,10 +25,9 @@ import { useOperationalAlerts } from '@/hooks/use-operational-alerts'
 
 /**
  * FX-38 & FX-39: Globally Pinned Urgent Alert Stack
- * - Pins open alerts across every Frontdesk page.
- * - Stacks multiple open alerts in strict order of severity and age.
- * - Focuses and highlights alert if opened via deep-link push notification (FX-39.3).
- * - Notifies local service worker to clear notification upon acknowledge (FX-39.4).
+ * - Pins open alerts across Frontdesk pages.
+ * - Suppressed on /admin/overview where alerts are embedded directly into the Live Operations Board.
+ * - Collapsible so it never covers the screen uninvited.
  */
 export function PinnedAlertStack() {
   return (
@@ -36,11 +38,13 @@ export function PinnedAlertStack() {
 }
 
 function PinnedAlertStackInner() {
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const targetAlertId =
     searchParams?.get('alertId') || searchParams?.get('highlight') || null
   const locationScope = useOptionalLocationScope()
   const branchId = locationScope?.selectedLocationId ?? null
+  const [isMinimized, setIsMinimized] = useState(false)
 
   const {
     pinnedAlerts,
@@ -48,6 +52,9 @@ function PinnedAlertStackInner() {
     dismissAlert,
     isAcknowledging,
   } = useOperationalAlerts(branchId)
+
+  // Suppress floating stack entirely on Live Operations Board (alerts are in-page)
+  if (pathname === '/admin/overview') return null
 
   // FX-39.4: When acknowledging, tell the service worker to close the notification on this device
   const handleAcknowledge = async (id: string) => {
@@ -66,11 +73,47 @@ function PinnedAlertStackInner() {
 
   if (pinnedAlerts.length === 0) return null
 
+  // If minimized, show a compact floating pill that doesn't block the screen
+  if (isMinimized) {
+    return (
+      <aside
+        aria-label="Urgent Operational Alerts"
+        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 pointer-events-auto"
+      >
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={() => setIsMinimized(false)}
+          className="shadow-xl gap-2 font-medium h-9 text-xs"
+        >
+          <IconBellRinging className="w-4 h-4 animate-bounce" />
+          <span>{pinnedAlerts.length} Active Alert{pinnedAlerts.length > 1 ? 's' : ''}</span>
+          <IconChevronUp className="w-3.5 h-3.5" />
+        </Button>
+      </aside>
+    )
+  }
+
   return (
     <aside
       aria-label="Urgent Operational Alerts"
       className="fixed bottom-5 right-5 z-50 flex max-h-[85vh] w-full max-w-[420px] flex-col gap-3 overflow-y-auto p-1 pointer-events-auto"
     >
+      <div className="flex items-center justify-between px-2 py-1 bg-background/90 backdrop-blur-xs rounded-lg border border-border/80 shadow-xs">
+        <span className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground">
+          <IconBellRinging className="w-3.5 h-3.5 text-amber-500" />
+          Active Alerts ({pinnedAlerts.length})
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsMinimized(true)}
+          className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1"
+        >
+          <IconChevronDown className="w-3 h-3" />
+          Minimize
+        </Button>
+      </div>
       {pinnedAlerts.map((alert) => {
         const isTarget = Boolean(targetAlertId && targetAlertId === alert._id)
         const isCritical = alert.severity === 'critical'

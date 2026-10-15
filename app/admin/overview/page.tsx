@@ -20,11 +20,15 @@ import {
   IconShieldLock,
   IconCheck,
   IconChevronRight,
+  IconChevronDown,
+  IconChevronUp,
+  IconX,
   IconLogin,
   IconFilter,
 } from '@tabler/icons-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useBranchBoard } from '@/hooks/use-branch-board'
+import { useOperationalAlerts } from '@/hooks/use-operational-alerts'
 import { useLocationScope } from '@/components/location-scope-provider'
 import type {
   BranchBoardItem,
@@ -64,6 +68,9 @@ export default function OperationsOverviewPage() {
   // Selected branch filter for the board view (optional for admin)
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>('all')
 
+  // In-page alerts view state (toggles open/close without deleting or dismissing)
+  const [showAlertsSection, setShowAlertsSection] = useState(false)
+
   // Quick view modals for staff and sessions drilldown
   const [staffModalBranch, setStaffModalBranch] = useState<BranchBoardItem | null>(null)
   const [sessionModalBranch, setSessionModalBranch] = useState<BranchBoardItem | null>(null)
@@ -76,6 +83,15 @@ export default function OperationsOverviewPage() {
     isClubAdmin ||
     role === 'staff' ||
     role === ('frontdesk' as any)
+
+  const effectiveBranchFilter =
+    selectedBranchFilter === 'all' ? undefined : selectedBranchFilter
+
+  const {
+    openAlerts,
+    acknowledgeAlert,
+    isAcknowledging,
+  } = useOperationalAlerts(effectiveBranchFilter)
 
   const {
     branches,
@@ -211,6 +227,41 @@ export default function OperationsOverviewPage() {
             </span>
           )}
 
+          {/* Notification Toggle Button: Opens/Closes the in-page alerts view */}
+          <Button
+            size="sm"
+            variant={showAlertsSection ? 'default' : 'outline'}
+            onClick={() => setShowAlertsSection(!showAlertsSection)}
+            className={`gap-1.5 h-9 transition-colors ${
+              !showAlertsSection && openAlerts.length > 0
+                ? totals.criticalAlerts > 0
+                  ? 'border-rose-500 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300'
+                  : 'border-amber-500 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300'
+                : ''
+            }`}
+            title={showAlertsSection ? 'Close alerts view' : 'View active alerts on board'}
+          >
+            <div className="relative">
+              <IconBellRinging
+                className={`w-4 h-4 ${
+                  totals.criticalAlerts > 0 ? 'animate-bounce text-rose-600' : ''
+                }`}
+              />
+              {openAlerts.length > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" />
+                </span>
+              )}
+            </div>
+            <span>Alerts ({openAlerts.length})</span>
+            {showAlertsSection ? (
+              <IconChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+            ) : (
+              <IconChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+            )}
+          </Button>
+
           <Button
             size="sm"
             variant="outline"
@@ -272,7 +323,11 @@ export default function OperationsOverviewPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-xs">
+          <Card
+            onClick={() => setShowAlertsSection(!showAlertsSection)}
+            className="border-border/60 bg-card/60 backdrop-blur-sm shadow-xs cursor-pointer hover:border-amber-500/50 hover:bg-muted/40 transition-all"
+            title="Click to view/hide alerts on board"
+          >
             <CardContent className="p-4 space-y-1">
               <div className="flex items-center justify-between text-muted-foreground">
                 <span className="text-xs font-medium">Open Alerts</span>
@@ -310,6 +365,116 @@ export default function OperationsOverviewPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* In-Page Collapsible Alerts Section (Toggleable, does NOT delete or dismiss alerts) */}
+      {showAlertsSection && (
+        <Card className="border-amber-400/80 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20 shadow-md transition-all">
+          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-border/50">
+            <div className="flex items-center gap-2">
+              <IconBellRinging className="w-4 h-4 text-amber-600" />
+              <CardTitle className="text-sm font-semibold">
+                Active Operational Alerts ({openAlerts.length})
+              </CardTitle>
+              {totals.criticalAlerts > 0 && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">
+                  {totals.criticalAlerts} Critical
+                </Badge>
+              )}
+              <span className="text-xs text-muted-foreground hidden md:inline">
+                &bull; Closing this section hides the list; it does not dismiss or delete any alerts.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAlertsSection(false)}
+                className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                title="Close alerts view without deleting"
+              >
+                <IconX className="w-3.5 h-3.5" />
+                Close Alerts View
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 space-y-2.5 max-h-[380px] overflow-y-auto">
+            {openAlerts.length === 0 ? (
+              <div className="text-center py-6 text-sm text-muted-foreground">
+                <IconCheck className="w-6 h-6 mx-auto mb-1 text-emerald-500" />
+                All clear! No active operational alerts.
+              </div>
+            ) : (
+              openAlerts.map((alert) => (
+                <div
+                  key={alert._id}
+                  className={`p-3 rounded-lg border transition-all ${
+                    alert.severity === 'critical'
+                      ? 'border-rose-400 bg-rose-50/90 dark:bg-rose-950/50'
+                      : alert.severity === 'warning'
+                      ? 'border-amber-300 bg-amber-50/70 dark:bg-amber-950/40'
+                      : 'border-border/70 bg-card'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant={
+                            alert.severity === 'critical'
+                              ? 'destructive'
+                              : alert.severity === 'warning'
+                              ? 'secondary'
+                              : 'outline'
+                          }
+                          className="text-[10px] uppercase font-bold"
+                        >
+                          {alert.severity}
+                        </Badge>
+                        {alert.branchId && (
+                          <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                            <IconBuildingStore className="w-3 h-3" />
+                            {typeof alert.branchId === 'object' && alert.branchId !== null
+                              ? (alert.branchId as any).name
+                              : 'Club'}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-muted-foreground">
+                          {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-semibold text-foreground">
+                        {alert.title}
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        {alert.message}
+                      </p>
+                      {((alert.relatedEntity?.metadata as any)?.customerName || alert.relatedEntity?.summary) && (
+                        <div className="text-xs bg-background/60 rounded px-2 py-1 mt-1 inline-block border border-border/40">
+                          Target: {(alert.relatedEntity?.metadata as any)?.customerName || alert.relatedEntity?.summary}
+                          {(alert.relatedEntity?.metadata as any)?.goal ? ` - ${(alert.relatedEntity?.metadata as any).goal}` : ''}
+                          {(alert.relatedEntity?.metadata as any)?.customerPhone ? ` (${(alert.relatedEntity?.metadata as any).customerPhone})` : ''}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => acknowledgeAlert(alert._id)}
+                        disabled={isAcknowledging}
+                      >
+                        <IconCheck className="w-3 h-3 text-emerald-600" />
+                        Acknowledge
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Loading Skeletons */}
@@ -483,17 +648,13 @@ export default function OperationsOverviewPage() {
 
                     {/* Metric 4: Open Alerts */}
                     <div
-                      onClick={() =>
-                        navigateToMetric(
-                          branch.id,
-                          `/admin/alerts?branchId=${branch.id}`
-                        )
-                      }
+                      onClick={() => setShowAlertsSection(true)}
                       className={`group cursor-pointer rounded-lg border p-3 transition-colors space-y-1 ${
                         alerts.criticalCount > 0
                           ? 'border-red-400 bg-red-100/50 dark:bg-red-950/40 hover:bg-red-100/80'
                           : 'border-border/70 bg-muted/30 hover:bg-muted/70 hover:border-amber-500/50'
                       }`}
+                      title="Click to view alerts on board"
                     >
                       <div className="flex items-center justify-between text-muted-foreground text-xs">
                         <span className="font-medium">Open Alerts</span>
@@ -564,13 +725,9 @@ export default function OperationsOverviewPage() {
                         Latest Alert:
                       </div>
                       <div
-                        onClick={() =>
-                          navigateToMetric(
-                            branch.id,
-                            `/admin/alerts?branchId=${branch.id}`
-                          )
-                        }
+                        onClick={() => setShowAlertsSection(true)}
                         className="cursor-pointer text-xs p-2 rounded bg-background border border-border/60 hover:border-primary/50 transition-colors flex items-start gap-2"
+                        title="Click to view alerts on board"
                       >
                         <span
                           className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
