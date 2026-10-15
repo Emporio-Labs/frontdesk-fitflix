@@ -53,6 +53,7 @@ const navGroups = [
   {
     items: [
       { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
+      { title: "Operations Board", url: "/admin/overview", icon: IconBuildingStore },
     ],
   },
   {

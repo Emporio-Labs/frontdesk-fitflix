@@ -207,4 +207,7 @@ export const queryKeys = {
   alertRules: {
     all: () => ['alert-rules'] as const,
   },
+  branchBoard: {
+    all: (branchId?: string | null) => ['branch-board', branchId ?? 'all'] as const,
+  },
 }
