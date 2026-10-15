@@ -26,7 +26,9 @@ export default function AdminLayout({
               tables scroll inside their own container instead of being clipped.
               MobileStaffScope stamps the FX-09 mobile-cards attribute when a
               trainer/nutritionist is signed in; admin sessions render unchanged. */}
-          <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+          {/* overflow-x-clip, not -hidden: hidden makes this a scroll container
+              and breaks position: sticky on the pages inside. */}
+          <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
             <MobileStaffScope>{children}</MobileStaffScope>
           </div>
         </SidebarInset>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/hooks/use-auth'
+import { TrainerBottomNav, useTrainerBottomNavVisible } from '@/components/trainer-bottom-nav'
 
 /**
  * FX-09 — role-scoped mobile treatment.
@@ -12,17 +13,30 @@ import { useAuth } from '@/hooks/use-auth'
  * at admin pages on a phone still sees the wide-table layout with a
  * horizontal scroll (FX-09.5 is about desktop, but keeping admin phone
  * behaviour unchanged too avoids surprising anyone).
+ *
+ * Trainers also get a bottom tab bar on phones. `--bottom-nav-h` is set while
+ * it shows, so sticky bottom bars can sit above it
+ * (`bottom-[var(--bottom-nav-h,0px)]`).
  */
 export function MobileStaffScope({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const isStaffPhoneUser = user?.role === 'trainer' || user?.role === 'nutritionist'
+  const navVisible = useTrainerBottomNavVisible()
+  const showTrainerNav = user?.role === 'trainer' && navVisible
 
   return (
     <div
       data-mobile-cards={isStaffPhoneUser ? 'tables' : undefined}
-      className="contents"
+      className={showTrainerNav ? 'contents [--bottom-nav-h:4rem] md:[--bottom-nav-h:0px]' : 'contents'}
     >
       {children}
+      {showTrainerNav && (
+        <>
+          {/* Keeps the end of the page clear of the fixed tab bar. */}
+          <div aria-hidden className="md:hidden h-16 shrink-0" />
+          <TrainerBottomNav />
+        </>
+      )}
     </div>
   )
 }

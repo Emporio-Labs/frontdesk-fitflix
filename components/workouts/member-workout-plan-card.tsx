@@ -10,44 +10,17 @@ import { IconBarbell, IconCalendarEvent, IconEdit, IconPlus, IconRefresh } from 
 import { StatusBadge } from '@/components/status-badge'
 import { useMemberAssignment } from '@/hooks/use-member-workout'
 import { AssignPlanSheet, type AssignPlanMember } from '@/components/workouts/assign-plan-sheet'
-import type { MemberAssignment } from '@/lib/services/trainer-workout.service'
-
-const localIso = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
-// scheduledDate is stored as UTC midnight of the calendar day.
-const scheduledIso = (value: string) => value.slice(0, 10)
-
-const formatDay = (value: string) =>
-  new Date(`${scheduledIso(value)}T00:00:00`).toLocaleDateString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  })
-
-function summarize(assignment: MemberAssignment) {
-  const progress = assignment.dayProgress ?? []
-  const nameOf = (dayNumber: number) =>
-    assignment.userDays?.find((d) => d.dayNumber === dayNumber)?.name ?? `Day ${dayNumber}`
-  const today = localIso(new Date())
-  const todayEntry = progress.find((d) => scheduledIso(d.scheduledDate) === today)
-  const next = progress.find((d) => d.status === 'pending')
-  return {
-    total: progress.length,
-    completed: progress.filter((d) => d.status === 'completed').length,
-    missed: progress.filter((d) => d.status === 'missed').length,
-    today: todayEntry ? { ...todayEntry, name: nameOf(todayEntry.dayNumber) } : null,
-    next: next ? { ...next, name: nameOf(next.dayNumber) } : null,
-    end: progress.length ? progress[progress.length - 1].scheduledDate : null,
-  }
-}
+import {
+  formatScheduledDay as formatDay,
+  isActiveAssignment,
+  summarizeAssignment as summarize,
+} from '@/lib/workout-assignment-summary'
 
 /** Member profile card: the current workout plan, with assign / change / edit-schedule actions. */
 export function MemberWorkoutPlanCard({ member }: { member: AssignPlanMember }) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const { data: assignment, isLoading, isError } = useMemberAssignment(member._id)
-  // The backend matches both "active" and legacy "Active".
-  const active = assignment?.status?.toLowerCase() === 'active' ? assignment : null
+  const active = isActiveAssignment(assignment) ? assignment : null
   const stats = active ? summarize(active) : null
 
   return (

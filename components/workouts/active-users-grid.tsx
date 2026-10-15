@@ -1,23 +1,26 @@
+import { useState } from 'react'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconFlame, IconCalendar } from '@tabler/icons-react'
+import { IconChevronRight, IconFlame, IconSearch } from '@tabler/icons-react'
 import { useUsers } from '@/hooks/use-users'
 import { useMyMembers } from '@/hooks/use-my-members'
 import { useAuth } from '@/hooks/use-auth'
 import { useWorkoutPlans } from '@/hooks/use-workout-plans'
+import { useMemberAssignment } from '@/hooks/use-member-workout'
+import { isActiveAssignment, summarizeAssignment } from '@/lib/workout-assignment-summary'
 
-type AssignedEntry = {
+type RosterEntry = {
   userId: string
   displayName: string
-  planName: string
-  planStatus: string
   email?: string
+  phone?: string
 }
+
+const PAGE = 30
 
 /** Normalise an assignedUsers item — may be a string ID or a populated object. */
 function toUserId(item: any): string {
@@ -30,164 +33,170 @@ function toUserDisplayName(item: any): string | null {
   return item?.username || item?.name || item?.email || null
 }
 
+/**
+ * Trainers: their roster. Admins: everyone who has been assigned a plan.
+ * Each row loads the member's real assignment (plan, day, progress).
+ */
 export function ActiveUsersGrid() {
   const { user: currentUser } = useAuth()
   const isTrainer = currentUser?.role === 'trainer'
+  const [search, setSearch] = useState('')
+  const [shown, setShown] = useState(PAGE)
+
   const { data: users = [], isLoading: usersLoading } = useUsers()
   const { data: myMembers = [], isLoading: myMembersLoading } = useMyMembers()
   const { data: plansData, isLoading: plansLoading } = useWorkoutPlans()
   const plans = plansData?.plans ?? []
 
-  const isLoading = isTrainer ? myMembersLoading || plansLoading : usersLoading || plansLoading
+  const isLoading = isTrainer ? myMembersLoading : usersLoading || plansLoading
 
-  // Build a lookup map from userId -> User for the cross-join fallback
-  const userMap = new Map<string, any>(
-    (users as any[]).map((u) => [u._id?.toString() ?? u.id?.toString(), u])
-  )
-
-  // Collect unique assigned entries across all plans
-  const entriesMap = new Map<string, AssignedEntry>()
-
+  const entries: RosterEntry[] = []
   if (isTrainer) {
-    for (const member of myMembers) {
-      const uid = member._id?.toString() ?? member.id?.toString()
-      if (!uid) continue
-      const displayName = member.name || member.username || member.email || 'Member'
-      
-      // Find active plan assigned to this member
-      const memberPlan = plans.find((p: any) =>
-        (p.assignedUsers ?? []).some((item: any) => toUserId(item) === uid)
-      )
-
-      entriesMap.set(uid, {
-        userId: uid,
-        displayName,
+    for (const member of myMembers as any[]) {
+      const userId = member._id?.toString() ?? member.id?.toString()
+      if (!userId) continue
+      entries.push({
+        userId,
+        displayName: member.name || member.username || member.email || 'Member',
         email: member.email,
-        planName: memberPlan?.name ?? 'No active plan',
-        planStatus: memberPlan?.status ?? '',
+        phone: member.phone,
       })
     }
   } else {
+    const userMap = new Map<string, any>(
+      (users as any[]).map((u) => [u._id?.toString() ?? u.id?.toString(), u])
+    )
+    const seen = new Set<string>()
     for (const plan of plans) {
       for (const item of plan.assignedUsers ?? []) {
         const userId = toUserId(item)
-        if (!userId) continue
-
-        if (entriesMap.has(userId)) continue // already recorded
-
-        const inlineDisplayName = toUserDisplayName(item)
-        const userRecord = userMap.get(userId)
-        const displayName =
-          inlineDisplayName ||
-          userRecord?.username ||
-          userRecord?.name ||
-          userRecord?.email ||
-          userId.slice(-6)
-
-        entriesMap.set(userId, {
+        if (!userId || seen.has(userId)) continue
+        seen.add(userId)
+        const record = userMap.get(userId)
+        entries.push({
           userId,
-          displayName,
-          email: userRecord?.email,
-          planName: plan.name ?? 'Unnamed Plan',
-          planStatus: plan.status ?? '',
+          displayName:
+            toUserDisplayName(item) || record?.username || record?.name || record?.email || userId.slice(-6),
+          email: record?.email,
+          phone: record?.phone,
         })
       }
     }
   }
 
-  const assignedEntries = Array.from(entriesMap.values())
-
-  // Fake-but-stable progress: deterministic from userId string
-  const getProgress = (uid: string) => {
-    let hash = 0
-    for (let i = 0; i < uid.length; i++) {
-      hash = (hash * 31 + uid.charCodeAt(i)) >>> 0
-    }
-    return (hash % 71) + 10 // range: 10–80
-  }
+  const term = search.trim().toLowerCase()
+  const filtered = entries.filter(
+    (e) =>
+      !term ||
+      e.displayName.toLowerCase().includes(term) ||
+      (e.email ?? '').toLowerCase().includes(term) ||
+      (e.phone ?? '').includes(term)
+  )
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div>
-          <CardTitle>{isTrainer ? 'My Assigned Roster' : 'Assigned Members'}</CardTitle>
-          <CardDescription>
-            {isTrainer
-              ? 'Members currently assigned to your personal training roster'
-              : 'Users with active workout plans'}
-          </CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-24 w-full rounded-lg" />
-            ))}
-          </div>
-        ) : assignedEntries.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">
-            {isTrainer ? 'No members currently assigned to your roster' : 'No users assigned to workout plans yet'}
-          </p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {assignedEntries.map((entry) => (
-              <div
-                key={entry.userId}
-                className="flex flex-col justify-between p-3.5 rounded-lg border bg-card hover:bg-muted/40 transition-colors gap-3"
-              >
-                <div className="flex items-start gap-3">
-                  <Avatar className="h-9 w-9 shrink-0">
-                    <AvatarFallback className="text-xs font-medium bg-primary/10">
-                      {entry.displayName.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{entry.displayName}</p>
-                    <p className="text-xs text-muted-foreground truncate">{entry.planName}</p>
-                    {entry.planStatus ? (
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <Progress value={getProgress(entry.userId)} className="h-1 flex-1" />
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] px-1 shrink-0 ${
-                            entry.planStatus === 'Active'
-                              ? 'border-emerald-500 text-emerald-600'
-                              : entry.planStatus === 'Draft'
-                              ? 'border-amber-500 text-amber-600'
-                              : ''
-                          }`}
-                        >
-                          {entry.planStatus}
-                        </Badge>
-                      </div>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] mt-1">
-                        No active plan
-                      </Badge>
-                    )}
-                  </div>
-                </div>
+    <div className="space-y-3">
+      <div className="relative">
+        <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setShown(PAGE)
+          }}
+          placeholder="Search members by name, email or phone"
+          className="pl-9 h-11"
+        />
+      </div>
 
-                <div className="flex flex-col gap-1.5 mt-1">
-                  <Button variant="outline" size="sm" asChild className="w-full h-8 text-xs font-medium">
-                    <Link href={`/dashboard/workouts/members/${entry.userId}`}>
-                      <IconCalendar className="w-3.5 h-3.5 mr-1.5 text-primary" />
-                      View & Edit Schedule
-                    </Link>
-                  </Button>
-                  <Button variant="secondary" size="sm" asChild className="w-full h-8 text-xs font-medium">
-                    <Link href={`/dashboard/workouts/members/${entry.userId}/live`}>
-                      <IconFlame className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
-                      Live Workout Session
-                    </Link>
-                  </Button>
-                </div>
-              </div>
+      {isLoading ? (
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-[72px] w-full rounded-lg" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-10">
+          {entries.length === 0
+            ? isTrainer
+              ? 'No members on your roster yet.'
+              : 'No members have been assigned a workout plan yet.'
+            : 'No members match your search.'}
+        </p>
+      ) : (
+        <>
+          <div className="rounded-lg border divide-y bg-card overflow-hidden md:grid md:grid-cols-2 md:divide-y-0 md:gap-px md:bg-border">
+            {filtered.slice(0, shown).map((entry) => (
+              <MemberRow key={entry.userId} entry={entry} />
             ))}
           </div>
-        )}
-      </CardContent>
-    </Card>
+          {filtered.length > shown && (
+            <Button variant="outline" className="w-full" onClick={() => setShown((n) => n + PAGE)}>
+              Show more ({filtered.length - shown} more)
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function MemberRow({ entry }: { entry: RosterEntry }) {
+  const { data: assignment, isLoading } = useMemberAssignment(entry.userId)
+  const active = isActiveAssignment(assignment) ? assignment : null
+  const stats = active ? summarizeAssignment(active) : null
+
+  return (
+    <div className="flex items-center gap-2 bg-card pr-2">
+      <Link
+        href={`/dashboard/workouts/members/${entry.userId}`}
+        className="flex flex-1 min-w-0 items-center gap-3 p-3 hover:bg-muted/40 active:bg-muted/60 transition-colors"
+      >
+        <Avatar className="h-10 w-10 shrink-0">
+          <AvatarFallback className="text-xs font-medium bg-primary/10">
+            {entry.displayName.slice(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate">{entry.displayName}</p>
+          {isLoading ? (
+            <Skeleton className="h-3 w-32 mt-1.5" />
+          ) : active && stats ? (
+            <>
+              <p className="text-xs text-muted-foreground truncate">
+                {active.planId?.name ?? 'Workout plan'}
+                {stats.today
+                  ? ` · Today: Day ${stats.today.dayNumber}`
+                  : stats.next
+                    ? ` · Next: Day ${stats.next.dayNumber}`
+                    : ' · Finished'}
+              </p>
+              <div className="flex items-center gap-2 mt-1.5">
+                <Progress
+                  value={stats.total ? (stats.completed / stats.total) * 100 : 0}
+                  className="h-1 flex-1"
+                />
+                <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                  {stats.completed}/{stats.total}
+                </span>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-amber-600">No active plan — tap to assign</p>
+          )}
+        </div>
+        <IconChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      </Link>
+      <Button
+        variant="ghost"
+        size="icon"
+        asChild
+        className="h-10 w-10 shrink-0"
+        title="Live workout session"
+      >
+        <Link href={`/dashboard/workouts/members/${entry.userId}/live`} aria-label={`Live session with ${entry.displayName}`}>
+          <IconFlame className="h-5 w-5 text-amber-500" />
+        </Link>
+      </Button>
+    </div>
   )
 }

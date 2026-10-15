@@ -77,7 +77,7 @@ export function AssignPlanSheet({
   const [selectedId, setSelectedId] = useState('')
   const [startDate, setStartDate] = useState(todayIso)
 
-  const { data: listData, isLoading } = useWorkoutPlans({ isTemplate: true, status: 'Active', limit: 100 })
+  const { data: listData, isLoading } = useWorkoutPlans({ isTemplate: true, status: 'Active' })
   const assignMutation = useAssignWorkoutPlan()
 
   const ranked = useMemo(() => {

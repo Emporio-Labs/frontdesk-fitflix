@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useDeferredValue, useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { trainerWorkoutService } from '@/lib/services/trainer-workout.service'
 import {
@@ -80,8 +80,6 @@ export default function MemberLiveWorkoutPage() {
 
   const { data: member, isLoading: memberLoading } = useMyMember(userId)
   const { data: sessionData, isLoading: sessionLoading } = useActiveMemberWorkoutSession(userId)
-  const { data: exercisesData } = useExercises()
-  const allExercises = exercisesData?.exercises ?? []
 
   const startSessionMutation = useStartMemberWorkoutSession(userId)
   const session = sessionData?.session
@@ -93,6 +91,10 @@ export default function MemberLiveWorkoutPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [targetSection, setTargetSection] = useState<WorkoutSectionKey>('workout')
   const [exerciseSearch, setExerciseSearch] = useState('')
+  // Search on the server: filtering one page locally hid most of the library.
+  const exerciseQuery = useDeferredValue(exerciseSearch.trim())
+  const { data: exercisesData } = useExercises({ search: exerciseQuery || undefined, limit: 100 })
+  const allExercises = exercisesData?.exercises ?? []
   const [selectedExercise, setSelectedExercise] = useState<any>(null)
   const [newTargetSets, setNewTargetSets] = useState(3)
   const [newTargetReps, setNewTargetReps] = useState(10)

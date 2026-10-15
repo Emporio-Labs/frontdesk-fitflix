@@ -36,7 +36,9 @@ export function useWorkoutPlans(filters?: {
 }) {
   return useQuery({
     queryKey: queryKeys.workoutPlans.list(filters),
-    queryFn: () => workoutPlanService.getAll(filters),
+    // No limit = the whole list (all pages); a limit = just that page.
+    queryFn: () =>
+      filters?.limit ? workoutPlanService.getAll(filters) : workoutPlanService.getAllPages(filters),
   })
 }
 

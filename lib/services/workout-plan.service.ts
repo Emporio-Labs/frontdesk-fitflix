@@ -11,6 +11,15 @@ export interface WorkoutPlanListResponse {
   }
 }
 
+export interface WorkoutPlanListFilters {
+  page?: number
+  limit?: number
+  status?: string
+  goal?: string
+  difficulty?: string
+  isTemplate?: boolean
+}
+
 export interface CreateWorkoutPlanPayload {
   name: string
   description?: string
@@ -153,16 +162,7 @@ const excelForm = (file: File) => {
 }
 
 export const workoutPlanService = {
-  getAll: async (
-    filters?: {
-      page?: number
-      limit?: number
-      status?: string
-      goal?: string
-      difficulty?: string
-      isTemplate?: boolean
-    }
-  ): Promise<WorkoutPlanListResponse> => {
+  getAll: async (filters?: WorkoutPlanListFilters): Promise<WorkoutPlanListResponse> => {
     const params: Record<string, string | number> = {}
     if (filters?.page) params.page = filters.page
     if (filters?.limit) params.limit = filters.limit
@@ -173,6 +173,27 @@ export const workoutPlanService = {
 
     const { data } = await apiClient.get('/workout-plans', { params })
     return data
+  },
+
+  /**
+   * Every matching plan. The API pages at 20 by default (100 max), and lists
+   * that called it without a limit silently stopped at 20.
+   */
+  getAllPages: async (
+    filters?: Omit<WorkoutPlanListFilters, 'page' | 'limit'>
+  ): Promise<WorkoutPlanListResponse> => {
+    const first = await workoutPlanService.getAll({ ...filters, page: 1, limit: 100 })
+    const totalPages = first.pagination?.totalPages ?? 1
+    if (totalPages <= 1) return first
+    const rest = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) =>
+        workoutPlanService.getAll({ ...filters, page: i + 2, limit: 100 })
+      )
+    )
+    return {
+      plans: [first, ...rest].flatMap((r) => r.plans),
+      pagination: { ...first.pagination, page: 1, totalPages: 1 },
+    }
   },
 
   /** Excel template (.xlsx) including the caller's exercise library. */

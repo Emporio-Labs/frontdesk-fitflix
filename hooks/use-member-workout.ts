@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   trainerWorkoutService,
   type MemberAssignment,
@@ -10,19 +10,26 @@ import { toast } from 'sonner'
  * never had one (the endpoint 404s). Keyed under ['user-assignment', userId]
  * so the existing invalidations after an assign refresh it too.
  */
+const memberAssignmentQuery = (userId: string) => ({
+  queryKey: ['user-assignment', userId, 'summary'],
+  queryFn: async (): Promise<MemberAssignment | null> => {
+    try {
+      return await trainerWorkoutService.getUserAssignment(userId)
+    } catch (err: any) {
+      if (err?.response?.status === 404) return null
+      throw err
+    }
+  },
+  enabled: !!userId,
+})
+
 export function useMemberAssignment(userId: string) {
-  return useQuery({
-    queryKey: ['user-assignment', userId, 'summary'],
-    queryFn: async (): Promise<MemberAssignment | null> => {
-      try {
-        return await trainerWorkoutService.getUserAssignment(userId)
-      } catch (err: any) {
-        if (err?.response?.status === 404) return null
-        throw err
-      }
-    },
-    enabled: !!userId,
-  })
+  return useQuery(memberAssignmentQuery(userId))
+}
+
+/** Assignments for a roster, one request per member, keyed like useMemberAssignment. */
+export function useMemberAssignments(userIds: string[]) {
+  return useQueries({ queries: userIds.map(memberAssignmentQuery) })
 }
 
 export function useActiveMemberWorkoutSession(userId: string) {

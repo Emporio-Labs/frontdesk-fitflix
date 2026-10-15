@@ -13,9 +13,7 @@ export default function TemplatesPage() {
   const router = useRouter()
   const [category, setCategory] = useState('All')
   const [assigning, setAssigning] = useState<WorkoutPlan | null>(null)
-  // Ask for templates only, at the API's max page size: the default page of 20
-  // mixed plans silently dropped templates once there were more than 20 plans.
-  const { data: plansData } = useWorkoutPlans({ isTemplate: true, limit: 100 })
+  const { data: plansData } = useWorkoutPlans({ isTemplate: true })
   const plans = plansData?.plans ?? []
 
   const templates = plans.filter((p) => p.isTemplate)

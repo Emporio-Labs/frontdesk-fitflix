@@ -124,6 +124,7 @@ const navTrainerGroup = [
       { title: "Personal Training", url: "/admin/personal-training", icon: IconDumbbell },
       { title: "My Members", url: "/dashboard/workouts/members", icon: IconUsers },
       { title: "Workout Plans", url: "/dashboard/workouts/plans", icon: IconBarbell },
+      { title: "Workout Templates", url: "/dashboard/workouts/templates", icon: IconTemplate },
       { title: "Exercise Library", url: "/dashboard/workouts/exercises", icon: IconActivity },
       { title: "Live Sessions", url: "/dashboard/workouts/sessions", icon: IconClock },
       { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
