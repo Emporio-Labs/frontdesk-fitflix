@@ -75,9 +75,12 @@ function buildApiPayload(plan: Partial<WorkoutPlan>, statusOverride?: string): C
 export function PlanBuilderLayout({
   mode,
   plan,
+  initialPlan,
 }: {
   mode: 'create' | 'edit'
   plan?: WorkoutPlan
+  /** Create mode only: unsaved plan to start from (e.g. a template copy). */
+  initialPlan?: WorkoutPlan
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -101,9 +104,10 @@ export function PlanBuilderLayout({
     if (mode === 'edit' && plan) {
       loadPlan(plan)
     } else if (mode === 'create') {
-      resetPlan()
+      if (initialPlan) loadPlan(initialPlan)
+      else resetPlan()
     }
-  }, [mode, plan?._id])
+  }, [mode, plan?._id, initialPlan])
 
   const assignAfterCreate = (savedId: string) => {
     if (assignedUserIds.length === 0) return
@@ -199,10 +203,14 @@ export function PlanBuilderLayout({
           </Button>
           <div className="min-w-0">
             <h3 className="text-sm font-semibold truncate">
-              {mode === 'create' ? 'New Workout Plan' : currentPlan.name || 'Edit Plan'}
+              {mode === 'create' && !initialPlan ? 'New Workout Plan' : currentPlan.name || 'Edit Plan'}
             </h3>
             <p className="text-[10px] text-muted-foreground hidden sm:block">
-              {mode === 'create' ? 'Design a new workout plan' : 'Editing plan'}
+              {mode === 'edit'
+                ? 'Editing plan'
+                : initialPlan
+                  ? 'New plan from template (not saved yet)'
+                  : 'Design a new workout plan'}
             </p>
           </div>
         </div>

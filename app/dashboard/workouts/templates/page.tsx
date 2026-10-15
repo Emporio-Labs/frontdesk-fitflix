@@ -2,18 +2,15 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useWorkoutStore } from '@/stores/workout-store'
 import { useWorkoutPlans } from '@/hooks/use-workout-plans'
 import { PlanCard } from '@/components/workouts/plan-card'
 import { TemplateCategoryFilter } from '@/components/workouts/template-category-filter'
 import { ImportPlanDialog } from '@/components/workouts/import-plan-dialog'
-import { toast } from 'sonner'
 import type { WorkoutPlan } from '@/types/workout'
 
 export default function TemplatesPage() {
   const router = useRouter()
   const [category, setCategory] = useState('All')
-  const { loadPlan } = useWorkoutStore()
   const { data: plansData } = useWorkoutPlans()
   const plans = plansData?.plans ?? []
 
@@ -27,19 +24,10 @@ export default function TemplatesPage() {
             t.goal?.replace(/([A-Z])/g, ' $1').trim().toLowerCase().includes(category.toLowerCase())
         )
 
+  // The builder fetches the template itself; handing it over through the
+  // store didn't work because create mode resets the store on mount.
   const handleUseTemplate = (plan: WorkoutPlan) => {
-    loadPlan({
-      ...plan,
-      _id: '',
-      name: `${plan.name} (Copy)`,
-      status: 'Draft',
-      isTemplate: false,
-      assignedUsers: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
-    toast.success('Template loaded into builder')
-    router.push('/dashboard/workouts/create')
+    router.push(`/dashboard/workouts/create?from=${plan._id}`)
   }
 
   return (
