@@ -58,6 +58,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { HealthMarkersDialog } from '@/components/health-markers-dialog'
 import { HealthGoalsDialog } from '@/components/health-goals-dialog'
 import { ConsentDialog } from '@/components/consent-dialog'
+import { MemberReportsCard } from '@/components/member-reports-card'
 import { OnboardingReportsDialog } from '@/components/onboarding-reports-dialog'
 import { EditUserDialog } from '@/components/users/edit-user-dialog'
 import { InterestSummary } from '@/components/crm/interest-summary'
@@ -445,6 +446,9 @@ export default function UserDetailPage() {
 
           {/* ─── BODY COMPOSITION (ACTIVE X) ─── */}
           <MemberBcaMetrics userId={userId} />
+
+          {/* ─── REPORTS (DNA + MEMBER UPLOADS) ─── */}
+          <MemberReportsCard userId={userId} member={user} />
 
           <Card>
             <CardHeader>
