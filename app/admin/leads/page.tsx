@@ -40,6 +40,16 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
 const LEAD_DRAFT_KEY = 'add_lead_form_draft'
@@ -96,6 +106,7 @@ import {
   IconPlus, IconEdit, IconTrash, IconCheck, IconFileInvoice,
   IconFlame, IconUserPlus, IconAlertTriangle, IconPhone, IconUserCheck, IconFilter,
   IconBellRinging, IconBrandWhatsapp, IconArrowRight, IconClock,
+  IconDots, IconLayoutKanban, IconList, IconSearch,
 } from '@tabler/icons-react'
 import { CreateInvoiceSheet } from '@/components/invoices/create-invoice-sheet'
 import { useUsers } from '@/hooks/use-users'
@@ -126,6 +137,13 @@ import { validateEmail, validatePhoneNumber } from '@/lib/schemas'
 import KanbanColumn from './kanban-column'
 import KanbanCard from './kanban-card'
 
+const KANBAN_COLUMNS = [
+  { key: 'new', title: 'New', leadColor: 'bg-sky-50 border-sky-200', headerColor: 'text-sky-700' },
+  { key: 'contacted', title: 'Contacted', leadColor: 'bg-amber-50 border-amber-200', headerColor: 'text-amber-700' },
+  { key: 'qualified', title: 'Qualified', leadColor: 'bg-red-50 border-red-200', headerColor: 'text-red-700' },
+  { key: 'converted', title: 'Converted', leadColor: 'bg-green-50 border-green-200', headerColor: 'text-green-700' },
+] as const
+
 export default function LeadsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false)
@@ -135,6 +153,22 @@ export default function LeadsPage() {
   const [invoicingLead, setInvoicingLead] = useState<Lead | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('')
+  const [filterHeat, setFilterHeat] = useState<string>('')
+  // Board (kanban) or List (table) — shown one at a time, remembered per browser.
+  const [view, setView] = useState<'board' | 'list'>('board')
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('leads_view')
+      if (saved === 'board' || saved === 'list') setView(saved)
+    } catch {}
+  }, [])
+  const changeView = (next: string) => {
+    if (next !== 'board' && next !== 'list') return
+    setView(next)
+    try {
+      localStorage.setItem('leads_view', next)
+    } catch {}
+  }
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
 
   const {
@@ -254,9 +288,10 @@ export default function LeadsPage() {
         (l.email && l.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (l.phone && l.phone.toLowerCase().includes(searchTerm.toLowerCase()))
       const matchesStatus = !filterStatus || l.status === filterStatus
-      return matchesSearch && matchesStatus
+      const matchesHeat = !filterHeat || l.temperature === filterHeat
+      return matchesSearch && matchesStatus && matchesHeat
     })
-  }, [leads, searchTerm, filterStatus])
+  }, [leads, searchTerm, filterStatus, filterHeat])
 
   const statusToHeat: Record<LeadStatus, LeadTemperature> = {
     new: 'cold',
@@ -525,6 +560,8 @@ export default function LeadsPage() {
     await handleStatusChange(lead.id, nextStage)
   }
 
+  // Delete is one tap away in the row menu, so it asks first.
+  const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null)
   const handleDeleteLead = (id: string) => {
     deleteLead.mutate(id)
   }
@@ -1073,7 +1110,7 @@ export default function LeadsPage() {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               CRM Overview
             </p>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
               <CrmStatCard
                 title="Today's Signups"
                 value={leadsLoading ? null : todaySignups.length}
@@ -1107,8 +1144,8 @@ export default function LeadsPage() {
           </div>
 
           {/* ── SECTION 2: Today's Follow-ups + New Signups ─────────────────── */}
-          {/* On mobile the two columns stack vertically; lg+ they sit side-by-side */}
-          <div className="grid gap-4 lg:grid-cols-2">
+          {/* On phones the two columns stack vertically; from tablet up they sit side-by-side */}
+          <div className="grid gap-4 md:grid-cols-2">
 
             {/* Today's Follow-ups Panel */}
             <Card>
@@ -1201,354 +1238,293 @@ export default function LeadsPage() {
             </CardContent>
           </Card>
 
-          {/* ── SECTION 4: Existing Board Stats ────────────────────────────── */}
-          {/* Lead Funnel Stats */}
-          <div className="grid gap-4 md:grid-cols-5">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{leads.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">New</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{leads.filter(l => l.status === 'new').length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Contacted</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{leads.filter(l => l.status === 'contacted').length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Qualified</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{leads.filter(l => l.status === 'qualified').length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Converted</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{leads.filter(l => l.status === 'converted').length}</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Filters */}
-          <div className="flex gap-4">
-            <div className="flex-1">
+          {/* ── SECTION 4: Toolbar — search, filters, Board / List ─────────── */}
+          {/* Sticks just under the (sticky, h-12/h-14) site header while scrolling. */}
+          <div className="sticky top-12 sm:top-14 z-20 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border bg-background/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+            <div className="relative min-w-[12rem] flex-1">
+              <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search by name or email..."
+                placeholder="Search name, email or phone"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-10 pl-9"
               />
             </div>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-2 border rounded-md"
+            <Select value={filterStatus || 'all'} onValueChange={(v) => setFilterStatus(v === 'all' ? '' : v)}>
+              <SelectTrigger className="h-10 w-[9.5rem]" aria-label="Filter by status">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="contacted">Contacted</SelectItem>
+                <SelectItem value="qualified">Qualified</SelectItem>
+                <SelectItem value="converted">Converted</SelectItem>
+                <SelectItem value="lost">Lost</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterHeat || 'all'} onValueChange={(v) => setFilterHeat(v === 'all' ? '' : v)}>
+              <SelectTrigger className="h-10 w-[8.5rem]" aria-label="Filter by heat">
+                <SelectValue placeholder="Heat" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any heat</SelectItem>
+                <SelectItem value="hot">Hot</SelectItem>
+                <SelectItem value="warm">Warm</SelectItem>
+                <SelectItem value="cold">Cold</SelectItem>
+              </SelectContent>
+            </Select>
+            <ToggleGroup
+              type="single"
+              value={view}
+              onValueChange={changeView}
+              variant="outline"
+              className="ml-auto"
+              aria-label="Leads view"
             >
-              <option value="">All Status</option>
-              <option value="new">New</option>
-              <option value="contacted">Contacted</option>
-              <option value="qualified">Qualified</option>
-              <option value="converted">Converted</option>
-              <option value="lost">Lost</option>
-            </select>
+              <ToggleGroupItem value="board" className="h-10 gap-1.5 px-3" aria-label="Board view">
+                <IconLayoutKanban className="h-4 w-4" />
+                <span className="hidden lg:inline">Board</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="list" className="h-10 gap-1.5 px-3" aria-label="List view">
+                <IconList className="h-4 w-4" />
+                <span className="hidden lg:inline">List</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <p className="w-full px-1 text-xs text-muted-foreground">
+              {filteredLeads.length} of {leads.length} leads
+              {(searchTerm || filterStatus || filterHeat) && (
+                <button
+                  type="button"
+                  className="ml-2 underline underline-offset-2 hover:text-foreground"
+                  onClick={() => {
+                    setSearchTerm('')
+                    setFilterStatus('')
+                    setFilterHeat('')
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </p>
           </div>
 
-          {/* Kanban Board */}
-          <DndContext
-            collisionDetection={closestCorners}
-            onDragEnd={handleDragEnd}
-            onDragStart={(event) => {
-              const leadId = event.active.id as string
-              const lead = leads.find((l) => l.id === leadId)
-              setDraggedLead(lead || null)
-            }}
-          >
-            <div className="grid gap-4 lg:grid-cols-4">
-              <KanbanColumn
-                id="column-new"
-                title="New"
-                count={kanbanData.new.length}
-                leadColor="bg-sky-50 border-sky-200"
-                headerColor="text-sky-700"
-              >
-                {kanbanData.new.map((lead) => (
-                  <KanbanCard
-                    key={`new-${lead.id}`}
-                    lead={lead}
-                    onConvert={() => handleConvertLead(lead)}
-                    onInvoice={() => handleInvoiceLead(lead)}
-                    onEdit={() => handleEditLead(lead)}
-                    onCall={() => handleQuickCall(lead)}
-                    onWhatsApp={() => handleQuickWhatsApp(lead)}
-                    onAddNote={() => handleQuickAddNote(lead)}
-                    isPending={isPending}
-                    source={lead.source}
-                    isFollowUpToday={isFollowUpToday(lead)}
-                    leadAgeDays={getLeadAgeDays(lead.createdAt)}
-                  />
-                ))}
-              </KanbanColumn>
+          {isError && (
+            <p className="text-sm text-red-600">Failed to load leads from API. Check auth credentials and backend status.</p>
+          )}
 
-              <KanbanColumn
-                id="column-contacted"
-                title="Contacted"
-                count={kanbanData.contacted.length}
-                leadColor="bg-amber-50 border-amber-200"
-                headerColor="text-amber-700"
-              >
-                {kanbanData.contacted.map((lead) => (
-                  <KanbanCard
-                    key={`contacted-${lead.id}`}
-                    lead={lead}
-                    onConvert={() => handleConvertLead(lead)}
-                    onInvoice={() => handleInvoiceLead(lead)}
-                    onEdit={() => handleEditLead(lead)}
-                    onCall={() => handleQuickCall(lead)}
-                    onWhatsApp={() => handleQuickWhatsApp(lead)}
-                    onAddNote={() => handleQuickAddNote(lead)}
-                    isPending={isPending}
-                    source={lead.source}
-                    isFollowUpToday={isFollowUpToday(lead)}
-                    leadAgeDays={getLeadAgeDays(lead.createdAt)}
-                  />
-                ))}
-              </KanbanColumn>
-
-              <KanbanColumn
-                id="column-qualified"
-                title="Qualified"
-                count={kanbanData.qualified.length}
-                leadColor="bg-red-50 border-red-200"
-                headerColor="text-red-700"
-              >
-                {kanbanData.qualified.map((lead) => (
-                  <KanbanCard
-                    key={`qualified-${lead.id}`}
-                    lead={lead}
-                    onConvert={() => handleConvertLead(lead)}
-                    onInvoice={() => handleInvoiceLead(lead)}
-                    onEdit={() => handleEditLead(lead)}
-                    onCall={() => handleQuickCall(lead)}
-                    onWhatsApp={() => handleQuickWhatsApp(lead)}
-                    onAddNote={() => handleQuickAddNote(lead)}
-                    isPending={isPending}
-                    source={lead.source}
-                    isFollowUpToday={isFollowUpToday(lead)}
-                    leadAgeDays={getLeadAgeDays(lead.createdAt)}
-                  />
-                ))}
-              </KanbanColumn>
-
-              <KanbanColumn
-                id="column-converted"
-                title="Converted"
-                count={kanbanData.converted.length}
-                leadColor="bg-green-50 border-green-200"
-                headerColor="text-green-700"
-                isDragDisabled
-              >
-                {kanbanData.converted.map((lead) => (
-                  <KanbanCard
-                    key={`converted-${lead.id}`}
-                    lead={lead}
-                    onConvert={() => handleConvertLead(lead)}
-                    onEdit={() => handleEditLead(lead)}
-                    onCall={() => handleQuickCall(lead)}
-                    onWhatsApp={() => handleQuickWhatsApp(lead)}
-                    onAddNote={() => handleQuickAddNote(lead)}
-                    isPending={isPending}
-                    source={lead.source}
-                    isFollowUpToday={isFollowUpToday(lead)}
-                    leadAgeDays={getLeadAgeDays(lead.createdAt)}
-                    isDragDisabled
-                  />
-                ))}
-              </KanbanColumn>
-            </div>
-
-            <DragOverlay>
-              {draggedLead ? (
-                <div className="cursor-grabbing rounded-md border-2 border-blue-500 bg-white p-3 shadow-lg space-y-2 opacity-90">
-                  <div className="font-medium text-sm">{draggedLead.name}</div>
-                  <div className="text-xs text-muted-foreground">{draggedLead.email}</div>
-                  <div className="flex gap-1">
-                    <Badge className={getTemperatureColor(draggedLead.temperature)}>
-                      {draggedLead.temperature}
-                    </Badge>
-                    <Badge className={getStatusColor(draggedLead.status)}>
-                      {draggedLead.status}
-                    </Badge>
-                  </div>
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-
-          {/* Leads Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>All Leads</CardTitle>
-              <CardDescription>Total: {filteredLeads.length} leads</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {leadsLoading && (
-                <div className="space-y-2 pb-4">
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                </div>
-              )}
-              {isError && (
-                <p className="pb-4 text-sm text-red-600">Failed to load leads from API. Check auth credentials and backend status.</p>
-              )}
-              <div className="overflow-x-auto">
-                <Table className="whitespace-nowrap md:min-w-[1800px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="hidden lg:table-cell">Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead className="hidden lg:table-cell">Assigned Staff</TableHead>
-                      <TableHead className="hidden lg:table-cell">Source</TableHead>
-                      <TableHead className="hidden md:table-cell">Heat</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="hidden lg:table-cell">Contacts</TableHead>
-                      <TableHead className="hidden lg:table-cell">Aging</TableHead>
-                      <TableHead className="hidden lg:table-cell">Created</TableHead>
-                      <TableHead className="hidden md:table-cell">Follow Up</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredLeads.map((lead) => (
-                      <TableRow key={lead.id}>
-                        <TableCell className="font-medium">{lead.name}</TableCell>
-                        <TableCell className="hidden lg:table-cell">{lead.email}</TableCell>
-                        <TableCell>{lead.phone}</TableCell>
-                        <TableCell className="hidden lg:table-cell">{lead.assignedStaffName || '-'}</TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          <Badge className={getSourceColor(lead.source)}>
-                            {lead.source.replace('-', ' ')}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <Badge className={getTemperatureColor(lead.temperature)}>{lead.temperature}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(lead.status)}>
-                            {lead.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">{lead.contactCount || 0}</TableCell>
-                        <TableCell className="hidden lg:table-cell">{getLeadAgeDays(lead.createdAt)}d</TableCell>
-                        <TableCell className="hidden lg:table-cell">{formatDateOnly(lead.createdAt)}</TableCell>
-                        <TableCell className="hidden md:table-cell">{formatDateOnly(lead.followUpDate)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleQuickCall(lead)}
-                              disabled={isPending || !lead.phone}
-                            >
-                              Call
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleQuickWhatsApp(lead)}
-                              disabled={isPending || !lead.phone}
-                            >
-                              WA
-                            </Button>
-                            {lead.status !== 'converted' && lead.status !== 'lost' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-yellow-600"
-                                onClick={() => handleStatusChange(lead.id, 'contacted')}
-                                disabled={isPending}
-                              >
-                                C
-                              </Button>
-                            )}
-                            {lead.status !== 'qualified' && lead.status !== 'converted' && lead.status !== 'lost' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-indigo-600"
-                                onClick={() => handleStatusChange(lead.id, 'qualified')}
-                                disabled={isPending}
-                              >
-                                Q
-                              </Button>
-                            )}
-                            {lead.status !== 'converted' && lead.status !== 'lost' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-blue-600 hover:text-blue-700"
-                                onClick={() => handleInvoiceLead(lead)}
-                                disabled={isPending}
-                                title="Convert & Invoice"
-                              >
-                                <IconFileInvoice className="w-4 h-4" />
-                              </Button>
-                            )}
-                            {lead.status !== 'converted' && lead.status !== 'lost' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-green-600"
-                                onClick={() => handleConvertLead(lead)}
-                                disabled={isPending}
-                                title="Convert lead"
-                              >
-                                <IconCheck className="w-4 h-4" />
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditLead(lead)}
-                              disabled={isPending}
-                            >
-                              <IconEdit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => handleDeleteLead(lead.id)}
-                              disabled={isPending}
-                            >
-                              <IconTrash className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+          {view === 'board' ? (
+            /* Kanban: swipe sideways through the columns on phones/tablets
+               (one column ≈ 300px, snapping), a 4-column grid from xl. */
+            <DndContext
+              collisionDetection={closestCorners}
+              onDragEnd={handleDragEnd}
+              onDragStart={(event) => {
+                const leadId = event.active.id as string
+                const lead = leads.find((l) => l.id === leadId)
+                setDraggedLead(lead || null)
+              }}
+            >
+              <div className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2 xl:mx-0 xl:grid xl:grid-cols-4 xl:overflow-visible xl:px-0">
+                {KANBAN_COLUMNS.map((column) => (
+                  <KanbanColumn
+                    key={column.key}
+                    id={`column-${column.key}`}
+                    title={column.title}
+                    count={kanbanData[column.key].length}
+                    leadColor={column.leadColor}
+                    headerColor={column.headerColor}
+                    isDragDisabled={column.key === 'converted'}
+                    className="w-[85%] shrink-0 snap-start sm:w-[300px] xl:w-auto"
+                  >
+                    {kanbanData[column.key].map((lead) => (
+                      <KanbanCard
+                        key={`${column.key}-${lead.id}`}
+                        lead={lead}
+                        onConvert={() => handleConvertLead(lead)}
+                        onInvoice={column.key === 'converted' ? undefined : () => handleInvoiceLead(lead)}
+                        onEdit={() => handleEditLead(lead)}
+                        onCall={() => handleQuickCall(lead)}
+                        onWhatsApp={() => handleQuickWhatsApp(lead)}
+                        onAddNote={() => handleQuickAddNote(lead)}
+                        isPending={isPending}
+                        source={lead.source}
+                        isFollowUpToday={isFollowUpToday(lead)}
+                        leadAgeDays={getLeadAgeDays(lead.createdAt)}
+                        isDragDisabled={column.key === 'converted'}
+                      />
                     ))}
-                  </TableBody>
-                </Table>
+                  </KanbanColumn>
+                ))}
               </div>
-            </CardContent>
-          </Card>
+
+              <DragOverlay>
+                {draggedLead ? (
+                  <div className="cursor-grabbing rounded-md border-2 border-blue-500 bg-white p-3 shadow-lg space-y-2 opacity-90">
+                    <div className="font-medium text-sm">{draggedLead.name}</div>
+                    <div className="text-xs text-muted-foreground">{draggedLead.email}</div>
+                    <div className="flex gap-1">
+                      <Badge className={getTemperatureColor(draggedLead.temperature)}>
+                        {draggedLead.temperature}
+                      </Badge>
+                      <Badge className={getStatusColor(draggedLead.status)}>
+                        {draggedLead.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          ) : (
+            /* List: columns appear as width allows; contact details sit under
+               the name until there's room for their own columns. */
+            <Card>
+              <CardContent className="p-0">
+                {leadsLoading ? (
+                  <div className="space-y-2 p-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ) : filteredLeads.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-muted-foreground">No leads match these filters.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="pl-4">Lead</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="hidden md:table-cell">Heat</TableHead>
+                          <TableHead className="hidden md:table-cell">Follow-up</TableHead>
+                          <TableHead className="hidden lg:table-cell">Source</TableHead>
+                          <TableHead className="hidden xl:table-cell">Staff</TableHead>
+                          <TableHead className="hidden xl:table-cell text-right">Contacts</TableHead>
+                          <TableHead className="hidden xl:table-cell text-right">Age</TableHead>
+                          <TableHead className="pr-4 text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredLeads.map((lead) => {
+                          const open = lead.status !== 'converted' && lead.status !== 'lost'
+                          return (
+                            <TableRow key={lead.id}>
+                              <TableCell className="pl-4">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditLead(lead)}
+                                  className="text-left"
+                                >
+                                  <span className="block font-medium hover:underline">{lead.name}</span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    {lead.phone || '—'}
+                                    <span className="hidden sm:inline">{lead.email ? ` · ${lead.email}` : ''}</span>
+                                  </span>
+                                </button>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={getStatusColor(lead.status)}>{lead.status}</Badge>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                <Badge className={getTemperatureColor(lead.temperature)}>{lead.temperature}</Badge>
+                              </TableCell>
+                              <TableCell
+                                className={cn(
+                                  'hidden md:table-cell whitespace-nowrap',
+                                  isFollowUpToday(lead) && 'font-semibold text-orange-600'
+                                )}
+                              >
+                                {formatDateOnly(lead.followUpDate)}
+                              </TableCell>
+                              <TableCell className="hidden lg:table-cell">
+                                <Badge className={getSourceColor(lead.source)}>{lead.source.replace('-', ' ')}</Badge>
+                              </TableCell>
+                              <TableCell className="hidden xl:table-cell">{lead.assignedStaffName || '—'}</TableCell>
+                              <TableCell className="hidden xl:table-cell text-right tabular-nums">{lead.contactCount || 0}</TableCell>
+                              <TableCell className="hidden xl:table-cell text-right tabular-nums">
+                                {getLeadAgeDays(lead.createdAt)}d
+                              </TableCell>
+                              <TableCell className="pr-4">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="h-9 w-9"
+                                    onClick={() => handleQuickCall(lead)}
+                                    disabled={isPending || !lead.phone}
+                                    title="Call"
+                                    aria-label={`Call ${lead.name}`}
+                                  >
+                                    <IconPhone className="h-4 w-4 text-blue-600" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="h-9 w-9"
+                                    onClick={() => handleQuickWhatsApp(lead)}
+                                    disabled={isPending || !lead.phone}
+                                    title="WhatsApp"
+                                    aria-label={`WhatsApp ${lead.name}`}
+                                  >
+                                    <IconBrandWhatsapp className="h-4 w-4 text-emerald-600" />
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        variant="outline"
+                                        className="h-9 w-9"
+                                        disabled={isPending}
+                                        aria-label={`More actions for ${lead.name}`}
+                                      >
+                                        <IconDots className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-52">
+                                      {open && lead.status !== 'contacted' && (
+                                        <DropdownMenuItem onClick={() => handleStatusChange(lead.id, 'contacted')}>
+                                          <IconPhone className="mr-2 h-4 w-4" /> Mark contacted
+                                        </DropdownMenuItem>
+                                      )}
+                                      {open && lead.status !== 'qualified' && (
+                                        <DropdownMenuItem onClick={() => handleStatusChange(lead.id, 'qualified')}>
+                                          <IconFlame className="mr-2 h-4 w-4" /> Mark qualified
+                                        </DropdownMenuItem>
+                                      )}
+                                      {open && (
+                                        <>
+                                          <DropdownMenuItem onClick={() => handleInvoiceLead(lead)}>
+                                            <IconFileInvoice className="mr-2 h-4 w-4" /> Convert &amp; invoice
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handleConvertLead(lead)}>
+                                            <IconCheck className="mr-2 h-4 w-4" /> Convert to member
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                      <DropdownMenuItem onClick={() => handleEditLead(lead)}>
+                                        <IconEdit className="mr-2 h-4 w-4" /> Edit lead
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        className="text-red-600 focus:text-red-600"
+                                        onClick={() => setDeleteTarget(lead)}
+                                      >
+                                        <IconTrash className="mr-2 h-4 w-4" /> Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="reminders" className="space-y-4">
@@ -2028,6 +2004,29 @@ export default function LeadsPage() {
           }}
         />
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The lead will be removed from the board and lists.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => {
+                if (deleteTarget) handleDeleteLead(deleteTarget.id)
+                setDeleteTarget(null)
+              }}
+            >
+              Delete lead
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

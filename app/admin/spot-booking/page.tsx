@@ -379,9 +379,12 @@ export default function SpotBookingPage() {
                   >
                     {isCompleted ? <IconCheck className="w-3.5 h-3.5" /> : step.number}
                   </div>
+                  {/* Five labels don't fit below lg: show only the current step's. */}
                   <span
+                    title={step.label}
                     className={cn(
                       'text-xs whitespace-nowrap font-medium transition-colors',
+                      !isCurrent && 'hidden lg:inline',
                       isCurrent ? 'text-slate-900 font-bold' : isCompleted ? 'text-slate-700' : 'text-slate-400'
                     )}
                   >

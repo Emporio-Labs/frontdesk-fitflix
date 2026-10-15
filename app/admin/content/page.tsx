@@ -193,7 +193,7 @@ export default function ContentPage() {
   const isSaving = createOverride.isPending || updateOverride.isPending
 
   return (
-    <div className="flex-1 space-y-6 p-6 md:p-8 pt-6 max-w-7xl mx-auto">
+    <div className="w-full flex-1 space-y-6 p-6 md:p-8 pt-6 max-w-7xl mx-auto">
       {/* Top Header Bar */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-zinc-800 pb-5">
         <div>
@@ -233,7 +233,7 @@ export default function ContentPage() {
       </div>
 
       {/* Mode Switcher & Filter Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-950/60 p-2.5 rounded-2xl border border-zinc-800/80">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-zinc-950/60 p-2.5 rounded-2xl border border-zinc-800/80">
         {/* View Mode Tabs */}
         <div className="flex items-center gap-1 bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
           <Button
@@ -278,8 +278,8 @@ export default function ContentPage() {
         </div>
 
         {/* Search & Platform Filter (for Cards & Table view) */}
-        <div className="flex items-center gap-2">
-          <div className="relative w-full sm:w-64">
+        <div className="flex items-center gap-2 w-full lg:w-auto">
+          <div className="relative flex-1 lg:flex-none lg:w-64">
             <IconSearch className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             <Input
               placeholder="Search copy or keys..."

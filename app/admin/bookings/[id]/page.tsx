@@ -100,7 +100,7 @@ export default function BookingDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6 max-w-6xl mx-auto">
+      <div className="w-full p-6 space-y-6 max-w-6xl mx-auto">
         <div className="flex items-center gap-4">
           <Skeleton className="h-10 w-24 rounded-lg" />
           <Skeleton className="h-8 w-64 rounded-lg" />
@@ -117,7 +117,7 @@ export default function BookingDetailPage() {
 
   if (isError || !booking) {
     return (
-      <div className="p-6 max-w-lg mx-auto text-center space-y-4 py-16">
+      <div className="w-full p-6 max-w-lg mx-auto text-center space-y-4 py-16">
         <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto">
           <IconX className="h-6 w-6" />
         </div>
@@ -138,7 +138,7 @@ export default function BookingDetailPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="w-full p-6 space-y-6 max-w-6xl mx-auto">
       {/* Top Header & Actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">

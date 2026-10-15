@@ -167,7 +167,7 @@ export default function MemberLiveWorkoutPage() {
 
   if (memberLoading || sessionLoading) {
     return (
-      <div className="max-w-md mx-auto p-4 space-y-4">
+      <div className="w-full max-w-md mx-auto p-4 space-y-4">
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-32 w-full rounded-xl" />
         <Skeleton className="h-48 w-full rounded-xl" />
@@ -181,7 +181,7 @@ export default function MemberLiveWorkoutPage() {
   const stretchingExercises = exercises.filter((e: any) => e.section === 'stretching')
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-background pb-32 font-sans text-foreground">
+    <div className="w-full max-w-md mx-auto min-h-screen bg-background pb-32 font-sans text-foreground">
       {/* Header bar */}
       <div className="sticky top-12 sm:top-14 z-30 flex items-center justify-between gap-2 p-3 sm:p-4 bg-background/90 backdrop-blur border-b">
         <Button variant="ghost" size="sm" onClick={() => router.back()} className="h-10 px-2">

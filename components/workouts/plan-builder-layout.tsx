@@ -83,7 +83,8 @@ export function PlanBuilderLayout({
   initialPlan?: WorkoutPlan
 }) {
   const router = useRouter()
-  const isMobile = useIsMobile()
+  // Three resizable panels need a laptop-width screen; tablets get the tabs.
+  const isMobile = useIsMobile(1024)
   const {
     loadPlan,
     resetPlan,
