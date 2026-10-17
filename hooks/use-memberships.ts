@@ -114,14 +114,24 @@ export function usePauseMembership() {
       toast.success(data.message || 'Membership frozen')
     },
     onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Failed to freeze membership'),
+      toast.error(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to freeze membership'
+      ),
   })
 }
 
 export function useResumeMembership() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => membershipService.resume(id),
+    mutationFn: (params: string | { id: string; resumedAt?: string; reason?: string }) => {
+      const id = typeof params === 'string' ? params : params.id
+      const payload =
+        typeof params === 'string' ? undefined : { resumedAt: params.resumedAt, reason: params.reason }
+      return membershipService.resume(id, payload)
+    },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.memberships.all() })
       // Surface a capped credit explicitly — the member will otherwise notice
@@ -135,6 +145,11 @@ export function useResumeMembership() {
       }
     },
     onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Failed to resume membership'),
+      toast.error(
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Failed to resume membership'
+      ),
   })
 }

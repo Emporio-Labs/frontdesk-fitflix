@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useDeferredValue, useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { trainerWorkoutService } from '@/lib/services/trainer-workout.service'
 import {
@@ -80,8 +80,6 @@ export default function MemberLiveWorkoutPage() {
 
   const { data: member, isLoading: memberLoading } = useMyMember(userId)
   const { data: sessionData, isLoading: sessionLoading } = useActiveMemberWorkoutSession(userId)
-  const { data: exercisesData } = useExercises()
-  const allExercises = exercisesData?.exercises ?? []
 
   const startSessionMutation = useStartMemberWorkoutSession(userId)
   const session = sessionData?.session
@@ -93,6 +91,10 @@ export default function MemberLiveWorkoutPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [targetSection, setTargetSection] = useState<WorkoutSectionKey>('workout')
   const [exerciseSearch, setExerciseSearch] = useState('')
+  // Search on the server: filtering one page locally hid most of the library.
+  const exerciseQuery = useDeferredValue(exerciseSearch.trim())
+  const { data: exercisesData } = useExercises({ search: exerciseQuery || undefined, limit: 100 })
+  const allExercises = exercisesData?.exercises ?? []
   const [selectedExercise, setSelectedExercise] = useState<any>(null)
   const [newTargetSets, setNewTargetSets] = useState(3)
   const [newTargetReps, setNewTargetReps] = useState(10)
@@ -165,7 +167,7 @@ export default function MemberLiveWorkoutPage() {
 
   if (memberLoading || sessionLoading) {
     return (
-      <div className="max-w-md mx-auto p-4 space-y-4">
+      <div className="w-full max-w-md mx-auto p-4 space-y-4">
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-32 w-full rounded-xl" />
         <Skeleton className="h-48 w-full rounded-xl" />
@@ -179,7 +181,7 @@ export default function MemberLiveWorkoutPage() {
   const stretchingExercises = exercises.filter((e: any) => e.section === 'stretching')
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-background pb-32 font-sans text-foreground">
+    <div className="w-full max-w-md mx-auto min-h-screen bg-background pb-32 font-sans text-foreground">
       {/* Header bar */}
       <div className="sticky top-12 sm:top-14 z-30 flex items-center justify-between gap-2 p-3 sm:p-4 bg-background/90 backdrop-blur border-b">
         <Button variant="ghost" size="sm" onClick={() => router.back()} className="h-10 px-2">

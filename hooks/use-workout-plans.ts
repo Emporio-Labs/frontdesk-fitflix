@@ -32,10 +32,13 @@ export function useWorkoutPlans(filters?: {
   status?: string
   goal?: string
   difficulty?: string
+  isTemplate?: boolean
 }) {
   return useQuery({
     queryKey: queryKeys.workoutPlans.list(filters),
-    queryFn: () => workoutPlanService.getAll(filters),
+    // No limit = the whole list (all pages); a limit = just that page.
+    queryFn: () =>
+      filters?.limit ? workoutPlanService.getAll(filters) : workoutPlanService.getAllPages(filters),
   })
 }
 
@@ -83,6 +86,29 @@ export function useUpdateWorkoutPlan() {
   })
 }
 
+export function usePreviewWorkoutPlanImport() {
+  return useMutation({
+    mutationFn: (file: File) => workoutPlanService.previewImport(file),
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || 'Could not read the Excel file')
+    },
+  })
+}
+
+export function useImportWorkoutPlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => workoutPlanService.importFromExcel(file),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.workoutPlans.all() })
+      toast.success(data.message || 'Workout plan imported')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || 'Failed to import workout plan')
+    },
+  })
+}
+
 export function useDeleteWorkoutPlan() {
   const qc = useQueryClient()
   return useMutation({
@@ -107,10 +133,21 @@ export function useAssignWorkoutPlan() {
       id: string
       payload: { userIds: string[]; startDate?: string }
     }) => workoutPlanService.assignUsers(id, payload),
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.workoutPlans.all() })
       qc.invalidateQueries({ queryKey: queryKeys.workoutPlans.assignments.all() })
-      toast.success('Users assigned to workout plan')
+      qc.invalidateQueries({ queryKey: ['user-assignment'] })
+      // The endpoint answers 200 even when some members fail; report per member.
+      const assigned = (data?.created?.length ?? 0) + (data?.skipped?.length ?? 0)
+      const failed = data?.failed ?? []
+      if (failed.length > 0) {
+        toast.error(
+          `${failed.length} member${failed.length === 1 ? '' : 's'} could not be assigned: ${failed[0].error}`
+        )
+      }
+      if (assigned > 0 || failed.length === 0) {
+        toast.success(`Plan assigned to ${assigned} member${assigned === 1 ? '' : 's'}`)
+      }
     },
     onError: (err: any) => {
       console.error('Assign Users Error:', err?.response?.data || err)

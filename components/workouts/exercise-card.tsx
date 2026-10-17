@@ -106,11 +106,21 @@ export function ExerciseCard({
           onChange={(v) => onUpdate(index, { targetSets: v })}
         />
         <span className="text-muted-foreground text-xs">×</span>
-        <InlineInput
-          label="Reps"
-          value={exercise.targetReps}
-          onChange={(v) => onUpdate(index, { targetReps: v })}
-        />
+        {/* Timed work (plank, cardio, stretches) is prescribed in seconds;
+            reps stay at 1 for those, as the import and backend expect. */}
+        {exercise.durationSeconds != null ? (
+          <InlineInput
+            label="Secs"
+            value={exercise.durationSeconds}
+            onChange={(v) => onUpdate(index, { durationSeconds: v })}
+          />
+        ) : (
+          <InlineInput
+            label="Reps"
+            value={exercise.targetReps}
+            onChange={(v) => onUpdate(index, { targetReps: v })}
+          />
+        )}
         <InlineInput
           label="kg"
           value={exercise.targetWeightKg}
@@ -194,6 +204,7 @@ function InlineInput({
       </span>
       <Input
         type="number"
+        inputMode="numeric"
         value={value}
         onChange={(e) => onChange(Number(e.target.value) || 0)}
         className="w-full min-w-0 sm:w-14 h-9 sm:h-7 text-center text-xs px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

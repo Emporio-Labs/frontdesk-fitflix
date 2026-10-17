@@ -7,25 +7,10 @@ import { PlanBuilderLayout } from '@/components/workouts/plan-builder-layout'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import Link from 'next/link'
+import { normalizeApiPlan } from '@/lib/normalize-workout-plan'
 import type { WorkoutPlan } from '@/types/workout'
 
 const isMongoId = (id: string): boolean => /^[0-9a-f]{24}$/i.test(id)
-
-/** Map the raw API/lean response to the frontend WorkoutPlan shape. */
-function normalizeApiPlan(raw: any): WorkoutPlan {
-  return {
-    ...raw,
-    // .lean() returns _id; Mongoose Documents expose the virtual `id` too — handle both
-    id: raw._id?.toString() ?? raw.id,
-    // Backend stores null by default; our Zod schema only accepts string | undefined
-    templateCategory: raw.templateCategory ?? undefined,
-    description: raw.description ?? undefined,
-    // assignedUsers may be populated objects or plain string IDs
-    assignedUsers: (raw.assignedUsers || []).map((u: any) =>
-      typeof u === 'string' ? u : (u._id?.toString() ?? u.id ?? '')
-    ),
-  }
-}
 
 export default function EditWorkoutPage() {
   const params = useParams()

@@ -198,3 +198,27 @@ the manual-useState dialogs elsewhere are unchanged.
 view) is unrelated and untouched. This module is `app/admin/nutrition/`.
 
 > **Assumptions to verify (correct `nutrition.service.ts` + `lib/types/nutrition.ts` only — hooks/pages stay stable):** All `/nutrition/*` paths and response/field shapes are inferred from the backend domain models (the module is not yet in `api_docs.md`). Each block in `nutrition.service.ts` carries an `ASSUMPTION` comment. List endpoints assumed to return `{ items: [...] }`; mutations `{ message, <entity> }`. `GET /nutrition/me/plan` assumed for the member's active plan; `userId` passed as a query param for plans/hydration/adherence/progress. PDF (`GET /nutrition/plans/:id/pdf`) is a **deferred** seam — UI renders a disabled "Export PDF" button.
+
+---
+
+## Workout plan Excel import (added)
+
+Trainers/admins can create a workout plan (default: a template) from an `.xlsx` file
+instead of the drag-and-drop builder. Parsing and validation happen on the **backend**
+(`FITFLIX_BACKEND/src/utils/workout-plan-excel.ts`, format spec in
+`FITFLIX_BACKEND/docs/WORKOUT_PLAN_EXCEL_IMPORT.md`); the frontdesk only uploads and renders.
+
+- `lib/services/workout-plan.service.ts` — `downloadImportTemplate()` (`GET /workout-plans/import/template`, blob),
+  `previewImport(file)` (`POST /workout-plans/import?dryRun=true`), `importFromExcel(file)` (`POST /workout-plans/import`).
+  Types: `PlanImportIssue`, `PlanImportPreview`, `PlanImportResult`.
+- `hooks/use-workout-plans.ts` — `usePreviewWorkoutPlanImport()` (no cache side effects) and `useImportWorkoutPlan()`
+  (invalidates `workoutPlans.all()`).
+- `components/workouts/import-plan-dialog.tsx` — self-contained "Import from Excel" button + dialog: download template →
+  choose file → dry-run preview (issues table by sheet/cell, or day-by-day summary) → import → navigates to
+  `/dashboard/workouts/:id`. Mounted on `/dashboard/workouts/templates` and `/dashboard/workouts/plans`.
+- A rejected (non-dry-run) import returns 400 with the issue list under `err.response.data.details.errors`
+  (the backend's 4xx normaliser keeps only `{ error, code, details }`).
+- **Export:** `workoutPlanService.exportToExcel(id)` (`GET /workout-plans/:id/export`) → "Export to Excel" button in
+  `components/workouts/plan-builder-layout.tsx` toolbar (edit mode only; exports the last *saved* version).
+- `lib/download.ts` — `saveBlob(blob, filename)` and `fileSlug(name)` helpers for blob downloads.
+- The template's drop-downs/validation are generated server-side; no spreadsheet library in the frontdesk.

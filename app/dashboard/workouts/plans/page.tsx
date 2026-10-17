@@ -20,6 +20,7 @@ import { IconChevronLeft, IconPlus, IconSearch } from '@tabler/icons-react'
 import { useWorkoutPlans } from '@/hooks/use-workout-plans'
 import { PlanStatusBadge } from '@/components/workouts/plan-status-badge'
 import { DifficultyBadge } from '@/components/workouts/difficulty-badge'
+import { ImportPlanDialog } from '@/components/workouts/import-plan-dialog'
 import type { WorkoutPlan } from '@/types/workout'
 
 function PlansContent() {
@@ -70,12 +71,15 @@ function PlansContent() {
             All workout plans created for members and templates
           </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/workouts/create">
-            <IconPlus className="mr-2 h-4 w-4" />
-            Create Plan
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ImportPlanDialog />
+          <Button asChild>
+            <Link href="/dashboard/workouts/create">
+              <IconPlus className="mr-2 h-4 w-4" />
+              Create Plan
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>

@@ -31,6 +31,7 @@ import {
 import { GrantGraceDialog } from '@/components/grant-grace-dialog'
 import { useUser } from '@/hooks/use-users'
 import { MemberWorkoutJourney } from '@/components/workouts/member-workout-journey'
+import { MemberWorkoutPlanCard } from '@/components/workouts/member-workout-plan-card'
 import { useTrainers, useAssignTrainerToUser } from '@/hooks/use-trainers'
 import {
   Select,
@@ -59,6 +60,7 @@ import { HealthMarkersDialog } from '@/components/health-markers-dialog'
 import { HealthGoalsDialog } from '@/components/health-goals-dialog'
 import { ConsentDialog } from '@/components/consent-dialog'
 import { OnboardingReportsDialog } from '@/components/onboarding-reports-dialog'
+import { EditUserDialog } from '@/components/users/edit-user-dialog'
 import { InterestSummary } from '@/components/crm/interest-summary'
 import {
   computeBmi,
@@ -387,10 +389,7 @@ export default function UserDetailPage() {
               </div>
               <div className="flex items-center gap-2">
                 <GrantGraceDialog userId={userId} userName={user.username} />
-                <Button>
-                  <IconEdit className="w-4 h-4 mr-2" />
-                  Edit User
-                </Button>
+                <EditUserDialog user={user} />
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -612,6 +611,9 @@ export default function UserDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* ─── WORKOUT PLAN ─── */}
+          <MemberWorkoutPlanCard member={user} />
 
           {/* ─── WORKOUT JOURNEY ─── */}
           <MemberWorkoutJourney userId={userId} />

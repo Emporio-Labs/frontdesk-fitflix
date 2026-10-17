@@ -178,16 +178,18 @@
 
   /* Some pages wrap tables in .overflow-x-auto to keep desktop tables from
    * blowing out. That wrapper now conflicts with the block layout above, so
-   * neutralise the horizontal scroll inside a mobile-card container. */
-  [data-mobile-cards='tables'] .overflow-x-auto {
+   * neutralise the horizontal scroll inside a mobile-card container. Only for
+   * wrappers that hold a table: chip/tab rows rely on sideways scrolling. */
+  [data-mobile-cards='tables'] .overflow-x-auto:has(table) {
     overflow-x: visible;
   }
 
   /* Belt-and-braces guard against pages that lay out with hard pixel widths.
    * Only applied to the trainer/nutritionist wrappers so admin desktop pages
-   * seen on a phone are unaffected. */
+   * seen on a phone are unaffected. `clip`, not `hidden`: hidden makes this a
+   * scroll container, which breaks position: sticky for everything inside. */
   [data-mobile-cards='tables'] {
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 }
 

@@ -153,9 +153,10 @@ export function FollowUpCard({
         </div>
       </div>
 
-      <div className="flex gap-1.5">
+      {/* Wraps instead of overflowing when the card is narrow (two-up on tablets). */}
+      <div className="flex flex-wrap gap-1.5">
         {/* tel: anchor handles navigation; onCall records the contact attempt */}
-        <Button size="sm" variant="outline" className="h-7 text-xs flex-1" asChild>
+        <Button size="sm" variant="outline" className="h-7 text-xs flex-1 min-w-[5.5rem]" asChild>
           <a href={`tel:${lead.phone}`} onClick={onCall}>
             <IconPhone className="w-3 h-3 mr-1" />
             Call
@@ -163,7 +164,7 @@ export function FollowUpCard({
         </Button>
 
         {/* wa.me anchor handles navigation; onWhatsApp records the contact attempt */}
-        <Button size="sm" variant="outline" className="h-7 text-xs flex-1" asChild>
+        <Button size="sm" variant="outline" className="h-7 text-xs flex-1 min-w-[5.5rem]" asChild>
           <a
             href={`https://wa.me/${lead.phone?.replace(/\D/g, '')}`}
             target="_blank"
@@ -178,7 +179,7 @@ export function FollowUpCard({
         <Button
           size="sm"
           variant="default"
-          className="h-7 text-xs flex-1"
+          className="h-7 text-xs flex-1 min-w-[5.5rem]"
           onClick={onMarkContacted}
           disabled={
             lead.status === 'contacted' ||

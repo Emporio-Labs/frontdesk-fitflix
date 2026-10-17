@@ -10,6 +10,7 @@ interface KanbanColumnProps {
   leadColor: string
   headerColor: string
   isDragDisabled?: boolean
+  className?: string
   children: React.ReactNode
 }
 
@@ -20,6 +21,7 @@ export default function KanbanColumn({
   leadColor,
   headerColor,
   isDragDisabled = false,
+  className = '',
   children,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -30,7 +32,7 @@ export default function KanbanColumn({
   return (
     <Card
       ref={setNodeRef}
-      className={`transition-colors ${isOver && !isDragDisabled ? 'ring-2 ring-blue-400 bg-blue-50' : ''}`}
+      className={`transition-colors ${isOver && !isDragDisabled ? 'ring-2 ring-blue-400 bg-blue-50' : ''} ${className}`}
     >
       <CardHeader>
         <CardTitle className={`text-base ${headerColor}`}>{title}</CardTitle>

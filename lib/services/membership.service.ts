@@ -16,6 +16,13 @@ export interface Membership {
   endDate: string
   features: string[]
   notes: string
+  pauseIntervals?: Array<{
+    pausedAt: string
+    resumedAt: string | null
+    days: number
+    reason?: string
+  }>
+  totalPausedDays?: number
   createdAt?: string
 }
 
@@ -283,8 +290,8 @@ export const membershipService = {
     }
   },
 
-  resume: async (id: string) => {
-    const { data } = await apiClient.post(`/memberships/${id}/resume`)
+  resume: async (id: string, payload?: { resumedAt?: string; reason?: string }) => {
+    const { data } = await apiClient.post(`/memberships/${id}/resume`, payload ?? {})
     return data as {
       message: string
       membership: Membership

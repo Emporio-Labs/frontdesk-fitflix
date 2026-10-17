@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useDeferredValue, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -139,8 +140,6 @@ export default function MemberSchedulePage() {
 
   const qc = useQueryClient()
   const { data: user, isLoading: userLoading } = useUser(userId)
-  const { data: exercisesData } = useExercises()
-  const allExercises = exercisesData?.exercises ?? []
 
   // Fetch Member's Assignment Schedule
   const {
@@ -151,14 +150,28 @@ export default function MemberSchedulePage() {
     queryKey: ['user-assignment', userId],
     queryFn: () => trainerWorkoutService.getUserAssignment(userId),
     enabled: !!userId,
+    // 404 just means the member has no plan yet — don't retry it.
+    retry: (count, err: any) => err?.response?.status !== 404 && count < 1,
   })
 
   const [activeDayNumber, setActiveDayNumber] = useState<number>(1)
+  // Keep the selected day chip visible in the sideways-scrolling row (the
+  // page opens on today, which can be far right on a phone).
+  useEffect(() => {
+    document
+      .querySelector(`[data-day-chip="${activeDayNumber}"]`)
+      ?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [activeDayNumber])
   const [editingDays, setEditingDays] = useState<Record<number, PlanExerciseItem[]>>({})
   const [restDays, setRestDays] = useState<Record<number, boolean>>({})
   const [addExerciseDialogOpen, setAddExerciseDialogOpen] = useState(false)
   const [copyFromDialogOpen, setCopyFromDialogOpen] = useState(false)
   const [exerciseSearch, setExerciseSearch] = useState('')
+  // Search on the server: the library has far more exercises than one page,
+  // so filtering a single page locally hid most of them.
+  const exerciseQuery = useDeferredValue(exerciseSearch.trim())
+  const { data: exercisesData } = useExercises({ search: exerciseQuery || undefined, limit: 100 })
+  const allExercises = exercisesData?.exercises ?? []
   const [assignOrCreateModalOpen, setAssignOrCreateModalOpen] = useState(false)
   const [reportsOpen, setReportsOpen] = useState(false)
   const reportAccess = useCanAccessMemberReports(user)
@@ -580,7 +593,7 @@ export default function MemberSchedulePage() {
             <Button
               onClick={handleSaveDaySchedule}
               disabled={updateDayMutation.isPending}
-              className="w-full sm:w-auto shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="hidden sm:inline-flex sm:w-auto shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               <IconCheck className="w-4 h-4 mr-2" />
               {updateDayMutation.isPending ? 'Saving Schedule...' : `Save Day ${activeDayNumber} Schedule`}
@@ -612,7 +625,10 @@ export default function MemberSchedulePage() {
                   onValueChange={(val) => setActiveDayNumber(Number(val))}
                   className="w-full"
                 >
-                  <TabsList className="flex w-full flex-nowrap justify-start overflow-x-auto sm:flex-wrap h-auto gap-2 bg-muted/50 p-1.5 rounded-xl items-center">
+                  {/* Compact day chips: day number, date and status. They scroll
+                      sideways on phones and wrap from sm up; the full title is
+                      shown above the selected day. */}
+                  <TabsList className="flex w-full flex-nowrap justify-start overflow-x-auto sm:flex-wrap h-auto gap-1.5 bg-muted/50 p-1.5 rounded-xl items-stretch">
                     {dayListToRender.map((day: PlanDayItem) => {
                       const isCurrentDayRest = !!restDays[day.dayNumber] || day.isRestDay === true
                       const dayInfo = getScheduledDayInfo(
@@ -621,22 +637,38 @@ export default function MemberSchedulePage() {
                         day.name,
                         assignment?.dayProgress
                       )
+                      const status = assignment?.dayProgress?.find(
+                        (p: any) => p.dayNumber === day.dayNumber
+                      )?.status
+                      const isToday = dayInfo.relativeTag === 'Today'
                       return (
                         <TabsTrigger
                           key={day.dayNumber}
                           value={String(day.dayNumber)}
-                          className="shrink-0 px-3 sm:px-4 py-2.5 rounded-lg text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-1.5"
-                        >
-                          <span>{dayInfo.tabLabel}</span>
-                          {isCurrentDayRest && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-500/50 text-amber-600 bg-amber-500/10">
-                              Rest
-                            </Badge>
+                          title={dayInfo.tabLabel}
+                          data-day-chip={day.dayNumber}
+                          className={cn(
+                            'relative shrink-0 w-14 flex-col gap-0 px-1 py-1.5 rounded-lg text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground',
+                            isToday && 'ring-2 ring-emerald-500',
+                            isCurrentDayRest && 'data-[state=inactive]:text-muted-foreground'
                           )}
-                          {dayInfo.relativeTag === 'Today' && (
-                            <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0 h-4">
-                              Today
-                            </Badge>
+                        >
+                          <span>D{day.dayNumber}</span>
+                          <span className="text-[10px] font-normal opacity-80">
+                            {isCurrentDayRest
+                              ? 'Rest'
+                              : dayInfo.dateString
+                                ? dayInfo.dateString.split(', ').slice(1).join(' ') || dayInfo.dateString
+                                : `${day.exercises.length} ex`}
+                          </span>
+                          {(status === 'completed' || status === 'missed') && (
+                            <span
+                              aria-label={status}
+                              className={cn(
+                                'absolute top-1 right-1 h-1.5 w-1.5 rounded-full',
+                                status === 'completed' ? 'bg-emerald-500' : 'bg-red-500'
+                              )}
+                            />
                           )}
                         </TabsTrigger>
                       )
@@ -645,12 +677,23 @@ export default function MemberSchedulePage() {
                       variant="outline"
                       size="sm"
                       onClick={handleAddNewDay}
-                      className="shrink-0 h-9 px-3 text-xs border-dashed border-emerald-500/50 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium"
+                      className="shrink-0 h-auto w-14 flex-col gap-0 px-1 py-1.5 text-xs border-dashed border-emerald-500/50 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 font-medium"
                     >
-                      <IconPlus className="w-3.5 h-3.5 mr-1" />
-                      Add Day
+                      <IconPlus className="w-3.5 h-3.5" />
+                      <span className="text-[10px]">Add day</span>
                     </Button>
                   </TabsList>
+                  <p className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Done
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Missed
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="h-2.5 w-2.5 rounded ring-2 ring-emerald-500" /> Today
+                    </span>
+                  </p>
 
                   {dayListToRender.map((day: PlanDayItem) => {
                     const isCurrentDayRest = !!restDays[day.dayNumber]
@@ -860,6 +903,18 @@ export default function MemberSchedulePage() {
           )
         })()}
       </CardContent>
+          {/* Phones: save stays in reach while scrolling the day (sits above
+              the trainer tab bar via --bottom-nav-h). */}
+          <div className="sm:hidden sticky bottom-[var(--bottom-nav-h,0px)] z-30 border-t bg-background/95 backdrop-blur p-3 rounded-b-xl">
+            <Button
+              onClick={handleSaveDaySchedule}
+              disabled={updateDayMutation.isPending}
+              className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <IconCheck className="w-4 h-4 mr-2" />
+              {updateDayMutation.isPending ? 'Saving…' : `Save Day ${activeDayNumber}`}
+            </Button>
+          </div>
         </Card>
       )}
 

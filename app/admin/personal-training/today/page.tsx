@@ -166,7 +166,7 @@ export default function TrainerTodayPage() {
     setExpandedClasses((prev) => ({ ...prev, [sid]: !prev[sid] }))
 
   return (
-    <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6 max-w-7xl mx-auto">
+    <div className="w-full flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>

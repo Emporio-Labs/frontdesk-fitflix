@@ -23,8 +23,20 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconPlus, IconTrash, IconEye, IconRefresh, IconEdit, IconPlayerPause, IconPlayerPlay } from '@tabler/icons-react'
+import {
+  IconPlus,
+  IconTrash,
+  IconEye,
+  IconRefresh,
+  IconEdit,
+  IconPlayerPause,
+  IconPlayerPlay,
+  IconSearch,
+  IconX,
+  IconInfoCircle,
+} from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Membership, MembershipStatus } from '@/lib/services/membership.service'
 import { useMembershipPlans } from '@/hooks/use-membership-plans'
 import { useUsers } from '@/hooks/use-users'
@@ -63,10 +75,13 @@ function MembershipsPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | MembershipStatus>('all')
   const [selectedMembership, setSelectedMembership] = useState<Membership | null>(null)
   const [editingMembership, setEditingMembership] = useState<Membership | null>(null)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [resumingMembership, setResumingMembership] = useState<Membership | null>(null)
+  const [resumeDateInput, setResumeDateInput] = useState('')
   const [hasHandledAssignParam, setHasHandledAssignParam] = useState(false)
   const [isLockedMember, setIsLockedMember] = useState(false)
   const [formData, setFormData] = useState({
@@ -77,6 +92,7 @@ function MembershipsPageContent() {
     startDate: '',
     endDate: '',
     notes: '',
+    resumedAt: '',
   })
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12
@@ -93,19 +109,20 @@ function MembershipsPageContent() {
 
   const assignUserId = searchParams.get('assignUserId') || ''
 
-  const isStartDateDisabled = useMemo(() => {
-    if (!editingMembership) return false
-    const startDateStr = formatDateToInput(editingMembership.startDate)
-    if (!startDateStr) return false
-
+  const todayStr = useMemo(() => {
     const d = new Date()
     const year = d.getFullYear()
     const month = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
-    const todayStr = `${year}-${month}-${day}`
+    return `${year}-${month}-${day}`
+  }, [])
 
+  const isStartDateDisabled = useMemo(() => {
+    if (!editingMembership) return false
+    const startDateStr = formatDateToInput(editingMembership.startDate)
+    if (!startDateStr) return false
     return startDateStr < todayStr
-  }, [editingMembership])
+  }, [editingMembership, todayStr])
 
   const selectedPlan = useMemo(
     () => membershipPlans.find((plan) => plan.id === formData.planId),
@@ -234,18 +251,52 @@ function MembershipsPageContent() {
     }
   }, [selectedPlan, formData.startDate, formData.endDate])
 
-  const filteredMemberships = useMemo(
-    () =>
-      memberships.filter(
-        (m) =>
-          m.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          m.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          m.planName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          m.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          m.notes.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [memberships, searchTerm]
-  )
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: memberships.length,
+      Active: 0,
+      Paused: 0,
+      Expired: 0,
+      Cancelled: 0,
+    }
+    for (const m of memberships) {
+      if (counts[m.status] !== undefined) {
+        counts[m.status] += 1
+      }
+    }
+    return counts
+  }, [memberships])
+
+  const filteredMemberships = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase()
+
+    return memberships.filter((m) => {
+      // 1. Status Filter Guard
+      if (statusFilter !== 'all' && m.status !== statusFilter) {
+        return false
+      }
+
+      // 2. Search Query Guard
+      if (!query) {
+        return true
+      }
+
+      const matchedUser = findMembershipUser(m)
+      const username = matchedUser?.username?.toLowerCase() || ''
+      const email = matchedUser?.email?.toLowerCase() || ''
+      const phone = matchedUser?.phone || ''
+
+      return (
+        m.id.toLowerCase().includes(query) ||
+        m.userId.toLowerCase().includes(query) ||
+        m.planName.toLowerCase().includes(query) ||
+        m.notes.toLowerCase().includes(query) ||
+        username.includes(query) ||
+        email.includes(query) ||
+        phone.includes(query)
+      )
+    })
+  }, [memberships, statusFilter, searchTerm, users])
 
   const sortedMemberships = useMemo(() => {
     return [...filteredMemberships].sort((a, b) => {
@@ -289,7 +340,7 @@ function MembershipsPageContent() {
       return
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       userId: formData.userId.trim(),
       planId: selectedPlan.id,
       planName: selectedPlan.planName,
@@ -303,6 +354,10 @@ function MembershipsPageContent() {
       notes: formData.notes,
     }
 
+    if (editingMembership?.status === 'Paused' && formData.status === 'Active') {
+      payload.resumedAt = formData.resumedAt || todayStr
+    }
+
     const createdUserId = formData.userId
     if (editingMembership) {
       await updateMembership.mutateAsync({ id: editingMembership.id, payload })
@@ -313,7 +368,7 @@ function MembershipsPageContent() {
       await createMembership.mutateAsync({
         ...payload,
         locationId: selectedLocationId ?? undefined,
-      })
+      } as any)
     }
 
     resetForm()
@@ -360,6 +415,7 @@ function MembershipsPageContent() {
       startDate: formatDateToInput(membership.startDate),
       endDate: formatDateToInput(membership.endDate),
       notes: membership.notes,
+      resumedAt: todayStr,
     })
     setIsLockedMember(true)
     setIsAddDialogOpen(true)
@@ -378,6 +434,7 @@ function MembershipsPageContent() {
       startDate: '',
       endDate: '',
       notes: '',
+      resumedAt: '',
     })
     setIsLockedMember(false)
   }
@@ -594,6 +651,28 @@ function MembershipsPageContent() {
                     )}
                   </div>
                 </div>
+                {editingMembership?.status === 'Paused' && formData.status === 'Active' && (
+                  <div className="rounded-lg border bg-muted/30 p-3.5 text-sm space-y-2">
+                    <div className="flex items-center gap-2">
+                      <IconInfoCircle className="w-4 h-4 text-primary shrink-0" />
+                      <label className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                        Member Returned On (Effective Resume Date)
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      If the member actually returned to the gym earlier (e.g. last week), select that date. Frozen days up to that date will be credited back to push the expiry date forward, and days since will count as active gym use.
+                    </p>
+                    <div className="max-w-xs">
+                      <Input
+                        type="date"
+                        className="bg-background font-medium"
+                        value={formData.resumedAt}
+                        max={todayStr}
+                        onChange={(e) => setFormData({ ...formData, resumedAt: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">Start Date</label>
@@ -652,27 +731,102 @@ function MembershipsPageContent() {
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Filters and Search Bar */}
       <Card>
-        <CardHeader>
-          <Input
-            placeholder="Search memberships..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value)
-              setCurrentPage(1)
-            }}
-            className="max-w-sm"
-          />
-        </CardHeader>
+        <CardContent className="p-4 sm:p-5 flex flex-col gap-4">
+          {/* Status Tabs / Pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            {(['all', 'Active', 'Paused', 'Expired', 'Cancelled'] as const).map((status) => {
+              const isSelected = statusFilter === status
+              const count = statusCounts[status] ?? 0
+              return (
+                <Button
+                  key={status}
+                  type="button"
+                  variant={isSelected ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(
+                    'h-8 text-xs font-medium rounded-full px-3 transition-colors',
+                    isSelected
+                      ? 'bg-slate-900 text-white hover:bg-slate-800'
+                      : 'bg-white text-slate-700 hover:bg-slate-100'
+                  )}
+                  onClick={() => {
+                    setStatusFilter(status)
+                    setCurrentPage(1)
+                  }}
+                >
+                  <span>{status === 'all' ? 'All' : status}</span>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      'ml-1.5 px-1.5 py-0 text-[10px] rounded-full',
+                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                    )}
+                  >
+                    {count}
+                  </Badge>
+                </Button>
+              )
+            })}
+          </div>
+
+          {/* Search Input & Reset Filter */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative w-full sm:max-w-md">
+              <IconSearch className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                placeholder="Search by member, phone, plan, or notes..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="pl-9 pr-8"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('')
+                    setCurrentPage(1)
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  title="Clear search"
+                >
+                  <IconX className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {(statusFilter !== 'all' || searchTerm) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStatusFilter('all')
+                  setSearchTerm('')
+                  setCurrentPage(1)
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground self-start sm:self-auto"
+              >
+                Reset filters
+              </Button>
+            )}
+          </div>
+        </CardContent>
       </Card>
 
       {/* Memberships Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Memberships</CardTitle>
+          <CardTitle>
+            {statusFilter === 'all' ? 'All Memberships' : `${statusFilter} Memberships`}
+          </CardTitle>
           <CardDescription>
-            {isLoading ? 'Loading memberships...' : `Total: ${sortedMemberships.length} memberships`}
+            {isLoading
+              ? 'Loading memberships...'
+              : `Showing ${sortedMemberships.length} ${statusFilter === 'all' ? '' : statusFilter.toLowerCase() + ' '}membership${sortedMemberships.length === 1 ? '' : 's'}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -709,7 +863,9 @@ function MembershipsPageContent() {
                     {sortedMemberships.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                          No memberships found
+                          {statusFilter !== 'all'
+                            ? `No ${statusFilter.toLowerCase()} memberships found`
+                            : 'No memberships found'}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -763,9 +919,10 @@ function MembershipsPageContent() {
                                   size="sm"
                                   variant="outline"
                                   title="Resume and credit the frozen days back"
-                                  onClick={() =>
-                                    resumeMembership.mutate(membership.id)
-                                  }
+                                  onClick={() => {
+                                    setResumingMembership(membership)
+                                    setResumeDateInput(todayStr)
+                                  }}
                                   disabled={resumeMembership.isPending}
                                 >
                                   <IconPlayerPlay className="w-4 h-4" />
@@ -830,6 +987,108 @@ function MembershipsPageContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Resume Confirmation Dialog */}
+      {resumingMembership && (
+        <Dialog
+          open={!!resumingMembership}
+          onOpenChange={(open) => {
+            if (!open) {
+              setResumingMembership(null)
+              setResumeDateInput('')
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <IconPlayerPlay className="w-5 h-5 text-primary" />
+                Resume Membership
+              </DialogTitle>
+              <DialogDescription>
+                Re-activate membership for <strong className="text-foreground">{getMembershipUsername(resumingMembership)}</strong>
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-1">
+              {/* Membership Summary Card */}
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-xs">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="font-semibold text-sm text-foreground">{resumingMembership.planName}</span>
+                  <Badge className={getStatusColor(resumingMembership.status)}>{resumingMembership.status}</Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-muted-foreground pt-0.5">
+                  <div>
+                    <span className="block font-medium text-foreground">Current Expiry</span>
+                    {formatDateOnly(resumingMembership.endDate)}
+                  </div>
+                  <div>
+                    <span className="block font-medium text-foreground">Credits Remaining</span>
+                    {resumingMembership.creditsRemaining} / {resumingMembership.creditsIncluded}
+                  </div>
+                </div>
+              </div>
+
+              {/* Effective Resume Date Input */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground flex items-center justify-between">
+                  <span>Member Returned On</span>
+                  <span className="text-xs text-muted-foreground font-normal">Effective Date</span>
+                </label>
+                <Input
+                  type="date"
+                  className="font-medium bg-background"
+                  value={resumeDateInput}
+                  max={todayStr}
+                  onChange={(e) => setResumeDateInput(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Defaults to today. If the member returned earlier (e.g. last week), select that date so their freeze credit is calculated accurately.
+                </p>
+              </div>
+
+              {/* Informative Explanation Banner */}
+              <div className="rounded-lg border border-border/80 bg-muted/40 p-3 text-xs text-muted-foreground flex items-start gap-2.5">
+                <IconInfoCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div className="space-y-1 leading-relaxed">
+                  <p className="font-medium text-foreground">How this works:</p>
+                  <ul className="list-disc list-inside space-y-0.5">
+                    <li>The freeze ends on the chosen date.</li>
+                    <li>Frozen days up to that date are credited back to extend the expiry date.</li>
+                    <li>Any days between the return date and today count as active workout days already used.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setResumingMembership(null)
+                    setResumeDateInput('')
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!resumingMembership) return
+                    await resumeMembership.mutateAsync({
+                      id: resumingMembership.id,
+                      resumedAt: resumeDateInput || todayStr,
+                    })
+                    setResumingMembership(null)
+                    setResumeDateInput('')
+                  }}
+                  disabled={resumeMembership.isPending}
+                >
+                  {resumeMembership.isPending ? 'Resuming...' : 'Confirm & Resume'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Details Dialog */}
       {selectedMembership && (
