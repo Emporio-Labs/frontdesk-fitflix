@@ -208,7 +208,8 @@ export const queryKeys = {
     all: () => ['alert-rules'] as const,
   },
   branchBoard: {
-    all: (branchId?: string | null) => ['branch-board', branchId ?? 'all'] as const,
+    all: (branchId?: string | null, timeframe: string = 'today') =>
+      ['branch-board', branchId ?? 'all', timeframe] as const,
   },
   alertReports: {
     sla: (params?: Record<string, any>) => ['alert-reports', 'sla', params ?? {}] as const,

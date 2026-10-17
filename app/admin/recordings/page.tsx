@@ -188,7 +188,7 @@ export default function AdminRecordingsPage() {
             </Badge>
           </div>
           <p className="text-muted-foreground text-sm mt-1">
-            Manage recorded online broadcasts (FX-23). Hide recordings to remove them from the member
+            Manage recorded online broadcasts. Hide recordings to remove them from the member
             app, or delete outdated sessions.
           </p>
         </div>

@@ -172,12 +172,6 @@ export default function FunnelsAnalyticsPage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">Funnels & Drop-offs</h1>
-            <Badge
-              variant="outline"
-              className="gap-1 border-blue-200 bg-blue-50 text-xs font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
-            >
-              FX-22 Analytics
-            </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
             Identify where members drop out between viewing a plan and becoming a member, and between viewing a class and booking it.
@@ -342,8 +336,8 @@ export default function FunnelsAnalyticsPage() {
           <div>
             <CardTitle className="text-base font-semibold">
               {activeTab === 'signup'
-                ? 'Sign-up Conversion Journey (FX-22.2)'
-                : 'Class Booking Journey (FX-22.3)'}
+                ? 'Sign-up Conversion Journey'
+                : 'Class Booking Journey'}
             </CardTitle>
             <CardDescription className="text-xs">
               {activeTab === 'signup'

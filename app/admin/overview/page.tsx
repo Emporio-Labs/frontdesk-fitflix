@@ -34,6 +34,7 @@ import type {
   BranchBoardItem,
   BranchBoardStaffItem,
   BranchBoardSessionItem,
+  BranchBoardTimeframe,
 } from '@/lib/services/branch-board.service'
 import {
   Card,
@@ -67,6 +68,9 @@ export default function OperationsOverviewPage() {
 
   // Selected branch filter for the board view (optional for admin)
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>('all')
+
+  // Timeframe filter: 'today' (default, intraday live metrics) or 'all' (all-time totals)
+  const [timeframe, setTimeframe] = useState<BranchBoardTimeframe>('today')
 
   // In-page alerts view state (toggles open/close without deleting or dismissing)
   const [showAlertsSection, setShowAlertsSection] = useState(false)
@@ -102,7 +106,7 @@ export default function OperationsOverviewPage() {
     refetch,
     dataUpdatedAt,
     isSocketConnected,
-  } = useBranchBoard(selectedBranchFilter)
+  } = useBranchBoard(selectedBranchFilter, timeframe)
 
   // Aggregated totals across all visible branches
   const totals = useMemo(() => {
@@ -221,6 +225,22 @@ export default function OperationsOverviewPage() {
             </div>
           )}
 
+          {/* Timeframe Filter (Today vs All-time totals) */}
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={timeframe}
+              onValueChange={(val) => setTimeframe(val as BranchBoardTimeframe)}
+            >
+              <SelectTrigger className="w-[110px] h-9 text-xs">
+                <SelectValue placeholder="Timeframe" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="all">All-Time</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {asOf && (
             <span className="text-xs text-muted-foreground hidden sm:inline">
               Updated: {new Date(asOf).toLocaleTimeString()}
@@ -283,7 +303,9 @@ export default function OperationsOverviewPage() {
           <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-xs">
             <CardContent className="p-4 space-y-1">
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-xs font-medium">Live Sessions</span>
+                <span className="text-xs font-medium">
+                  {timeframe === 'today' ? 'Live Sessions' : 'Total Sessions'}
+                </span>
                 <IconActivity className="w-4 h-4 text-emerald-500" />
               </div>
               <div className="flex items-baseline gap-2">
@@ -298,7 +320,9 @@ export default function OperationsOverviewPage() {
           <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-xs">
             <CardContent className="p-4 space-y-1">
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-xs font-medium">Today's Check-ins</span>
+                <span className="text-xs font-medium">
+                  {timeframe === 'today' ? "Today's Check-ins" : 'Total Check-ins'}
+                </span>
                 <IconLogin className="w-4 h-4 text-blue-500" />
               </div>
               <div className="flex items-baseline gap-2">
@@ -313,7 +337,9 @@ export default function OperationsOverviewPage() {
           <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-xs">
             <CardContent className="p-4 space-y-1">
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-xs font-medium">Staff on Duty</span>
+                <span className="text-xs font-medium">
+                  {timeframe === 'today' ? 'Staff on Duty' : 'Staff Members'}
+                </span>
                 <IconUsers className="w-4 h-4 text-violet-500" />
               </div>
               <div className="flex items-baseline gap-2">
@@ -330,7 +356,9 @@ export default function OperationsOverviewPage() {
           >
             <CardContent className="p-4 space-y-1">
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-xs font-medium">Open Alerts</span>
+                <span className="text-xs font-medium">
+                  {timeframe === 'today' ? 'Open Alerts' : 'Total Alerts'}
+                </span>
                 <IconBellRinging
                   className={`w-4 h-4 ${
                     totals.criticalAlerts > 0 ? 'text-red-500 animate-pulse' : 'text-amber-500'
@@ -351,7 +379,9 @@ export default function OperationsOverviewPage() {
           <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-xs col-span-2 sm:col-span-1">
             <CardContent className="p-4 space-y-1">
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-xs font-medium">Today's Revenue</span>
+                <span className="text-xs font-medium">
+                  {timeframe === 'today' ? "Today's Revenue" : 'Total Revenue'}
+                </span>
                 <IconCurrencyRupee className="w-4 h-4 text-emerald-600" />
               </div>
               <div className="flex items-baseline gap-2">
@@ -597,7 +627,9 @@ export default function OperationsOverviewPage() {
                         )}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
-                        {sessions.upcomingCount} upcoming today
+                        {timeframe === 'today'
+                          ? `${sessions.upcomingCount} upcoming today`
+                          : `${sessions.upcomingCount} upcoming (${sessions.totalToday} total)`}
                       </div>
                     </div>
 
@@ -619,7 +651,9 @@ export default function OperationsOverviewPage() {
                         <span className="text-xl font-bold">
                           {checkIns.todayCount}
                         </span>
-                        <span className="text-[11px] text-muted-foreground">today</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {timeframe === 'today' ? 'today' : 'all-time'}
+                        </span>
                       </div>
                       <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
                         {checkIns.currentlyInGym} in gym right now
@@ -689,7 +723,7 @@ export default function OperationsOverviewPage() {
                     </div>
                   </div>
 
-                  {/* Metric 5: Today's Revenue Ribbon */}
+                  {/* Metric 5: Revenue Ribbon */}
                   <div
                     onClick={() =>
                       navigateToMetric(
@@ -702,7 +736,7 @@ export default function OperationsOverviewPage() {
                     <div>
                       <div className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                         <IconCurrencyRupee className="w-3.5 h-3.5 text-emerald-600" />
-                        Today's Revenue
+                        {timeframe === 'today' ? "Today's Revenue" : 'Total Revenue'}
                       </div>
                       <div className="text-lg font-bold mt-0.5">
                         ₹{revenue.todayTotal.toLocaleString('en-IN')}

@@ -66,14 +66,23 @@ export interface BranchBoardItem {
   }
 }
 
+export type BranchBoardTimeframe = 'today' | 'all'
+
 export interface BranchBoardResponse {
   asOf: string
+  timeframe?: BranchBoardTimeframe
   branches: BranchBoardItem[]
 }
 
 export const branchBoardService = {
-  getBoard: async (branchId?: string | null): Promise<BranchBoardResponse> => {
-    const params = branchId && branchId !== '__all__' ? { branchId } : undefined
+  getBoard: async (
+    branchId?: string | null,
+    timeframe: BranchBoardTimeframe = 'today'
+  ): Promise<BranchBoardResponse> => {
+    const params: Record<string, string> = { timeframe }
+    if (branchId && branchId !== '__all__' && branchId !== 'all') {
+      params.branchId = branchId
+    }
     const { data } = await apiClient.get<BranchBoardResponse>('/dashboard/branch-board', {
       params,
     })

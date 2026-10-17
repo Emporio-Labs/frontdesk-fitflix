@@ -8,9 +8,13 @@ import { queryKeys } from '@/lib/query-keys'
 import {
   branchBoardService,
   type BranchBoardItem,
+  type BranchBoardTimeframe,
 } from '@/lib/services/branch-board.service'
 
-export function useBranchBoard(branchId?: string | null) {
+export function useBranchBoard(
+  branchId?: string | null,
+  timeframe: BranchBoardTimeframe = 'today'
+) {
   const queryClient = useQueryClient()
   const socketRef = useRef<Socket | null>(null)
   const [isSocketConnected, setIsSocketConnected] = useState(false)
@@ -28,8 +32,8 @@ export function useBranchBoard(branchId?: string | null) {
     refetch,
     dataUpdatedAt,
   } = useQuery({
-    queryKey: queryKeys.branchBoard.all(effectiveBranchId),
-    queryFn: () => branchBoardService.getBoard(effectiveBranchId),
+    queryKey: queryKeys.branchBoard.all(effectiveBranchId, timeframe),
+    queryFn: () => branchBoardService.getBoard(effectiveBranchId, timeframe),
     refetchInterval: 15000, // 15s reactive fallback
     staleTime: 5000,
   })
@@ -93,6 +97,7 @@ export function useBranchBoard(branchId?: string | null) {
   return {
     branches: (data?.branches ?? []) as BranchBoardItem[],
     asOf: data?.asOf,
+    timeframe: data?.timeframe ?? timeframe,
     isLoading,
     isFetching,
     error,
