@@ -49,10 +49,10 @@ import {
 } from '@/lib/services/analytics.service'
 
 const DATE_RANGES = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This Week' },
+  { key: 'month', label: 'This Month' },
   { key: 'all', label: 'All Time' },
-  { key: '7d', label: 'Last 7 Days', days: 7 },
-  { key: '30d', label: 'Oct 1, 2026 - Oct 31, 2026', days: 30 },
-  { key: '90d', label: 'Last 90 Days', days: 90 },
 ]
 
 const STAGE_THEMES = [
@@ -85,19 +85,35 @@ const STAGE_THEMES = [
 
 export default function FunnelsAnalyticsPage() {
   const { locations, selectedLocationId, setSelectedLocationId } = useLocationScope()
-  const [selectedRange, setSelectedRange] = useState('30d')
+  const [selectedRange, setSelectedRange] = useState('all')
   const [activeTab, setActiveTab] = useState<'signup' | 'booking'>('signup')
 
   const dateFilter = useMemo(() => {
-    const range = DATE_RANGES.find((r) => r.key === selectedRange)
-    if (!range || !range.days) return { from: undefined, to: undefined }
-    const to = new Date()
-    const from = new Date()
-    from.setDate(from.getDate() - range.days)
-    return {
-      from: from.toISOString(),
-      to: to.toISOString(),
+    if (selectedRange === 'all') {
+      return { from: undefined, to: undefined }
     }
+
+    const now = new Date()
+    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+
+    if (selectedRange === 'today') {
+      const from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+      return { from: from.toISOString(), to: to.toISOString() }
+    }
+
+    if (selectedRange === 'week') {
+      const day = now.getDay()
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1)
+      const from = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0)
+      return { from: from.toISOString(), to: to.toISOString() }
+    }
+
+    if (selectedRange === 'month') {
+      const from = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0)
+      return { from: from.toISOString(), to: to.toISOString() }
+    }
+
+    return { from: undefined, to: undefined }
   }, [selectedRange])
 
   const queryParams = useMemo(() => {
@@ -206,10 +222,10 @@ export default function FunnelsAnalyticsPage() {
           {/* Date Range Filter */}
           <div className="flex items-center gap-1.5">
             <Select value={selectedRange} onValueChange={setSelectedRange}>
-              <SelectTrigger className="w-[220px] bg-background">
+              <SelectTrigger className="w-[160px] bg-background">
                 <div className="flex items-center gap-2 truncate">
                   <IconCalendar className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <SelectValue placeholder="Date Range" />
+                  <SelectValue placeholder="Timeframe" />
                 </div>
               </SelectTrigger>
               <SelectContent>
