@@ -3,6 +3,7 @@ export const queryKeys = {
     all: () => ['users'] as const,
     detail: (id: string) => ['users', id] as const,
     bcaMetrics: (id: string) => ['users', id, 'bca-metrics'] as const,
+    reports: (id: string) => ['users', id, 'reports'] as const,
   },
   admins: {
     all: () => ['admins'] as const,

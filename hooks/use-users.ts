@@ -68,6 +68,47 @@ export function useUserBcaMetrics(userId: string) {
   })
 }
 
+export function useUserReports(userId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.users.reports(userId),
+    queryFn: () => userService.getUserReports(userId),
+    select: (data) => data.reports,
+    enabled: !!userId && enabled,
+  })
+}
+
+export function useUploadDnaReport(userId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      file,
+      reportName,
+      onProgress,
+    }: {
+      file: File
+      reportName: string
+      onProgress?: (fraction: number) => void
+    }) => userService.uploadDnaReport(userId, { file, reportName }, onProgress),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.users.reports(userId) })
+      toast.success('DNA report uploaded')
+    },
+    onError: (err: any) => toast.error(extractApiError(err, 'Failed to upload DNA report')),
+  })
+}
+
+export function useDeleteDnaReport(userId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (reportId: string) => userService.deleteDnaReport(userId, reportId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.users.reports(userId) })
+      toast.success('DNA report deleted')
+    },
+    onError: (err: any) => toast.error(extractApiError(err, 'Failed to delete DNA report')),
+  })
+}
+
 export function useCreateUser() {
   const qc = useQueryClient()
   return useMutation({
