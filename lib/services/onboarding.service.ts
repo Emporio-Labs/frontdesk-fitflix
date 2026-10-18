@@ -27,6 +27,10 @@ export interface MedicalReport {
   uploadedAt: string
   createdAt?: string
   updatedAt?: string
+  // 'dna' is filed by the front desk; everything else is the member's own upload.
+  category?: 'medical' | 'dna'
+  source?: 'client' | 'frontdesk'
+  uploadedByRole?: string
 }
 
 // ── Expert appointment (returned by POST /onboarding/appointments) ────────────

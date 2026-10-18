@@ -252,6 +252,36 @@ export const userService = {
     return data as { reports: UserReport[] }
   },
 
+  // Every report on a member's file: their own uploads plus the DNA reports
+  // the front desk filed. Each comes with a short-lived signed reportUrl.
+  getUserReports: async (userId: string) => {
+    const { data } = await apiClient.get(`/users/${userId}/reports`)
+    return data as { reports: MedicalReport[] }
+  },
+
+  // Front desk only (backend: admin, frontdesk). The one way a DNA report is created.
+  uploadDnaReport: async (
+    userId: string,
+    payload: { file: File; reportName: string },
+    onProgress?: (fraction: number) => void,
+  ) => {
+    const form = new FormData()
+    form.append('file', payload.file)
+    form.append('reportName', payload.reportName)
+    const { data } = await apiClient.post(`/users/${userId}/dna-reports`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (event) => {
+        if (onProgress && event.total) onProgress(event.loaded / event.total)
+      },
+    })
+    return data as { message: string; report: MedicalReport }
+  },
+
+  deleteDnaReport: async (userId: string, reportId: string) => {
+    const { data } = await apiClient.delete(`/users/${userId}/dna-reports/${reportId}`)
+    return data as { message: string }
+  },
+
   // Staff-facing counterpart to the member's own GET /users/me/bca-metrics —
   // lets the front desk see an ActiveX scan the member never opened the app
   // to view. Guarded server-side to admin/frontdesk.
