@@ -18,7 +18,9 @@
       "Bash(python build_sprint_pdf.py)",
       "Bash(vercel --version)",
       "Bash(rm -f mock-analytics-requests.log)",
-      "Bash(node mock-analytics.js)"
+      "Bash(node mock-analytics.js)",
+      "Bash(docker info *)",
+      "Bash(timeout 25 bun -e \"import mongoose from 'mongoose'; const u=process.env.MONGODB_URL||'mongodb://127.0.0.1:27017/fitflix'; try{ await mongoose.connect\\(u,{serverSelectionTimeoutMS:10000}\\); console.log\\('CONNECTED to', mongoose.connection.name\\); await mongoose.disconnect\\(\\); }catch\\(e\\){ console.log\\('NO_CONNECTION:', e.message?.slice\\(0,160\\)\\); }\")"
     ]
   }
 }

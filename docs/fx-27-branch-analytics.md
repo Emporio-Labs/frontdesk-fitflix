@@ -58,19 +58,35 @@ with `configured: false`, and the page shows an **"Analytics isn't connected yet
 state instead of erroring — the same graceful-degradation pattern used elsewhere
 in the console against missing backends.
 
-## Assumptions to verify (see BACKEND_REQUIREMENTS.txt)
+## Backend (implemented in FITFLIX_BACKEND)
 
-The analytics service is **not yet in `api_docs.md`**, so its contract is inferred.
-`lib/services/analytics.service.ts` normalises tolerantly — an unexpected shape
-degrades to empty funnels rather than throwing. Confirm against the live service:
+The analytics service is the FITFLIX backend's `/analytics` prefix. The endpoint
+`GET /analytics/funnels` is implemented there (`src/routes/analytics.routes.ts`,
+`src/controllers/analytics.controller.ts` → `getBranchFunnels`,
+`src/services/branch-funnels.service.ts`). Wiring:
 
-- **Endpoint:** `GET {ANALYTICS_API_URL}/funnels?locationId=&from=&to=`
-- **Auth:** `X-Analytics-Key: <secret>` (service) + forwarded `Authorization` (user)
-- **Response:** `{ branchId, range:{from,to}, funnels:[{ key, title, steps:[{ key, label, count }] }], generatedAt }`
-  - the client also accepts a keyed form `{ signup:{…}, booking:{…} }`
-- **Branch enforcement:** the service must refuse an "all branches" (no `locationId`)
-  read for anyone who is not a super admin, and refuse a `locationId` outside the
-  caller's branch access. The UI only *offers* "All branches" to super admins.
+- **`ANALYTICS_API_URL`** → the backend's analytics prefix, e.g.
+  `http://localhost:3000/analytics` (the proxy calls `${ANALYTICS_API_URL}/funnels`).
+- **`ANALYTICS_API_KEY`** → must equal the backend's own `ANALYTICS_API_KEY`. The
+  backend validates the forwarded `X-Analytics-Key` header and returns 403 on a
+  mismatch; when the backend's var is unset the service gate is skipped (JWT +
+  role + branch guards still apply).
+- **Auth:** forwarded `Authorization` (user JWT) authorizes `admin`/`frontdesk`
+  and drives branch scope; `X-Analytics-Key` is the service credential.
+- **Response:** `{ branchId, range:{from,to}, funnels:[{ key, title, steps:[{ key, label, count }] }], generatedAt, configured }`
+  — the client also accepts a keyed form `{ signup:{…}, booking:{…} }`.
+- **Branch enforcement (FX-27.2):** `staffGuard` + `scopedLocationFilter` confine a
+  branch-scoped manager to their own branches and make an out-of-scope `locationId`
+  match nothing; a global/super admin may read across all branches. Active only
+  when `STAFF_RBAC_ENFORCE=true` (the whole branch system's master switch); the UI
+  only *offers* "All branches" to super admins regardless.
+
+**Funnel sources (confirm the stage definitions with the product owner):**
+
+- **Sign-up** ← `Lead` (`locationId`, `createdAt` in window): Leads → Contacted →
+  Qualified → Converted, by status progression.
+- **Booking** ← `Booking` (`locationId`, `createdAt` in window): Bookings created →
+  Confirmed → Attended, robust to the mixed numeric/string legacy `status` values.
 
 ## How this was verified
 

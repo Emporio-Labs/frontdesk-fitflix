@@ -420,6 +420,14 @@ Notes
  FX-27. ANALYTICS SERVICE — branch funnels   (NEW SERVICE / endpoint)
 ================================================================================
 
+STATUS: IMPLEMENTED in FITFLIX_BACKEND as GET /analytics/funnels
+  (routes/analytics.routes.ts, controllers/analytics.controller.ts ->
+  getBranchFunnels, services/branch-funnels.service.ts). The contract below
+  matches that implementation. Remaining to confirm with the product owner: the
+  exact funnel stage definitions and source collections (Lead for sign-up,
+  Booking for booking). Branch enforcement is live only when STAFF_RBAC_ENFORCE
+  is on, consistent with the rest of the branch-scope system.
+
 Context
 -------
 The Frontdesk Analytics page (/admin/analytics) shows the sign-up and booking
