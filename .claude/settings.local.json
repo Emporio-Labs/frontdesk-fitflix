@@ -16,7 +16,9 @@
       "Bash(python -)",
       "Bash(sed -i 's/&rarr;/-\\\\&gt;/g' build_sprint_pdf.py)",
       "Bash(python build_sprint_pdf.py)",
-      "Bash(vercel --version)"
+      "Bash(vercel --version)",
+      "Bash(rm -f mock-analytics-requests.log)",
+      "Bash(node mock-analytics.js)"
     ]
   }
 }

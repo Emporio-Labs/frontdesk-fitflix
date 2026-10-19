@@ -417,3 +417,71 @@ Notes
     { admin, null }.
 
 ================================================================================
+ FX-27. ANALYTICS SERVICE — branch funnels   (NEW SERVICE / endpoint)
+================================================================================
+
+Context
+-------
+The Frontdesk Analytics page (/admin/analytics) shows the sign-up and booking
+funnels for the branch the console has selected. The numbers come from a
+dedicated analytics service authenticated with a SECRET KEY that must never
+reach the browser (FX-27.3).
+
+The frontend never calls the analytics service directly. It calls a same-origin
+Next.js route (app/api/analytics/proxy.ts) which attaches the secret key server
+-side and forwards the request. Until the service ships, the page shows an
+"Analytics isn't connected yet" state (the proxy returns configured:false when
+ANALYTICS_API_URL / ANALYTICS_API_KEY are unset) — nothing breaks.
+
+Frontend env (SERVER-ONLY — no NEXT_PUBLIC_ prefix, so never bundled to client):
+  ANALYTICS_API_URL   base URL of the analytics service
+  ANALYTICS_API_KEY   secret service-to-service key
+
+Endpoint (REQUIRED to light up the feature)
+--------------------------------------------
+  GET {ANALYTICS_API_URL}/funnels?locationId=<id>&from=<YYYY-MM-DD>&to=<YYYY-MM-DD>
+
+  - locationId OMITTED means "all branches" (super admins only — see enforcement).
+  - from/to are an inclusive calendar-day window.
+
+  Headers the proxy sends:
+    X-Analytics-Key: <ANALYTICS_API_KEY>     // the service credential
+    Authorization:   Bearer <user token>     // the signed-in staff member
+    X-Location-Id:   <selected branch>        // mirrors the backend convention
+
+Response shape (what lib/services/analytics.service.ts expects)
+---------------------------------------------------------------
+  {
+    branchId:   string | null,              // echo; null = all branches
+    range:      { from: string, to: string },
+    generatedAt: string,                     // ISO
+    funnels: [
+      {
+        key:   "signup" | "booking" | string,
+        title: string,                        // e.g. "Sign-up funnel"
+        steps: [
+          { key: string, label: string, count: number }  // ordered top→bottom
+        ]
+      }
+    ]
+  }
+
+  A keyed form is also accepted: { signup: {…funnel}, booking: {…funnel} }.
+  Step counts should be monotonically non-increasing down each funnel.
+
+Access enforcement (REQUIRED — FX-27.2 / FX-27.4)
+-------------------------------------------------
+  The service is the authority on who may read what (the UI only hides controls):
+  - Refuse a no-locationId ("all branches") read unless the caller (per the
+    forwarded Authorization token) is a super admin.
+  - Refuse a locationId outside the caller's branch access.
+  This mirrors the existing branch-scope gate (staffContext.service.ts); the
+  X-Analytics-Key only proves the request came from Frontdesk's server, not from
+  the browser — it is NOT a substitute for per-user authorization.
+
+Suggested funnel stages (confirm against product analytics)
+-----------------------------------------------------------
+  Sign-up:  Leads → Sign-ups → Onboarding complete → Membership active
+  Booking:  Slots viewed → Bookings created → Confirmed → Attended
+
+================================================================================

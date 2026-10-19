@@ -32,6 +32,7 @@ import {
   IconBell,
   IconStethoscope,
   IconApple,
+  IconChartFunnel,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -94,6 +95,7 @@ const navGroups = [
   {
     label: "Insights",
     items: [
+      { title: "Analytics", url: "/admin/analytics", icon: IconChartFunnel },
       { title: "Concierge Alerts", url: "/admin/alerts", icon: IconBellRinging },
       { title: "Leads", url: "/admin/leads", icon: IconTarget },
       { title: "Promotions", url: "/admin/promotions", icon: IconSpeakerphone },
@@ -186,6 +188,7 @@ const navManagerGroup = [
   {
     label: "Insights",
     items: [
+      { title: "Analytics", url: "/admin/analytics", icon: IconChartFunnel },
       { title: "Concierge Alerts", url: "/admin/alerts", icon: IconBellRinging },
       { title: "Promotions", url: "/admin/promotions", icon: IconSpeakerphone },
       { title: "Reports", url: "/admin/reports", icon: IconReport },

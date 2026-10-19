@@ -69,6 +69,9 @@ export const ROLE_ALLOWED_PREFIXES: Partial<Record<UserRole, string[]>> = {
     '/admin/therapies',
     '/admin/alerts',
     '/admin/reports',
+    // FX-27.4 — branch funnels, scoped by the analytics service to the manager's
+    // own branch (FX-27.2).
+    '/admin/analytics',
     '/admin/promotions',
     '/admin/audit-logs',
     '/admin/me/notifications',
