@@ -204,4 +204,11 @@ export const queryKeys = {
   content: {
     all: () => ['content'] as const,
   },
+  // FX-27 — branch analytics (sign-up + booking funnels). Per-branch, so callers
+  // fold the active branch in via `scopedKey` from the location scope provider.
+  analytics: {
+    all: () => ['analytics'] as const,
+    funnels: (range?: Record<string, unknown>) =>
+      ['analytics', 'funnels', range ?? {}] as const,
+  },
 }

@@ -67,6 +67,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     // FX-20.3 — compose & send club-wide member notifications.
     { resource: 'member_notifications', action: 'create' },
     { resource: 'member_notifications', action: 'read' },
+    // FX-27.4 — the branch analytics page (sign-up + booking funnels).
+    { resource: 'analytics', action: 'read' },
     { resource: 'settings', action: 'read' },
     { resource: 'settings', action: 'update' },
   ],
@@ -103,6 +105,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     // FX-20.3 — compose & send club-wide member notifications.
     { resource: 'member_notifications', action: 'create' },
     { resource: 'member_notifications', action: 'read' },
+    // FX-27.4 — the branch analytics page (sign-up + booking funnels).
+    { resource: 'analytics', action: 'read' },
     { resource: 'settings', action: 'read' },
   ],
   // FX-31.1 — branch manager: branch-ops read/update + leads, no org-admin
@@ -124,6 +128,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'leads', action: 'read' },
     { resource: 'leads', action: 'update' },
     { resource: 'audit_logs', action: 'read' },
+    // FX-27.4 — a club manager may read their own branch's funnels. The analytics
+    // service scopes the numbers to the branch they have selected (FX-27.2);
+    // "all branches" stays super-admin-only, enforced there, not here.
+    { resource: 'analytics', action: 'read' },
     { resource: 'attendance', action: 'read' },
     { resource: 'attendance', action: 'create' },
     { resource: 'attendance', action: 'update' },
