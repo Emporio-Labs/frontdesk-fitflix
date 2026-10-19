@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf, IconEye, IconEyeOff } from '@tabler/icons-react'
+import { IconPlus, IconEdit, IconTrash, IconRefresh, IconUsers, IconShieldHalf, IconEye, IconEyeOff, IconSearch, IconFilterOff, IconX } from '@tabler/icons-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,11 +31,13 @@ import {
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
 import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '@/hooks/use-admins'
 import { useMemberships } from '@/hooks/use-memberships'
+import { useMembershipPlans } from '@/hooks/use-membership-plans'
 import { User, CreateUserPayload } from '@/lib/services/user.service'
 import { Admin } from '@/lib/services/admin.service'
 import { StatusBadge } from '@/components/status-badge'
 import { UserDetailsDialog } from '@/components/users/user-details-dialog'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -147,6 +149,9 @@ function deriveOnboardingState(user: User): OnboardingState {
 export default function UsersPage() {
   // Member state
   const [memberSearch, setMemberSearch] = useState('')
+  const [membershipFilter, setMembershipFilter] = useState<'all' | 'unassigned' | 'assigned_active' | 'assigned_paused' | 'assigned_any'>('all')
+  const [planFilter, setPlanFilter] = useState<string>('all')
+  const [onboardingFilter, setOnboardingFilter] = useState<'all' | 'completed' | 'in_progress' | 'not_started' | 'incomplete'>('all')
   const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [memberForm, setMemberForm] = useState({
@@ -280,6 +285,7 @@ export default function UsersPage() {
   const updateUser = useUpdateUser()
   const deleteUser = useDeleteUser()
   const { data: memberships = [] } = useMemberships()
+  const { data: membershipPlans = [] } = useMembershipPlans()
 
   const { data: admins = [], isLoading: adminsLoading, isError: adminsError, refetch: refetchAdmins } = useAdmins()
   const createAdmin = useCreateAdmin()
@@ -309,6 +315,107 @@ export default function UsersPage() {
     return keys.map((key) => membershipsByUserKey.get(key)).find(Boolean)
   }
 
+  const availablePlanNames = useMemo(() => {
+    const set = new Set<string>()
+    membershipPlans.forEach((p) => {
+      if (p.planName) set.add(p.planName)
+    })
+    memberships.forEach((m) => {
+      if (m.planName) set.add(m.planName)
+    })
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [membershipPlans, memberships])
+
+  const memberCounts = useMemo(() => {
+    let unassigned = 0
+    let active = 0
+    let paused = 0
+    let incompleteOnboarding = 0
+
+    users.forEach((user) => {
+      const m = getUserMembership(user)
+      if (!m) {
+        unassigned++
+      } else if (m.status === 'Active') {
+        active++
+      } else if (m.status === 'Paused') {
+        paused++
+      }
+
+      const ob = deriveOnboardingState(user)
+      if (ob !== 'completed') {
+        incompleteOnboarding++
+      }
+    })
+
+    return {
+      total: users.length,
+      unassigned,
+      active,
+      paused,
+      incompleteOnboarding,
+    }
+  }, [users, membershipsByUserKey])
+
+  const handleSelectQuickPill = (pill: 'all' | 'unassigned' | 'active' | 'paused' | 'incomplete_onboarding') => {
+    setMemberPage(1)
+    if (pill === 'all') {
+      setMembershipFilter('all')
+      setPlanFilter('all')
+      setOnboardingFilter('all')
+    } else if (pill === 'unassigned') {
+      setMembershipFilter('unassigned')
+      setPlanFilter('all')
+      setOnboardingFilter('all')
+    } else if (pill === 'active') {
+      setMembershipFilter('assigned_active')
+      setPlanFilter('all')
+      setOnboardingFilter('all')
+    } else if (pill === 'paused') {
+      setMembershipFilter('assigned_paused')
+      setPlanFilter('all')
+      setOnboardingFilter('all')
+    } else if (pill === 'incomplete_onboarding') {
+      setOnboardingFilter('incomplete')
+      setMembershipFilter('all')
+      setPlanFilter('all')
+    }
+  }
+
+  const activeQuickPill = useMemo(() => {
+    if (membershipFilter === 'unassigned' && planFilter === 'all' && onboardingFilter === 'all') {
+      return 'unassigned'
+    }
+    if (membershipFilter === 'assigned_active' && planFilter === 'all' && onboardingFilter === 'all') {
+      return 'active'
+    }
+    if (membershipFilter === 'assigned_paused' && planFilter === 'all' && onboardingFilter === 'all') {
+      return 'paused'
+    }
+    if (onboardingFilter === 'incomplete' && membershipFilter === 'all' && planFilter === 'all') {
+      return 'incomplete_onboarding'
+    }
+    if (membershipFilter === 'all' && planFilter === 'all' && onboardingFilter === 'all') {
+      return 'all'
+    }
+    return 'custom'
+  }, [membershipFilter, planFilter, onboardingFilter])
+
+  const isAnyFilterActive = Boolean(
+    memberSearch.trim() ||
+    membershipFilter !== 'all' ||
+    planFilter !== 'all' ||
+    onboardingFilter !== 'all'
+  )
+
+  const handleResetFilters = () => {
+    setMemberSearch('')
+    setMembershipFilter('all')
+    setPlanFilter('all')
+    setOnboardingFilter('all')
+    setMemberPage(1)
+  }
+
   const formatDateOnly = (value?: string) => {
     if (!value) return '-'
     const parsed = new Date(value)
@@ -330,12 +437,46 @@ export default function UsersPage() {
   }
 
   // --- Member helpers ---
-  const filteredUsers = users.filter(
-    (u) =>
-      u.username.toLowerCase().includes(memberSearch.toLowerCase()) ||
-      (u.email && u.email.toLowerCase().includes(memberSearch.toLowerCase())) ||
-      (u.phone && u.phone.includes(memberSearch))
-  )
+  const filteredUsers = useMemo(() => {
+    const query = memberSearch.trim().toLowerCase()
+
+    return users.filter((u) => {
+      // 1. Text Search (username, email, phone)
+      if (query) {
+        const matchesUsername = u.username.toLowerCase().includes(query)
+        const matchesEmail = Boolean(u.email && u.email.toLowerCase().includes(query))
+        const matchesPhone = Boolean(u.phone && u.phone.includes(query))
+        if (!matchesUsername && !matchesEmail && !matchesPhone) return false
+      }
+
+      const membership = getUserMembership(u)
+
+      // 2. Membership status filter
+      if (membershipFilter === 'unassigned') {
+        if (membership) return false
+      } else if (membershipFilter === 'assigned_active') {
+        if (!membership || membership.status !== 'Active') return false
+      } else if (membershipFilter === 'assigned_paused') {
+        if (!membership || membership.status !== 'Paused') return false
+      } else if (membershipFilter === 'assigned_any') {
+        if (!membership) return false
+      }
+
+      // 3. Plan Name filter
+      if (planFilter !== 'all') {
+        if (!membership || membership.planName !== planFilter) return false
+      }
+
+      // 4. Onboarding status filter
+      const obState = deriveOnboardingState(u)
+      if (onboardingFilter === 'completed' && obState !== 'completed') return false
+      if (onboardingFilter === 'in_progress' && obState !== 'in_progress') return false
+      if (onboardingFilter === 'not_started' && obState !== 'not_started') return false
+      if (onboardingFilter === 'incomplete' && obState === 'completed') return false
+
+      return true
+    })
+  }, [users, memberSearch, membershipFilter, planFilter, onboardingFilter, membershipsByUserKey])
 
   const totalMemberPages = Math.ceil(filteredUsers.length / itemsPerPage)
   const activeMemberPage = Math.max(1, Math.min(memberPage, totalMemberPages || 1))
@@ -496,17 +637,34 @@ export default function UsersPage() {
 
         {/* ─── MEMBERS TAB ─── */}
         <TabsContent value="members" className="mt-4 space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Input
-              placeholder="Search by username or email..."
-              value={memberSearch}
-              onChange={(e) => {
-                setMemberSearch(e.target.value)
-                setMemberPage(1)
-              }}
-              className="w-full sm:max-w-sm h-9 bg-background focus-visible:ring-1"
-            />
-            <div className="ml-auto flex gap-2">
+          {/* Top Actions Row: Search + Refresh + Add Member */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-sm">
+              <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search username, email, phone..."
+                value={memberSearch}
+                onChange={(e) => {
+                  setMemberSearch(e.target.value)
+                  setMemberPage(1)
+                }}
+                className="w-full pl-8 pr-8 h-9 bg-background focus-visible:ring-1"
+              />
+              {memberSearch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMemberSearch('')
+                    setMemberPage(1)
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                  title="Clear search"
+                >
+                  <IconX className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-auto">
               <Button variant="outline" size="sm" onClick={() => refetchUsers()} className="h-9 px-3 text-xs">
                 <IconRefresh className="w-4 h-4 mr-1.5" /> Refresh
               </Button>
@@ -646,10 +804,203 @@ export default function UsersPage() {
             </div>
           </div>
 
+          {/* Quick-Action Status Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
+            <button
+              type="button"
+              onClick={() => handleSelectQuickPill('all')}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium transition-all border whitespace-nowrap cursor-pointer',
+                activeQuickPill === 'all'
+                  ? 'bg-foreground text-background border-foreground shadow-sm'
+                  : 'bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted/50'
+              )}
+            >
+              All Members
+              <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold', activeQuickPill === 'all' ? 'bg-background/20 text-background' : 'bg-muted text-muted-foreground')}>
+                {memberCounts.total}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectQuickPill('unassigned')}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium transition-all border whitespace-nowrap cursor-pointer',
+                activeQuickPill === 'unassigned'
+                  ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                  : 'bg-card text-muted-foreground border-border hover:border-amber-500/50 hover:text-foreground hover:bg-amber-500/5'
+              )}
+            >
+              Needs Plan (Unassigned)
+              <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold', activeQuickPill === 'unassigned' ? 'bg-white/20 text-white' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400')}>
+                {memberCounts.unassigned}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectQuickPill('active')}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium transition-all border whitespace-nowrap cursor-pointer',
+                activeQuickPill === 'active'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                  : 'bg-card text-muted-foreground border-border hover:border-emerald-500/50 hover:text-foreground hover:bg-emerald-500/5'
+              )}
+            >
+              Active Plan
+              <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold', activeQuickPill === 'active' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400')}>
+                {memberCounts.active}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectQuickPill('paused')}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium transition-all border whitespace-nowrap cursor-pointer',
+                activeQuickPill === 'paused'
+                  ? 'bg-yellow-600 text-white border-yellow-600 shadow-sm'
+                  : 'bg-card text-muted-foreground border-border hover:border-yellow-500/50 hover:text-foreground hover:bg-yellow-500/5'
+              )}
+            >
+              Paused Plan
+              <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold', activeQuickPill === 'paused' ? 'bg-white/20 text-white' : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400')}>
+                {memberCounts.paused}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectQuickPill('incomplete_onboarding')}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium transition-all border whitespace-nowrap cursor-pointer',
+                activeQuickPill === 'incomplete_onboarding'
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                  : 'bg-card text-muted-foreground border-border hover:border-purple-500/50 hover:text-foreground hover:bg-purple-500/5'
+              )}
+            >
+              Pending Onboarding
+              <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-semibold', activeQuickPill === 'incomplete_onboarding' ? 'bg-white/20 text-white' : 'bg-purple-500/10 text-purple-600 dark:text-purple-400')}>
+                {memberCounts.incompleteOnboarding}
+              </span>
+            </button>
+          </div>
+
+          {/* Secondary Controls: Dropdown Filters Row */}
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            {/* Membership Dropdown */}
+            <div className="w-full sm:w-48">
+              <Select
+                value={membershipFilter}
+                onValueChange={(val: any) => {
+                  setMembershipFilter(val)
+                  setMemberPage(1)
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs bg-card">
+                  <SelectValue placeholder="Membership Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Memberships</SelectItem>
+                  <SelectItem value="unassigned">Needs Plan (Not Assigned)</SelectItem>
+                  <SelectItem value="assigned_active">Active Plan</SelectItem>
+                  <SelectItem value="assigned_paused">Paused Plan</SelectItem>
+                  <SelectItem value="assigned_any">Any Assigned Plan</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Plan Filter Dropdown */}
+            <div className="w-full sm:w-48">
+              <Select
+                value={planFilter}
+                onValueChange={(val: any) => {
+                  setPlanFilter(val)
+                  setMemberPage(1)
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs bg-card">
+                  <SelectValue placeholder="Filter by Plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Plans</SelectItem>
+                  {availablePlanNames.map((planName) => (
+                    <SelectItem key={planName} value={planName}>
+                      {planName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Onboarding Filter Dropdown */}
+            <div className="w-full sm:w-48">
+              <Select
+                value={onboardingFilter}
+                onValueChange={(val: any) => {
+                  setOnboardingFilter(val)
+                  setMemberPage(1)
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs bg-card">
+                  <SelectValue placeholder="Onboarding Stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Onboarding Stages</SelectItem>
+                  <SelectItem value="incomplete">Incomplete (Needs Action)</SelectItem>
+                  <SelectItem value="not_started">Not Started</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Clear Filters Button */}
+            {isAnyFilterActive && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleResetFilters}
+                className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <IconFilterOff className="w-3.5 h-3.5 mr-1" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
           <Card className="border-border shadow-sm bg-card overflow-hidden">
             <CardHeader className="py-4 px-6 border-b border-border/60">
-              <CardTitle className="text-lg font-bold text-foreground">All Members</CardTitle>
-              <CardDescription>{usersLoading ? 'Loading...' : `${filteredUsers.length} members`}</CardDescription>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <CardTitle className="text-lg font-bold text-foreground">
+                    {membershipFilter === 'unassigned' ? 'Members Needing Plan' :
+                     membershipFilter === 'assigned_active' ? 'Active Members' :
+                     membershipFilter === 'assigned_paused' ? 'Paused Members' :
+                     onboardingFilter === 'incomplete' ? 'Pending Onboarding Members' :
+                     'All Members'}
+                  </CardTitle>
+                  <CardDescription>
+                    {usersLoading
+                      ? 'Loading...'
+                      : isAnyFilterActive
+                      ? `Showing ${filteredUsers.length} of ${users.length} members`
+                      : `${users.length} members`}
+                  </CardDescription>
+                </div>
+                {isAnyFilterActive && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetFilters}
+                    className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground self-start sm:self-auto cursor-pointer"
+                  >
+                    <IconX className="w-3.5 h-3.5 mr-1" />
+                    Reset filters
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {usersError && <div className="text-center py-8 text-red-500">Failed to load members. Check credentials.</div>}
@@ -676,7 +1027,27 @@ export default function UsersPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredUsers.length === 0 ? (
-                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No members found. Add your first member.</TableCell></TableRow>
+                      <TableRow>
+                        <TableCell colSpan={11} className="text-center py-12">
+                          {isAnyFilterActive ? (
+                            <div className="flex flex-col items-center justify-center space-y-2">
+                              <IconFilterOff className="w-8 h-8 text-muted-foreground/60" />
+                              <p className="text-sm font-medium text-foreground">No members match your filter criteria</p>
+                              <p className="text-xs text-muted-foreground">Try adjusting your search query or reset the filters.</p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleResetFilters}
+                                className="mt-2 h-8 text-xs cursor-pointer"
+                              >
+                                Clear all filters
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground py-8">No members found. Add your first member.</p>
+                          )}
+                        </TableCell>
+                      </TableRow>
                     ) : (
                       paginatedUsers.map((user, index) => {
                         const membership = getUserMembership(user)

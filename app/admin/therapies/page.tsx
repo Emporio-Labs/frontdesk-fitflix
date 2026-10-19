@@ -426,6 +426,16 @@ export default function TherapiesPage() {
       const originalTags = (editingGc.tags || []).map((t) => t.trim()).filter(Boolean).sort().join(',')
       return currentTags !== originalTags
     }
+    if (fieldName === 'bookingCloseValue') {
+      const normCurrent = (currentValue === '' || currentValue === null || currentValue === undefined) ? '' : Number(currentValue)
+      const normOriginal = (originalValue === '' || originalValue === null || originalValue === undefined) ? '' : Number(originalValue)
+      return normCurrent !== normOriginal
+    }
+    if (fieldName === 'bookingCloseUnit') {
+      const normCurrentVal = (gcForm.bookingCloseValue === '' || gcForm.bookingCloseValue === null || gcForm.bookingCloseValue === undefined) ? '' : Number(gcForm.bookingCloseValue)
+      if (normCurrentVal === '') return false
+      return currentValue !== (originalValue ?? 'minutes')
+    }
     return currentValue !== originalValue
   }
 
@@ -844,7 +854,7 @@ export default function TherapiesPage() {
       isPublished: gc.isPublished ?? gc.isActive ?? true,
       bookingWindowValue: (gc as any).bookingWindowValue ?? 72,
       bookingWindowUnit: (gc as any).bookingWindowUnit ?? 'hours',
-      bookingCloseValue: (gc as any).bookingCloseValue ?? '',
+      bookingCloseValue: (gc as any).bookingCloseValue != null && (gc as any).bookingCloseValue !== '' ? (gc as any).bookingCloseValue : '',
       bookingCloseUnit: (gc as any).bookingCloseUnit ?? 'minutes',
       imageUrl: gc.imageUrl ?? '',
       format: gc.format ?? 'drop_in',
@@ -854,23 +864,54 @@ export default function TherapiesPage() {
       enrollmentClosesAt: toDateInput(gc.enrollmentClosesAt),
     })
     const info = gc.scheduleInfo || ''
-    if (info.startsWith('One-Time:')) {
-      const timeMatch = info.match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/)
-      setGcSchedule({
-        ...DEFAULT_SCHEDULE,
-        mode: 'one-time',
-        startTime: timeMatch?.[1] ?? '07:00',
-        endTime: timeMatch?.[2] ?? '08:00',
-        oneTimeDate: '',
-      })
-    } else {
-      const timeMatch = info.match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/)
-      setGcSchedule({
-        ...DEFAULT_SCHEDULE,
-        startTime: timeMatch?.[1] ?? DEFAULT_SCHEDULE.startTime,
-        endTime: timeMatch?.[2] ?? DEFAULT_SCHEDULE.endTime,
-      })
+    const pattern = gc.schedulePattern || ''
+    const recurrenceRule = (gc.recurrenceRule || '').toUpperCase()
+
+    const isOneTime = info.startsWith('One-Time:') || recurrenceRule === 'NONE'
+
+    let frequency: RecurrenceFrequency = 'weekly'
+    if (recurrenceRule === 'DAILY' || info.startsWith('Daily') || pattern.toLowerCase().startsWith('daily')) {
+      frequency = 'daily'
+    } else if (recurrenceRule === 'MONTHLY' || info.startsWith('Monthly') || pattern.toLowerCase().startsWith('monthly')) {
+      frequency = 'monthly'
+    } else if (recurrenceRule === 'WEEKLY' || info.startsWith('Weekly') || pattern.toLowerCase().startsWith('weekly')) {
+      frequency = 'weekly'
     }
+
+    const timeMatch = info.match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/)
+    const startTime = timeMatch?.[1] ?? DEFAULT_SCHEDULE.startTime
+    const endTime = timeMatch?.[2] ?? DEFAULT_SCHEDULE.endTime
+
+    let daysOfWeek: number[] = []
+    if (Array.isArray(gc.daysOfWeek) && gc.daysOfWeek.length > 0) {
+      daysOfWeek = gc.daysOfWeek.filter((d) => typeof d === 'number' && d >= 0 && d <= 6)
+    }
+    if (daysOfWeek.length === 0) {
+      const combinedText = `${info} ${pattern}`
+      const foundDays: number[] = []
+      DAY_LABELS.forEach((label, idx) => {
+        if (new RegExp(`\\b${label}\\b`, 'i').test(combinedText)) {
+          foundDays.push(idx)
+        }
+      })
+      if (foundDays.length > 0) {
+        daysOfWeek = foundDays
+      } else if (frequency === 'daily') {
+        daysOfWeek = [0, 1, 2, 3, 4, 5, 6]
+      } else {
+        daysOfWeek = DEFAULT_SCHEDULE.daysOfWeek
+      }
+    }
+
+    setGcSchedule({
+      ...DEFAULT_SCHEDULE,
+      mode: isOneTime ? 'one-time' : 'recurring',
+      frequency,
+      daysOfWeek,
+      startTime,
+      endTime,
+      oneTimeDate: '',
+    })
     setShowPreview(false)
     setSelectedSlotIds(gc.slots || [])
     setSlotSearchTerm('')
