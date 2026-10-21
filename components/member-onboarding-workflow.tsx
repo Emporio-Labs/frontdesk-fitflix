@@ -109,7 +109,7 @@ export function MemberOnboardingWorkflow({
             <div>
               <p className="font-medium text-amber-950 dark:text-amber-100">Activate a membership to start onboarding</p>
               <p className="mt-1 text-amber-900/80 dark:text-amber-200/80">The shared record is visible, but centre onboarding starts after a membership plan is active.</p>
-              <Button asChild variant="link" className="h-auto px-0 pt-2 text-amber-800 dark:text-amber-200"><Link href={`/admin/memberships?assignUserId=${encodeURIComponent(userId)}`}>Assign membership <IconChevronRight className="ml-1 h-4 w-4" /></Link></Button>
+              <Button asChild variant="link" className="h-auto px-0 pt-2 text-amber-800 dark:text-amber-200"><Link href={`/admin/sales/new?userId=${encodeURIComponent(userId)}`}>Sell plan <IconChevronRight className="ml-1 h-4 w-4" /></Link></Button>
             </div>
           </div>
         ) : (

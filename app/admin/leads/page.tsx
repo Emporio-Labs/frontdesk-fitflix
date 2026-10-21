@@ -103,15 +103,11 @@ function clearLeadDraft() {
   } catch (e) {}
 }
 import {
-  IconPlus, IconEdit, IconTrash, IconCheck, IconFileInvoice,
+  IconPlus, IconEdit, IconTrash, IconShoppingCart, IconCreditCard,
   IconFlame, IconUserPlus, IconAlertTriangle, IconPhone, IconUserCheck, IconFilter,
   IconBellRinging, IconBrandWhatsapp, IconArrowRight, IconClock,
   IconDots, IconLayoutKanban, IconList, IconSearch,
 } from '@tabler/icons-react'
-import { CreateInvoiceSheet } from '@/components/invoices/create-invoice-sheet'
-import { useUsers } from '@/hooks/use-users'
-import { useRenewalReminders } from '@/hooks/use-memberships'
-import type { RenewalTarget } from '@/lib/services/membership.service'
 import {
   CrmStatCard,
   FollowUpCard,
@@ -122,7 +118,6 @@ import {
 import { InterestSummary } from '@/components/crm/interest-summary'
 import {
   useAddLeadInteraction,
-  useConvertLead,
   useCreateLead,
   useDeleteLead,
   useLeadAnalytics,
@@ -144,13 +139,19 @@ const KANBAN_COLUMNS = [
   { key: 'converted', title: 'Converted', leadColor: 'bg-green-50 border-green-200', headerColor: 'text-green-700' },
 ] as const
 
+const CONVERTED_BY_PAYMENT =
+  'Leads move to Converted when their invoice is paid. Use "Sell plan" to start the sale.'
+
+/** Where a lead's sale continues: resume its unpaid invoice, or start one. */
+function saleHref(lead: Lead) {
+  return lead.pendingInvoiceId
+    ? `/admin/sales/new?invoiceId=${encodeURIComponent(lead.pendingInvoiceId)}`
+    : `/admin/sales/new?leadId=${encodeURIComponent(lead.id)}`
+}
+
 export default function LeadsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false)
-  const [isInvoiceSheetOpen, setIsInvoiceSheetOpen] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
-  const [convertingLead, setConvertingLead] = useState<Lead | null>(null)
-  const [invoicingLead, setInvoicingLead] = useState<Lead | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [filterHeat, setFilterHeat] = useState<string>('')
@@ -183,11 +184,8 @@ export default function LeadsPage() {
   const createLead = useCreateLead()
   const updateLead = useUpdateLead()
   const deleteLead = useDeleteLead()
-  const convertLead = useConvertLead()
   const addInteraction = useAddLeadInteraction()
   const contactAttempt = useRecordLeadContactAttempt()
-  const { data: users = [] } = useUsers()
-  const { data: renewals, isLoading: renewalsLoading } = useRenewalReminders()
 
   const [formData, setFormData] = useState({
     name: '',
@@ -261,26 +259,6 @@ export default function LeadsPage() {
     }
     setIsAddDialogOpen(true)
   }
-  const [convertFormData, setConvertFormData] = useState({
-    username: '',
-    phone: '',
-    age: '30',
-    gender: '0',
-    healthGoals: '',
-    password: 'Lead@12345',
-  })
-
-  const existingUserMatch = useMemo(() => {
-    if (!convertFormData.phone) return null
-    const cleanInput = convertFormData.phone.replace(/\D/g, '').slice(-10)
-    if (cleanInput.length < 10) return null
-    return users.find((u) => {
-      if (!u.phone) return null
-      const cleanUserPhone = u.phone.replace(/\D/g, '').slice(-10)
-      return cleanUserPhone === cleanInput
-    })
-  }, [convertFormData.phone, users])
-
   const filteredLeads = useMemo(() => {
     return leads.filter((l) => {
       const matchesSearch =
@@ -400,7 +378,8 @@ export default function LeadsPage() {
           email: formData.email.trim(),
           phone: formData.phone.trim(),
           source: formData.source.trim(),
-          status: formData.status,
+          // Only payment sets Converted; don't echo it back on an edit.
+          status: formData.status === 'converted' ? undefined : formData.status,
           temperature: mappedHeat,
           tags: editingLead.tags,
           notes: formData.notes.trim(),
@@ -448,58 +427,14 @@ export default function LeadsPage() {
     setIsAddDialogOpen(true)
   }
 
-  const handleInvoiceLead = (lead: Lead) => {
-    setInvoicingLead(lead)
-    setIsInvoiceSheetOpen(true)
-  }
-
-  const handleConvertLead = (lead: Lead) => {
-    setConvertingLead(lead)
-    setConvertFormData({
-      username: lead.name,
-      phone: lead.phone || '',
-      age: '30',
-      gender: '0',
-      healthGoals: lead.interestedIn || 'general fitness',
-      password: 'Lead@12345',
-    })
-    setIsConvertDialogOpen(true)
-  }
-
-  const handleConfirmConvert = async () => {
-    if (convertingLead) {
-      if (!convertFormData.phone.trim()) {
-        toast.error('Phone number is required for conversion')
-        return
-      }
-
-      const payload: any = {
-        username: convertFormData.username.trim() || convertingLead.name,
-        phone: convertFormData.phone.trim(),
-        age: convertFormData.age.trim() || '30',
-        gender: Number.parseInt(convertFormData.gender, 10) || 0,
-        healthGoals: convertFormData.healthGoals
-          .split(',')
-          .map((goal) => goal.trim())
-          .filter(Boolean),
-      }
-
-      if (convertFormData.password.trim()) {
-        payload.password = convertFormData.password.trim()
-      }
-
-      await convertLead.mutateAsync({
-        id: convertingLead.id,
-        payload,
-      })
-      setConvertingLead(null)
-      setIsConvertDialogOpen(false)
-    }
-  }
-
   const handleStatusChange = async (leadId: string, newStatus: LeadStatus) => {
     const lead = leads.find((item) => item.id === leadId)
     if (!lead) return
+
+    if (newStatus === 'converted') {
+      toast.error(CONVERTED_BY_PAYMENT)
+      return
+    }
 
     const isValidForwardMove = (() => {
       const order: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted']
@@ -548,6 +483,10 @@ export default function LeadsPage() {
 
     const nextStage = stageMap[targetColumn]
     if (!nextStage || nextStage === lead.status) return
+    if (nextStage === 'converted') {
+      toast.error(CONVERTED_BY_PAYMENT)
+      return
+    }
 
     const order: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted']
     const from = order.indexOf(lead.status)
@@ -600,31 +539,6 @@ export default function LeadsPage() {
     }
   }
 
-  const handleRenewalCall = (target: RenewalTarget) => {
-    if (!target.phone) {
-      toast.error('Phone number is missing for this member')
-      return
-    }
-    if (typeof window !== 'undefined') {
-      window.location.href = `tel:${target.phone.replace(/\D/g, '')}`
-    }
-  }
-
-  const handleRenewalWhatsApp = (target: RenewalTarget) => {
-    if (!target.phone) {
-      toast.error('Phone number is missing for this member')
-      return
-    }
-    if (typeof window !== 'undefined') {
-      const digits = target.phone.replace(/\D/g, '')
-      const firstName = target.memberName.split(' ')[0] || 'there'
-      const message = encodeURIComponent(
-        `Hi ${firstName}, this is Fitflix. Your ${target.planName} membership expires on ${target.endDateIst}. Would you like to renew it?`
-      )
-      window.open(`https://wa.me/${digits}?text=${message}`, '_blank', 'noopener,noreferrer')
-    }
-  }
-
   const handleQuickAddNote = async (lead: Lead) => {
     const note = typeof window !== 'undefined' ? window.prompt(`Add a note for ${lead.name}`) : ''
     if (!note || !note.trim()) return
@@ -650,7 +564,6 @@ export default function LeadsPage() {
     createLead.isPending ||
     updateLead.isPending ||
     deleteLead.isPending ||
-    convertLead.isPending ||
     addInteraction.isPending ||
     contactAttempt.isPending
 
@@ -716,79 +629,6 @@ export default function LeadsPage() {
   }
 
   const isFollowUpToday = (lead: Lead) => todayFollowUps.some((item) => item.id === lead.id)
-
-  const renewalDayLabel = (days: number) => {
-    if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago`
-    if (days === 0) return 'Today'
-    if (days === 1) return 'Tomorrow'
-    return `in ${days} days`
-  }
-
-  const renderRenewalCard = (target: RenewalTarget) => (
-    <div
-      key={target.membershipId}
-      className={`rounded-md border p-3 ${
-        target.bucket === 'overdue' ? 'border-red-200 bg-red-50' : ''
-      }`}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-medium">
-            {target.memberUnknown ? (
-              <span className="text-muted-foreground">{target.memberName}</span>
-            ) : (
-              <Link href={`/admin/users/${target.userId}`} className="hover:underline">
-                {target.memberName}
-              </Link>
-            )}
-          </div>
-          <div className="text-xs text-muted-foreground">{target.planName}</div>
-          <div className="text-xs text-muted-foreground">
-            {target.phone || 'No phone on file'}
-          </div>
-          <div
-            className={`text-xs ${target.bucket === 'overdue' ? 'text-red-700' : 'text-muted-foreground'}`}
-          >
-            {target.bucket === 'overdue' ? 'Expired' : 'Expires'} {formatDateOnly(target.endDate)} ·{' '}
-            {renewalDayLabel(target.daysUntilExpiry)}
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <Badge className={getStatusColor(String(target.status).toLowerCase())}>
-            {target.status}
-          </Badge>
-          {target.price > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {target.currency} {target.price}
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="flex gap-2 pt-2">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={!target.phone}
-          onClick={() => handleRenewalCall(target)}
-        >
-          <IconPhone className="mr-1 h-4 w-4" /> Call
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={!target.phone}
-          onClick={() => handleRenewalWhatsApp(target)}
-        >
-          WhatsApp
-        </Button>
-        {!target.memberUnknown && (
-          <Button size="sm" variant="outline" asChild>
-            <Link href={`/admin/users/${target.userId}`}>View member</Link>
-          </Button>
-        )}
-      </div>
-    </div>
-  )
 
   const kanbanData = useMemo(() => {
     const active = filteredLeads.filter((lead) => lead.status !== 'lost')
@@ -920,7 +760,10 @@ export default function LeadsPage() {
                     <option value="new">New</option>
                     <option value="contacted">Contacted</option>
                     <option value="qualified">Qualified</option>
-                    <option value="converted">Converted</option>
+                    {/* Converted is set by payment only — shown, not choosable. */}
+                    {formData.status === 'converted' && (
+                      <option value="converted" disabled>Converted</option>
+                    )}
                     <option value="lost">Lost</option>
                   </select>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -1099,7 +942,6 @@ export default function LeadsPage() {
         <TabsList>
           <TabsTrigger value="board">Board</TabsTrigger>
           <TabsTrigger value="reminders">Reminders</TabsTrigger>
-          <TabsTrigger value="renewals">Renewals</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
@@ -1334,15 +1176,13 @@ export default function LeadsPage() {
                     count={kanbanData[column.key].length}
                     leadColor={column.leadColor}
                     headerColor={column.headerColor}
-                    isDragDisabled={column.key === 'converted'}
+                    refusesDrop={column.key === 'converted'}
                     className="w-[85%] shrink-0 snap-start sm:w-[300px] xl:w-auto"
                   >
                     {kanbanData[column.key].map((lead) => (
                       <KanbanCard
                         key={`${column.key}-${lead.id}`}
                         lead={lead}
-                        onConvert={() => handleConvertLead(lead)}
-                        onInvoice={column.key === 'converted' ? undefined : () => handleInvoiceLead(lead)}
                         onEdit={() => handleEditLead(lead)}
                         onCall={() => handleQuickCall(lead)}
                         onWhatsApp={() => handleQuickWhatsApp(lead)}
@@ -1423,7 +1263,12 @@ export default function LeadsPage() {
                                 </button>
                               </TableCell>
                               <TableCell>
-                                <Badge className={getStatusColor(lead.status)}>{lead.status}</Badge>
+                                <div className="flex flex-wrap gap-1">
+                                  <Badge className={getStatusColor(lead.status)}>{lead.status}</Badge>
+                                  {lead.pendingInvoiceId && lead.status !== 'converted' && (
+                                    <Badge className="bg-amber-100 text-amber-800">Awaiting payment</Badge>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell className="hidden md:table-cell">
                                 <Badge className={getTemperatureColor(lead.temperature)}>{lead.temperature}</Badge>
@@ -1492,14 +1337,15 @@ export default function LeadsPage() {
                                         </DropdownMenuItem>
                                       )}
                                       {open && (
-                                        <>
-                                          <DropdownMenuItem onClick={() => handleInvoiceLead(lead)}>
-                                            <IconFileInvoice className="mr-2 h-4 w-4" /> Convert &amp; invoice
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => handleConvertLead(lead)}>
-                                            <IconCheck className="mr-2 h-4 w-4" /> Convert to member
-                                          </DropdownMenuItem>
-                                        </>
+                                        <DropdownMenuItem asChild>
+                                          <Link href={saleHref(lead)}>
+                                            {lead.pendingInvoiceId ? (
+                                              <><IconCreditCard className="mr-2 h-4 w-4" /> Resume payment</>
+                                            ) : (
+                                              <><IconShoppingCart className="mr-2 h-4 w-4" /> Sell plan</>
+                                            )}
+                                          </Link>
+                                        </DropdownMenuItem>
                                       )}
                                       <DropdownMenuItem onClick={() => handleEditLead(lead)}>
                                         <IconEdit className="mr-2 h-4 w-4" /> Edit lead
@@ -1575,9 +1421,13 @@ export default function LeadsPage() {
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button size="sm" variant="outline" onClick={() => handleEditLead(lead)}>Edit</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleConvertLead(lead)}>
-                      Convert
-                    </Button>
+                    {lead.status !== 'converted' && (
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={saleHref(lead)}>
+                          {lead.pendingInvoiceId ? 'Resume payment' : 'Sell plan'}
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1610,6 +1460,13 @@ export default function LeadsPage() {
                     <Button size="sm" variant="outline" onClick={() => handleQuickCall(lead)}>Call</Button>
                     <Button size="sm" variant="outline" onClick={() => handleQuickWhatsApp(lead)}>WhatsApp</Button>
                     <Button size="sm" variant="outline" onClick={() => handleEditLead(lead)}>Edit</Button>
+                    {lead.status !== 'converted' && (
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={saleHref(lead)}>
+                          {lead.pendingInvoiceId ? 'Resume payment' : 'Sell plan'}
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1640,108 +1497,18 @@ export default function LeadsPage() {
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button size="sm" variant="outline" onClick={() => handleEditLead(lead)}>Edit</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleConvertLead(lead)}>
-                      Convert
-                    </Button>
+                    {lead.status !== 'converted' && (
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={saleHref(lead)}>
+                          {lead.pendingInvoiceId ? 'Resume payment' : 'Sell plan'}
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="renewals" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Membership Renewals</CardTitle>
-              <CardDescription>
-                Members whose membership expires this month ({renewals?.monthLabel}) — call them to
-                renew.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-4">
-                <div className="rounded-md border p-3">
-                  <div className="text-2xl font-bold text-red-700">{renewals?.overdue.length ?? 0}</div>
-                  <div className="text-xs text-muted-foreground">Overdue</div>
-                </div>
-                <div className="rounded-md border p-3">
-                  <div className="text-2xl font-bold text-amber-600">
-                    {renewals?.dueThisWeek.length ?? 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Due this week</div>
-                </div>
-                <div className="rounded-md border p-3">
-                  <div className="text-2xl font-bold">{renewals?.upcoming.length ?? 0}</div>
-                  <div className="text-xs text-muted-foreground">Later this month</div>
-                </div>
-                <div className="rounded-md border p-3">
-                  <div className="text-2xl font-bold">{renewals?.total ?? 0}</div>
-                  <div className="text-xs text-muted-foreground">Total this month</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {renewalsLoading ? (
-            <Card>
-              <CardContent className="space-y-3 pt-6">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
-          ) : (renewals?.total ?? 0) === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">
-                  No memberships expiring this month. Nothing to chase right now.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <IconAlertTriangle className="h-5 w-5 text-red-600" /> Overdue
-                  </CardTitle>
-                  <CardDescription>{renewals?.overdue.length ?? 0} expired, awaiting renewal</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {(renewals?.overdue.length ?? 0) === 0 && (
-                    <p className="text-sm text-muted-foreground">No overdue renewals.</p>
-                  )}
-                  {renewals?.overdue.map(renderRenewalCard)}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Due This Week</CardTitle>
-                  <CardDescription>{renewals?.dueThisWeek.length ?? 0} expiring within 7 days</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {(renewals?.dueThisWeek.length ?? 0) === 0 && (
-                    <p className="text-sm text-muted-foreground">Nothing due this week.</p>
-                  )}
-                  {renewals?.dueThisWeek.map(renderRenewalCard)}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Later This Month</CardTitle>
-                  <CardDescription>{renewals?.upcoming.length ?? 0} expiring later this month</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {(renewals?.upcoming.length ?? 0) === 0 && (
-                    <p className="text-sm text-muted-foreground">Nothing further out this month.</p>
-                  )}
-                  {renewals?.upcoming.map(renderRenewalCard)}
-                </CardContent>
-              </Card>
-            </>
-          )}
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
@@ -1884,126 +1651,6 @@ export default function LeadsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-
-            {/* Convert Lead Dialog */}
-            {convertingLead && (
-              <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Convert Lead to Member</DialogTitle>
-                    <DialogDescription>
-                      Convert {convertingLead.name} from lead to member
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <p className="text-sm font-medium text-green-900">Lead Information:</p>
-                      <p className="text-sm text-green-800 mt-1">Name: {convertingLead.name}</p>
-                      <p className="text-sm text-green-800">Email: {convertingLead.email}</p>
-                      <p className="text-sm text-green-800">Phone: {convertingLead.phone}</p>
-                    </div>
-                    {existingUserMatch && (
-                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg flex items-start gap-2">
-                        <IconUserCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-semibold text-amber-900">Active App Profile Found</p>
-                          <p className="text-xs text-amber-800 mt-1">
-                            Converting will link this premium protocol directly to the user's existing mobile account ({existingUserMatch.username}) without resetting credentials.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    <div>
-                      <label className="text-sm font-medium">Username</label>
-                      <Input
-                        value={convertFormData.username}
-                        onChange={(e) => setConvertFormData({ ...convertFormData, username: e.target.value })}
-                        placeholder="username"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">
-                        Phone <span className="text-red-600">*</span>
-                      </label>
-                      <Input
-                        value={convertFormData.phone}
-                        onChange={(e) => setConvertFormData({ ...convertFormData, phone: e.target.value })}
-                        placeholder="+1234567890"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-sm font-medium">Age</label>
-                        <Input
-                          value={convertFormData.age}
-                          onChange={(e) => setConvertFormData({ ...convertFormData, age: e.target.value })}
-                          placeholder="30"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium">Gender</label>
-                        <select
-                          value={convertFormData.gender}
-                          onChange={(e) => setConvertFormData({ ...convertFormData, gender: e.target.value })}
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="0">Male (0)</option>
-                          <option value="1">Female (1)</option>
-                          <option value="2">Other (2)</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Health Goals (comma separated)</label>
-                      <Input
-                        value={convertFormData.healthGoals}
-                        onChange={(e) => setConvertFormData({ ...convertFormData, healthGoals: e.target.value })}
-                        placeholder="weight loss, strength"
-                      />
-                    </div>
-                    {!existingUserMatch && (
-                      <div>
-                        <label className="text-sm font-medium">Temporary Password</label>
-                        <Input
-                          value={convertFormData.password}
-                          onChange={(e) => setConvertFormData({ ...convertFormData, password: e.target.value })}
-                          type="password"
-                          placeholder="Temporary password"
-                        />
-                      </div>
-                    )}
-                    <p className="text-sm text-muted-foreground">
-                      This will create a new member profile and mark this lead as converted. You can then assign a membership plan.
-                    </p>
-                    <div className="flex gap-2 pt-4">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setIsConvertDialogOpen(false)
-                          setConvertingLead(null)
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button onClick={handleConfirmConvert} disabled={isPending}>
-                        {isPending ? 'Converting...' : 'Convert to Member'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
-
-      {invoicingLead && (
-        <CreateInvoiceSheet
-          lead={invoicingLead}
-          open={isInvoiceSheetOpen}
-          onOpenChange={(open) => {
-            setIsInvoiceSheetOpen(open)
-            if (!open) setInvoicingLead(null)
-          }}
-        />
-      )}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
