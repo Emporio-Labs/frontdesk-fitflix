@@ -1,9 +1,17 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -19,9 +27,10 @@ import {
   IconClock,
   IconCircleCheck,
   IconRefresh,
+  IconPlus,
 } from '@tabler/icons-react'
 import { useInvoices } from '@/hooks/use-invoices'
-import { Invoice } from '@/lib/services/invoice.service'
+import { Invoice, InvoicePaymentStatus } from '@/lib/services/invoice.service'
 import { InvoiceStatusBadge } from '@/components/invoices/invoice-status-badge'
 import { InvoiceDetailDrawer } from '@/components/invoices/invoice-detail-drawer'
 
@@ -36,17 +45,43 @@ function formatDate(iso?: string) {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+type StatusFilter = 'awaiting' | 'paid' | 'closed' | 'all'
+
+const STATUS_FILTERS: Record<StatusFilter, { label: string; statuses?: InvoicePaymentStatus[] }> = {
+  awaiting: { label: 'Awaiting payment', statuses: ['DRAFT', 'PENDING'] },
+  paid: { label: 'Paid', statuses: ['PAID'] },
+  closed: { label: 'Failed / cancelled / refunded', statuses: ['FAILED', 'CANCELLED', 'REFUNDED'] },
+  all: { label: 'All invoices' },
+}
+
+const isAwaitingPayment = (invoice: Invoice) =>
+  invoice.paymentStatus === 'DRAFT' || invoice.paymentStatus === 'PENDING'
+
 export default function InvoicesPage() {
   const [search, setSearch] = useState('')
+  // The desk's job here is collecting money, so open on what's still unpaid.
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('awaiting')
+  // ?invoiceId=… (e.g. from a member's membership card) opens that invoice.
+  const [linkedInvoiceId, setLinkedInvoiceId] = useState<string | null>(null)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   const { data: invoices = [], isLoading, isError, refetch } = useInvoices()
 
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('invoiceId')
+    if (id) {
+      setLinkedInvoiceId(id)
+      setStatusFilter('all')
+    }
+  }, [])
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    if (!q) return invoices
-    return invoices.filter(
+    const statuses = STATUS_FILTERS[statusFilter].statuses
+    const byStatus = statuses ? invoices.filter((inv) => statuses.includes(inv.paymentStatus)) : invoices
+    if (!q) return byStatus
+    return byStatus.filter(
       (inv) => {
         const memberName = inv.userId?.name || inv.lead?.name || ''
         const memberEmail = inv.userId?.email || inv.lead?.email || ''
@@ -57,7 +92,7 @@ export default function InvoicesPage() {
         )
       }
     )
-  }, [invoices, search])
+  }, [invoices, search, statusFilter])
 
   const metrics = useMemo(() => {
     const total = invoices.length
@@ -74,6 +109,13 @@ export default function InvoicesPage() {
     setDrawerOpen(true)
   }
 
+  useEffect(() => {
+    if (!linkedInvoiceId || invoices.length === 0) return
+    const match = invoices.find((inv) => inv.id === linkedInvoiceId)
+    if (match) handleRowClick(match)
+    setLinkedInvoiceId(null)
+  }, [linkedInvoiceId, invoices])
+
   return (
     <div className="flex-1 space-y-4 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -81,10 +123,18 @@ export default function InvoicesPage() {
           <h2 className="text-3xl font-bold tracking-tight">Invoices</h2>
           <p className="text-muted-foreground">Track payments and membership activations</p>
         </div>
-        <Button variant="outline" onClick={() => refetch()}>
-          <IconRefresh className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => refetch()}>
+            <IconRefresh className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+          <Button asChild>
+            <Link href="/admin/sales/new">
+              <IconPlus className="w-4 h-4 mr-2" />
+              New invoice
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Metric Cards */}
@@ -118,17 +168,31 @@ export default function InvoicesPage() {
       {/* Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <CardTitle>All Invoices</CardTitle>
-              <CardDescription>Click a row to view details, mark as paid, or download PDF</CardDescription>
+              <CardTitle>{STATUS_FILTERS[statusFilter].label}</CardTitle>
+              <CardDescription>Click a row to view details or download PDF</CardDescription>
             </div>
-            <Input
-              className="w-64"
-              placeholder="Search by invoice # or member..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                <SelectTrigger className="w-full sm:w-56" aria-label="Filter by payment status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(STATUS_FILTERS) as StatusFilter[]).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {STATUS_FILTERS[key].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                className="w-full sm:w-64"
+                placeholder="Search by invoice # or member..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -154,13 +218,18 @@ export default function InvoicesPage() {
                     <TableHead>Method</TableHead>
                     <TableHead>Issued</TableHead>
                     <TableHead>Paid</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
-                        {search ? 'No invoices match your search.' : 'No invoices yet. Generate one from a lead.'}
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                        {search
+                          ? 'No invoices match your search.'
+                          : statusFilter === 'awaiting'
+                            ? 'Nothing awaiting payment.'
+                            : 'No invoices here yet. Start one with New sale.'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -200,6 +269,15 @@ export default function InvoicesPage() {
                       </TableCell>
                       <TableCell className="text-sm">{formatDate(invoice.issuedAt)}</TableCell>
                       <TableCell className="text-sm">{formatDate(invoice.paidAt)}</TableCell>
+                      <TableCell className="text-right">
+                        {isAwaitingPayment(invoice) && (
+                          <Button size="sm" variant="outline" asChild onClick={(e) => e.stopPropagation()}>
+                            <Link href={`/admin/sales/new?invoiceId=${encodeURIComponent(invoice.id)}`}>
+                              Record payment
+                            </Link>
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

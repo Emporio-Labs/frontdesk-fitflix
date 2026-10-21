@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api-client'
 
-export type MembershipStatus = 'Active' | 'Paused' | 'Cancelled' | 'Expired'
+/** `Upcoming` = paid for, but its start date (e.g. a renewal's) is still ahead. */
+export type MembershipStatus = 'Active' | 'Paused' | 'Cancelled' | 'Expired' | 'Upcoming'
 
 export interface Membership {
   id: string
@@ -23,6 +24,8 @@ export interface Membership {
     reason?: string
   }>
   totalPausedDays?: number
+  /** The invoice whose payment created this membership; absent for manual ones. */
+  invoiceId?: string
   createdAt?: string
 }
 
@@ -40,6 +43,8 @@ export interface CreateMembershipPayload {
   notes?: string
   /** The branch this membership is issued at. Backend resolves via resolveLocationId. */
   locationId?: string
+  /** Required by the backend for a manual (invoice-less) membership — admin only. */
+  reason?: string
 }
 
 export interface UpdateMembershipPayload {
@@ -73,13 +78,16 @@ function normalizeMembership(raw: any): Membership {
     creditsRemaining: Number.isFinite(creditsRemaining) ? creditsRemaining : 0,
     price: Number(raw?.price ?? 0),
     currency: raw?.currency || 'INR',
-    status: (['Active', 'Paused', 'Cancelled', 'Expired'].includes(normalizedStatus)
+    status: (['Active', 'Paused', 'Cancelled', 'Expired', 'Upcoming'].includes(normalizedStatus)
       ? normalizedStatus
       : 'Active') as MembershipStatus,
     startDate: raw?.startDate || '',
     endDate: raw?.endDate || '',
     features: Array.isArray(raw?.features) ? raw.features : [],
     notes: raw?.notes || '',
+    ...(raw?.invoiceId
+      ? { invoiceId: String(typeof raw.invoiceId === 'object' ? raw.invoiceId._id || raw.invoiceId.id : raw.invoiceId) }
+      : {}),
     createdAt: raw?.createdAt || '',
   }
 }
@@ -173,10 +181,16 @@ export function buildRenewalReminders(
     if (key) userById.set(key, user)
   }
 
+  // A member whose next term is already paid for (Upcoming) has renewed.
+  const renewedUserIds = new Set(
+    memberships.filter((m) => m.status === 'Upcoming').map((m) => String(m.userId || ''))
+  )
+
   const targets: RenewalTarget[] = []
 
   for (const membership of memberships) {
-    if (membership.status === 'Cancelled') continue
+    if (membership.status === 'Cancelled' || membership.status === 'Upcoming') continue
+    if (renewedUserIds.has(String(membership.userId || ''))) continue
 
     const endDateIst = toIstDateOnly(membership.endDate)
     if (!endDateIst) continue

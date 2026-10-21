@@ -330,8 +330,8 @@ export function UserDetailsDialog({
                 <div className="p-4 rounded-lg border border-dashed text-center space-y-2">
                   <p className="text-xs text-muted-foreground">No active membership assigned to this member.</p>
                   <Button asChild size="sm" variant="outline" className="text-xs h-8">
-                    <Link href={`/admin/memberships?assignUserId=${encodeURIComponent(u._id)}`}>
-                      Assign Membership Now
+                    <Link href={`/admin/sales/new?userId=${encodeURIComponent(u._id)}`}>
+                      Sell plan
                     </Link>
                   </Button>
                 </div>

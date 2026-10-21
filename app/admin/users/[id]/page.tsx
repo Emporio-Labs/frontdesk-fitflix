@@ -27,6 +27,8 @@ import {
   IconCreditCard,
   IconCalendar,
   IconRun,
+  IconRepeat,
+  IconShoppingCart,
 } from '@tabler/icons-react'
 import { GrantGraceDialog } from '@/components/grant-grace-dialog'
 import { useUser } from '@/hooks/use-users'
@@ -283,6 +285,10 @@ export default function UserDetailPage() {
     () => (memberships ?? []).filter((m) => m.userId === userId),
     [memberships, userId],
   )
+  // Anyone with a live or already-bought term is renewing; everyone else is a new sale.
+  const canRenew = userMemberships.some(
+    (m) => m.status === 'Active' || m.status === 'Paused' || m.status === 'Upcoming',
+  )
 
   const serviceMap = useMemo(() => {
     const m = new Map<string, string>()
@@ -383,12 +389,25 @@ export default function UserDetailPage() {
       {user && (
         <>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 pb-4">
               <div>
                 <CardTitle className="text-2xl">{user.username}</CardTitle>
                 <CardDescription>{user.email}</CardDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button asChild size="sm">
+                  {canRenew ? (
+                    <Link href={`/admin/sales/new?userId=${encodeURIComponent(userId)}&mode=renew`}>
+                      <IconRepeat className="w-4 h-4 mr-1.5" />
+                      Renew
+                    </Link>
+                  ) : (
+                    <Link href={`/admin/sales/new?userId=${encodeURIComponent(userId)}`}>
+                      <IconShoppingCart className="w-4 h-4 mr-1.5" />
+                      Sell plan
+                    </Link>
+                  )}
+                </Button>
                 <GrantGraceDialog userId={userId} userName={user.username} />
                 <EditUserDialog user={user} />
               </div>
@@ -526,6 +545,20 @@ export default function UserDetailPage() {
                           </div>
                         )}
                       </div>
+                      {m.status === 'Upcoming' && (
+                        <p className="text-xs text-muted-foreground">
+                          Paid for — starts {formatDateForDisplay(m.startDate)}.
+                        </p>
+                      )}
+                      {m.invoiceId ? (
+                        <Link
+                          href={`/admin/invoices?invoiceId=${encodeURIComponent(m.invoiceId)}`}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          <IconFileText className="w-3.5 h-3.5" />
+                          View invoice
+                        </Link>
+                      ) : null}
                     </div>
                   ))}
                 </div>

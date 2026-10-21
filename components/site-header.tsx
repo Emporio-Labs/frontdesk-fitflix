@@ -1,5 +1,8 @@
 'use client'
 
+import Link from 'next/link'
+import { IconPlus } from '@tabler/icons-react'
+import { Button } from '@/components/ui/button'
 import { LocationSwitcher } from '@/components/location-switcher'
 import { ConciergeAlertBell } from '@/components/concierge-alert-bell'
 import { SidebarTrigger } from '@/components/ui/sidebar'
@@ -21,6 +24,14 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           {!isExpertRole && <ConciergeAlertBell />}
           <LocationSwitcher />
+          {!isExpertRole && (
+            <Button asChild size="sm" className="shrink-0">
+              <Link href="/admin/sales/new">
+                <IconPlus className="size-4" />
+                <span className="hidden sm:inline">New sale</span>
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
     </header>

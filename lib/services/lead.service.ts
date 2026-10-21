@@ -54,6 +54,11 @@ export interface Lead {
    * in-app activity before someone calls them.
    */
   convertedUserId: string
+  /**
+   * An unpaid (DRAFT/PENDING) invoice raised for this lead, when there is one.
+   * Paying it is what converts the lead.
+   */
+  pendingInvoiceId?: string
   interactions: LeadInteraction[]
   fcmTokens: string[]
   stageHistory: LeadStageHistory[]
@@ -233,6 +238,7 @@ function normalizeLead(raw: any): Lead {
     isDeleted: Boolean(raw?.isDeleted),
     revision: Number(raw?.revision ?? 0),
     convertedUserId,
+    ...(raw?.pendingInvoiceId ? { pendingInvoiceId: String(raw.pendingInvoiceId) } : {}),
     interactions: Array.isArray(raw?.interactions)
       ? raw.interactions.map((item: any) => ({
           id: String(item?._id || item?.id || ''),
