@@ -36,6 +36,7 @@ import { User, CreateUserPayload } from '@/lib/services/user.service'
 import { Admin } from '@/lib/services/admin.service'
 import { StatusBadge } from '@/components/status-badge'
 import { UserDetailsDialog } from '@/components/users/user-details-dialog'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -45,6 +46,9 @@ const GENDER_OPTIONS = ['Male', 'Female', 'Others']
 
 const MEMBER_DRAFT_KEY = 'create_member_form_draft'
 
+// Select value for "no home club"; Radix Select can't hold an empty string.
+const NO_HOME_CLUB = 'none'
+
 type MemberFormState = {
   username: string
   email: string
@@ -53,9 +57,10 @@ type MemberFormState = {
   age: string
   gender: string
   healthGoalsInput: string
+  homeClubId: string
 }
 
-function defaultMemberForm(): MemberFormState {
+function defaultMemberForm(homeClubId = NO_HOME_CLUB): MemberFormState {
   return {
     username: '',
     email: '',
@@ -64,6 +69,7 @@ function defaultMemberForm(): MemberFormState {
     age: '',
     gender: 'Male',
     healthGoalsInput: '',
+    homeClubId,
   }
 }
 
@@ -154,10 +160,14 @@ export default function UsersPage() {
   const [onboardingFilter, setOnboardingFilter] = useState<'all' | 'completed' | 'in_progress' | 'not_started' | 'incomplete'>('all')
   const [isMemberDialogOpen, setIsMemberDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
-  const [memberForm, setMemberForm] = useState({
-    username: '', email: '', phone: '', password: '',
-    age: '', gender: 'Male', healthGoalsInput: '',
-  })
+  const [memberForm, setMemberForm] = useState<MemberFormState>(defaultMemberForm())
+  // With one branch there is nothing to choose: the field stays hidden and the
+  // backend leaves the home club as it is.
+  const { locations, selectedLocationId, isSingleLocation } = useLocationScope()
+  const locationNameById = useMemo(
+    () => new Map(locations.map((l) => [l._id, l.name])),
+    [locations]
+  )
   const [memberFormErrors, setMemberFormErrors] = useState<Record<string, string>>({})
   const [memberPage, setMemberPage] = useState(1)
   const [showPassword, setShowPassword] = useState(false)
@@ -181,7 +191,8 @@ export default function UsersPage() {
         memberForm.password !== '' ||
         memberForm.age !== String(editingUser.age ?? '') ||
         memberForm.gender !== (editingUser.gender || 'Male') ||
-        memberForm.healthGoalsInput !== (editingUser.healthGoals?.join(', ') || '')
+        memberForm.healthGoalsInput !== (editingUser.healthGoals?.join(', ') || '') ||
+        memberForm.homeClubId !== (editingUser.homeClubId || NO_HOME_CLUB)
       )
     }
     return Boolean(
@@ -212,11 +223,13 @@ export default function UsersPage() {
     setMemberFormErrors({})
     setShowPassword(false)
     setShowUnsavedConfirm(false)
+    // A new member joins the branch the desk is looking at, unless they pick another.
+    const defaultHomeClub = (!isSingleLocation && selectedLocationId) || NO_HOME_CLUB
     const draft = loadMemberDraft()
     if (draft) {
-      setMemberForm(draft)
+      setMemberForm({ ...draft, homeClubId: draft.homeClubId || defaultHomeClub })
     } else {
-      setMemberForm(defaultMemberForm())
+      setMemberForm(defaultMemberForm(defaultHomeClub))
     }
     setIsMemberDialogOpen(true)
   }
@@ -280,7 +293,14 @@ export default function UsersPage() {
   }
   const itemsPerPage = 12
 
-  const { data: users = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useUsers()
+  const { data: allUsers = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useUsers()
+  // Everything below (counts, pills, the list) is for the selected branch: its
+  // members, plus members with no home club yet so the desk can still find and
+  // assign them.
+  const users = useMemo(() => {
+    if (isSingleLocation || !selectedLocationId) return allUsers
+    return allUsers.filter((u) => !u.homeClubId || u.homeClubId === selectedLocationId)
+  }, [allUsers, isSingleLocation, selectedLocationId])
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const deleteUser = useDeleteUser()
@@ -484,7 +504,7 @@ export default function UsersPage() {
   const paginatedUsers = filteredUsers.slice(memberStartIndex, memberStartIndex + itemsPerPage)
 
   const resetMemberForm = () => {
-    setMemberForm({ username: '', email: '', phone: '', password: '', age: '', gender: 'Male', healthGoalsInput: '' })
+    setMemberForm(defaultMemberForm())
     setMemberFormErrors({})
     setEditingUser(null)
     setShowPassword(false)
@@ -528,6 +548,7 @@ export default function UsersPage() {
       username: user.username, email: user.email || '', phone: user.phone,
       password: '', age: String(user.age ?? ''), gender: user.gender,
       healthGoalsInput: user.healthGoals.join(', '),
+      homeClubId: user.homeClubId || NO_HOME_CLUB,
     })
     setIsMemberDialogOpen(true)
   }
@@ -536,11 +557,16 @@ export default function UsersPage() {
     if (!validateMemberForm()) return
     const healthGoals = memberForm.healthGoalsInput.split(',').map(s => s.trim()).filter(Boolean)
     const cleanPhone = memberForm.phone.replace(/[\s\-()]/g, '')
+    const homeClubId = memberForm.homeClubId === NO_HOME_CLUB ? null : memberForm.homeClubId
     try {
       if (editingUser) {
+        const homeClubChanged = homeClubId !== (editingUser.homeClubId || null)
         await updateUser.mutateAsync({
           id: editingUser._id,
-          payload: { username: memberForm.username, phone: cleanPhone, age: Number(memberForm.age), gender: memberForm.gender, healthGoals },
+          payload: {
+            username: memberForm.username, phone: cleanPhone, age: Number(memberForm.age), gender: memberForm.gender, healthGoals,
+            ...(!isSingleLocation && homeClubChanged ? { homeClubId } : {}),
+          },
         })
       } else {
         const payload: CreateUserPayload = {
@@ -555,6 +581,9 @@ export default function UsersPage() {
         }
         if (memberForm.password.trim()) {
           payload.password = memberForm.password.trim()
+        }
+        if (!isSingleLocation && homeClubId) {
+          payload.homeClubId = homeClubId
         }
         await createUser.mutateAsync(payload)
         clearMemberDraft()
@@ -758,6 +787,22 @@ export default function UsersPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {!isSingleLocation && (
+                      <div>
+                        <label className="text-sm font-medium">Home club</label>
+                        <Select value={memberForm.homeClubId} onValueChange={(v) => setMemberForm({ ...memberForm, homeClubId: v })}>
+                          <SelectTrigger><SelectValue placeholder="Choose a branch" /></SelectTrigger>
+                          <SelectContent>
+                            {locations.map((l) => <SelectItem key={l._id} value={l._id}>{l.name}</SelectItem>)}
+                            <SelectItem value={NO_HOME_CLUB}>No home club</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">In-person classes and offers follow this branch.</p>
+                        {(memberFormErrors.homeClubId || memberFormErrors.homeLocationId) && (
+                          <p className="text-xs text-red-500 mt-1">{memberFormErrors.homeClubId || memberFormErrors.homeLocationId}</p>
+                        )}
+                      </div>
+                    )}
                     <div>
                       <label className="text-sm font-medium">Health Goals (comma-separated)</label>
                       <Input value={memberForm.healthGoalsInput} onChange={(e) => setMemberForm({ ...memberForm, healthGoalsInput: e.target.value })} placeholder="Build muscle, Improve stamina" />
@@ -1065,6 +1110,11 @@ export default function UsersPage() {
                               >
                                 {user.username}
                               </button>
+                              {!isSingleLocation && (
+                                <span className={cn('block text-[11px] font-normal truncate', user.homeClubId ? 'text-muted-foreground' : 'text-amber-600')}>
+                                  {user.homeClubId ? (locationNameById.get(user.homeClubId) ?? 'Unknown branch') : 'No home club'}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell className="text-muted-foreground truncate max-w-[180px]" title={user.email}>{user.email}</TableCell>
                             <TableCell className="hidden text-center lg:table-cell">{user.age}</TableCell>

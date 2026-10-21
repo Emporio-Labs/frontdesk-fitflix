@@ -91,6 +91,8 @@ export interface User {
   emergencyContact?: string
   address?: string
   onboarded?: boolean
+  /** The member's home branch (a `Location._id`), or null when unassigned. */
+  homeClubId?: string | null
   createdAt: string
   updatedAt: string
   onboardingStatus?: UserOnboardingSummary
@@ -111,6 +113,8 @@ export interface CreateUserPayload {
   dateOfBirth?: string
   emergencyContact?: string
   address?: string
+  /** Home branch (a `Location._id`). */
+  homeClubId?: string | null
 }
 
 export interface UpdateUserPayload {
@@ -122,6 +126,8 @@ export interface UpdateUserPayload {
   dateOfBirth?: string
   emergencyContact?: string
   address?: string
+  /** Move the member to another home branch; null clears it. */
+  homeClubId?: string | null
 }
 
 export interface OnboardUserPayload {
@@ -196,6 +202,7 @@ function normalizeUser(raw: any): User {
     age: Number(raw?.age || 0),
     gender: String(raw?.gender || ''),
     healthGoals: Array.isArray(raw?.healthGoals) ? raw.healthGoals.map(String) : [],
+    homeClubId: raw?.homeClubId || raw?.homeLocationId ? String(raw.homeClubId || raw.homeLocationId) : null,
     createdAt: String(raw?.createdAt || ''),
     updatedAt: String(raw?.updatedAt || raw?.createdAt || ''),
     assignedTrainer: raw?.assignedTrainer ?? undefined,
