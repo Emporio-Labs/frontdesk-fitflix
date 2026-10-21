@@ -51,10 +51,30 @@ export function clearToken() {
 // components/location-scope-provider.tsx (localStorage key 'hh_selected_location').
 // Sent on every request as X-Location-Id so staff never have to attach it by
 // hand; absent ("all branches") means the backend resolves/refuses on its own.
+// If the authenticated user is branch-scoped, this strictly locks to their assigned branch.
 function getSelectedLocationId(): string | null {
   if (typeof window === 'undefined') return null
   try {
-    return localStorage.getItem('hh_selected_location')
+    const raw = localStorage.getItem('hh_selected_location')
+    const userJson = localStorage.getItem('hh_user')
+    if (userJson) {
+      try {
+        const user = JSON.parse(userJson)
+        const isBranchRestricted =
+          user &&
+          user.role !== 'super_admin' &&
+          !user.allBranches &&
+          (user.scope === 'branch' || (Array.isArray(user.branchIds) && user.branchIds.length > 0))
+
+        if (isBranchRestricted && Array.isArray(user.branchIds) && user.branchIds.length > 0) {
+          const validBranchIds = user.branchIds.map(String)
+          if (!raw || !validBranchIds.includes(raw)) {
+            return validBranchIds[0]
+          }
+        }
+      } catch {}
+    }
+    return raw
   } catch {
     return null
   }

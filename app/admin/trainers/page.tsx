@@ -25,8 +25,9 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { IconPlus, IconEdit, IconTrash, IconRefresh, IconEye, IconEyeOff } from '@tabler/icons-react'
 import { useTrainers, useCreateTrainer, useUpdateTrainer, useDeleteTrainer } from '@/hooks/use-trainers'
-import { useLocations } from '@/hooks/use-locations'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { Trainer } from '@/lib/services/trainer.service'
+import { toast } from 'sonner'
 
 const TRAINER_DRAFT_KEY = 'add_trainer_form_draft'
 
@@ -132,11 +133,18 @@ export default function TrainersPage() {
   }, [formData, editingTrainer])
 
   const { data: trainers = [], isLoading, isError, refetch } = useTrainers()
-  const { data: locations = [] } = useLocations()
+  const { locations, isBranchRestricted, assignedBranchIds, selectedLocationId } = useLocationScope()
   const createTrainer = useCreateTrainer()
   const updateTrainer = useUpdateTrainer()
   const deleteTrainer = useDeleteTrainer()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+
+  const canAlterTrainer = (trainer: Trainer) => {
+    if (!isBranchRestricted) return true
+    const tBranches = trainer.branchIds && trainer.branchIds.length > 0 ? trainer.branchIds : (trainer.locationId ? [trainer.locationId] : [])
+    if (tBranches.length === 0) return true
+    return tBranches.some((id) => assignedBranchIds.includes(String(id)))
+  }
 
   const filtered = useMemo(
     () =>
@@ -182,15 +190,29 @@ export default function TrainersPage() {
     setShowPassword(false)
     setShowUnsavedConfirm(false)
     const draft = loadTrainerDraft()
+    const defaultBranches = isBranchRestricted && assignedBranchIds.length > 0
+      ? [selectedLocationId || assignedBranchIds[0]]
+      : []
     if (draft) {
-      setFormData(draft)
+      setFormData({
+        ...defaultTrainerForm(),
+        ...draft,
+        branchIds: draft.branchIds && draft.branchIds.length > 0 ? draft.branchIds : defaultBranches,
+      })
     } else {
-      setFormData(defaultTrainerForm())
+      setFormData({
+        ...defaultTrainerForm(),
+        branchIds: defaultBranches,
+      })
     }
     setIsDialogOpen(true)
   }
 
   const handleOpenEdit = (trainer: Trainer) => {
+    if (!canAlterTrainer(trainer)) {
+      toast.error('You can only alter trainers in your assigned branch.')
+      return
+    }
     setEditingTrainer(trainer)
     setFormData({
       trainerName: trainer.trainerName || '', email: trainer.email || '', phone: trainer.phone || '',
@@ -237,6 +259,19 @@ export default function TrainersPage() {
     const specialities = formData.specialitiesInput.split(',').map(s => s.trim()).filter(Boolean)
     const cleanPhone = formData.phone.replace(/[\s\-()]/g, '')
     
+    if (editingTrainer && !canAlterTrainer(editingTrainer)) {
+      toast.error('You can only alter trainers in your assigned branch.')
+      return
+    }
+
+    if (isBranchRestricted) {
+      const invalid = formData.branchIds.filter((id) => !assignedBranchIds.includes(id))
+      if (invalid.length > 0) {
+        toast.error('You can only assign trainers to your assigned branch.')
+        return
+      }
+    }
+
     try {
       if (editingTrainer) {
         await updateTrainer.mutateAsync({
@@ -524,8 +559,32 @@ export default function TrainersPage() {
                             <TableCell>{trainer.createdAt ? new Date(trainer.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
-                                <Button size="sm" variant="outline" onClick={() => handleOpenEdit(trainer)}><IconEdit className="w-4 h-4" /></Button>
-                                <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${trainer.trainerName}?`)) deleteTrainer.mutate(trainerKey) }} disabled={deleteTrainer.isPending}><IconTrash className="w-4 h-4" /></Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenEdit(trainer)}
+                                  disabled={!canAlterTrainer(trainer)}
+                                  title={canAlterTrainer(trainer) ? "Edit Trainer" : "Assigned to another branch"}
+                                  className="disabled:opacity-30"
+                                >
+                                  <IconEdit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600 disabled:opacity-30"
+                                  onClick={() => {
+                                    if (!canAlterTrainer(trainer)) {
+                                      toast.error('You can only delete trainers in your assigned branch.')
+                                      return
+                                    }
+                                    if (confirm(`Delete ${trainer.trainerName}?`)) deleteTrainer.mutate(trainerKey)
+                                  }}
+                                  disabled={deleteTrainer.isPending || !canAlterTrainer(trainer)}
+                                  title={canAlterTrainer(trainer) ? "Delete Trainer" : "Assigned to another branch"}
+                                >
+                                  <IconTrash className="w-4 h-4" />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>

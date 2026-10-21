@@ -17,6 +17,8 @@ export interface Membership {
   features: string[]
   notes: string
   createdAt?: string
+  /** The branch this membership was issued at. */
+  locationId?: string | null
 }
 
 export interface CreateMembershipPayload {
@@ -74,6 +76,7 @@ function normalizeMembership(raw: any): Membership {
     features: Array.isArray(raw?.features) ? raw.features : [],
     notes: raw?.notes || '',
     createdAt: raw?.createdAt || '',
+    locationId: raw?.locationId ?? raw?.branchId ?? raw?.location?._id ?? null,
   }
 }
 

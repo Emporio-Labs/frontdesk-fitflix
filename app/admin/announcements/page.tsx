@@ -80,7 +80,7 @@ function formatSentAt(value?: string) {
 }
 
 export default function AnnouncementsPage() {
-  const { locations, selectedLocationId } = useLocationScope()
+  const { locations, selectedLocationId, isBranchRestricted, assignedBranchIds } = useLocationScope()
   const canSend = useCanAccess('member_notifications', 'create')
   const multiBranch = locations.length > 1
 
@@ -91,7 +91,7 @@ export default function AnnouncementsPage() {
     title: '',
     body: '',
     // Default to the branch the console is scoped to; 'all' when unscoped.
-    locationId: selectedLocationId ?? 'all',
+    locationId: selectedLocationId ?? (isBranchRestricted && assignedBranchIds.length > 0 ? assignedBranchIds[0] : 'all'),
     audience: 'all',
   })
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -104,10 +104,15 @@ export default function AnnouncementsPage() {
 
   // With a single branch the picker is hidden (FX-20.4); the backend resolves
   // the club from the X-Location-Id header, so send it company-wide (null).
-  const targetLocationId = useMemo(
-    () => (multiBranch && form.locationId !== 'all' ? form.locationId : null),
-    [multiBranch, form.locationId],
-  )
+  const targetLocationId = useMemo(() => {
+    if (isBranchRestricted && assignedBranchIds.length > 0) {
+      if (form.locationId !== 'all' && assignedBranchIds.includes(form.locationId)) {
+        return form.locationId
+      }
+      return selectedLocationId || assignedBranchIds[0]
+    }
+    return multiBranch && form.locationId !== 'all' ? form.locationId : null
+  }, [isBranchRestricted, assignedBranchIds, selectedLocationId, multiBranch, form.locationId])
 
   const canSubmit = Boolean(form.title.trim() && form.body.trim()) && canSend
 
@@ -179,27 +184,36 @@ export default function AnnouncementsPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Branch picker — hidden with a single branch (FX-20.4). */}
-            {multiBranch && (
+            {isBranchRestricted && assignedBranchIds.length <= 1 ? (
               <div className="space-y-1.5">
                 <Label>Club</Label>
-                <Select
-                  value={form.locationId}
-                  onValueChange={(v) => set('locationId', v)}
-                  disabled={!canSend}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All clubs (company-wide)</SelectItem>
-                    {locations.map((l) => (
-                      <SelectItem key={l._id} value={l._id}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                  {locations[0]?.name || 'Assigned Club'}
+                </div>
               </div>
+            ) : (
+              multiBranch && (
+                <div className="space-y-1.5">
+                  <Label>Club</Label>
+                  <Select
+                    value={form.locationId}
+                    onValueChange={(v) => set('locationId', v)}
+                    disabled={!canSend}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!isBranchRestricted && <SelectItem value="all">All clubs (company-wide)</SelectItem>}
+                      {locations.map((l) => (
+                        <SelectItem key={l._id} value={l._id}>
+                          {l.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )
             )}
 
             <div className="space-y-1.5">

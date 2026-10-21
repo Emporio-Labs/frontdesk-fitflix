@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useMemo } from "react"
 import {
   IconDashboard,
   IconListDetails,
@@ -270,8 +271,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: '/placeholder-user.jpg',
   }
 
+  const isBranchRestricted = Boolean(
+    user &&
+    user.role !== 'super_admin' &&
+    !user.allBranches &&
+    (user.scope === 'branch' || (Array.isArray(user.branchIds) && user.branchIds.length > 0))
+  )
+
   const role = user?.role
-  const groups =
+  const rawGroups =
     role === 'trainer'
       ? navTrainerGroup
       : role === 'nutritionist'
@@ -287,6 +295,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       : role === 'sports_scientist'
       ? navSportsScientistGroup
       : navGroups
+
+  const groups = useMemo(() => {
+    if (!isBranchRestricted) return rawGroups
+    return rawGroups
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((item) => item.url !== '/admin/locations'),
+      }))
+      .filter((g) => g.items.length > 0)
+  }, [rawGroups, isBranchRestricted])
+
   // FX-47 / FX-46 F5 — the brand link lands on the same page as the role's
   // post-login start page, so clicking the logo never disagrees with where login
   // dropped them. Nutritionist keeps its my-clients landing (middleware bounces

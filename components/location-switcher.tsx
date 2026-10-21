@@ -37,13 +37,13 @@ export function LocationSwitcher() {
     selectedLocation,
     setSelectedLocationId,
     isSingleLocation,
+    isBranchRestricted,
   } = scope
 
   // FX-19.3 — only a super admin may read across every branch at once, so only
-  // they are offered "All branches". Everyone else (branch-scoped staff per
-  // FX-18, and clinic admins) views one branch at a time. The backend scopes
-  // data regardless; this is the matching UI.
-  const canSeeAllBranches = user?.role === 'super_admin'
+  // they are offered "All branches". Branch-restricted staff cannot see "All branches"
+  // or switch to branches outside their assignment.
+  const canSeeAllBranches = user?.role === 'super_admin' && !isBranchRestricted
 
   // Anyone without the "All branches" option must always have a concrete branch
   // selected, so default to the first available branch once the list is known.
@@ -73,11 +73,18 @@ export function LocationSwitcher() {
 
   if (isSingleLocation) {
     return (
-      // Which branch you're operating on matters at the desk, so keep this on
-      // mobile too — just cap the width and truncate instead of hiding it.
-      <span className="flex min-w-0 max-w-[40vw] items-center gap-1.5 text-sm text-muted-foreground sm:max-w-none">
-        <IconMapPin className="size-4 shrink-0" />
-        <span className="truncate">{selectedLocation?.name ?? locations[0]?.name}</span>
+      // Locked to single / assigned branch. No dropdown is displayed so shifting is impossible.
+      <span
+        className="flex min-w-0 max-w-[40vw] items-center gap-1.5 text-sm text-muted-foreground sm:max-w-none"
+        title={isBranchRestricted ? 'Assigned branch' : undefined}
+      >
+        <IconMapPin className="size-4 shrink-0 text-primary" />
+        <span className="truncate font-medium">{selectedLocation?.name ?? locations[0]?.name}</span>
+        {isBranchRestricted && (
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Assigned
+          </span>
+        )}
       </span>
     )
   }

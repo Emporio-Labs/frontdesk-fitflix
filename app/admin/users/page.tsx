@@ -31,7 +31,7 @@ import {
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
 import { useAdmins, useInviteAdmin, useResendInvite, useUpdateAdmin, useDeleteAdmin, useSetAdminStatus } from '@/hooks/use-admins'
 import { useMemberships } from '@/hooks/use-memberships'
-import { useLocations } from '@/hooks/use-locations'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { User, CreateUserPayload } from '@/lib/services/user.service'
 import { Admin } from '@/lib/services/admin.service'
 import { StatusBadge } from '@/components/status-badge'
@@ -254,10 +254,13 @@ export default function UsersPage() {
     setShowPassword(false)
     setShowUnsavedConfirm(false)
     const draft = loadMemberDraft()
+    const defaultBranch = isBranchRestricted && assignedBranchIds.length > 0
+      ? (selectedLocationId || assignedBranchIds[0])
+      : (locations.length === 1 ? locations[0]?._id ?? '' : '')
     if (draft) {
-      setMemberForm(draft)
+      setMemberForm({ ...draft, homeClubId: draft.homeClubId || defaultBranch })
     } else {
-      setMemberForm(defaultMemberForm())
+      setMemberForm({ ...defaultMemberForm(), homeClubId: defaultBranch })
     }
     setIsMemberDialogOpen(true)
   }
@@ -340,7 +343,13 @@ export default function UsersPage() {
   const updateAdmin = useUpdateAdmin()
   const deleteAdmin = useDeleteAdmin()
   const setAdminStatus = useSetAdminStatus()
-  const { data: locations = [] } = useLocations()
+  const { locations, allLocations, isBranchRestricted, assignedBranchIds, selectedLocationId } = useLocationScope()
+
+  const canAlterMember = (member: User) => {
+    if (!isBranchRestricted) return true
+    if (!member.homeClubId) return true
+    return assignedBranchIds.includes(String(member.homeClubId))
+  }
 
   // FX-32.1 — branch picker validation error (scoped role with no branch chosen).
   const [adminFormError, setAdminFormError] = useState('')
@@ -459,6 +468,10 @@ export default function UsersPage() {
   }
 
   const handleOpenEditUser = (user: User) => {
+    if (!canAlterMember(user)) {
+      toast.error('You can only alter members in your assigned branch.')
+      return
+    }
     setEditingUser(user)
     setMemberForm({
       username: user.username, email: user.email || '', phone: user.phone,
@@ -477,6 +490,16 @@ export default function UsersPage() {
     // (FX-20.4), so default to the sole location; otherwise use the chosen value.
     const homeClubId =
       memberForm.homeClubId || (locations.length === 1 ? locations[0]?._id ?? '' : '')
+
+    if (editingUser && !canAlterMember(editingUser)) {
+      toast.error('You can only alter members in your assigned branch.')
+      return
+    }
+
+    if (isBranchRestricted && homeClubId && !assignedBranchIds.includes(homeClubId)) {
+      toast.error('Cannot assign member to another branch.')
+      return
+    }
     try {
       if (editingUser) {
         await updateUser.mutateAsync({
@@ -546,6 +569,13 @@ export default function UsersPage() {
   }
 
   const handleOpenEditAdmin = (admin: Admin) => {
+    if (isBranchRestricted && admin.branchIds && admin.branchIds.length > 0) {
+      const hasOverlap = admin.branchIds.some((id) => assignedBranchIds.includes(id))
+      if (!hasOverlap) {
+        toast.error('You can only edit staff in your assigned branch.')
+        return
+      }
+    }
     setEditingAdmin(admin)
     setAdminFormError('')
     setAdminForm({
@@ -566,10 +596,23 @@ export default function UsersPage() {
   const resolveAdminBranchPayload = (): { branchIds: string[]; allBranches: boolean } | null => {
     const role = adminForm.staffRole
     if (isFullAdminRole(role)) return { branchIds: [], allBranches: false }
-    if (isExpertRole(role) || adminForm.allBranches) return { branchIds: [], allBranches: true }
+    if (isExpertRole(role) || adminForm.allBranches) {
+      if (isBranchRestricted) {
+        setAdminFormError('You cannot create accounts spanning all branches.')
+        return null
+      }
+      return { branchIds: [], allBranches: true }
+    }
     if (adminForm.branchIds.length === 0) {
       setAdminFormError('Select at least one branch, or mark this role as working across all branches.')
       return null
+    }
+    if (isBranchRestricted) {
+      const invalidBranches = adminForm.branchIds.filter((id) => !assignedBranchIds.includes(id))
+      if (invalidBranches.length > 0) {
+        setAdminFormError('You can only assign staff to your own branch.')
+        return null
+      }
     }
     return { branchIds: adminForm.branchIds, allBranches: false }
   }
@@ -642,6 +685,13 @@ export default function UsersPage() {
     personalAccounts.every((a) => a.status === 'active' && !!a.lastLoginAt)
 
   const handleToggleStatus = async (admin: Admin) => {
+    if (isBranchRestricted && admin.branchIds && admin.branchIds.length > 0) {
+      const hasOverlap = admin.branchIds.some((id) => assignedBranchIds.includes(id))
+      if (!hasOverlap) {
+        toast.error('You can only change status for staff in your assigned branch.')
+        return
+      }
+    }
     const next = admin.status === 'disabled' ? 'active' : 'disabled'
     if (next === 'disabled' && !confirm(`Disable ${admin.adminName}'s account? They will no longer be able to sign in.`)) {
       return
@@ -793,24 +843,34 @@ export default function UsersPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* FX-20.1 — home club picker; hidden with a single branch (FX-20.4). */}
-                    {locations.length > 1 && (
+                    {/* FX-20.1 — home club picker */}
+                    {isBranchRestricted && assignedBranchIds.length <= 1 ? (
                       <div>
                         <label className="text-sm font-medium">Home Club</label>
-                        <Select
-                          value={memberForm.homeClubId || 'none'}
-                          onValueChange={(v) => setMemberForm({ ...memberForm, homeClubId: v === 'none' ? '' : v })}
-                        >
-                          <SelectTrigger><SelectValue placeholder="Select a club" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No home club</SelectItem>
-                            {locations.map((loc) => (
-                              <SelectItem key={loc._id} value={loc._id}>{loc.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground mt-1">The club whose in-person classes, offers and notifications this member sees.</p>
+                        <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                          {locations.find((l) => l._id === memberForm.homeClubId)?.name || locations[0]?.name || 'Assigned Branch'}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Locked to your assigned branch.</p>
                       </div>
+                    ) : (
+                      locations.length > 1 && (
+                        <div>
+                          <label className="text-sm font-medium">Home Club</label>
+                          <Select
+                            value={memberForm.homeClubId || 'none'}
+                            onValueChange={(v) => setMemberForm({ ...memberForm, homeClubId: v === 'none' ? '' : v })}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Select a club" /></SelectTrigger>
+                            <SelectContent>
+                              {!isBranchRestricted && <SelectItem value="none">No home club</SelectItem>}
+                              {locations.map((loc) => (
+                                <SelectItem key={loc._id} value={loc._id}>{loc.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground mt-1">The club whose in-person classes, offers and notifications this member sees.</p>
+                        </div>
+                      )
                     )}
                     <div>
                       <label className="text-sm font-medium">Health Goals (comma-separated)</label>
@@ -970,19 +1030,26 @@ export default function UsersPage() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
                                   onClick={() => handleOpenEditUser(user)}
-                                  title="Edit User"
+                                  disabled={!canAlterMember(user)}
+                                  title={canAlterMember(user) ? "Edit User" : "Belongs to another branch"}
                                 >
                                   <IconEdit className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                  onClick={() => { if (confirm(`Delete ${user.username}?`)) deleteUser.mutate(user._id) }}
-                                  disabled={deleteUser.isPending}
-                                  title="Delete User"
+                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30"
+                                  onClick={() => {
+                                    if (!canAlterMember(user)) {
+                                      toast.error('You can only delete members in your assigned branch.')
+                                      return
+                                    }
+                                    if (confirm(`Delete ${user.username}?`)) deleteUser.mutate(user._id)
+                                  }}
+                                  disabled={deleteUser.isPending || !canAlterMember(user)}
+                                  title={canAlterMember(user) ? "Delete User" : "Belongs to another branch"}
                                 >
                                   <IconTrash className="w-4 h-4" />
                                 </Button>
