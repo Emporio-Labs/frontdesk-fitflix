@@ -55,6 +55,8 @@ export interface CreateInvoicePayload {
 export interface UpdateInvoiceStatusPayload {
   paymentStatus: InvoicePaymentStatus
   paymentMethod?: InvoicePaymentMethod
+  /** PAID only: the day the created membership starts (YYYY-MM-DD). Omitted = on payment. */
+  membershipStartDate?: string
 }
 
 function normalizeInvoice(raw: any): Invoice {
