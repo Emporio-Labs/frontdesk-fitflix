@@ -776,7 +776,7 @@ export default function TherapiesPage() {
             s.isDaily &&
             s.startTime === range.startTime &&
             s.endTime === range.endTime &&
-            (selectedLocationId ? (s as any).locationId === selectedLocationId : true)
+            (!selectedLocationId || !s.locationId || s.locationId === selectedLocationId)
         )
 
         if (existing) {
@@ -797,7 +797,10 @@ export default function TherapiesPage() {
             createdSlotIds.push(res.slot._id)
           }
         } catch (err) {
-          const duplicateId = (err as any)?.response?.data?.existingSlotId || (err as any)?.data?.existingSlotId
+          const duplicateId =
+            (err as any)?.response?.data?.details?.existingSlotId ||
+            (err as any)?.response?.data?.existingSlotId ||
+            (err as any)?.data?.existingSlotId
           if (duplicateId) {
             createdSlotIds.push(duplicateId)
           } else {

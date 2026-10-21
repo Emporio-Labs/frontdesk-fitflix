@@ -40,6 +40,7 @@ export const SLOT_EXPERT_TYPE_LABELS: Record<SlotExpertType, string> = {
 
 export interface Slot {
   _id: string
+  locationId?: string
   date?: string
   expertType: SlotExpertType
   startTime: string
@@ -115,6 +116,7 @@ function normalizeSlot(raw: any): Slot {
 
   return {
     _id: String(raw?._id || raw?.id || ''),
+    locationId: String(raw?.locationId?._id || raw?.locationId || '') || undefined,
     date: rawDate || undefined,
     expertType,
     startTime: String(raw?.startTime || ''),
