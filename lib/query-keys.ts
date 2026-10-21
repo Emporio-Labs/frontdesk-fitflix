@@ -50,6 +50,10 @@ export const queryKeys = {
   membershipPlans: {
     all: () => ['membership-plans'] as const,
     detail: (id: string) => ['membership-plans', id] as const,
+    forLocation: (locationId: string) => ['membership-plans', 'location', locationId] as const,
+  },
+  people: {
+    lookup: (q: string) => ['people', 'lookup', q] as const,
   },
   therapies: {
     all: () => ['therapies'] as const,
