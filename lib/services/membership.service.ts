@@ -302,4 +302,28 @@ export const membershipService = {
       newEndDate: string | null
     }
   },
+  downloadTemplate: async (): Promise<Blob> => {
+    const response = await apiClient.get('/memberships/migration/template', {
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  previewMigration: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await apiClient.post('/memberships/migration/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
+  executeMigration: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await apiClient.post('/memberships/migration/execute', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
 }

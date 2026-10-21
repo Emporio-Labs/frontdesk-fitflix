@@ -49,6 +49,7 @@ import {
   useDeleteMembership,
 } from '@/hooks/use-memberships'
 import { useLocationScope } from '@/components/location-scope-provider'
+import { MemberMigrationDialog } from '@/components/memberships/member-migration-dialog'
 
 function formatDateToInput(value?: string) {
   if (!value) return ''
@@ -465,6 +466,7 @@ function MembershipsPageContent() {
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <IconRefresh className="w-4 h-4 mr-1" /> Refresh
           </Button>
+          <MemberMigrationDialog onSuccess={() => refetch()} />
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button
@@ -1160,3 +1162,5 @@ export default function MembershipsPage() {
     </Suspense>
   )
 }
+
+
