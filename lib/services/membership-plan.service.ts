@@ -28,6 +28,12 @@ export interface MembershipPlan {
   status: MembershipPlanStatus
   features: string[]
   benefits: MembershipPlanBenefits
+  /** Branch the plan is sold at (a `Location._id`); null = every branch. */
+  locationId: string | null
+  /** Founding-member (presale) plan; listed first in the sale flow. */
+  isFounding: boolean
+  /** Last day the plan can be sold (ISO date); null = no cut-off. */
+  availableUntil: string | null
   createdAt: string
   updatedAt?: string
 }
@@ -85,6 +91,11 @@ function normalizePlan(raw: any): MembershipPlan {
     status,
     features: Array.isArray(raw?.features) ? raw.features.filter(Boolean) : [],
     benefits,
+    locationId: raw?.locationId
+      ? String(typeof raw.locationId === 'object' ? raw.locationId._id || raw.locationId.id : raw.locationId)
+      : null,
+    isFounding: Boolean(raw?.isFounding),
+    availableUntil: raw?.availableUntil ? String(raw.availableUntil) : null,
     createdAt: raw?.createdAt || raw?.created_at || '',
     updatedAt: raw?.updatedAt || raw?.updated_at || undefined,
   }
@@ -115,6 +126,17 @@ export const membershipPlanService = {
   // gymId kept for call-site compatibility; the backend list is not gym-scoped.
   getAll: async (_gymId?: string): Promise<{ plans: MembershipPlan[] }> => {
     const { data } = await apiClient.get('/membership-plans')
+    const plans = Array.isArray(data?.plans) ? data.plans : Array.isArray(data) ? data : []
+    return { plans: plans.map(normalizePlan) }
+  },
+
+  /**
+   * Plans sellable at one branch: its own plus the all-branch ones. A backend
+   * that predates the `locationId` filter returns every plan, so the caller
+   * still filters on `plan.locationId`.
+   */
+  getForLocation: async (locationId: string): Promise<{ plans: MembershipPlan[] }> => {
+    const { data } = await apiClient.get('/membership-plans', { params: { locationId } })
     const plans = Array.isArray(data?.plans) ? data.plans : Array.isArray(data) ? data : []
     return { plans: plans.map(normalizePlan) }
   },

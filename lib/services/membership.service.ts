@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api-client'
 
-export type MembershipStatus = 'Active' | 'Paused' | 'Cancelled' | 'Expired'
+/** `Upcoming`: paid, starts on a future date. */
+export type MembershipStatus = 'Active' | 'Upcoming' | 'Paused' | 'Cancelled' | 'Expired'
 
 export interface Membership {
   id: string
@@ -23,6 +24,10 @@ export interface Membership {
     reason?: string
   }>
   totalPausedDays?: number
+  /** Branch the membership belongs to (a `Location._id`). */
+  locationId?: string
+  /** The invoice that paid for this membership. */
+  invoiceId?: string
   createdAt?: string
 }
 
@@ -56,7 +61,7 @@ export interface UpdateMembershipPayload {
   notes?: string
 }
 
-function normalizeMembership(raw: any): Membership {
+export function normalizeMembership(raw: any): Membership {
   const legacyPlan = raw?.planType || 'Standard Plan'
   const normalizedStatus = String(raw?.status || 'Active')
   const userRef = raw?.userId || raw?.user
@@ -73,15 +78,22 @@ function normalizeMembership(raw: any): Membership {
     creditsRemaining: Number.isFinite(creditsRemaining) ? creditsRemaining : 0,
     price: Number(raw?.price ?? 0),
     currency: raw?.currency || 'INR',
-    status: (['Active', 'Paused', 'Cancelled', 'Expired'].includes(normalizedStatus)
+    status: (['Active', 'Upcoming', 'Paused', 'Cancelled', 'Expired'].includes(normalizedStatus)
       ? normalizedStatus
       : 'Active') as MembershipStatus,
     startDate: raw?.startDate || '',
     endDate: raw?.endDate || '',
     features: Array.isArray(raw?.features) ? raw.features : [],
     notes: raw?.notes || '',
+    locationId: refId(raw?.locationId) || undefined,
+    invoiceId: refId(raw?.invoiceId) || undefined,
     createdAt: raw?.createdAt || '',
   }
+}
+
+function refId(value: any): string {
+  if (!value) return ''
+  return typeof value === 'string' ? value : String(value?._id || value?.id || '')
 }
 
 // --- Renewal reminders (client-side derivation, no dedicated backend endpoint) ---
