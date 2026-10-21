@@ -51,6 +51,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useLocationScope } from '@/components/location-scope-provider'
 
 const LEAD_DRAFT_KEY = 'add_lead_form_draft'
 
@@ -182,6 +183,9 @@ export default function LeadsPage() {
   const { data: leadDigest } = useLeadDigest() as any
   const createLead = useCreateLead()
   const updateLead = useUpdateLead()
+  // A new lead belongs to the branch the desk is looking at. With one branch
+  // the backend fills it in, so nothing is sent.
+  const { selectedLocationId, isSingleLocation } = useLocationScope()
   const deleteLead = useDeleteLead()
   const convertLead = useConvertLead()
   const addInteraction = useAddLeadInteraction()
@@ -390,6 +394,11 @@ export default function LeadsPage() {
       }
     }
 
+    if (!editingLead && !isSingleLocation && !selectedLocationId) {
+      toast.error('Pick a branch in the top switcher before adding a lead')
+      return
+    }
+
     const mappedHeat = statusToHeat[formData.status]
 
     if (editingLead) {
@@ -423,6 +432,7 @@ export default function LeadsPage() {
         interestedIn: formData.interestedIn.trim(),
         assignedStaffName: formData.assignedStaffName.trim(),
         followUpDate: formData.followUpDate ? new Date(formData.followUpDate).toISOString() : undefined,
+        ...(!isSingleLocation && selectedLocationId ? { locationId: selectedLocationId } : {}),
       })
       clearLeadDraft()
     }

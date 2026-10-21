@@ -72,6 +72,8 @@ export interface CreateLeadPayload {
   ownerId?: string
   assignedStaffName?: string
   followUpDate?: string
+  /** Branch the lead is for (a `Location._id`). */
+  locationId?: string
 }
 
 export interface UpdateLeadPayload {
@@ -433,6 +435,7 @@ function toCreatePayload(payload: CreateLeadPayload) {
     ...(tags.length ? { tags } : {}),
     ...(payload.ownerId ? { ownerId: payload.ownerId } : {}),
     ...(payload.assignedStaffName ? { assignedStaffName: payload.assignedStaffName } : {}),
+    ...(payload.locationId ? { locationId: payload.locationId } : {}),
     ...followUp,
   }
 }
