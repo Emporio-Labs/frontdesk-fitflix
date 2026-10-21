@@ -299,8 +299,11 @@ export default function TherapiesPage() {
     startTime: '09:00',
     endTime: '17:00',
     capacityPerHour: 1,
+    bufferMinutes: 0,
+    replaceExisting: true,
   })
   const [isGeneratingSlots, setIsGeneratingSlots] = useState(false)
+  const [slotWindowTab, setSlotWindowTab] = useState<'linked' | 'available' | 'all'>('linked')
 
   // ── Group Classes state ───────────────────────────────────────────────────
   const [gcDialogOpen, setGcDialogOpen] = useState(false)
@@ -367,6 +370,55 @@ export default function TherapiesPage() {
   const [pendingPublishGc, setPendingPublishGc] = useState<{ id: string; isPublished: boolean } | null>(null)
   const [gcPublishFilter, setGcPublishFilter] = useState<'all' | 'published' | 'unpublished' | 'retired' | 'completed'>('all')
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false)
+  const [therapyDiscardOpen, setTherapyDiscardOpen] = useState(false)
+
+  const handleCloseTherapyDialog = () => {
+    setIsDialogOpen(false)
+    setEditingItem(null)
+    resetForm()
+  }
+
+  const isTherapyFormDirty = () => {
+    if (isGeneratingSlots) return true
+
+    if (editingItem) {
+      if (formData.name.trim() !== (editingItem.name || '').trim()) return true
+      if (formData.time !== editingItem.time) return true
+      if (formData.creditCost !== editingItem.creditCost) return true
+      if (formData.description.trim() !== (editingItem.description || '').trim()) return true
+      const currentTags = formData.tags.split(',').map((t) => t.trim()).filter(Boolean).sort().join(',')
+      const origTags = (editingItem.tags || []).map((t) => t.trim()).filter(Boolean).sort().join(',')
+      if (currentTags !== origTags) return true
+
+      const currentSlots = [...selectedSlotIds].sort()
+      const origSlots = [...(editingItem.slots || [])].sort()
+      if (currentSlots.length !== origSlots.length) return true
+      for (let i = 0; i < currentSlots.length; i++) {
+        if (currentSlots[i] !== origSlots[i]) return true
+      }
+      return false
+    }
+
+    return (
+      formData.name.trim() !== '' ||
+      formData.description.trim() !== '' ||
+      formData.tags.trim() !== '' ||
+      selectedSlotIds.length > 0
+    )
+  }
+
+  const handleTherapyDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      if (isGeneratingSlots) return
+      if (isTherapyFormDirty()) {
+        setTherapyDiscardOpen(true)
+      } else {
+        handleCloseTherapyDialog()
+      }
+    } else {
+      setIsDialogOpen(true)
+    }
+  }
 
   const isFormDirty = () => {
     if (editingGc) {
@@ -636,7 +688,10 @@ export default function TherapiesPage() {
       startTime: '09:00',
       endTime: '17:00',
       capacityPerHour: 1,
+      bufferMinutes: 0,
+      replaceExisting: true,
     })
+    setSlotWindowTab('linked')
   }
 
   const openCreateDialog = () => {
@@ -661,7 +716,10 @@ export default function TherapiesPage() {
     setSlotPlan((current) => ({
       ...current,
       capacityPerHour: 1,
+      bufferMinutes: 0,
+      replaceExisting: true,
     }))
+    setSlotWindowTab('linked')
     setIsDialogOpen(true)
   }
 
@@ -679,68 +737,96 @@ export default function TherapiesPage() {
       return
     }
 
-    if (startInMinutes % 60 !== 0 || endInMinutes % 60 !== 0) {
-      toast.error('Hourly slot generation requires full-hour times (for example, 09:00 to 17:00)')
+    const durationInMinutes = Math.round(Number(formData.time))
+    if (!Number.isFinite(durationInMinutes) || durationInMinutes <= 0) {
+      toast.error('Please enter a valid therapy duration in minutes first')
       return
     }
+
+    const bufferInMinutes = Math.max(0, Math.round(Number(slotPlan.bufferMinutes) || 0))
+    const step = durationInMinutes + bufferInMinutes
 
     if (!Number.isInteger(slotPlan.capacityPerHour) || slotPlan.capacityPerHour <= 0) {
-      toast.error('Capacity per hour must be at least 1')
+      toast.error('Capacity per slot must be at least 1')
       return
     }
 
-    const hourlyRanges: Array<{ startTime: string; endTime: string }> = []
-    for (let cursor = startInMinutes; cursor + 60 <= endInMinutes; cursor += 60) {
-      hourlyRanges.push({
+    const generatedRanges: Array<{ startTime: string; endTime: string }> = []
+    for (let cursor = startInMinutes; cursor + durationInMinutes <= endInMinutes; cursor += step) {
+      generatedRanges.push({
         startTime: minutesToTime(cursor),
-        endTime: minutesToTime(cursor + 60),
+        endTime: minutesToTime(cursor + durationInMinutes),
       })
     }
 
-    if (!hourlyRanges.length) {
-      toast.error('No hourly slots can be generated from this time range')
+    if (!generatedRanges.length) {
+      toast.error(`No ${durationInMinutes}-minute slots fit between ${slotPlan.startTime} and ${slotPlan.endTime}`)
       return
     }
 
     setIsGeneratingSlots(true)
     try {
-      const requests = hourlyRanges.map((range) =>
-        slotService.create({
-          startTime: range.startTime,
-          endTime: range.endTime,
-          isDaily: true,
-          capacity: slotPlan.capacityPerHour,
-        })
-      )
-
-      const results = await Promise.allSettled(requests)
       const createdSlotIds: string[] = []
       let failedCount = 0
 
-      for (const result of results) {
-        if (result.status === 'fulfilled') {
-          const createdId = result.value?.slot?._id
-          if (createdId) {
-            createdSlotIds.push(createdId)
+      for (const range of generatedRanges) {
+        // Reuse matching daily slot if already present in inventory
+        const existing = slotOptions.find(
+          (s) =>
+            s.isDaily &&
+            s.startTime === range.startTime &&
+            s.endTime === range.endTime &&
+            (selectedLocationId ? (s as any).locationId === selectedLocationId : true)
+        )
+
+        if (existing) {
+          createdSlotIds.push(existing._id)
+          continue
+        }
+
+        try {
+          const res = await slotService.create({
+            startTime: range.startTime,
+            endTime: range.endTime,
+            isDaily: true,
+            capacity: slotPlan.capacityPerHour,
+            expertType: 'facility',
+            locationId: selectedLocationId ?? undefined,
+          })
+          if (res?.slot?._id) {
+            createdSlotIds.push(res.slot._id)
           }
-        } else {
-          failedCount += 1
+        } catch (err) {
+          const duplicateId = (err as any)?.response?.data?.existingSlotId || (err as any)?.data?.existingSlotId
+          if (duplicateId) {
+            createdSlotIds.push(duplicateId)
+          } else {
+            failedCount += 1
+          }
         }
       }
 
       if (createdSlotIds.length > 0) {
-        setSelectedSlotIds((current) => Array.from(new Set([...current, ...createdSlotIds])))
+        if (slotPlan.replaceExisting) {
+          setSelectedSlotIds(createdSlotIds)
+          setManualSlotIds('') // Wipe old/ghost manual slot IDs
+        } else {
+          setSelectedSlotIds((current) => Array.from(new Set([...current, ...createdSlotIds])))
+        }
+        setSlotWindowTab('linked')
         await refetchSlots()
       }
 
       if (createdSlotIds.length > 0) {
         toast.success(
-          `Created ${createdSlotIds.length} daily hourly slots with ${slotPlan.capacityPerHour} capacity each and attached them to this therapy`
+          `Configured ${createdSlotIds.length} daily ${durationInMinutes}-min slots with ${slotPlan.capacityPerHour} capacity each and ${
+            slotPlan.replaceExisting ? 'replaced previous' : 'attached'
+          } windows for this therapy`
         )
       }
 
       if (failedCount > 0) {
-        toast.error(`${failedCount} hourly slots could not be created. Check for duplicate or invalid times.`)
+        toast.error(`${failedCount} slots could not be created or resolved. Check for duplicate or invalid times.`)
       }
 
       if (createdSlotIds.length === 0 && failedCount === 0) {
@@ -754,6 +840,11 @@ export default function TherapiesPage() {
   }
 
   const handleSave = async () => {
+    if (isGeneratingSlots) {
+      toast.error('Slots are currently being generated. Please wait until generation completes.')
+      return
+    }
+
     if (!formData.name.trim()) {
       toast.error('Name is required')
       return
@@ -821,7 +912,7 @@ export default function TherapiesPage() {
     setSlotSearchTerm('')
     setManualSlotIds('')
     setShowManualSlotInput(false)
-    setSlotPlan({ startTime: '09:00', endTime: '17:00', capacityPerHour: 1 })
+    setSlotPlan({ startTime: '09:00', endTime: '17:00', capacityPerHour: 1, bufferMinutes: 0, replaceExisting: true })
     setGcErrors({})
   }
 
@@ -917,7 +1008,7 @@ export default function TherapiesPage() {
     setSlotSearchTerm('')
     setManualSlotIds('')
     setShowManualSlotInput(false)
-    setSlotPlan({ startTime: '09:00', endTime: '17:00', capacityPerHour: 1 })
+    setSlotPlan({ startTime: '09:00', endTime: '17:00', capacityPerHour: 1, bufferMinutes: 0, replaceExisting: true })
     setGcDialogOpen(true)
   }
 
@@ -1187,6 +1278,11 @@ export default function TherapiesPage() {
     })
   }, [slots])
 
+  const availableSlotCount = useMemo(
+    () => slotOptions.filter((s) => !selectedSlotIds.includes(s._id)).length,
+    [slotOptions, selectedSlotIds]
+  )
+
   const filteredSlotOptions = useMemo(() => {
     let filtered = slotOptions.filter((slot) => {
       if (!slot.isDaily && slot.date && slot.date < todayStr()) {
@@ -1199,6 +1295,7 @@ export default function TherapiesPage() {
     const genEnd = timeToMinutes(slotPlan.endTime)
     if (genStart !== null && genEnd !== null) {
       filtered = filtered.filter((slot) => {
+        if (selectedSlotIds.includes(slot._id)) return true
         const slotStart = timeToMinutes(slot.startTime)
         const slotEnd = timeToMinutes(slot.endTime)
         if (slotStart !== null && slotEnd !== null) {
@@ -1206,6 +1303,12 @@ export default function TherapiesPage() {
         }
         return true
       })
+    }
+
+    if (slotWindowTab === 'linked') {
+      filtered = filtered.filter((slot) => selectedSlotIds.includes(slot._id))
+    } else if (slotWindowTab === 'available') {
+      filtered = filtered.filter((slot) => !selectedSlotIds.includes(slot._id))
     }
 
     const query = slotSearchTerm.trim().toLowerCase()
@@ -1220,7 +1323,7 @@ export default function TherapiesPage() {
         slot._id.toLowerCase().includes(query)
       )
     })
-  }, [slotOptions, slotSearchTerm, slotPlan.startTime, slotPlan.endTime])
+  }, [slotOptions, slotSearchTerm, slotPlan.startTime, slotPlan.endTime, slotWindowTab, selectedSlotIds])
 
   const knownSlotIds = useMemo(() => new Set(slotOptions.map((slot) => slot._id)), [slotOptions])
 
@@ -1306,14 +1409,34 @@ export default function TherapiesPage() {
           <Button variant="outline" size="sm" onClick={handleRefresh}>
             <IconRefresh className="mr-1 h-4 w-4" /> Refresh
           </Button>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={handleTherapyDialogOpenChange}>
             <DialogTrigger asChild>
               <Button onClick={openCreateDialog}>
                 <IconPlus className="mr-2 h-4 w-4" />
                 Add Therapy
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[560px]">
+            <DialogContent
+              className="max-h-[85vh] overflow-y-auto sm:max-w-[560px]"
+              onPointerDownOutside={(e) => {
+                e.preventDefault()
+                if (isGeneratingSlots) return
+                if (isTherapyFormDirty()) {
+                  setTherapyDiscardOpen(true)
+                } else {
+                  handleCloseTherapyDialog()
+                }
+              }}
+              onEscapeKeyDown={(e) => {
+                e.preventDefault()
+                if (isGeneratingSlots) return
+                if (isTherapyFormDirty()) {
+                  setTherapyDiscardOpen(true)
+                } else {
+                  handleCloseTherapyDialog()
+                }
+              }}
+            >
               <DialogHeader>
                 <DialogTitle>{editingItem ? 'Edit Therapy' : 'Create Therapy'}</DialogTitle>
                 <DialogDescription>Set up the details that members and staff will see during booking.</DialogDescription>
@@ -1365,21 +1488,26 @@ export default function TherapiesPage() {
                     placeholder="iv, energy boost, anti-aging"
                   />
                 </div>
-                <div className="space-y-3 rounded-lg border border-dashed p-3">
+                <div className="space-y-3 rounded-lg border border-dashed p-3 bg-muted/20">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Generate Hourly Slots For This Therapy</label>
-                    <Badge variant="outline" className="rounded-full">Hourly</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Daily recurring slots are created for each hour in this range.
-                  </p>
-
-                  <div className="grid gap-3 sm:grid-cols-3">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">Capacity Per Hour</label>
+                      <label className="text-sm font-medium">Generate Slots For This Therapy</label>
+                      <p className="text-xs text-muted-foreground">
+                        Automatically creates slots matching duration ({formData.time || 60} mins)
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="rounded-full">
+                      {formData.time || 60} min / slot
+                    </Badge>
+                  </div>
+
+                  <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Capacity / Slot</label>
                       <Input
                         type="number"
                         min={1}
+                        disabled={isGeneratingSlots}
                         value={slotPlan.capacityPerHour}
                         onChange={(e) =>
                           setSlotPlan({
@@ -1390,60 +1518,174 @@ export default function TherapiesPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">Start Hour</label>
+                      <label className="text-xs font-medium text-muted-foreground">Buffer (mins)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="0"
+                        disabled={isGeneratingSlots}
+                        value={slotPlan.bufferMinutes}
+                        onChange={(e) =>
+                          setSlotPlan({
+                            ...slotPlan,
+                            bufferMinutes: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Start Time</label>
                       <Input
                         type="time"
-                        step={3600}
+                        disabled={isGeneratingSlots}
                         value={slotPlan.startTime}
                         onChange={(e) => setSlotPlan({ ...slotPlan, startTime: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">End Hour</label>
+                      <label className="text-xs font-medium text-muted-foreground">End Time</label>
                       <Input
                         type="time"
-                        step={3600}
+                        disabled={isGeneratingSlots}
                         value={slotPlan.endTime}
                         onChange={(e) => setSlotPlan({ ...slotPlan, endTime: e.target.value })}
                       />
                     </div>
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleGenerateSlots}
-                    disabled={isGeneratingSlots}
-                  >
-                    {isGeneratingSlots ? 'Generating Slots...' : 'Generate Slots For This Therapy'}
-                  </Button>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        disabled={isGeneratingSlots}
+                        className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                        checked={slotPlan.replaceExisting}
+                        onChange={(e) =>
+                          setSlotPlan({
+                            ...slotPlan,
+                            replaceExisting: e.target.checked,
+                          })
+                        }
+                      />
+                      <span>Replace existing windows with new slots</span>
+                    </label>
+
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleGenerateSlots}
+                      disabled={isGeneratingSlots}
+                    >
+                      {isGeneratingSlots ? (
+                        <>
+                          <IconLoader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                          Generating Slots...
+                        </>
+                      ) : (
+                        'Generate Slots For This Therapy'
+                      )}
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">
-                      Booking Windows For This Therapy
-                      {!editingItem && <span className="ml-1 text-red-500">*</span>}
-                    </label>
+                    <div>
+                      <label className="text-sm font-medium">
+                        Booking Windows For This Therapy
+                        {!editingItem && <span className="ml-1 text-red-500">*</span>}
+                      </label>
+                      <p className="text-xs text-muted-foreground">
+                        Select which time windows this therapy can be booked in. Only linked windows appear during booking.
+                      </p>
+                    </div>
                     <Badge variant={selectedSlotIds.length === 0 ? 'destructive' : 'secondary'} className="rounded-full">
                       {selectedSlotIds.length} linked
                     </Badge>
                   </div>
 
-                  <p className="text-xs text-muted-foreground">
-                    Select which time windows this therapy can be booked in. At least one slot is required.
-                    Only linked windows appear during booking.
-                  </p>
+                  {/* Tabs: Active Linked vs Other Available vs All */}
+                  <div className="flex items-center justify-between gap-2 border-b pb-2">
+                    <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-1 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setSlotWindowTab('linked')}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-colors",
+                          slotWindowTab === 'linked'
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <span>Active Linked</span>
+                        <Badge
+                          variant={selectedSlotIds.length > 0 ? "secondary" : "outline"}
+                          className="h-4 px-1.5 text-[10px] rounded-full"
+                        >
+                          {selectedSlotIds.length}
+                        </Badge>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSlotWindowTab('available')}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-colors",
+                          slotWindowTab === 'available'
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <span>Other Available</span>
+                        <Badge variant="outline" className="h-4 px-1.5 text-[10px] rounded-full">
+                          {availableSlotCount}
+                        </Badge>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSlotWindowTab('all')}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-colors",
+                          slotWindowTab === 'all'
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <span>All</span>
+                        <Badge variant="outline" className="h-4 px-1.5 text-[10px] rounded-full">
+                          {slotOptions.length}
+                        </Badge>
+                      </button>
+                    </div>
+
+                    {slotWindowTab === 'linked' && selectedSlotIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSlotIds([])}
+                        className="text-[11px] text-muted-foreground hover:text-red-500 transition-colors"
+                      >
+                        Unlink All
+                      </button>
+                    )}
+                  </div>
 
                   <Input
                     value={slotSearchTerm}
                     onChange={(e) => setSlotSearchTerm(e.target.value)}
-                    placeholder="Filter slots by schedule, time, or ID"
+                    placeholder={
+                      slotWindowTab === 'linked'
+                        ? "Search active linked windows..."
+                        : slotWindowTab === 'available'
+                        ? "Search available unlinked windows..."
+                        : "Filter all windows by schedule, time, or ID"
+                    }
                   />
 
                   <div className="rounded-md border">
-                    <ScrollArea className="h-44">
+                    <ScrollArea className="h-52">
                       <div className="space-y-2 p-2">
-                        {isLoadingSlots ? (
+                        {isLoadingSlots || isGeneratingSlots ? (
                           [...Array(4)].map((_, index) => (
                             <Skeleton key={index} className="h-14 w-full" />
                           ))
@@ -1452,12 +1694,20 @@ export default function TherapiesPage() {
                             Failed to load slots. You can still add IDs manually.
                           </p>
                         ) : filteredSlotOptions.length === 0 ? (
-                          <p className="p-2 text-sm text-muted-foreground">No slots match this filter.</p>
+                          <div className="p-4 text-center">
+                            <p className="text-xs text-muted-foreground">
+                              {slotWindowTab === 'linked'
+                                ? 'No windows linked yet. Click "Generate Slots For This Therapy" above or switch to "Other Available" to select existing windows.'
+                                : slotWindowTab === 'available'
+                                ? 'No other slots available. All existing slots are currently linked to this therapy.'
+                                : 'No slots match this filter.'}
+                            </p>
+                          </div>
                         ) : (
                           filteredSlotOptions.map((slot: Slot) => (
                             <label
                               key={slot._id}
-                              className="flex cursor-pointer items-start gap-3 rounded-md border p-2 hover:bg-muted/40"
+                              className="flex cursor-pointer items-start gap-3 rounded-md border p-2 hover:bg-muted/40 transition-colors"
                             >
                               <Checkbox
                                 checked={selectedSlotIds.includes(slot._id)}
@@ -1470,9 +1720,16 @@ export default function TherapiesPage() {
                                 </p>
                                 <div className="flex items-center gap-2">
                                   <Badge variant={slot.remainingCapacity <= 0 ? 'destructive' : 'secondary'}>
-                                    {slot.remainingCapacity <= 0 ? 'Full' : `Open ${slot.remainingCapacity}/${slot.capacity}`}
+                                    Open {slot.remainingCapacity}/{slot.capacity}
                                   </Badge>
-                                  <span className="text-xs text-muted-foreground">ID ...{slot._id.slice(-8)}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    ID ...{slot._id.slice(-8)}
+                                  </span>
+                                  {selectedSlotIds.includes(slot._id) && (
+                                    <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20">
+                                      Linked
+                                    </Badge>
+                                  )}
                                 </div>
                               </div>
                             </label>
@@ -1482,30 +1739,34 @@ export default function TherapiesPage() {
                     </ScrollArea>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      Use Generate Slots above for new windows, or link existing windows from this list.
-                    </p>
-                    <Button
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Use Generate Slots above for new windows, or link existing windows from this list.</span>
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowManualSlotInput((current) => !current)}
+                      onClick={() => setShowManualSlotInput(!showManualSlotInput)}
+                      className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
                     >
-                      {showManualSlotInput ? 'Hide Advanced IDs' : 'Advanced: Manual IDs'}
-                    </Button>
+                      {showManualSlotInput ? 'Hide Manual IDs' : 'Advanced: Manual IDs'}
+                    </button>
                   </div>
 
                   {showManualSlotInput && (
-                    <Input
-                      value={manualSlotIds}
-                      onChange={(e) => setManualSlotIds(e.target.value)}
-                      placeholder="Advanced only: paste slot IDs separated by commas"
-                    />
+                    <div className="space-y-1.5 pt-2 border-t">
+                      <label className="text-xs font-medium">Manual Slot ObjectIds (comma-separated)</label>
+                      <Input
+                        value={manualSlotIds}
+                        onChange={(e) => setManualSlotIds(e.target.value)}
+                        placeholder="65f1a2b3c4d5e6f7a8b9c0d1, 65f1a2b3c4d5e6f7a8b9c0d2"
+                        className="font-mono text-xs"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Enter valid 24-character hex MongoDB ObjectIds separated by commas.
+                      </p>
+                    </div>
                   )}
 
                   {missingSelectedSlotCount > 0 && (
-                    <p className="text-xs text-amber-600">
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
                       {missingSelectedSlotCount} previously selected slot IDs are not in the current slot list and will still be saved.
                     </p>
                   )}
@@ -1513,16 +1774,33 @@ export default function TherapiesPage() {
                 <div className="flex gap-2 pt-2">
                   <Button
                     variant="outline"
+                    disabled={isPending || isGeneratingSlots}
                     onClick={() => {
-                      setIsDialogOpen(false)
-                      setEditingItem(null)
-                      resetForm()
+                      if (isTherapyFormDirty()) {
+                        setTherapyDiscardOpen(true)
+                      } else {
+                        handleCloseTherapyDialog()
+                      }
                     }}
                   >
                     Cancel
                   </Button>
-                  <Button onClick={handleSave} disabled={isPending}>
-                    {isPending ? 'Saving...' : editingItem ? 'Save Changes' : 'Create Therapy'}
+                  <Button onClick={handleSave} disabled={isPending || isGeneratingSlots}>
+                    {isPending ? (
+                      <span className="flex items-center gap-1.5">
+                        <IconLoader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </span>
+                    ) : isGeneratingSlots ? (
+                      <span className="flex items-center gap-1.5">
+                        <IconLoader2 className="h-4 w-4 animate-spin" />
+                        Generating Slots...
+                      </span>
+                    ) : editingItem ? (
+                      'Save Changes'
+                    ) : (
+                      'Create Therapy'
+                    )}
                   </Button>
                 </div>
               </div>
@@ -3191,6 +3469,35 @@ export default function TherapiesPage() {
       </Tabs>
 
       {/* Unsaved Changes Confirmation Modal */}
+      {/* Therapy Unsaved Changes Confirmation Modal */}
+      <Dialog open={therapyDiscardOpen} onOpenChange={setTherapyDiscardOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Discard Unsaved Changes?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to close? Any unsaved edits and newly generated slots will be lost.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setTherapyDiscardOpen(false)}
+            >
+              Keep Editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setTherapyDiscardOpen(false)
+                handleCloseTherapyDialog()
+              }}
+            >
+              Discard Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
