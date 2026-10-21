@@ -8,11 +8,14 @@ import {
 } from '@/lib/services/membership.service'
 import { useUsers } from '@/hooks/use-users'
 import { queryKeys } from '@/lib/query-keys'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { toast } from 'sonner'
 
 export function useMemberships() {
+  // FX-19 — key on the selected branch so the memberships list follows the picker.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.memberships.all(),
+    queryKey: scopedKey(queryKeys.memberships.all()),
     queryFn: membershipService.getAll,
     select: (data) => data.memberships,
   })

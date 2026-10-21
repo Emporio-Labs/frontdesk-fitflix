@@ -120,7 +120,7 @@ export function ActiveUsersGrid() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-24 w-full rounded-lg" />
             ))}
@@ -130,7 +130,7 @@ export function ActiveUsersGrid() {
             {isTrainer ? 'No members currently assigned to your roster' : 'No users assigned to workout plans yet'}
           </p>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {assignedEntries.map((entry) => (
               <div
                 key={entry.userId}

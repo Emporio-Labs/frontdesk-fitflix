@@ -85,6 +85,8 @@ export interface CreateGroupClassPayload {
   endDate?: string | null
   enrollmentOpensAt?: string | null
   enrollmentClosesAt?: string | null
+  /** The branch this class belongs to. Backend resolves via resolveLocationId. */
+  locationId?: string
 }
 
 export interface UpdateGroupClassPayload extends Partial<CreateGroupClassPayload> {}
@@ -224,6 +226,10 @@ export const groupClassService = {
       bookingWindowUnit: payload.bookingWindowUnit,
       bookingCloseValue: payload.bookingCloseValue,
       bookingCloseUnit: payload.bookingCloseUnit,
+      // Stamps the new class at the currently-selected branch. Backend falls
+      // back to the sole active location when this is omitted, which keeps
+      // single-branch clinics unchanged.
+      locationId: payload.locationId,
       ...eventFields(payload),
     })
     return {

@@ -1,11 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { slotService, CreateSlotPayload, UpdateSlotPayload } from '@/lib/services/slot.service'
 import { queryKeys } from '@/lib/query-keys'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { toast } from 'sonner'
 
 export function useSlots() {
+  // FX-19 — key on the selected branch so the slot list follows the header picker.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.slots.all(),
+    queryKey: scopedKey(queryKeys.slots.all()),
     queryFn: slotService.getAll,
     select: (data) => data.slots,
   })

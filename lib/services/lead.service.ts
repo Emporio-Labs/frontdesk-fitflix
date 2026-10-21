@@ -18,6 +18,7 @@ export interface LeadInteraction {
   note: string
   createdAt: string
   createdBy?: string
+  createdByName?: string
 }
 
 export interface LeadStageHistory {
@@ -39,6 +40,15 @@ export interface Lead {
   tags: string[]
   ownerId: string
   assignedStaffName: string
+  /** The branch this lead belongs to (FX-33.1). Empty when not stamped. */
+  locationId: string
+  /**
+   * FX-33.2 — the sales person / manager who claimed this lead. Empty
+   * `claimedById` means it sits unclaimed in the branch queue.
+   */
+  claimedById: string
+  claimedByName: string
+  claimedAt?: string
   createdAt: string
   updatedAt: string
   followUpDate?: string
@@ -97,6 +107,22 @@ export interface ConvertLeadPayload {
   gender: number
   healthGoals: string[]
   password: string
+}
+
+/**
+ * FX-34.4 — one row of the manager's team-performance view. Server-computed per
+ * staff member (keyed by who claimed the lead) and already branch-scoped.
+ */
+export interface TeamPerformanceMember {
+  staffId: string | null
+  staffName: string
+  openLeads: number
+  conversions: number
+  totalClaimed: number
+  /** Mean (claim → first call/whatsapp/email) in ms; null when never contacted. */
+  avgTimeToFirstContactMs: number | null
+  /** How many of this person's leads had a usable first-contact sample. */
+  firstContactSamples: number
 }
 
 export interface LeadRemindersResponse {
@@ -210,6 +236,14 @@ function normalizeLead(raw: any): Lead {
       ? convertedUser
       : String(convertedUser?._id || convertedUser?.id || '')
 
+  // claimedBy, like convertedUser, may arrive as an id string or a populated
+  // object depending on the endpoint. Take whichever shape came back.
+  const claimedBy = raw?.claimedBy
+  const claimedById =
+    typeof claimedBy === 'string'
+      ? claimedBy
+      : String(claimedBy?._id || claimedBy?.id || '')
+
   return {
     id: String(raw?._id || raw?.id || ''),
     name: String(raw?.leadName || raw?.name || ''),
@@ -221,8 +255,12 @@ function normalizeLead(raw: any): Lead {
     interestedIn: String(raw?.interestedIn || ''),
     temperature: heat,
     tags,
-    ownerId: String(raw?.ownerId || ''),
+    ownerId: String(raw?.ownerId || raw?.owner || ''),
     assignedStaffName: String(raw?.assignedStaffName || ''),
+    locationId: String(raw?.locationId || ''),
+    claimedById,
+    claimedByName: String(raw?.claimedByName || ''),
+    claimedAt: raw?.claimedAt ? String(raw.claimedAt) : undefined,
     createdAt: String(raw?.createdAt || ''),
     updatedAt: String(raw?.updatedAt || raw?.createdAt || ''),
     followUpDate: followUpSource ? String(followUpSource) : undefined,
@@ -237,7 +275,15 @@ function normalizeLead(raw: any): Lead {
           type: String(item?.type || 'note') as LeadInteraction['type'],
           note: String(item?.note || ''),
           createdAt: String(item?.createdAt || ''),
-          ...(item?.createdBy ? { createdBy: String(item.createdBy) } : {}),
+          ...(item?.createdBy
+            ? {
+                createdBy:
+                  typeof item.createdBy === 'string'
+                    ? item.createdBy
+                    : String(item.createdBy?._id || item.createdBy?.id || ''),
+              }
+            : {}),
+          ...(item?.createdByName ? { createdByName: String(item.createdByName) } : {}),
         }))
       : [],
     fcmTokens: Array.isArray(raw?.fcmTokens) ? raw.fcmTokens.map((t: unknown) => String(t)) : [],
@@ -494,6 +540,34 @@ export const leadService = {
   delete: async (id: string): Promise<{ message: string }> => {
     const { data } = await apiClient.delete(`/leads/${id}`)
     return { message: data?.message || 'Lead deleted successfully' }
+  },
+
+  claim: async (id: string): Promise<{ message: string; lead: Lead }> => {
+    const { data } = await apiClient.post(`/leads/${id}/claim`)
+    return {
+      message: data?.message || 'Lead claimed',
+      lead: normalizeLead(extractRawLead(data)),
+    }
+  },
+
+  /**
+   * FX-34.1/.3 — reassign a lead to another staff member, or (assigneeId null)
+   * release it back to the branch's unclaimed queue. The backend enforces who
+   * may do what (a sales caller may only release their own lead).
+   */
+  reassign: async (id: string, assigneeId: string | null): Promise<{ message: string; lead: Lead }> => {
+    const { data } = await apiClient.post(`/leads/${id}/reassign`, { assigneeId })
+    return {
+      message: data?.message || (assigneeId ? 'Lead reassigned' : 'Lead released to the queue'),
+      lead: normalizeLead(extractRawLead(data)),
+    }
+  },
+
+  // FX-34.4 — per-person performance for the branch manager's view.
+  getTeamPerformance: async (): Promise<{ members: TeamPerformanceMember[] }> => {
+    const { data } = await apiClient.get('/leads/team-performance')
+    const members = Array.isArray(data?.members) ? data.members : []
+    return { members: members as TeamPerformanceMember[] }
   },
 
   convert: async (id: string, payload: ConvertLeadPayload): Promise<{ message: string; lead?: Lead }> => {

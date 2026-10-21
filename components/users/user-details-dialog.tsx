@@ -30,9 +30,10 @@ import {
   IconBarbell,
   IconClipboardCheck,
 } from '@tabler/icons-react'
-import { useUser } from '@/hooks/use-users'
+import { useUser, useUserBcaMetrics } from '@/hooks/use-users'
 import { useTrainers, useAssignTrainerToUser } from '@/hooks/use-trainers'
-import { User } from '@/lib/services/user.service'
+import { User, BcaMetric, type OnboardingStep } from '@/lib/services/user.service'
+import { getMemberOnboardingStatus } from '@/lib/member-onboarding'
 import { Membership } from '@/lib/services/membership.service'
 import { StatusBadge } from '@/components/status-badge'
 import { computeBmi, getBmiCategory, toNumberSafe } from '@/lib/health-insights'
@@ -72,6 +73,7 @@ export function UserDetailsDialog({
 }: UserDetailsDialogProps) {
   const userId = initialUser?._id || ''
   const { data: fullUser, isLoading: userLoading } = useUser(userId)
+  const { data: bcaHistory } = useUserBcaMetrics(open ? userId : '')
   const { data: trainers = [] } = useTrainers()
   const assignTrainerMutation = useAssignTrainerToUser()
 
@@ -92,8 +94,12 @@ export function UserDetailsDialog({
       : trainers.find((t) => t._id === currentTrainerId)?.trainerName
 
   const markers = (u.healthMarkers || {}) as Record<string, any>
-  const heightVal = markers.height || markers.heightCm
-  const weightVal = markers.weight || markers.weightKg
+  const latestScan = (bcaHistory ?? []).reduce<BcaMetric | null>(
+    (latest, s) => (!latest || new Date(s.recordedAt) > new Date(latest.recordedAt) ? s : latest),
+    null,
+  )
+  const heightVal = markers.height || markers.heightCm || latestScan?.vitals.height_cm
+  const weightVal = markers.weight || markers.weightKg || latestScan?.vitals.weight_kg
   const heightDisplay = heightVal
     ? String(heightVal).toLowerCase().endsWith('cm')
       ? String(heightVal)
@@ -105,7 +111,7 @@ export function UserDetailsDialog({
       : `${weightVal} kg`
     : '—'
 
-  const bmiVal = markers.bmi || computeBmi(heightVal, weightVal)
+  const bmiVal = markers.bmi || latestScan?.vitals.bmi || computeBmi(heightVal, weightVal)
   const bmiNum = toNumberSafe(bmiVal)
   const bmiDisplay = bmiVal != null ? String(bmiVal) : '—'
   const bmiCategory = getBmiCategory(bmiNum)
@@ -128,6 +134,14 @@ export function UserDetailsDialog({
   }`
 
   const onboarding = u.onboardingStatus
+  const flagSteps = getMemberOnboardingStatus({
+    onboarding,
+    hasActiveMembership: !!membership,
+    hasTrainerAssigned: currentTrainerId !== 'none',
+  })
+  const completedStepKeys = flagSteps.steps
+    .filter((s) => s.status === 'complete')
+    .map((s) => s.key as OnboardingStep)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -277,17 +291,17 @@ export function UserDetailsDialog({
                   Onboarding Progress
                 </h4>
                 <div className="rounded-lg border bg-card p-4 space-y-2">
-                  <OnboardingTimeline
-                    currentStep={onboarding.currentStep}
-                    completedSteps={onboarding.completedSteps ?? []}
-                  />
+                  <OnboardingTimeline completedSteps={completedStepKeys} />
                   <p className="text-xs text-muted-foreground">
-                    Current step:{' '}
-                    <span className="font-medium text-foreground">
-                      {onboardingStepLabel(onboarding.currentStep)}
-                    </span>
-                    {' · '}
-                    {onboarding.completedSteps?.length ?? 0} of 7 completed
+                    {flagSteps.completedCount} of {flagSteps.steps.length} completed
+                    {flagSteps.pendingSteps[0] && (
+                      <>
+                        {' · '}Next:{' '}
+                        <span className="font-medium text-foreground">
+                          {onboardingStepLabel(flagSteps.pendingSteps[0].key)}
+                        </span>
+                      </>
+                    )}
                   </p>
                 </div>
               </div>

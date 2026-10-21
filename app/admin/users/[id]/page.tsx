@@ -45,6 +45,7 @@ import { useServices } from '@/hooks/use-services'
 import { useTherapies } from '@/hooks/use-therapies'
 import { useGroupClasses } from '@/hooks/use-group-classes'
 import { useSlots } from '@/hooks/use-slots'
+import { useLocations } from '@/hooks/use-locations'
 import { useOnboardingProfile } from '@/hooks/use-onboarding'
 import { normalizeHealthMarkers, normalizeProfile } from '@/lib/onboarding-normalize'
 import { BOOKING_STATUS, type BookingStatusValue } from '@/lib/services/booking.service'
@@ -237,6 +238,12 @@ export default function UserDetailPage() {
 
   const { data: user, isLoading, isError } = useUser(userId)
   const { data: rawProfile } = useOnboardingProfile(userId)
+  // FX-20.1 — resolve the member's home club name for display (multi-branch only).
+  const { data: locations = [] } = useLocations()
+  const homeClubLabel = useMemo(() => {
+    if (!user?.homeClubId) return null
+    return user.homeClubName || locations.find((l) => l._id === user.homeClubId)?.name || null
+  }, [user?.homeClubId, user?.homeClubName, locations])
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_DEBUG_AUTH === '1' && rawProfile) {
@@ -425,6 +432,13 @@ export default function UserDetailPage() {
                   <p className="text-sm text-gray-500">Updated</p>
                   <p className="font-medium">{user.updatedAt}</p>
                 </div>
+                {/* FX-20.1 — home club; shown only when the chain has >1 branch (FX-20.4). */}
+                {locations.length > 1 && (
+                  <div>
+                    <p className="text-sm text-gray-500">Home Club</p>
+                    <p className="font-medium">{homeClubLabel || 'Not set'}</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -645,6 +659,8 @@ export default function UserDetailPage() {
             open={reportsOpen}
             onOpenChange={setReportsOpen}
             reports={profile.reports}
+            userId={userId}
+            member={user || { id: userId, _id: userId }}
           />
         </>
       )}

@@ -172,6 +172,28 @@ export const personalTrainingService = {
     return res.data.booking
   },
 
+  // ASSUMPTION (FX-15): POST /api/v1/pt/admin/bookings/:id/no-show is UNVERIFIED.
+  // Backend endpoint tracked under FX-15 (club no-show rule, due 2026-09-29).
+  // Response is assumed to include `credits: { consumed, refunded, bypassed }` in the
+  // shape already used by booking.service / appointment.service so the UI can report
+  // what happened to the member's balance. The club no-show rule (forfeit vs partial
+  // refund vs grace) is applied server-side — the frontend must not compute any
+  // credit delta.
+  markNoShow: async (
+    bookingId: string,
+    data?: { reason?: string }
+  ): Promise<{
+    booking: UnifiedBookingDto
+    credits?: { consumed?: number; refunded?: number; bypassed?: boolean }
+    message?: string
+  }> => {
+    const res = await apiClient.post(
+      `/api/v1/pt/admin/bookings/${bookingId}/no-show`,
+      data || {}
+    )
+    return res.data
+  },
+
   // Trainer Change Requests
   getTrainerChangeRequests: async (): Promise<TrainerChangeRequestDto[]> => {
     const res = await apiClient.get('/api/v1/pt/admin/trainer-change-requests')

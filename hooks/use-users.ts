@@ -8,6 +8,7 @@ import {
   ChangePasswordPayload,
 } from '@/lib/services/user.service'
 import { queryKeys } from '@/lib/query-keys'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { toast } from 'sonner'
 
 function extractApiError(err: any, fallback: string): string {
@@ -18,8 +19,11 @@ function extractApiError(err: any, fallback: string): string {
 }
 
 export function useUsers() {
+  // FX-19 — key on the selected branch so the members list (and the dashboard's
+  // member count, which derives from it) follows the header picker.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.users.all(),
+    queryKey: scopedKey(queryKeys.users.all()),
     queryFn: userService.getAll,
     select: (data) => data.users,
     staleTime: 0, // user list must always be fresh (memberships, roles can change)

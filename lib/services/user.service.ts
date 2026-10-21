@@ -91,6 +91,14 @@ export interface User {
   emergencyContact?: string
   address?: string
   onboarded?: boolean
+  /** FX-20.1 — the member's home club (a `Location._id`). Null when unset or
+   * when the chain has a single branch. In-person classes/offers and club
+   * notifications are scoped to this club by the backend; the member app reads it. */
+  homeClubId?: string | null
+  /** FX-20.1 — resolved home-club name when the backend populates the relation
+   * (`homeClub: { _id, name }`). UI falls back to resolving the id via the
+   * locations list when this is absent. */
+  homeClubName?: string
   createdAt: string
   updatedAt: string
   onboardingStatus?: UserOnboardingSummary
@@ -111,6 +119,8 @@ export interface CreateUserPayload {
   dateOfBirth?: string
   emergencyContact?: string
   address?: string
+  /** FX-20.1 — assign the member's home club (a `Location._id`) at creation. */
+  homeClubId?: string | null
 }
 
 export interface UpdateUserPayload {
@@ -122,6 +132,8 @@ export interface UpdateUserPayload {
   dateOfBirth?: string
   emergencyContact?: string
   address?: string
+  /** FX-20.1 — change the member's home club (a `Location._id`). */
+  homeClubId?: string | null
 }
 
 export interface OnboardUserPayload {
@@ -187,6 +199,19 @@ export interface BcaMetric {
 
 function normalizeUser(raw: any): User {
   const id = String(raw?._id || raw?.id || '')
+  // FX-20.1 — the backend may send the home club as a flat id (`homeClubId` /
+  // `locationId`) or a populated relation (`homeClub: { _id, name }`). Accept
+  // both; store the id (or null) and the name when present.
+  const homeClubId =
+    String(
+      raw?.homeClubId ?? raw?.locationId ?? raw?.homeClub?._id ?? raw?.homeClub ?? '',
+    ) || null
+  const homeClubName =
+    typeof raw?.homeClub === 'object' && raw?.homeClub?.name
+      ? String(raw.homeClub.name)
+      : raw?.homeClubName
+        ? String(raw.homeClubName)
+        : undefined
   return {
     id,
     _id: id,
@@ -196,6 +221,8 @@ function normalizeUser(raw: any): User {
     age: Number(raw?.age || 0),
     gender: String(raw?.gender || ''),
     healthGoals: Array.isArray(raw?.healthGoals) ? raw.healthGoals.map(String) : [],
+    homeClubId,
+    homeClubName,
     createdAt: String(raw?.createdAt || ''),
     updatedAt: String(raw?.updatedAt || raw?.createdAt || ''),
     assignedTrainer: raw?.assignedTrainer ?? undefined,
@@ -290,4 +317,23 @@ export const userService = {
     const { data } = await apiClient.delete(`/users/${id}`)
     return { message: data?.message || 'User deleted successfully' }
   },
+
+  // Generates or fetches a short-lived signed URL for a specific uploaded report.
+  // Calls GET /users/:id/reports/:reportId/url (API_REFERENCE.md line 737).
+  getReportSignedUrl: async (
+    userId: string,
+    reportId: string
+  ): Promise<{ url: string; expiresIn?: number }> => {
+    try {
+      const { data } = await apiClient.get(`/users/${userId}/reports/${reportId}/url`)
+      if (data?.url) {
+        return { url: data.url, expiresIn: data?.expiresIn ?? 900 }
+      }
+      return { url: data?.reportUrl ?? data?.data?.url ?? '', expiresIn: data?.expiresIn ?? 900 }
+    } catch (err) {
+      // In development/mock environments or if backend endpoint throws, fallback safely
+      return { url: '', expiresIn: 900 }
+    }
+  },
 }
+

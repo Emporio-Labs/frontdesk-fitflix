@@ -61,6 +61,8 @@ export interface CreateSlotPayload {
   isDaily?: boolean
   capacity?: number
   isBooked?: boolean
+  /** The branch this slot belongs to. Backend resolves via resolveLocationId. */
+  locationId?: string
 }
 
 export interface UpdateSlotPayload {

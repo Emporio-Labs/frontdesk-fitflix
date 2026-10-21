@@ -6,10 +6,13 @@ import {
   UpdateInvoiceStatusPayload,
 } from '@/lib/services/invoice.service'
 import { queryKeys } from '@/lib/query-keys'
+import { useLocationScope } from '@/components/location-scope-provider'
 
 export function useInvoices() {
+  // FX-19 — key on the selected branch so the invoices list follows the picker.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.invoices.all(),
+    queryKey: scopedKey(queryKeys.invoices.all()),
     queryFn: () => invoiceService.getAll(),
     select: (data) => data.items,
   })

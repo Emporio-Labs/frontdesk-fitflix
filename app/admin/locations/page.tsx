@@ -9,6 +9,8 @@ import {
   IconPlus,
   IconSettings,
 } from '@tabler/icons-react'
+import { useAuth } from '@/hooks/use-auth'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -71,6 +73,20 @@ const emptyForm = {
 type FormState = typeof emptyForm
 
 export default function LocationsPage() {
+  const { user } = useAuth()
+  const isBranchRestricted = Boolean(
+    user &&
+    user.role !== 'super_admin' &&
+    !user.allBranches &&
+    (user.scope === 'branch' || (Array.isArray(user.branchIds) && user.branchIds.length > 0))
+  )
+  const assignedBranchIds = Array.isArray(user?.branchIds) ? user.branchIds.map(String) : []
+
+  const canAlterLocation = (locId: string) => {
+    if (!isBranchRestricted) return true
+    return assignedBranchIds.includes(String(locId))
+  }
+
   const { data: locations, isLoading } = useLocations(true)
   const createLocation = useCreateLocation()
   const updateLocation = useUpdateLocation()
@@ -82,12 +98,20 @@ export default function LocationsPage() {
   const [settingsFor, setSettingsFor] = useState<Location | null>(null)
 
   const openCreate = () => {
+    if (isBranchRestricted) {
+      toast.error('You cannot add new branches as an assigned branch staff member.')
+      return
+    }
     setEditing(null)
     setForm(emptyForm)
     setFormOpen(true)
   }
 
   const openEdit = (location: Location) => {
+    if (!canAlterLocation(location._id)) {
+      toast.error('You can only edit your assigned branch.')
+      return
+    }
     setEditing(location)
     setForm({
       name: location.name,
@@ -137,10 +161,12 @@ export default function LocationsPage() {
             Branches, their operating policy, and per-location settings.
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <IconPlus className="size-4" />
-          Add branch
-        </Button>
+        {!isBranchRestricted && (
+          <Button onClick={openCreate}>
+            <IconPlus className="size-4" />
+            Add branch
+          </Button>
+        )}
       </div>
 
       {activeCount === 1 && (
@@ -214,7 +240,16 @@ export default function LocationsPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => setSettingsFor(location)}
+                            onClick={() => {
+                              if (!canAlterLocation(location._id)) {
+                                toast.error('You can only view settings for your assigned branch.')
+                                return
+                              }
+                              setSettingsFor(location)
+                            }}
+                            disabled={!canAlterLocation(location._id)}
+                            title={canAlterLocation(location._id) ? "Settings" : "Assigned to another branch"}
+                            className="disabled:opacity-30"
                           >
                             <IconSettings className="size-4" />
                           </Button>
@@ -222,6 +257,9 @@ export default function LocationsPage() {
                             size="sm"
                             variant="ghost"
                             onClick={() => openEdit(location)}
+                            disabled={!canAlterLocation(location._id)}
+                            title={canAlterLocation(location._id) ? "Edit branch" : "Assigned to another branch"}
+                            className="disabled:opacity-30"
                           >
                             <IconEdit className="size-4" />
                           </Button>
@@ -229,10 +267,16 @@ export default function LocationsPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() =>
+                              onClick={() => {
+                                if (!canAlterLocation(location._id)) {
+                                  toast.error('You can only deactivate your assigned branch.')
+                                  return
+                                }
                                 deactivateLocation.mutate(location._id)
-                              }
-                              disabled={deactivateLocation.isPending}
+                              }}
+                              disabled={deactivateLocation.isPending || !canAlterLocation(location._id)}
+                              title={canAlterLocation(location._id) ? "Deactivate branch" : "Assigned to another branch"}
+                              className="disabled:opacity-30"
                             >
                               Deactivate
                             </Button>

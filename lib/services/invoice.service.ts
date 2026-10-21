@@ -48,6 +48,8 @@ export interface CreateInvoicePayload {
   items: InvoiceItem[]
   discount?: number
   tax?: number
+  /** The branch this invoice is issued at. Backend resolves via resolveLocationId. */
+  locationId?: string
 }
 
 export interface UpdateInvoiceStatusPayload {

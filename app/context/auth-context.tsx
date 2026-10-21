@@ -3,6 +3,12 @@
 import React, { createContext, useState, ReactNode, useEffect } from 'react'
 import { UserRole } from '@/lib/rbac'
 import { storeCredentials, clearCredentials, clearToken, getStoredCredentials, getStoredToken } from '@/lib/api-client'
+import { getRoleStartPage } from '@/lib/role-workspaces'
+
+// Re-exported from the shared role-workspaces module (the single source of truth
+// for role→start-page) so existing importers (app/page.tsx, app-sidebar.tsx)
+// keep working without change.
+export { getRoleStartPage }
 
 // Helpers for auth cookie (read by Next.js middleware for route protection).
 // Note: this is a presence-only indicator cookie, NOT the auth token.
@@ -34,6 +40,13 @@ export interface AuthContextType {
     name: string
     email: string
     role: UserRole
+    // FX-18 — the signed-in staffer's branch scope, used to restrict the branch
+    // switcher. `scope: 'branch'` / `allBranches: false` means "only branchIds";
+    // a global admin is `scope: 'global'` / `allBranches: true`. Absent for
+    // members and legacy sessions (treated as unrestricted).
+    branchIds?: string[]
+    allBranches?: boolean
+    scope?: 'global' | 'branch'
   } | null
   isAuthenticated: boolean
   setRole: (role: UserRole) => void
@@ -56,12 +69,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if ((stored || token) && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser)
+        const validRoles: UserRole[] = [
+          'super_admin',
+          'clinic_admin',
+          'manager',
+          'staff',
+          'clinician',
+          'sales',
+          'trainer',
+          'nutritionist',
+          'sports_scientist',
+          'unassigned',
+        ]
+        if (!validRoles.includes(parsedUser.role)) {
+          clearCredentials()
+          clearToken()
+          clearAuthCookie()
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('hh_user')
+            localStorage.removeItem('hh_token')
+            localStorage.removeItem('hh_refresh_token')
+          }
+          setUser(null)
+          return
+        }
         setUser(parsedUser)
         setRole(parsedUser.role)
         // Reinstate auth cookie so middleware allows access on refresh
         setAuthCookie(parsedUser.role)
       } catch (_) {
         clearCredentials()
+        clearToken()
         clearAuthCookie()
       }
     } else {
@@ -86,9 +124,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(userData)
     setRole(userData?.role ?? 'clinic_admin')
-    // Hard redirect — ensures middleware sees the new cookie immediately
+    // Hard redirect — ensures middleware sees the new cookie immediately.
+    // Start page comes from the shared role map; trainer/nutritionist keep their
+    // existing deep landing pages (hub roots would just bounce once in middleware).
     if (typeof window !== 'undefined') {
-      const target = userData?.role === 'trainer' ? '/admin/personal-training' : '/dashboard'
+      let target = getRoleStartPage(userData?.role)
+      if (userData?.role === 'trainer') target = '/admin/personal-training/today'
+      else if (userData?.role === 'nutritionist') target = '/admin/nutrition/my-clients'
       window.location.href = target
     }
   }

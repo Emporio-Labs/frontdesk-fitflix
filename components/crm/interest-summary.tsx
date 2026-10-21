@@ -80,6 +80,9 @@ export function InterestSummary({ userId }: { userId?: string | null }) {
   if (data.mtmJoins > 0) {
     signals.push(`Joined the live session ${data.mtmJoins}×`)
   }
+  if (data.screensViewed && data.screensViewed.length > 0) {
+    signals.push(`Screens visited: ${data.screensViewed.join(', ')}`)
+  }
 
   return (
     <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">

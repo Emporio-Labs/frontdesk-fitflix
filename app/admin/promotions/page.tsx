@@ -9,6 +9,7 @@ import {
   IconPlus,
   IconTrash,
 } from '@tabler/icons-react'
+import { toast } from 'sonner'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -166,9 +167,15 @@ const emptyForm = {
 type FormState = typeof emptyForm
 
 export default function PromotionsPage() {
-  const { locations, selectedLocation } = useLocationScope()
+  const { locations, selectedLocation, isBranchRestricted, assignedBranchIds, selectedLocationId } = useLocationScope()
   // Staff view: the whole list, including promos that are off or out of window.
   const { data: promotions, isLoading } = usePromotions(true)
+
+  const canAlterPromotion = (promo: Promotion) => {
+    if (!isBranchRestricted) return true
+    if (!promo.locationId) return false // Company-wide promotions cannot be altered by branch-scoped staff
+    return assignedBranchIds.includes(String(promo.locationId))
+  }
   // Target options, so an admin picks a class instead of pasting a UUID.
   const { data: classes, isLoading: classesLoading } = useGroupClasses()
   const { data: therapies, isLoading: therapiesLoading } = useTherapies()
@@ -218,16 +225,21 @@ export default function PromotionsPage() {
   const openCreate = () => {
     setEditing(null)
     setError(null)
+    const defaultLoc = isBranchRestricted && assignedBranchIds.length > 0
+      ? (selectedLocationId || assignedBranchIds[0])
+      : (selectedLocation?._id ?? 'all')
     setForm({
       ...emptyForm,
-      // Default a new promo to the branch being viewed, so a scoped admin
-      // doesn't accidentally publish company-wide.
-      locationId: selectedLocation?._id ?? 'all',
+      locationId: defaultLoc,
     })
     setFormOpen(true)
   }
 
   const openEdit = (promotion: Promotion) => {
+    if (!canAlterPromotion(promotion)) {
+      toast.error('You can only alter promotions in your assigned branch.')
+      return
+    }
     setEditing(promotion)
     setError(null)
     setForm({
@@ -270,6 +282,11 @@ export default function PromotionsPage() {
     if (!form.activeFrom || !form.activeTo) return 'Both window dates are required'
     if (new Date(form.activeTo) <= new Date(form.activeFrom)) {
       return 'The window must end after it starts'
+    }
+    if (isBranchRestricted) {
+      if (form.locationId === 'all' || !assignedBranchIds.includes(form.locationId)) {
+        return 'You can only create or alter promotions for your assigned branch'
+      }
     }
     return null
   }
@@ -499,13 +516,25 @@ export default function PromotionsPage() {
                               size="sm"
                               variant="ghost"
                               onClick={() => openEdit(promotion)}
+                              disabled={!canAlterPromotion(promotion)}
+                              title={canAlterPromotion(promotion) ? "Edit promotion" : "Cannot edit promotion from another branch"}
+                              className="disabled:opacity-30"
                             >
                               <IconEdit className="size-4" />
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => setDeleting(promotion)}
+                              onClick={() => {
+                                if (!canAlterPromotion(promotion)) {
+                                  toast.error('You can only delete promotions in your assigned branch.')
+                                  return
+                                }
+                                setDeleting(promotion)
+                              }}
+                              disabled={!canAlterPromotion(promotion)}
+                              title={canAlterPromotion(promotion) ? "Delete promotion" : "Cannot delete promotion from another branch"}
+                              className="disabled:opacity-30"
                             >
                               <IconTrash className="size-4" />
                             </Button>
@@ -782,22 +811,28 @@ export default function PromotionsPage() {
               </div>
               <div className="grid gap-2">
                 <Label>Branch</Label>
-                <Select
-                  value={form.locationId}
-                  onValueChange={(v) => set('locationId', v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All branches</SelectItem>
-                    {locations.map((l) => (
-                      <SelectItem key={l._id} value={l._id}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isBranchRestricted && assignedBranchIds.length <= 1 ? (
+                  <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                    {locations[0]?.name || selectedLocation?.name || 'Assigned Branch'}
+                  </div>
+                ) : (
+                  <Select
+                    value={form.locationId}
+                    onValueChange={(v) => set('locationId', v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!isBranchRestricted && <SelectItem value="all">All branches</SelectItem>}
+                      {locations.map((l) => (
+                        <SelectItem key={l._id} value={l._id}>
+                          {l.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
 

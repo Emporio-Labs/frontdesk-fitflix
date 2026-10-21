@@ -198,3 +198,38 @@ the manual-useState dialogs elsewhere are unchanged.
 view) is unrelated and untouched. This module is `app/admin/nutrition/`.
 
 > **Assumptions to verify (correct `nutrition.service.ts` + `lib/types/nutrition.ts` only — hooks/pages stay stable):** All `/nutrition/*` paths and response/field shapes are inferred from the backend domain models (the module is not yet in `api_docs.md`). Each block in `nutrition.service.ts` carries an `ASSUMPTION` comment. List endpoints assumed to return `{ items: [...] }`; mutations `{ message, <entity> }`. `GET /nutrition/me/plan` assumed for the member's active plan; `userId` passed as a query param for plans/hydration/adherence/progress. PDF (`GET /nutrition/plans/:id/pdf`) is a **deferred** seam — UI renders a disabled "Export PDF" button.
+
+---
+
+## Analytics module (added)
+
+FX-27 — an **Analytics** page (`/admin/analytics`) showing the **sign-up** and
+**booking funnels** for the branch the console has selected. Admin-only. The funnel
+numbers come from a separate **analytics service** whose secret key stays
+server-side. Full write-up: `docs/fx-27-branch-analytics.md`.
+
+**Key architectural point (FX-27.3):** the browser never talks to the analytics
+service directly. It calls a **same-origin Next.js route** (`/api/analytics/*`) that
+attaches the secret from `ANALYTICS_API_KEY` — a **server-only** env var (no
+`NEXT_PUBLIC_` prefix, so Next never inlines it into a client bundle). This is the
+reverse-proxy pattern from `app/api/leads/*`, plus secret-key injection. The user's
+own bearer token is forwarded upstream so the analytics service enforces branch
+access (FX-27.2) — RBAC here stays resource/action only.
+
+**Files added:**
+- `lib/services/analytics.service.ts` — `analyticsService.getFunnels({ locationId, from, to })` hitting the same-origin `/api/analytics/funnels`. Uses its **own axios instance** (not `apiClient`, which points at the backend) that attaches the bearer token. Tolerant `normalizeFunnels` → empty funnels on shape mismatch. Carries `ASSUMPTION` comments.
+- `hooks/use-analytics.ts` — `useAnalyticsFunnels(range, enabled)`. Folds the active branch into the query key via `scopedKey` (per [[branch-separation-architecture]]).
+- `app/api/analytics/proxy.ts` — server-side gateway: reads `ANALYTICS_API_URL` / `ANALYTICS_API_KEY`, attaches `X-Analytics-Key`, forwards `Authorization` + `X-Location-Id`. Returns `{ configured: false }` empty payload when unset so the page degrades gracefully.
+- `app/api/analytics/funnels/route.ts` — `GET` → `proxyAnalyticsRequest(req, '/funnels')` (`dynamic = 'force-dynamic'`, `revalidate = 0`).
+- `components/analytics/funnel-card.tsx` — presentational funnel (per-step bar, step-to-step conversion, drop-off, overall conversion). No new deps.
+- `app/admin/analytics/page.tsx` — the page: date-range selector (7/30/90d), loading/error/not-connected/empty states, page-level `useCanAccess('analytics','read')` lock.
+- `docs/fx-27-branch-analytics.md`.
+
+**Files extended:**
+- `lib/rbac.ts` — new `analytics` resource, `read` for **super_admin / clinic_admin / manager**.
+- `lib/query-keys.ts` — `analytics.funnels(range)` (folded through `scopedKey`).
+- `components/app-sidebar.tsx` — "Analytics" (`IconChartFunnel`) in the Insights group of **navGroups** and **navManagerGroup** only.
+- `lib/role-workspaces.ts` — `/admin/analytics` added to the `manager` allow-list (super_admin/clinic_admin are unrestricted; all other roles stay blocked).
+- `.env` / `.env.example` — `ANALYTICS_API_URL`, `ANALYTICS_API_KEY` (server-only).
+
+> **Assumption to verify:** the analytics service contract (`GET /funnels`, headers, response shape) is inferred — the service is not in `api_docs.md`. See `docs/fx-27-branch-analytics.md` and `BACKEND_REQUIREMENTS.txt`. The service must refuse an all-branches read for non-super-admins and refuse out-of-scope `locationId`s.

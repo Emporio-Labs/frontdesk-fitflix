@@ -6,11 +6,16 @@ import {
   BookingStatusValue,
 } from '@/lib/services/booking.service'
 import { queryKeys } from '@/lib/query-keys'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { toast } from 'sonner'
 
 export function useBookings() {
+  // FX-19 — fold the selected branch into the key so switching branch refetches
+  // (the X-Location-Id header scopes the response) and never serves the previous
+  // branch's rows from cache.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.bookings.all(),
+    queryKey: scopedKey(queryKeys.bookings.all()),
     queryFn: bookingService.getAll,
     select: (data) => data.bookings,
   })

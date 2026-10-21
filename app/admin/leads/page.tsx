@@ -95,7 +95,7 @@ function clearLeadDraft() {
 import {
   IconPlus, IconEdit, IconTrash, IconCheck, IconFileInvoice,
   IconFlame, IconUserPlus, IconAlertTriangle, IconPhone, IconUserCheck, IconFilter,
-  IconBellRinging, IconBrandWhatsapp, IconArrowRight, IconClock,
+  IconBellRinging, IconBrandWhatsapp, IconArrowRight, IconClock, IconHandGrab, IconUserOff,
 } from '@tabler/icons-react'
 import { CreateInvoiceSheet } from '@/components/invoices/create-invoice-sheet'
 import { useUsers } from '@/hooks/use-users'
@@ -111,6 +111,7 @@ import {
 import { InterestSummary } from '@/components/crm/interest-summary'
 import {
   useAddLeadInteraction,
+  useClaimLead,
   useConvertLead,
   useCreateLead,
   useDeleteLead,
@@ -118,9 +119,13 @@ import {
   useLeadDigest,
   useLeadReminders,
   useLeads,
+  useLeadTeamPerformance,
+  useReassignLead,
   useRecordLeadContactAttempt,
   useUpdateLead,
 } from '@/hooks/use-leads'
+import { useAdmins } from '@/hooks/use-admins'
+import { useAuth, useCanAccess } from '@/hooks/use-auth'
 import { Lead, LeadStatus, LeadTemperature } from '@/lib/services/lead.service'
 import { validateEmail, validatePhoneNumber } from '@/lib/schemas'
 import KanbanColumn from './kanban-column'
@@ -135,6 +140,7 @@ export default function LeadsPage() {
   const [invoicingLead, setInvoicingLead] = useState<Lead | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('')
+  const [queueView, setQueueView] = useState<'all' | 'unclaimed' | 'mine'>('all')
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
 
   const {
@@ -152,6 +158,17 @@ export default function LeadsPage() {
   const convertLead = useConvertLead()
   const addInteraction = useAddLeadInteraction()
   const contactAttempt = useRecordLeadContactAttempt()
+  const claimLead = useClaimLead()
+  const reassignLead = useReassignLead()
+  const { user, role } = useAuth()
+  const canClaimLeads = useCanAccess('leads', 'update')
+  // FX-34.1/.3 — only a manager (or an admin role) may reassign to anyone or
+  // release any lead; a plain sales/staff owner can only release their own.
+  const canReassignLeads = role === 'manager' || role === 'clinic_admin' || role === 'super_admin'
+  const { data: branchAdmins = [] } = useAdmins({ enabled: canReassignLeads })
+  const { data: teamPerformance = [], isLoading: teamPerformanceLoading } = useLeadTeamPerformance({
+    enabled: canReassignLeads,
+  })
   const { data: users = [] } = useUsers()
   const { data: renewals, isLoading: renewalsLoading } = useRenewalReminders()
 
@@ -254,9 +271,16 @@ export default function LeadsPage() {
         (l.email && l.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (l.phone && l.phone.toLowerCase().includes(searchTerm.toLowerCase()))
       const matchesStatus = !filterStatus || l.status === filterStatus
-      return matchesSearch && matchesStatus
+      // FX-33.4 — queue view: unclaimed queue vs. the leads I've claimed.
+      const matchesQueue =
+        queueView === 'all'
+          ? true
+          : queueView === 'unclaimed'
+            ? !l.claimedById
+            : l.claimedById === user?.id
+      return matchesSearch && matchesStatus && matchesQueue
     })
-  }, [leads, searchTerm, filterStatus])
+  }, [leads, searchTerm, filterStatus, queueView, user?.id])
 
   const statusToHeat: Record<LeadStatus, LeadTemperature> = {
     new: 'cold',
@@ -588,6 +612,33 @@ export default function LeadsPage() {
     }
   }
 
+  const handleClaimLead = (lead: Lead) => {
+    claimLead.mutate(lead.id)
+  }
+
+  // FX-34.1 — staff a manager can reassign a lead to: active sales people and
+  // managers. The backend still enforces that the assignee works at the lead's
+  // branch, so a cross-branch pick is refused with a clear message.
+  const staffOptions = useMemo(
+    () =>
+      branchAdmins
+        .filter(
+          (a) =>
+            (a.staffRole === 'sales' || a.staffRole === 'manager') &&
+            a.status !== 'disabled'
+        )
+        .map((a) => ({ id: a.id, name: a.adminName })),
+    [branchAdmins]
+  )
+
+  const handleReassignLead = (lead: Lead, assigneeId: string | null) => {
+    reassignLead.mutate({ id: lead.id, assigneeId })
+  }
+
+  // FX-34.3 — a non-manager may release only a lead they currently hold.
+  const canReleaseOwnLead = (lead: Lead) =>
+    !canReassignLeads && !!user?.id && lead.claimedById === user.id
+
   const handleQuickAddNote = async (lead: Lead) => {
     const note = typeof window !== 'undefined' ? window.prompt(`Add a note for ${lead.name}`) : ''
     if (!note || !note.trim()) return
@@ -615,7 +666,9 @@ export default function LeadsPage() {
     deleteLead.isPending ||
     convertLead.isPending ||
     addInteraction.isPending ||
-    contactAttempt.isPending
+    contactAttempt.isPending ||
+    claimLead.isPending ||
+    reassignLead.isPending
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -679,6 +732,19 @@ export default function LeadsPage() {
   }
 
   const isFollowUpToday = (lead: Lead) => todayFollowUps.some((item) => item.id === lead.id)
+
+  // FX-34.4 — compact "time to first contact" display (e.g. "2h 15m", "3d 4h").
+  const formatDuration = (ms: number | null) => {
+    if (ms == null || !Number.isFinite(ms) || ms < 0) return '—'
+    const totalMinutes = Math.round(ms / 60000)
+    if (totalMinutes < 60) return `${totalMinutes}m`
+    const totalHours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+    if (totalHours < 24) return minutes ? `${totalHours}h ${minutes}m` : `${totalHours}h`
+    const days = Math.floor(totalHours / 24)
+    const hours = totalHours % 24
+    return hours ? `${days}d ${hours}h` : `${days}d`
+  }
 
   const renewalDayLabel = (days: number) => {
     if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago`
@@ -1064,6 +1130,8 @@ export default function LeadsPage() {
           <TabsTrigger value="reminders">Reminders</TabsTrigger>
           <TabsTrigger value="renewals">Renewals</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          {/* FX-34.4 — per-person performance, managers/admins only. */}
+          {canReassignLeads && <TabsTrigger value="team">Team</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="board" className="space-y-4">
@@ -1267,6 +1335,17 @@ export default function LeadsPage() {
               <option value="converted">Converted</option>
               <option value="lost">Lost</option>
             </select>
+            {/* FX-33.4 — branch queue views */}
+            <select
+              value={queueView}
+              onChange={(e) => setQueueView(e.target.value as 'all' | 'unclaimed' | 'mine')}
+              className="px-3 py-2 border rounded-md"
+              title="Filter by claim ownership"
+            >
+              <option value="all">All leads</option>
+              <option value="unclaimed">Unclaimed queue</option>
+              <option value="mine">My leads</option>
+            </select>
           </div>
 
           {/* Kanban Board */}
@@ -1297,6 +1376,12 @@ export default function LeadsPage() {
                     onCall={() => handleQuickCall(lead)}
                     onWhatsApp={() => handleQuickWhatsApp(lead)}
                     onAddNote={() => handleQuickAddNote(lead)}
+                    onClaim={() => handleClaimLead(lead)}
+                    canClaim={canClaimLeads && lead.status !== 'converted'}
+                    onReassign={(assigneeId) => handleReassignLead(lead, assigneeId)}
+                    canReassign={canReassignLeads}
+                    canRelease={canReleaseOwnLead(lead)}
+                    staffOptions={staffOptions}
                     isPending={isPending}
                     source={lead.source}
                     isFollowUpToday={isFollowUpToday(lead)}
@@ -1322,6 +1407,12 @@ export default function LeadsPage() {
                     onCall={() => handleQuickCall(lead)}
                     onWhatsApp={() => handleQuickWhatsApp(lead)}
                     onAddNote={() => handleQuickAddNote(lead)}
+                    onClaim={() => handleClaimLead(lead)}
+                    canClaim={canClaimLeads && lead.status !== 'converted'}
+                    onReassign={(assigneeId) => handleReassignLead(lead, assigneeId)}
+                    canReassign={canReassignLeads}
+                    canRelease={canReleaseOwnLead(lead)}
+                    staffOptions={staffOptions}
                     isPending={isPending}
                     source={lead.source}
                     isFollowUpToday={isFollowUpToday(lead)}
@@ -1347,6 +1438,12 @@ export default function LeadsPage() {
                     onCall={() => handleQuickCall(lead)}
                     onWhatsApp={() => handleQuickWhatsApp(lead)}
                     onAddNote={() => handleQuickAddNote(lead)}
+                    onClaim={() => handleClaimLead(lead)}
+                    canClaim={canClaimLeads && lead.status !== 'converted'}
+                    onReassign={(assigneeId) => handleReassignLead(lead, assigneeId)}
+                    canReassign={canReassignLeads}
+                    canRelease={canReleaseOwnLead(lead)}
+                    staffOptions={staffOptions}
                     isPending={isPending}
                     source={lead.source}
                     isFollowUpToday={isFollowUpToday(lead)}
@@ -1372,6 +1469,12 @@ export default function LeadsPage() {
                     onCall={() => handleQuickCall(lead)}
                     onWhatsApp={() => handleQuickWhatsApp(lead)}
                     onAddNote={() => handleQuickAddNote(lead)}
+                    onClaim={() => handleClaimLead(lead)}
+                    canClaim={canClaimLeads && lead.status !== 'converted'}
+                    onReassign={(assigneeId) => handleReassignLead(lead, assigneeId)}
+                    canReassign={canReassignLeads}
+                    canRelease={canReleaseOwnLead(lead)}
+                    staffOptions={staffOptions}
                     isPending={isPending}
                     source={lead.source}
                     isFollowUpToday={isFollowUpToday(lead)}
@@ -1441,7 +1544,18 @@ export default function LeadsPage() {
                         <TableCell className="font-medium">{lead.name}</TableCell>
                         <TableCell className="hidden lg:table-cell">{lead.email}</TableCell>
                         <TableCell>{lead.phone}</TableCell>
-                        <TableCell className="hidden lg:table-cell">{lead.assignedStaffName || '-'}</TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {lead.claimedById ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-700">
+                              <IconUserCheck className="w-3.5 h-3.5" />
+                              {lead.claimedByName || lead.assignedStaffName || 'Claimed'}
+                            </span>
+                          ) : lead.assignedStaffName ? (
+                            lead.assignedStaffName
+                          ) : (
+                            <Badge className="bg-amber-100 text-amber-800">Unclaimed</Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           <Badge className={getSourceColor(lead.source)}>
                             {lead.source.replace('-', ' ')}
@@ -1461,6 +1575,33 @@ export default function LeadsPage() {
                         <TableCell className="hidden md:table-cell">{formatDateOnly(lead.followUpDate)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            {!lead.claimedById && canClaimLeads && lead.status !== 'converted' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                                onClick={() => handleClaimLead(lead)}
+                                disabled={isPending}
+                                title="Claim this lead"
+                              >
+                                <IconHandGrab className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {/* FX-34.1/.3 — release a claimed lead back to the queue. */}
+                            {lead.claimedById &&
+                              lead.status !== 'converted' &&
+                              (canReassignLeads || canReleaseOwnLead(lead)) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                                  onClick={() => handleReassignLead(lead, null)}
+                                  disabled={isPending}
+                                  title="Release to the unclaimed queue"
+                                >
+                                  <IconUserOff className="w-4 h-4" />
+                                </Button>
+                              )}
                             <Button
                               size="sm"
                               variant="outline"
@@ -1907,6 +2048,68 @@ export default function LeadsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── FX-34.4 — Team performance (managers/admins) ─────────────────── */}
+        {canReassignLeads && (
+          <TabsContent value="team" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <IconUserCheck className="w-4 h-4" />
+                  Team Performance
+                </CardTitle>
+                <CardDescription>
+                  Open leads, conversions and average time to first contact per person at your branch.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {teamPerformanceLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : teamPerformance.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No claimed leads yet — once staff start working the queue, their numbers show here.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table className="whitespace-nowrap">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Staff</TableHead>
+                          <TableHead className="text-right">Open Leads</TableHead>
+                          <TableHead className="text-right">Conversions</TableHead>
+                          <TableHead className="text-right">Total Claimed</TableHead>
+                          <TableHead className="text-right">Avg. Time to First Contact</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {teamPerformance.map((member) => (
+                          <TableRow key={member.staffId || member.staffName}>
+                            <TableCell className="font-medium">{member.staffName}</TableCell>
+                            <TableCell className="text-right">{member.openLeads}</TableCell>
+                            <TableCell className="text-right text-emerald-700">{member.conversions}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">{member.totalClaimed}</TableCell>
+                            <TableCell className="text-right">
+                              {formatDuration(member.avgTimeToFirstContactMs)}
+                              {member.firstContactSamples > 0 && (
+                                <span className="ml-1 text-xs text-muted-foreground">
+                                  ({member.firstContactSamples})
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
             {/* Convert Lead Dialog */}

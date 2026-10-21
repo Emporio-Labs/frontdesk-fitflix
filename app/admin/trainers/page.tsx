@@ -25,7 +25,9 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { IconPlus, IconEdit, IconTrash, IconRefresh, IconEye, IconEyeOff } from '@tabler/icons-react'
 import { useTrainers, useCreateTrainer, useUpdateTrainer, useDeleteTrainer } from '@/hooks/use-trainers'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { Trainer } from '@/lib/services/trainer.service'
+import { toast } from 'sonner'
 
 const TRAINER_DRAFT_KEY = 'add_trainer_form_draft'
 
@@ -39,6 +41,8 @@ type TrainerFormState = {
   imageUrl: string
   keySentence: string
   isActive: boolean
+  // FX-17 — branches this coach may act on.
+  branchIds: string[]
 }
 
 function defaultTrainerForm(): TrainerFormState {
@@ -52,6 +56,7 @@ function defaultTrainerForm(): TrainerFormState {
     imageUrl: '',
     keySentence: '',
     isActive: true,
+    branchIds: [],
   }
 }
 
@@ -105,7 +110,13 @@ export default function TrainersPage() {
         formData.specialitiesInput !== (editingTrainer.specialities?.join(', ') || '') ||
         formData.imageUrl !== (editingTrainer.imageUrl || '') ||
         formData.keySentence !== (editingTrainer.keySentence || '') ||
-        formData.isActive !== (editingTrainer.isActive !== false)
+        formData.isActive !== (editingTrainer.isActive !== false) ||
+        formData.branchIds.join(',') !==
+          ((editingTrainer.branchIds && editingTrainer.branchIds.length > 0
+            ? editingTrainer.branchIds
+            : editingTrainer.locationId
+              ? [editingTrainer.locationId]
+              : []).join(','))
       )
     }
     return Boolean(
@@ -122,10 +133,18 @@ export default function TrainersPage() {
   }, [formData, editingTrainer])
 
   const { data: trainers = [], isLoading, isError, refetch } = useTrainers()
+  const { locations, isBranchRestricted, assignedBranchIds, selectedLocationId } = useLocationScope()
   const createTrainer = useCreateTrainer()
   const updateTrainer = useUpdateTrainer()
   const deleteTrainer = useDeleteTrainer()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+
+  const canAlterTrainer = (trainer: Trainer) => {
+    if (!isBranchRestricted) return true
+    const tBranches = trainer.branchIds && trainer.branchIds.length > 0 ? trainer.branchIds : (trainer.locationId ? [trainer.locationId] : [])
+    if (tBranches.length === 0) return true
+    return tBranches.some((id) => assignedBranchIds.includes(String(id)))
+  }
 
   const filtered = useMemo(
     () =>
@@ -171,15 +190,29 @@ export default function TrainersPage() {
     setShowPassword(false)
     setShowUnsavedConfirm(false)
     const draft = loadTrainerDraft()
+    const defaultBranches = isBranchRestricted && assignedBranchIds.length > 0
+      ? [selectedLocationId || assignedBranchIds[0]]
+      : []
     if (draft) {
-      setFormData(draft)
+      setFormData({
+        ...defaultTrainerForm(),
+        ...draft,
+        branchIds: draft.branchIds && draft.branchIds.length > 0 ? draft.branchIds : defaultBranches,
+      })
     } else {
-      setFormData(defaultTrainerForm())
+      setFormData({
+        ...defaultTrainerForm(),
+        branchIds: defaultBranches,
+      })
     }
     setIsDialogOpen(true)
   }
 
   const handleOpenEdit = (trainer: Trainer) => {
+    if (!canAlterTrainer(trainer)) {
+      toast.error('You can only alter trainers in your assigned branch.')
+      return
+    }
     setEditingTrainer(trainer)
     setFormData({
       trainerName: trainer.trainerName || '', email: trainer.email || '', phone: trainer.phone || '',
@@ -188,6 +221,13 @@ export default function TrainersPage() {
       imageUrl: trainer.imageUrl || '',
       keySentence: trainer.keySentence || '',
       isActive: trainer.isActive !== false,
+      // Fall back to the legacy single branch when branchIds isn't set yet.
+      branchIds:
+        trainer.branchIds && trainer.branchIds.length > 0
+          ? trainer.branchIds
+          : trainer.locationId
+            ? [trainer.locationId]
+            : [],
     })
     setIsDialogOpen(true)
   }
@@ -219,6 +259,19 @@ export default function TrainersPage() {
     const specialities = formData.specialitiesInput.split(',').map(s => s.trim()).filter(Boolean)
     const cleanPhone = formData.phone.replace(/[\s\-()]/g, '')
     
+    if (editingTrainer && !canAlterTrainer(editingTrainer)) {
+      toast.error('You can only alter trainers in your assigned branch.')
+      return
+    }
+
+    if (isBranchRestricted) {
+      const invalid = formData.branchIds.filter((id) => !assignedBranchIds.includes(id))
+      if (invalid.length > 0) {
+        toast.error('You can only assign trainers to your assigned branch.')
+        return
+      }
+    }
+
     try {
       if (editingTrainer) {
         await updateTrainer.mutateAsync({
@@ -230,6 +283,7 @@ export default function TrainersPage() {
             imageUrl: formData.imageUrl,
             keySentence: formData.keySentence,
             isActive: formData.isActive,
+            branchIds: formData.branchIds,
           },
         })
       } else {
@@ -237,6 +291,7 @@ export default function TrainersPage() {
           trainerName: formData.trainerName, email: formData.email, phone: cleanPhone,
           password: formData.password, description: formData.description, specialities,
           imageUrl: formData.imageUrl, keySentence: formData.keySentence, isActive: formData.isActive,
+          branchIds: formData.branchIds,
         })
         clearTrainerDraft()
       }
@@ -352,6 +407,38 @@ export default function TrainersPage() {
                   </div>
                   <Switch checked={formData.isActive} onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })} />
                 </div>
+                {/* FX-17 — branches this coach may act on. Checked branches are
+                    the only ones the backend lets them operate once enforcement
+                    is on. */}
+                {locations.length > 0 && (
+                  <div className="rounded-lg border p-3 shadow-xs">
+                    <label className="text-sm font-medium">Branches</label>
+                    <p className="text-xs text-muted-foreground mb-2">Which branches this trainer works at.</p>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {locations.map((loc) => {
+                        const checked = formData.branchIds.includes(loc._id)
+                        return (
+                          <label key={loc._id} className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-input"
+                              checked={checked}
+                              onChange={(e) => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  branchIds: e.target.checked
+                                    ? [...prev.branchIds, loc._id]
+                                    : prev.branchIds.filter((id) => id !== loc._id),
+                                }))
+                              }}
+                            />
+                            <span>{loc.name}{loc.isActive === false ? ' (inactive)' : ''}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" onClick={handleCloseTrainerDialog}>Cancel</Button>
                   <Button onClick={handleSubmit} disabled={isPending}>
@@ -472,8 +559,32 @@ export default function TrainersPage() {
                             <TableCell>{trainer.createdAt ? new Date(trainer.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
-                                <Button size="sm" variant="outline" onClick={() => handleOpenEdit(trainer)}><IconEdit className="w-4 h-4" /></Button>
-                                <Button size="sm" variant="outline" className="text-red-600" onClick={() => { if (confirm(`Delete ${trainer.trainerName}?`)) deleteTrainer.mutate(trainerKey) }} disabled={deleteTrainer.isPending}><IconTrash className="w-4 h-4" /></Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenEdit(trainer)}
+                                  disabled={!canAlterTrainer(trainer)}
+                                  title={canAlterTrainer(trainer) ? "Edit Trainer" : "Assigned to another branch"}
+                                  className="disabled:opacity-30"
+                                >
+                                  <IconEdit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600 disabled:opacity-30"
+                                  onClick={() => {
+                                    if (!canAlterTrainer(trainer)) {
+                                      toast.error('You can only delete trainers in your assigned branch.')
+                                      return
+                                    }
+                                    if (confirm(`Delete ${trainer.trainerName}?`)) deleteTrainer.mutate(trainerKey)
+                                  }}
+                                  disabled={deleteTrainer.isPending || !canAlterTrainer(trainer)}
+                                  title={canAlterTrainer(trainer) ? "Delete Trainer" : "Assigned to another branch"}
+                                >
+                                  <IconTrash className="w-4 h-4" />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>

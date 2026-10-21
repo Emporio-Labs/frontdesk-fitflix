@@ -4,8 +4,9 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
 import { authService } from '@/lib/services/auth.service'
-import { storeToken } from '@/lib/api-client'
+import { storeToken, clearToken } from '@/lib/api-client'
 import { toast } from 'sonner'
+import type { UserRole } from '@/lib/rbac'
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -46,25 +47,60 @@ export default function LoginPage() {
           responseKeys: Object.keys(data),
         })
       }
+      const roleMap: Record<string, UserRole> = {
+        admin: 'clinic_admin',
+        clinic_admin: 'clinic_admin',
+        super_admin: 'super_admin',
+        // FX-31.1 — branch manager (issued as Admin.staffRole = 'manager').
+        manager: 'manager',
+        frontdesk: 'staff',
+        staff: 'staff',
+        doctor: 'clinician',
+        clinician: 'clinician',
+        sales: 'sales',
+        trainer: 'trainer',
+        nutritionist: 'nutritionist',
+        sports_scientist: 'sports_scientist',
+        'sports-scientist': 'sports_scientist',
+      }
+
+      const rawRole = (apiUser?.staffRole || apiUser?.role || '')
+        .toString()
+        .trim()
+        .toLowerCase()
+
+      // FX-31.4 — a staff account with no role yet (empty role) is signed in as
+      // `unassigned` and lands on the waiting page, rather than being refused. A
+      // non-empty but unrecognised role is still refused (likely a member or a
+      // misconfigured account, not "awaiting assignment").
+      const mappedRole: UserRole | undefined =
+        roleMap[rawRole] ?? (rawRole === '' ? 'unassigned' : undefined)
+
+      if (!mappedRole) {
+        clearToken()
+        toast.error('Sign-in refused: Your account role is not recognized.')
+        return
+      }
+
       // Store JWT token if the backend provides one
       if (token) {
         storeToken(token)
       }
-      const roleMap: Record<string, any> = {
-        admin: 'clinic_admin',
-        super_admin: 'super_admin',
-        frontdesk: 'staff',
-        doctor: 'clinician',
-        trainer: 'trainer',
-        nutritionist: 'staff',
-        user: 'sales', // restrict normal 'user' from accessing powerful dashboard reads if they shouldn't
-      }
-      const mappedRole = roleMap[apiUser?.role] ?? 'clinic_admin'
+
       login(email, password, {
         id: apiUser?.id ?? '',
         name: apiUser?.email ?? email,
         email: apiUser?.email ?? email,
         role: mappedRole,
+        // FX-18 — carry the backend's branch scope so the switcher can be
+        // restricted to the branches this staffer works at.
+        branchIds: Array.isArray(apiUser?.branchIds)
+          ? apiUser.branchIds.map(String)
+          : [],
+        allBranches: Boolean(apiUser?.allBranches),
+        scope: apiUser?.scope === 'branch' || apiUser?.scope === 'global'
+          ? apiUser.scope
+          : undefined,
       })
       toast.success('Welcome back!')
       // Redirect is handled inside login() via window.location.href

@@ -12,6 +12,10 @@ export interface Trainer {
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
+  /** FX-17 — legacy single branch; `branchIds` is the authoritative scope. */
+  locationId?: string | null
+  /** FX-17 — branches this coach may act on. */
+  branchIds?: string[]
 }
 
 export interface CreateTrainerPayload {
@@ -24,6 +28,8 @@ export interface CreateTrainerPayload {
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
+  /** FX-17 — branches this coach may act on. */
+  branchIds?: string[]
 }
 
 export interface UpdateTrainerPayload {
@@ -33,6 +39,8 @@ export interface UpdateTrainerPayload {
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
+  /** FX-17 — branches this coach may act on. */
+  branchIds?: string[]
 }
 
 export const trainerService = {

@@ -36,6 +36,7 @@ import {
   useUpdateMembership,
   useDeleteMembership,
 } from '@/hooks/use-memberships'
+import { useLocationScope } from '@/components/location-scope-provider'
 
 function formatDateToInput(value?: string) {
   if (!value) return ''
@@ -88,6 +89,13 @@ function MembershipsPageContent() {
   const createMembership = useCreateMembership()
   const updateMembership = useUpdateMembership()
   const deleteMembership = useDeleteMembership()
+  const { selectedLocationId, isBranchRestricted, assignedBranchIds } = useLocationScope()
+
+  const canAlterMembership = (m: Membership) => {
+    if (!isBranchRestricted) return true
+    if (!m.locationId) return true
+    return assignedBranchIds.includes(String(m.locationId))
+  }
 
   const assignUserId = searchParams.get('assignUserId') || ''
 
@@ -272,6 +280,11 @@ function MembershipsPageContent() {
   const paginatedMemberships = sortedMemberships.slice(startIndex, startIndex + itemsPerPage)
 
   const handleSaveMembership = async () => {
+    if (editingMembership && !canAlterMembership(editingMembership)) {
+      toast.error('You can only alter memberships for your assigned branch.')
+      return
+    }
+
     if (!formData.userId.trim()) {
       toast.error('Select a member before saving')
       return
@@ -305,7 +318,13 @@ function MembershipsPageContent() {
     if (editingMembership) {
       await updateMembership.mutateAsync({ id: editingMembership.id, payload })
     } else {
-      await createMembership.mutateAsync(payload)
+      // Stamp new memberships at the branch selected in the header. On edit we
+      // deliberately don't send it, so an admin viewing a different branch can
+      // still fix a note without moving the membership between branches.
+      await createMembership.mutateAsync({
+        ...payload,
+        locationId: selectedLocationId ?? undefined,
+      })
     }
 
     resetForm()
@@ -357,8 +376,12 @@ function MembershipsPageContent() {
     setIsAddDialogOpen(true)
   }
 
-  const handleDeleteMembership = (id: string) => {
-    deleteMembership.mutate(id)
+  const handleDeleteMembership = (membership: Membership) => {
+    if (!canAlterMembership(membership)) {
+      toast.error('You can only delete memberships for your assigned branch.')
+      return
+    }
+    deleteMembership.mutate(membership.id)
   }
 
   const resetForm = () => {
@@ -741,11 +764,16 @@ function MembershipsPageContent() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  title="Freeze — frozen days are credited back to the expiry on resume"
-                                  onClick={() =>
+                                  title={canAlterMembership(membership) ? "Freeze — frozen days are credited back to the expiry on resume" : "Belongs to another branch"}
+                                  onClick={() => {
+                                    if (!canAlterMembership(membership)) {
+                                      toast.error('You can only alter memberships for your assigned branch.')
+                                      return
+                                    }
                                     pauseMembership.mutate({ id: membership.id })
-                                  }
-                                  disabled={pauseMembership.isPending}
+                                  }}
+                                  disabled={pauseMembership.isPending || !canAlterMembership(membership)}
+                                  className="disabled:opacity-30"
                                 >
                                   <IconPlayerPause className="w-4 h-4" />
                                 </Button>
@@ -754,11 +782,16 @@ function MembershipsPageContent() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  title="Resume and credit the frozen days back"
-                                  onClick={() =>
+                                  title={canAlterMembership(membership) ? "Resume and credit the frozen days back" : "Belongs to another branch"}
+                                  onClick={() => {
+                                    if (!canAlterMembership(membership)) {
+                                      toast.error('You can only alter memberships for your assigned branch.')
+                                      return
+                                    }
                                     resumeMembership.mutate(membership.id)
-                                  }
-                                  disabled={resumeMembership.isPending}
+                                  }}
+                                  disabled={resumeMembership.isPending || !canAlterMembership(membership)}
+                                  className="disabled:opacity-30"
                                 >
                                   <IconPlayerPlay className="w-4 h-4" />
                                 </Button>
@@ -766,9 +799,10 @@ function MembershipsPageContent() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => handleDeleteMembership(membership.id)}
-                                disabled={deleteMembership.isPending}
+                                className="text-red-600 hover:text-red-700 disabled:opacity-30"
+                                onClick={() => handleDeleteMembership(membership)}
+                                disabled={deleteMembership.isPending || !canAlterMembership(membership)}
+                                title={canAlterMembership(membership) ? "Delete Membership" : "Belongs to another branch"}
                               >
                                 <IconTrash className="w-4 h-4" />
                               </Button>

@@ -5,6 +5,7 @@ import {
   UpdateGroupClassPayload,
 } from '@/lib/services/group-class.service'
 import { queryKeys } from '@/lib/query-keys'
+import { useLocationScope } from '@/components/location-scope-provider'
 import { toast } from 'sonner'
 
 // Surfaces per-field validation reasons from the backend's zod error shape
@@ -21,8 +22,10 @@ function formatApiError(err: any, fallback: string): string {
 }
 
 export function useGroupClasses() {
+  // FX-19 — key on the selected branch so the class list follows the header picker.
+  const { scopedKey } = useLocationScope()
   return useQuery({
-    queryKey: queryKeys.groupClasses.all(),
+    queryKey: scopedKey(queryKeys.groupClasses.all()),
     queryFn: groupClassService.getAll,
     select: (data) => data.groupClasses,
     staleTime: 30_000,

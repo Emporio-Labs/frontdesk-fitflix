@@ -14,12 +14,12 @@ export default function WorkoutsPage() {
     <div className="flex-1 space-y-6 p-4 pt-4 sm:p-6 sm:pt-5 lg:p-8 lg:pt-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Workouts</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Workouts</h2>
           <p className="text-muted-foreground">
             Create, manage, and assign workout plans to members
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
           <Button variant="outline" asChild>
             <Link href="/dashboard/workouts/exercises">
               <IconDumbbell className="w-4 h-4 mr-2" />
@@ -32,7 +32,7 @@ export default function WorkoutsPage() {
               Member Roster
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="col-span-2">
             <Link href="/dashboard/workouts/create">
               <IconPlus className="w-4 h-4 mr-2" />
               Create Plan

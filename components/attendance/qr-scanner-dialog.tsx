@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { IconQrcode, IconUserCheck } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { useQrCheckIn } from '@/hooks/use-gym-visits'
+import { useOptionalLocationScope } from '@/components/location-scope-provider'
 
 const SCANNER_ELEMENT_ID = 'gym-qr-scanner'
 // Debounce so the same frame decoded multiple times in a row doesn't fire
@@ -66,6 +67,18 @@ export function QrScannerDialog() {
   const scannerRef = useRef<import('html5-qrcode').Html5Qrcode | null>(null)
   const pausedRef = useRef(false)
   const qrCheckIn = useQrCheckIn()
+  // Read the branch selected in the header so every scan is stamped correctly.
+  // Tolerant: falls back to undefined so the backend resolver handles single-branch.
+  const scope = useOptionalLocationScope()
+  const selectedLocationId = scope?.selectedLocationId ?? undefined
+  // The camera effect below reads locationId inside a long-lived callback, so a
+  // ref keeps it fresh when the front-desk switches branches without closing
+  // the scanner. A plain closure would stamp scans at the branch that was
+  // active when the dialog opened.
+  const selectedLocationIdRef = useRef<string | undefined>(selectedLocationId)
+  useEffect(() => {
+    selectedLocationIdRef.current = selectedLocationId
+  }, [selectedLocationId])
 
   useEffect(() => {
     if (!open) return
@@ -94,7 +107,7 @@ export function QrScannerDialog() {
               return
             }
 
-            qrCheckIn.mutate(token, {
+            qrCheckIn.mutate({ token, locationId: selectedLocationIdRef.current }, {
               onSuccess: (data) => {
                 setLastResult({ name: data.visit.username || 'Member' })
               },

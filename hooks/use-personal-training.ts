@@ -3,6 +3,7 @@ import {
   personalTrainingService,
   ExpertScheduleDto,
 } from '@/lib/services/personal-training.service'
+import { queryKeys } from '@/lib/query-keys'
 import { toast } from 'sonner'
 
 export function usePtTrainers() {
@@ -87,6 +88,35 @@ export function useCompletePtBooking() {
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to complete session')
+    },
+  })
+}
+
+export function useNoShowPtBooking() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ bookingId, reason }: { bookingId: string; reason?: string }) =>
+      personalTrainingService.markNoShow(bookingId, { reason }),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ['pt', 'admin-bookings'] })
+      // Credit ledger + user balances change on no-show; refresh both so the
+      // member's credit history reflects the club no-show rule (FX-24.3).
+      qc.invalidateQueries({ queryKey: ['credits'] })
+      qc.invalidateQueries({ queryKey: queryKeys.users.all() })
+
+      const credits = result?.credits
+      if (credits && (credits.consumed || credits.refunded || credits.bypassed)) {
+        const parts: string[] = []
+        if (credits.consumed) parts.push(`−${credits.consumed} credit${credits.consumed === 1 ? '' : 's'} consumed`)
+        if (credits.refunded) parts.push(`+${credits.refunded} refunded`)
+        if (credits.bypassed) parts.push('credit bypassed by rule')
+        toast.success(`Marked no-show · ${parts.join(', ')}`)
+      } else {
+        toast.success(result?.message || 'Session marked as no-show')
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to mark no-show')
     },
   })
 }

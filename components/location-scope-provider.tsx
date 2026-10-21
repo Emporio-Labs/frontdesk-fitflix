@@ -16,8 +16,11 @@ import type { Location } from '@/lib/services/location.service'
  * the backend resolves the location on its own, so nothing has to be selected.
  */
 
+import { useAuth } from '@/hooks/use-auth'
+
 type LocationScopeValue = {
   locations: Location[]
+  allLocations: Location[]
   isLoading: boolean
   /** Selected branch, or null for "all branches". */
   selectedLocationId: string | null
@@ -25,6 +28,10 @@ type LocationScopeValue = {
   setSelectedLocationId: (id: string | null) => void
   /** True while there is nothing to choose between. */
   isSingleLocation: boolean
+  /** Whether the current signed-in user is confined to specific branch(es). */
+  isBranchRestricted: boolean
+  /** The branch IDs assigned to current user. */
+  assignedBranchIds: string[]
   /**
    * Fold the active scope into a query key.
    *   queryKey: scopedKey(queryKeys.bookings.all())
@@ -43,11 +50,26 @@ export function LocationScopeProvider({
 }: {
   children: React.ReactNode
 }) {
+  const { user } = useAuth()
   const { data: locations, isLoading } = useLocations()
   const [selectedLocationId, setSelectedLocationIdState] = useState<
     string | null
   >(null)
   const [hydrated, setHydrated] = useState(false)
+
+  // Determine if the signed-in user is restricted to assigned branches.
+  // Super admins are always global. Any account with allBranches: true is global.
+  // Any account with scope: 'branch' or with populated branchIds and !allBranches is branch-scoped.
+  const isBranchRestricted = Boolean(
+    user &&
+    user.role !== 'super_admin' &&
+    !user.allBranches &&
+    (user.scope === 'branch' || (Array.isArray(user.branchIds) && user.branchIds.length > 0))
+  )
+
+  const assignedBranchIds = useMemo(() => {
+    return Array.isArray(user?.branchIds) ? user.branchIds.map(String) : []
+  }, [user?.branchIds])
 
   // Restore the previous selection after mount so SSR and first client render
   // agree; reading localStorage during render would cause a hydration mismatch.
@@ -61,21 +83,46 @@ export function LocationScopeProvider({
     setHydrated(true)
   }, [])
 
-  const list = useMemo(() => locations ?? [], [locations])
+  // For branch-restricted staff, the available locations list contains ONLY their assigned branches.
+  const list = useMemo(() => {
+    const raw = locations ?? []
+    if (!isBranchRestricted || assignedBranchIds.length === 0) return raw
+    return raw.filter((loc) => assignedBranchIds.includes(String(loc._id)))
+  }, [locations, isBranchRestricted, assignedBranchIds])
 
-  // Drop a stale selection if that branch was deactivated or removed, so the
-  // console can't stay pinned to a location that no longer exists.
+  // Ensure selected branch is valid and strictly confined for branch-restricted users
   useEffect(() => {
-    if (!hydrated || list.length === 0 || !selectedLocationId) return
+    if (!hydrated) return
+
+    if (isBranchRestricted && assignedBranchIds.length > 0) {
+      // Must be set to an assigned branch; if not or invalid, clamp to the first assigned branch.
+      if (!selectedLocationId || !assignedBranchIds.includes(selectedLocationId)) {
+        const fallback = assignedBranchIds[0]
+        setSelectedLocationIdState(fallback)
+        try {
+          window.localStorage.setItem(STORAGE_KEY, fallback)
+        } catch {}
+      }
+      return
+    }
+
+    if (list.length === 0 || !selectedLocationId) return
     if (!list.some((l) => l._id === selectedLocationId)) {
       setSelectedLocationIdState(null)
       try {
         window.localStorage.removeItem(STORAGE_KEY)
       } catch {}
     }
-  }, [hydrated, list, selectedLocationId])
+  }, [hydrated, list, selectedLocationId, isBranchRestricted, assignedBranchIds])
 
   const setSelectedLocationId = (id: string | null) => {
+    // If user is branch-restricted, they cannot shift to unauthorized branch or "all branches".
+    if (isBranchRestricted && assignedBranchIds.length > 0) {
+      if (!id || !assignedBranchIds.includes(id)) {
+        return
+      }
+    }
+
     setSelectedLocationIdState(id)
     try {
       if (id) window.localStorage.setItem(STORAGE_KEY, id)
@@ -91,15 +138,18 @@ export function LocationScopeProvider({
 
     return {
       locations: list,
+      allLocations: locations ?? [],
       isLoading,
       selectedLocationId: effectiveId,
       selectedLocation: list.find((l) => l._id === effectiveId) ?? null,
       setSelectedLocationId,
       isSingleLocation,
+      isBranchRestricted,
+      assignedBranchIds,
       scopedKey: (key) => [...key, effectiveId ?? 'all'] as const,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list, isLoading, selectedLocationId])
+  }, [list, locations, isLoading, selectedLocationId, isBranchRestricted, assignedBranchIds])
 
   return (
     <LocationScopeContext.Provider value={value}>

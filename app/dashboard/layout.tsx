@@ -2,6 +2,7 @@
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { LocationScopeProvider } from '@/components/location-scope-provider'
+import { MobileStaffScope } from '@/components/mobile-staff-scope'
 import { SidebarRouteSync } from '@/components/sidebar-route-sync'
 import { SiteHeader } from '@/components/site-header'
 import {
@@ -22,9 +23,11 @@ export default function DashboardLayout({
         <SidebarInset>
           <SiteHeader />
           {/* min-w-0 lets this flex child shrink below its content width, so wide
-              tables scroll inside their own container instead of being clipped. */}
+              tables scroll inside their own container instead of being clipped.
+              MobileStaffScope stamps the FX-09 mobile-cards attribute when a
+              trainer/nutritionist is signed in. */}
           <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-            {children}
+            <MobileStaffScope>{children}</MobileStaffScope>
           </div>
         </SidebarInset>
       </LocationScopeProvider>

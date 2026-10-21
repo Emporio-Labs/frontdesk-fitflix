@@ -404,7 +404,7 @@ export function ExpertAvailabilityEditor({
               'Working hours drive what members can book. Blocked dates and disabled modes remove times immediately.'}
           </CardDescription>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {headerAction ??
             (expertName ? (
               <Badge variant="outline" className="px-3 py-1 text-sm font-medium">
@@ -479,7 +479,7 @@ export function ExpertAvailabilityEditor({
                   </p>
                 </div>
                 {APPOINTMENT_MODES.map((mode) => (
-                  <div key={mode.value} className="flex items-center justify-between">
+                  <div key={mode.value} className="flex items-center justify-between gap-3">
                     <div>
                       <span className="text-sm font-medium">{mode.label}</span>
                       <span className="ml-2 text-xs text-muted-foreground">{mode.hint}</span>
@@ -493,7 +493,7 @@ export function ExpertAvailabilityEditor({
               </div>
 
               <div className="p-4 rounded-lg border space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold">Accepting bookings</p>
                     <p className="text-xs text-muted-foreground">
@@ -518,12 +518,12 @@ export function ExpertAvailabilityEditor({
                   </p>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                 <Input
                   type="date"
                   value={newBlackoutDate}
                   onChange={(e) => setNewBlackoutDate(e.target.value)}
-                  className="w-44 h-9 bg-background"
+                  className="w-full sm:w-44 h-9 bg-background"
                 />
                 <Button
                   type="button"
@@ -576,7 +576,7 @@ export function ExpertAvailabilityEditor({
                 return (
                   <div
                     key={dayName}
-                    className={`flex flex-col p-4 gap-3 transition-colors ${
+                    className={`flex flex-col p-3 sm:p-4 gap-3 transition-colors ${
                       validationErrors.length > 0
                         ? 'bg-red-50/50 dark:bg-red-950/20 border-red-200'
                         : daySlot.isAvailable
@@ -584,7 +584,7 @@ export function ExpertAvailabilityEditor({
                           : 'bg-muted/20 opacity-75'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
                         <Switch
                           checked={daySlot.isAvailable}
@@ -623,7 +623,7 @@ export function ExpertAvailabilityEditor({
                     </div>
 
                     {validationErrors.length > 0 && (
-                      <div className="pl-9 space-y-1">
+                      <div className="sm:pl-9 space-y-1">
                         {validationErrors.map((err, errIdx) => (
                           <div
                             key={errIdx}
@@ -636,15 +636,15 @@ export function ExpertAvailabilityEditor({
                     )}
 
                     {daySlot.isAvailable && (
-                      <div className="pl-9 space-y-2">
+                      <div className="sm:pl-9 space-y-2">
                         {daySlot.shifts.map((st, shiftIdx) => {
                           const shiftDur = computeDurationHours(st.startTime, st.endTime)
                           return (
                             <div
                               key={shiftIdx}
-                              className="flex flex-wrap items-center gap-3 p-2 rounded-md bg-muted/30 border border-muted/50 text-xs"
+                              className="flex flex-wrap items-center gap-2 sm:gap-3 p-2 rounded-md bg-muted/30 border border-muted/50 text-xs"
                             >
-                              <span className="font-mono text-muted-foreground w-14">
+                              <span className="font-mono text-muted-foreground w-full sm:w-14">
                                 Shift {shiftIdx + 1}:
                               </span>
 
@@ -656,7 +656,7 @@ export function ExpertAvailabilityEditor({
                                   onChange={(e) =>
                                     handleShiftStartTimeChange(idx, shiftIdx, e.target.value)
                                   }
-                                  className="w-32 h-8 text-xs font-mono bg-background"
+                                  className="w-[7.5rem] sm:w-32 h-8 text-xs font-mono bg-background"
                                 />
                               </div>
 
@@ -670,7 +670,7 @@ export function ExpertAvailabilityEditor({
                                   onChange={(e) =>
                                     handleShiftEndTimeChange(idx, shiftIdx, e.target.value)
                                   }
-                                  className="w-32 h-8 text-xs font-mono bg-background"
+                                  className="w-[7.5rem] sm:w-32 h-8 text-xs font-mono bg-background"
                                 />
                               </div>
 

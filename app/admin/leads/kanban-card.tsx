@@ -10,15 +10,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Lead, LeadTemperature } from '@/lib/services/lead.service'
 import {
   IconBrandWhatsapp,
   IconCheck,
   IconEdit,
   IconGripVertical,
+  IconHandGrab,
   IconMessage,
   IconPhone,
   IconFileInvoice,
+  IconUserCheck,
+  IconUserShare,
+  IconUserOff,
 } from '@tabler/icons-react'
 
 interface KanbanCardProps {
@@ -29,11 +40,38 @@ interface KanbanCardProps {
   onWhatsApp: () => void
   onAddNote: () => void
   onInvoice?: () => void
+  onClaim?: () => void
+  /** Whether the current staff member may claim this (unclaimed) lead. */
+  canClaim?: boolean
+  /**
+   * FX-34.1/.3 — reassign this lead to another staff member, or release it to
+   * the queue (assigneeId null). Wired to both the manager control and the
+   * owner's "Release" button below.
+   */
+  onReassign?: (assigneeId: string | null) => void
+  /** FX-34.1 — a manager may reassign to anyone at the branch / release. */
+  canReassign?: boolean
+  /** FX-34.3 — a non-manager owner may release their own lead to the queue. */
+  canRelease?: boolean
+  /** Branch staff the manager can reassign to: [{ id, name }]. */
+  staffOptions?: Array<{ id: string; name: string }>
   isPending: boolean
   source: string
   isFollowUpToday: boolean
   leadAgeDays: number
   isDragDisabled?: boolean
+}
+
+function formatClaimedAt(value?: string): string {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 export default function KanbanCard({
@@ -44,12 +82,19 @@ export default function KanbanCard({
   onWhatsApp,
   onAddNote,
   onInvoice,
+  onClaim,
+  canClaim = false,
+  onReassign,
+  canReassign = false,
+  canRelease = false,
+  staffOptions = [],
   isPending,
   source,
   isFollowUpToday,
   leadAgeDays,
   isDragDisabled = false,
 }: KanbanCardProps) {
+  const isClaimed = Boolean(lead.claimedById)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -140,7 +185,35 @@ export default function KanbanCard({
             {lead.status}
           </Badge>
           <Badge variant="outline">{lead.source}</Badge>
+          {isClaimed ? (
+            <Badge className="bg-emerald-100 text-emerald-800" variant="secondary">
+              <IconUserCheck className="w-3 h-3 mr-1" />
+              {lead.claimedByName || 'Claimed'}
+            </Badge>
+          ) : (
+            <Badge className="bg-amber-100 text-amber-800" variant="secondary">
+              Unclaimed
+            </Badge>
+          )}
         </div>
+
+        {/* FX-33.2 — claim affordance straight on the card for unclaimed leads. */}
+        {!isClaimed && canClaim && onClaim && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full h-8 text-amber-700 border-amber-300 hover:bg-amber-100"
+            disabled={isPending}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClaim()
+            }}
+            title="Claim this lead"
+          >
+            <IconHandGrab className="w-4 h-4 mr-1.5" />
+            Claim
+          </Button>
+        )}
       </div>
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
@@ -200,6 +273,88 @@ export default function KanbanCard({
               </div>
             </div>
 
+            {/* FX-33.2 — claim ownership: who holds it + when, or a Claim action. */}
+            {isClaimed ? (
+              <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 p-2.5 border border-emerald-200/50 flex items-center gap-2">
+                <IconUserCheck className="w-4 h-4 text-emerald-700 dark:text-emerald-300" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                    Claimed by {lead.claimedByName || 'staff'}
+                  </span>
+                  {lead.claimedAt && (
+                    <span className="text-xs text-emerald-900 dark:text-emerald-200">
+                      {formatClaimedAt(lead.claimedAt)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : canClaim && onClaim ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full h-9 text-amber-700 border-amber-300 hover:bg-amber-100"
+                disabled={isPending}
+                onClick={() => handleAction(onClaim)}
+                title="Claim this lead"
+              >
+                <IconHandGrab className="w-4 h-4 mr-1.5" />
+                Claim this lead
+              </Button>
+            ) : null}
+
+            {/* FX-34.1/.3 — reassignment. A manager can hand this lead to any
+                staff member at the branch, or release it to the queue. A
+                non-manager owner gets only the release action on their own lead. */}
+            {onReassign && lead.status !== 'converted' && (canReassign || (canRelease && isClaimed)) && (
+              <div className="rounded-md border border-sky-200/60 bg-sky-50/60 dark:bg-sky-950/20 p-2.5 space-y-2">
+                <span className="text-xs font-semibold text-sky-800 dark:text-sky-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <IconUserShare className="w-3.5 h-3.5" />
+                  Reassign
+                </span>
+                {canReassign && (
+                  <Select
+                    value=""
+                    disabled={isPending}
+                    onValueChange={(value) => {
+                      if (value) handleAction(() => onReassign(value))
+                    }}
+                  >
+                    <SelectTrigger className="h-9 bg-background">
+                      <SelectValue placeholder="Assign to a team member…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {staffOptions.filter((s) => s.id !== lead.claimedById).length === 0 ? (
+                        <SelectItem value="__none__" disabled>
+                          No other staff at this branch
+                        </SelectItem>
+                      ) : (
+                        staffOptions
+                          .filter((s) => s.id !== lead.claimedById)
+                          .map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+                {isClaimed && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full h-9 text-amber-700 border-amber-300 hover:bg-amber-100"
+                    disabled={isPending}
+                    onClick={() => handleAction(() => onReassign(null))}
+                    title="Release this lead back to the unclaimed queue"
+                  >
+                    <IconUserOff className="w-4 h-4 mr-1.5" />
+                    Release to queue
+                  </Button>
+                )}
+              </div>
+            )}
+
             {lead.followUpDate && (
               <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 p-2.5 border border-amber-200/50 flex flex-col gap-0.5">
                 <span className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Scheduled Follow Up</span>
@@ -221,14 +376,17 @@ export default function KanbanCard({
                   {lead.interactions.map((item) => (
                     <div key={item.id} className="text-xs space-y-0.5 border-b last:border-0 pb-2 last:pb-0">
                       <p className="text-foreground leading-relaxed">{item.note}</p>
-                      {item.createdAt && (
+                      {(item.createdAt || item.createdByName) && (
                         <span className="text-[10px] text-muted-foreground">
-                          {new Date(item.createdAt).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          {item.createdByName ? `${item.createdByName} · ` : ''}
+                          {item.createdAt
+                            ? new Date(item.createdAt).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : ''}
                         </span>
                       )}
                     </div>

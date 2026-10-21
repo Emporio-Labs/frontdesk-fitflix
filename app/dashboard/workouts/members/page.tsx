@@ -19,7 +19,7 @@ export default function MembersPage() {
             </Button>
             <span className="text-xs text-muted-foreground">Workouts / Members</span>
           </div>
-          <h2 className="text-3xl font-bold tracking-tight">Assigned Members</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Assigned Members</h2>
           <p className="text-muted-foreground text-sm">
             All gym members currently assigned to workout plans and their active progress
           </p>

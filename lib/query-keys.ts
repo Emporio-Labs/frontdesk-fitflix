@@ -12,12 +12,20 @@ export const queryKeys = {
     all: () => ['doctors'] as const,
     detail: (id: string) => ['doctors', id] as const,
   },
+  auditLogs: {
+    all: () => ['audit-logs'] as const,
+    list: (filters?: Record<string, unknown>) => ['audit-logs', 'list', filters ?? {}] as const,
+  },
   trainers: {
     all: () => ['trainers'] as const,
     detail: (id: string) => ['trainers', id] as const,
     myMembers: () => ['trainers', 'me', 'members'] as const,
     publicAll: () => ['trainers', 'public'] as const,
     publicDetail: (id: string) => ['trainers', 'public', id] as const,
+  },
+  nutritionists: {
+    myClients: () => ['nutritionists', 'me', 'clients'] as const,
+    myClient: (userId: string) => ['nutritionists', 'me', 'clients', userId] as const,
   },
   slots: {
     all: () => ['slots'] as const,
@@ -65,6 +73,7 @@ export const queryKeys = {
   leads: {
     all: () => ['leads'] as const,
     detail: (id: string) => ['leads', id] as const,
+    teamPerformance: () => ['leads', 'team-performance'] as const,
   },
   gymVisits: {
     all: (filters?: Record<string, unknown>) =>
@@ -180,6 +189,12 @@ export const queryKeys = {
       ['promotions', includeInactive ? 'with-inactive' : 'live'] as const,
     detail: (id: string) => ['promotions', id] as const,
   },
+  // FX-20.3 — club-wide member notifications. Per-branch, so callers pass these
+  // through `scopedKey` from the location scope provider before use.
+  memberNotifications: {
+    all: () => ['member-notifications'] as const,
+    detail: (id: string) => ['member-notifications', id] as const,
+  },
   // Deliberately not location-scoped: a person's in-app activity is theirs
   // wherever the staff member reading it happens to be sitting.
   activity: {
@@ -188,5 +203,12 @@ export const queryKeys = {
   // Also global — the app fetches one copy map for every user and branch.
   content: {
     all: () => ['content'] as const,
+  },
+  // FX-27 — branch analytics (sign-up + booking funnels). Per-branch, so callers
+  // fold the active branch in via `scopedKey` from the location scope provider.
+  analytics: {
+    all: () => ['analytics'] as const,
+    funnels: (range?: Record<string, unknown>) =>
+      ['analytics', 'funnels', range ?? {}] as const,
   },
 }

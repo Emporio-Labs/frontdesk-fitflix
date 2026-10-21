@@ -51,6 +51,7 @@ import {
   type VisitType,
   type GymVisit,
 } from '@/lib/services/gym-visit.service'
+import { useLocationScope } from '@/components/location-scope-provider'
 
 const RANGE_OPTIONS = [
   { key: '1d', label: 'Today', days: 1 },
@@ -377,6 +378,7 @@ function CheckInCard() {
   const { data: memberships = [] } = useMemberships()
   const { data: currentlyIn = [] } = useCurrentlyIn()
   const checkIn = useCheckIn()
+  const { selectedLocationId } = useLocationScope()
 
   const activeUserIds = useMemo(() => {
     const now = new Date()
@@ -421,6 +423,7 @@ function CheckInCard() {
         userId: selected.id,
         visitType,
         notes: notes.trim() || undefined,
+        locationId: selectedLocationId ?? undefined,
       },
       {
         onSuccess: () => {

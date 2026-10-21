@@ -27,6 +27,7 @@ export interface InterestSummary {
   lastActiveAt: string | null
   eventCount: number
   topInterests: InterestItem[]
+  screensViewed: string[]
   planViews: number
   consultTaps: number
   mtmJoins: number
@@ -42,6 +43,9 @@ const normalizeSummary = (raw: any): InterestSummary => ({
         count: Number(item?.count ?? 0),
         lastViewedAt: String(item?.lastViewedAt ?? ''),
       }))
+    : [],
+  screensViewed: Array.isArray(raw?.screensViewed)
+    ? raw.screensViewed.map((s: any) => String(s ?? '').trim()).filter(Boolean)
     : [],
   planViews: Number(raw?.planViews ?? 0),
   consultTaps: Number(raw?.consultTaps ?? 0),
