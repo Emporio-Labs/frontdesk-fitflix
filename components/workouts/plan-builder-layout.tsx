@@ -17,6 +17,7 @@ import {
   IconFileSpreadsheet,
   IconPlayerPlay,
   IconLoader2,
+  IconTrash,
 } from '@tabler/icons-react'
 import { workoutPlanService } from '@/lib/services/workout-plan.service'
 import { fileSlug, saveBlob } from '@/lib/download'
@@ -29,7 +30,18 @@ import {
   useCreateWorkoutPlan,
   useUpdateWorkoutPlan,
   useAssignWorkoutPlan,
+  useDeleteWorkoutPlan,
 } from '@/hooks/use-workout-plans'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import type { WorkoutPlan } from '@/types/workout'
 import type { CreateWorkoutPlanPayload } from '@/lib/services/workout-plan.service'
@@ -95,11 +107,14 @@ export function PlanBuilderLayout({
     assignmentStartDate,
   } = useWorkoutStore()
   const [assignOpen, setAssignOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [mobileTab, setMobileTab] = useState<'plan' | 'days' | 'preview'>('days')
   const createMutation = useCreateWorkoutPlan()
   const updateMutation = useUpdateWorkoutPlan()
   const assignMutation = useAssignWorkoutPlan()
+  const deleteMutation = useDeleteWorkoutPlan()
   const isSaving = createMutation.isPending || updateMutation.isPending
+  const isDeleting = deleteMutation.isPending
 
   useEffect(() => {
     if (mode === 'edit' && plan) {
@@ -192,6 +207,18 @@ export function PlanBuilderLayout({
     }
   }
 
+  const handleDeletePlan = async () => {
+    if (!savedPlanId) return
+    try {
+      await deleteMutation.mutateAsync(savedPlanId)
+      resetPlan()
+      setDeleteDialogOpen(false)
+      router.push('/dashboard/workouts')
+    } catch {
+      // errors surfaced via mutation's onError toast
+    }
+  }
+
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-var(--header-height))]">
       {/* Toolbar */}
@@ -217,28 +244,46 @@ export function PlanBuilderLayout({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {savedPlanId && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs px-2.5 sm:px-3"
-              onClick={handleExport}
-              disabled={isExporting}
-              title="Download the last saved version as an Excel file you can edit and import as a new plan"
-            >
-              {isExporting ? (
-                <IconLoader2 className="w-3.5 h-3.5 sm:mr-1 animate-spin" />
-              ) : (
-                <IconFileSpreadsheet className="w-3.5 h-3.5 sm:mr-1" />
-              )}
-              <span className="hidden sm:inline">Export to Excel</span>
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs px-2.5 sm:px-3 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setDeleteDialogOpen(true)}
+                disabled={isSaving || isDeleting}
+                title="Delete this workout plan"
+              >
+                {isDeleting ? (
+                  <IconLoader2 className="w-3.5 h-3.5 sm:mr-1 animate-spin" />
+                ) : (
+                  <IconTrash className="w-3.5 h-3.5 sm:mr-1" />
+                )}
+                <span className="hidden sm:inline">Delete Plan</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs px-2.5 sm:px-3"
+                onClick={handleExport}
+                disabled={isExporting || isDeleting}
+                title="Download the last saved version as an Excel file you can edit and import as a new plan"
+              >
+                {isExporting ? (
+                  <IconLoader2 className="w-3.5 h-3.5 sm:mr-1 animate-spin" />
+                ) : (
+                  <IconFileSpreadsheet className="w-3.5 h-3.5 sm:mr-1" />
+                )}
+                <span className="hidden sm:inline">Export to Excel</span>
+              </Button>
+            </>
           )}
           <Button
             variant="outline"
             size="sm"
             className="h-8 text-xs px-2.5 sm:px-3"
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || isDeleting}
           >
             {isSaving ? (
               <IconLoader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
@@ -252,7 +297,7 @@ export function PlanBuilderLayout({
             size="sm"
             className="h-8 text-xs"
             onClick={handlePublish}
-            disabled={isSaving}
+            disabled={isSaving || isDeleting}
           >
             {isSaving ? (
               <IconLoader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
@@ -317,6 +362,41 @@ export function PlanBuilderLayout({
         onOpenChange={setAssignOpen}
         planId={mode === 'edit' ? plan?._id : undefined}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Workout Plan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{' '}
+              <span className="font-semibold text-foreground">
+                {currentPlan.name || 'this workout plan'}
+              </span>
+              ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeletePlan()
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <IconLoader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Plan'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

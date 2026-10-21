@@ -12,6 +12,7 @@ export interface Trainer {
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
+  password?: string
 }
 
 export interface CreateTrainerPayload {

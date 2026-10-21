@@ -208,7 +208,11 @@ export default function TrainersPage() {
       }
     }
     
-    if (!editingTrainer && !formData.password) errors.password = 'Password is required'
+    if (!editingTrainer && !formData.password) {
+      errors.password = 'Password is required'
+    } else if (formData.password && formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters'
+    }
 
     setFormErrors(errors)
     return Object.keys(errors).length === 0
@@ -230,6 +234,7 @@ export default function TrainersPage() {
             imageUrl: formData.imageUrl,
             keySentence: formData.keySentence,
             isActive: formData.isActive,
+            ...(formData.password.trim() ? { password: formData.password.trim() } : {}),
           },
         })
       } else {
@@ -295,7 +300,7 @@ export default function TrainersPage() {
                   <Input value={formData.trainerName} onChange={(e) => setFormData({ ...formData, trainerName: e.target.value })} placeholder="Coach John" />
                   {formErrors.trainerName && <p className="text-xs text-red-500 mt-1">{formErrors.trainerName}</p>}
                 </div>
-                {!editingTrainer && (
+                {!editingTrainer ? (
                   <>
                     <div>
                       <label className="text-sm font-medium">Phone *</label>
@@ -328,6 +333,34 @@ export default function TrainersPage() {
                       {formErrors.password && <p className="text-xs text-red-500 mt-1">{formErrors.password}</p>}
                     </div>
                   </>
+                ) : (
+                  <div>
+                    <label className="text-sm font-medium">Reset Password</label>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        placeholder="Leave blank to keep current password"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {formErrors.password ? (
+                      <p className="text-xs text-red-500 mt-1">{formErrors.password}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Leave blank to keep current password (minimum 6 characters if updating).
+                      </p>
+                    )}
+                  </div>
                 )}
                 <div>
                   <label className="text-sm font-medium">Description</label>
