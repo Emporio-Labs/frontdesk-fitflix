@@ -9,6 +9,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { IconCash, IconCreditCard, IconBuildingBank, IconDeviceMobile } from '@tabler/icons-react'
 import { Invoice, InvoicePaymentMethod } from '@/lib/services/invoice.service'
 import { useUpdateInvoiceStatus } from '@/hooks/use-invoices'
@@ -30,15 +31,28 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
+// Local calendar day as YYYY-MM-DD, for the date input's default and min.
+function todayISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function MarkPaidDialog({ invoice, open, onOpenChange }: Props) {
   const [method, setMethod] = useState<InvoicePaymentMethod>('CASH')
+  // Paying creates the membership. Presales are paid before the branch
+  // opens, so the desk can start it on opening day instead of today.
+  const [startDate, setStartDate] = useState(todayISO())
   const updateStatus = useUpdateInvoiceStatus()
 
   const handleConfirm = async () => {
     try {
       await updateStatus.mutateAsync({
         id: invoice.id,
-        payload: { paymentStatus: 'PAID', paymentMethod: method },
+        payload: {
+          paymentStatus: 'PAID',
+          paymentMethod: method,
+          ...(startDate && startDate !== todayISO() ? { membershipStartDate: startDate } : {}),
+        },
       })
       onOpenChange(false)
     } catch {
@@ -74,6 +88,20 @@ export function MarkPaidDialog({ invoice, open, onOpenChange }: Props) {
                 {pm.label}
               </button>
             ))}
+          </div>
+
+          <div>
+            <label htmlFor="membership-start" className="text-sm font-medium">Membership starts</label>
+            <Input
+              id="membership-start"
+              type="date"
+              value={startDate}
+              min={todayISO()}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Leave as today, or pick the branch&apos;s opening day for a founding member.
+            </p>
           </div>
 
           <div className="flex gap-3 pt-2">
