@@ -51,6 +51,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useLocationScope } from '@/components/location-scope-provider'
 
 const LEAD_DRAFT_KEY = 'add_lead_form_draft'
 
@@ -65,6 +66,8 @@ type LeadFormState = {
   interestedIn: string
   followUpDate: string
   assignedStaffName: string
+  /** Branch the new lead belongs to; '' until picked. Unused when editing. */
+  locationId: string
 }
 
 function defaultLeadForm(): LeadFormState {
@@ -79,6 +82,7 @@ function defaultLeadForm(): LeadFormState {
     interestedIn: '',
     followUpDate: '',
     assignedStaffName: '',
+    locationId: '',
   }
 }
 
@@ -182,6 +186,9 @@ export default function LeadsPage() {
   const { data: leadDigest } = useLeadDigest() as any
   const createLead = useCreateLead()
   const updateLead = useUpdateLead()
+  // A new lead belongs to a branch, picked in the form and defaulting to the
+  // switcher's. With one branch the backend fills it in, so nothing is sent.
+  const { locations, selectedLocationId, isSingleLocation } = useLocationScope()
   const deleteLead = useDeleteLead()
   const convertLead = useConvertLead()
   const addInteraction = useAddLeadInteraction()
@@ -200,6 +207,7 @@ export default function LeadsPage() {
     interestedIn: '',
     followUpDate: '',
     assignedStaffName: '',
+    locationId: '',
   })
   const [showLeadUnsavedConfirm, setShowLeadUnsavedConfirm] = useState(false)
 
@@ -255,7 +263,7 @@ export default function LeadsPage() {
     setEditingLead(null)
     const draft = loadLeadDraft()
     if (draft) {
-      setFormData(draft)
+      setFormData({ ...draft, locationId: draft.locationId || selectedLocationId || '' })
     } else {
       resetForm()
     }
@@ -390,6 +398,11 @@ export default function LeadsPage() {
       }
     }
 
+    if (!editingLead && !isSingleLocation && !formData.locationId) {
+      toast.error('Branch is required')
+      return
+    }
+
     const mappedHeat = statusToHeat[formData.status]
 
     if (editingLead) {
@@ -423,6 +436,7 @@ export default function LeadsPage() {
         interestedIn: formData.interestedIn.trim(),
         assignedStaffName: formData.assignedStaffName.trim(),
         followUpDate: formData.followUpDate ? new Date(formData.followUpDate).toISOString() : undefined,
+        ...(!isSingleLocation && formData.locationId ? { locationId: formData.locationId } : {}),
       })
       clearLeadDraft()
     }
@@ -444,6 +458,7 @@ export default function LeadsPage() {
       interestedIn: lead.interestedIn,
       followUpDate: lead.followUpDate ? String(lead.followUpDate).split('T')[0] : '',
       assignedStaffName: lead.assignedStaffName || '',
+      locationId: '',
     })
     setIsAddDialogOpen(true)
   }
@@ -643,6 +658,7 @@ export default function LeadsPage() {
       interestedIn: '',
       followUpDate: '',
       assignedStaffName: '',
+      locationId: selectedLocationId ?? '',
     })
   }
 
@@ -894,6 +910,19 @@ export default function LeadsPage() {
                       <p className="mt-1 text-xs text-red-600">Duplicate phone detected in existing leads</p>
                     )}
                 </div>
+                {!editingLead && !isSingleLocation && (
+                  <div>
+                    <label className="text-sm font-medium">
+                      Branch <span className="text-red-600">*</span>
+                    </label>
+                    <Select value={formData.locationId} onValueChange={(v) => setFormData({ ...formData, locationId: v })}>
+                      <SelectTrigger aria-label="Branch"><SelectValue placeholder="Choose a branch" /></SelectTrigger>
+                      <SelectContent>
+                        {locations.map((l) => <SelectItem key={l._id} value={l._id}>{l.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div>
                   <label className="text-sm font-medium">Interested In</label>
                   <Input
