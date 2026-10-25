@@ -215,4 +215,9 @@ export const queryKeys = {
   alertReports: {
     sla: (params?: Record<string, any>) => ['alert-reports', 'sla', params ?? {}] as const,
   },
+  loginActivity: {
+    all: () => ['login-activity'] as const,
+    list: (from: string, to: string, role: string) =>
+      ['login-activity', from, to, role] as const,
+  },
 }

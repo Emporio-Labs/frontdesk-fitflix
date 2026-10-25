@@ -62,6 +62,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'attendance', action: 'update' },
     { resource: 'settings', action: 'read' },
     { resource: 'settings', action: 'update' },
+    { resource: 'login_activity', action: 'read' },
   ],
   clinic_admin: [
     { resource: 'users', action: 'read' },
@@ -94,6 +95,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     { resource: 'attendance', action: 'create' },
     { resource: 'attendance', action: 'update' },
     { resource: 'settings', action: 'read' },
+    { resource: 'login_activity', action: 'read' },
   ],
   staff: [
     { resource: 'users', action: 'read' },
