@@ -14,10 +14,10 @@ import { useMembershipPlansForLocation } from '@/hooks/use-membership-plans'
 import type { Location } from '@/lib/services/location.service'
 import type { MembershipPlan } from '@/lib/services/membership-plan.service'
 import {
-  addDays,
   computeTotals,
   formatDay,
   formatINR,
+  lastCoveredDay,
   locationOpensOn,
   membershipEndDate,
   renewableMembership,
@@ -81,7 +81,8 @@ export function PlanStep({
   const today = todayIso()
   const opensOn = locationOpensOn(location)
   const current = person.kind === 'member' ? renewableMembership(person.currentMembership) : null
-  const afterCurrent = current ? addDays(toIsoDay(current.endDate), 1) : ''
+  // The stored end is exclusive, so the next term starts on it, gap-free.
+  const afterCurrent = current ? toIsoDay(current.endDate) : ''
 
   // Drop a plan that isn't sold at the newly picked branch.
   useEffect(() => {
@@ -108,7 +109,7 @@ export function PlanStep({
 
   const totals = computeTotals(selected?.totalPrice ?? 0, plan.discount, taxPercentFor(location))
   const endDate = selected && plan.startDate ? membershipEndDate(plan.startDate, selected) : ''
-  const overlapsCurrent = !!current && !!plan.startDate && plan.startDate <= toIsoDay(current.endDate)
+  const overlapsCurrent = !!current && !!plan.startDate && plan.startDate < afterCurrent
   const mismatch = homeClubMismatch(person, plan)
   const homeClubName = person.kind === 'member' ? locations.find((l) => l._id === person.homeLocationId)?.name : ''
   const blocker = planBlocker(person, plan, selected, !isSingleLocation)
@@ -261,7 +262,7 @@ export function PlanStep({
             <p className="flex items-start gap-1.5 text-sm text-orange-700 dark:text-orange-400">
               <IconAlertTriangle className="mt-0.5 size-4 shrink-0" />
               <span>
-                Overlaps the current {current?.planName} plan, which runs till {formatDay(current?.endDate)}.{' '}
+                Overlaps the current {current?.planName} plan, which runs till {formatDay(lastCoveredDay(current?.endDate))}.{' '}
                 <button
                   type="button"
                   className="font-medium underline"

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { Invoice } from '@/lib/services/invoice.service'
 import type { Membership } from '@/lib/services/membership.service'
-import { formatDay, invoicePersonName, toIsoDay, todayIso } from './sale-utils'
+import { formatDay, invoicePersonName, lastCoveredDay, toIsoDay, todayIso } from './sale-utils'
 
 interface Props {
   invoice: Invoice
@@ -37,7 +37,8 @@ export function ReadyStep({
   const name = invoicePersonName(invoice)
   const firstName = name.split(' ')[0]
   const start = toIsoDay(membership?.startDate) || startDate
-  const end = toIsoDay(membership?.endDate) || endDate
+  // A stored end is exclusive; `endDate` (computed here) is already the last day.
+  const end = membership?.endDate ? lastCoveredDay(membership.endDate) : endDate
   const status = membership?.status ?? (start && start > todayIso() ? 'Upcoming' : 'Active')
   const upcoming = status === 'Upcoming'
   const userId = membership?.userId || invoice.userId?.id
@@ -47,7 +48,7 @@ export function ReadyStep({
       <div className="space-y-1">
         <h1 className="text-2xl font-bold sm:text-3xl">
           {firstName} is {upcoming ? 'signed up' : 'a member'}
-          {branchName ? ` at Fitflix ${branchName}` : ''}
+          {branchName ? ` at ${branchName}` : ''}
         </h1>
         <p className="text-muted-foreground">
           Payment recorded, invoice {invoice.invoiceNumber} paid

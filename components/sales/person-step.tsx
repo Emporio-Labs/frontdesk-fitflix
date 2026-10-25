@@ -12,12 +12,12 @@ import { usePeopleLookup } from '@/hooks/use-people'
 import { phoneKey, type LookupLead, type LookupMember } from '@/lib/services/people.service'
 import type { Location } from '@/lib/services/location.service'
 import {
-  addDays,
   apiErrorMessage,
   formatDay,
   formatINR,
   formatShortDay,
   initials,
+  lastCoveredDay,
   renewableMembership,
   toIsoDay,
   todayIso,
@@ -290,6 +290,7 @@ function MemberRow({
 }) {
   const current = renewableMembership(member.currentMembership)
   const lapsed = member.currentMembership && !current ? member.currentMembership : null
+  // Stored ends are exclusive: renew on `end`, show the day before as "till".
   const end = toIsoDay(current?.endDate)
   const upcoming = current && toIsoDay(current.startDate) > todayIso()
 
@@ -311,11 +312,11 @@ function MemberRow({
               {current.planName} ·{' '}
               <b className="text-green-700 dark:text-green-400">
                 {upcoming ? `Starts ${formatDay(current.startDate)}` : current.status === 'Paused' ? 'Paused' : 'Active'} till{' '}
-                {formatDay(end)}
+                {formatDay(lastCoveredDay(end))}
               </b>
             </>
           )}
-          {lapsed && ` · ${lapsed.planName} ended ${formatDay(lapsed.endDate)}`}
+          {lapsed && ` · ${lapsed.planName} ended ${formatDay(lastCoveredDay(lapsed.endDate))}`}
           {!member.currentMembership && ' · No plan'}
         </p>
       </div>
@@ -324,7 +325,7 @@ function MemberRow({
           <Button variant="outline" asChild>
             <Link href="/admin/attendance">Check in instead</Link>
           </Button>
-          <Button onClick={onRenew}>Renew from {formatShortDay(addDays(end, 1))}</Button>
+          <Button onClick={onRenew}>Renew from {formatShortDay(end)}</Button>
         </>
       ) : (
         <Button onClick={onSell}>Sell plan</Button>

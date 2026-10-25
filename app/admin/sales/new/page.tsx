@@ -102,7 +102,8 @@ function renewPlan(locationId: string | null, current: LookupMembership): SalePl
     ...blankPlan(current.locationId || locationId),
     planId: current.planId || null,
     startMode: 'after',
-    startDate: addDays(toIsoDay(current.endDate), 1),
+    // Stored ends are exclusive: the renewal starts on the old end, no gap.
+    startDate: toIsoDay(current.endDate),
   }
 }
 

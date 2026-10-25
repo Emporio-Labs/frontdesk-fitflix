@@ -103,13 +103,23 @@ export function addMonths(day: string, months: number): string {
 }
 
 /**
- * Last day of a membership starting on `start` (inclusive): a 12-month plan
- * from 13 Mar 2026 ends 12 Mar 2027, so a renewal starts the day after.
+ * Last day of a membership starting on `start`, for display (inclusive): a
+ * 12-month plan from 13 Mar 2026 covers through 12 Mar 2027.
  */
 export function membershipEndDate(start: string, plan: Pick<MembershipPlan, 'durationMonths' | 'durationDays'>): string {
   if (!start) return ''
   if (plan.durationDays) return addDays(start, plan.durationDays - 1)
   return addDays(addMonths(start, plan.durationMonths || 1), -1)
+}
+
+/**
+ * Stored membership terms are half-open, [startDate, endDate): the stored end
+ * is the first day *after* the term, which is also where a renewal starts.
+ * Show `lastCoveredDay` to people; start renewals on `toIsoDay(endDate)`.
+ */
+export function lastCoveredDay(storedEnd?: string | null): string {
+  const end = toIsoDay(storedEnd)
+  return end ? addDays(end, -1) : ''
 }
 
 /** Whole days from `start` through `end` inclusive. */
@@ -157,7 +167,7 @@ export function computeTotals(price: number, discountInput: string, taxPercent: 
 export function renewableMembership(m?: LookupMembership | null): LookupMembership | null {
   if (!m || !['Active', 'Upcoming', 'Paused'].includes(m.status)) return null
   const end = toIsoDay(m.endDate)
-  return end && end >= todayIso() ? m : null
+  return end && end > todayIso() ? m : null
 }
 
 export function personName(p: SalePerson | null): string {
@@ -186,7 +196,7 @@ export function apiErrorMessage(err: any, fallback: string): string {
 
 export interface MembershipOverlap {
   conflictingMembershipId: string
-  /** Last day of the clashing membership (YYYY-MM-DD). */
+  /** Last day the clashing membership covers (YYYY-MM-DD). */
   endDate: string
   /** The first day this sale could start instead. */
   nextStart: string
@@ -195,11 +205,12 @@ export interface MembershipOverlap {
 export function membershipOverlap(err: any): MembershipOverlap | null {
   const data = err?.response?.data
   if (err?.response?.status !== 409 || data?.code !== 'MEMBERSHIP_OVERLAP') return null
-  const endDate = toIsoDay(data?.details?.endDate)
+  // details.endDate is the clash's exclusive end: the first free day.
+  const freeFrom = toIsoDay(data?.details?.endDate)
   return {
     conflictingMembershipId: String(data?.details?.conflictingMembershipId || ''),
-    endDate,
-    nextStart: endDate ? addDays(endDate, 1) : '',
+    endDate: lastCoveredDay(freeFrom),
+    nextStart: freeFrom,
   }
 }
 
