@@ -69,6 +69,10 @@ const statusConfig: Record<string, StatusStyle> = {
     badge: 'bg-orange-50/60 text-orange-700 border-orange-200/50 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20',
     dot: 'bg-orange-500',
   },
+  upcoming: {
+    badge: 'bg-sky-50/60 text-sky-700 border-sky-200/50 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20',
+    dot: 'bg-sky-500',
+  },
   paused: {
     badge: 'bg-orange-50/60 text-orange-700 border-orange-200/50 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20',
     dot: 'bg-orange-500',

@@ -49,6 +49,7 @@ import {
   useDeleteMembership,
 } from '@/hooks/use-memberships'
 import { useLocationScope } from '@/components/location-scope-provider'
+import { useAuth } from '@/hooks/use-auth'
 
 function formatDateToInput(value?: string) {
   if (!value) return ''
@@ -93,6 +94,7 @@ function MembershipsPageContent() {
     endDate: '',
     notes: '',
     resumedAt: '',
+    reason: '',
   })
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 12
@@ -106,6 +108,10 @@ function MembershipsPageContent() {
   const updateMembership = useUpdateMembership()
   const deleteMembership = useDeleteMembership()
   const { selectedLocationId } = useLocationScope()
+  // A membership without an invoice bypasses billing, so only admins may make
+  // one (the backend enforces this too); everyone else sells through New sale.
+  const { role } = useAuth()
+  const isAdmin = role === 'super_admin' || role === 'clinic_admin'
 
   const assignUserId = searchParams.get('assignUserId') || ''
 
@@ -182,9 +188,13 @@ function MembershipsPageContent() {
 
 
   useEffect(() => {
-    if (!assignUserId || hasHandledAssignParam || users.length === 0) {
+    if (!assignUserId || hasHandledAssignParam) return
+    if (!isAdmin) {
+      setHasHandledAssignParam(true)
+      router.replace(`/admin/sales/new?userId=${encodeURIComponent(assignUserId)}`)
       return
     }
+    if (users.length === 0) return
 
     const matchedUser = users.find(
       (user) =>
@@ -223,7 +233,7 @@ function MembershipsPageContent() {
     setIsLockedMember(true)
     setIsAddDialogOpen(true)
     setHasHandledAssignParam(true)
-  }, [assignUserId, hasHandledAssignParam, users, memberships])
+  }, [assignUserId, hasHandledAssignParam, users, memberships, isAdmin])
 
   useEffect(() => {
     if (!selectedPlan || !formData.startDate) {
@@ -340,6 +350,11 @@ function MembershipsPageContent() {
       return
     }
 
+    if (!editingMembership && !formData.reason.trim()) {
+      toast.error('Give a reason for creating a membership without an invoice')
+      return
+    }
+
     const payload: Record<string, unknown> = {
       userId: formData.userId.trim(),
       planId: selectedPlan.id,
@@ -367,6 +382,7 @@ function MembershipsPageContent() {
       // still fix a note without moving the membership between branches.
       await createMembership.mutateAsync({
         ...payload,
+        reason: formData.reason.trim(),
         locationId: selectedLocationId ?? undefined,
       } as any)
     }
@@ -416,6 +432,7 @@ function MembershipsPageContent() {
       endDate: formatDateToInput(membership.endDate),
       notes: membership.notes,
       resumedAt: todayStr,
+      reason: '',
     })
     setIsLockedMember(true)
     setIsAddDialogOpen(true)
@@ -435,6 +452,7 @@ function MembershipsPageContent() {
       endDate: '',
       notes: '',
       resumedAt: '',
+      reason: '',
     })
     setIsLockedMember(false)
   }
@@ -449,6 +467,8 @@ function MembershipsPageContent() {
         return 'bg-red-100 text-red-800'
       case 'Expired':
         return 'bg-gray-200 text-gray-800'
+      case 'Upcoming':
+        return 'bg-sky-100 text-sky-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
@@ -466,22 +486,27 @@ function MembershipsPageContent() {
             <IconRefresh className="w-4 h-4 mr-1" /> Refresh
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => {
-                  setEditingMembership(null)
-                  resetForm()
-                }}
-              >
-                <IconPlus className="w-4 h-4 mr-2" />
-                Add Membership
-              </Button>
-            </DialogTrigger>
+            {isAdmin && (
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditingMembership(null)
+                    resetForm()
+                  }}
+                >
+                  <IconPlus className="w-4 h-4 mr-2" />
+                  Manual membership (no invoice)
+                </Button>
+              </DialogTrigger>
+            )}
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{editingMembership ? 'Edit Membership' : 'Create New Membership'}</DialogTitle>
+                <DialogTitle>{editingMembership ? 'Edit Membership' : 'Manual membership (no invoice)'}</DialogTitle>
                 <DialogDescription>
-                  {editingMembership ? 'Update membership details' : 'Add a new membership plan for a member'}
+                  {editingMembership
+                    ? 'Update membership details'
+                    : 'No invoice is raised and nothing is collected. To sell a plan, use New sale.'}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -701,6 +726,18 @@ function MembershipsPageContent() {
                     className="w-full px-3 py-2 border rounded-md h-20 resize-none"
                   />
                 </div>
+                {!editingMembership && (
+                  <div>
+                    <label className="text-sm font-medium">
+                      Reason <span className="text-red-600">*</span>
+                    </label>
+                    <Input
+                      value={formData.reason}
+                      onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                      placeholder="e.g. complimentary staff membership, migrated from old system"
+                    />
+                  </div>
+                )}
                 <div className="flex gap-2 pt-4">
                   <Button
                     variant="outline"
@@ -722,7 +759,7 @@ function MembershipsPageContent() {
                         : 'Save Changes'
                       : createMembership.isPending
                         ? 'Adding...'
-                        : 'Add Membership'}
+                        : 'Create without invoice'}
                   </Button>
                 </div>
               </div>
