@@ -54,7 +54,7 @@ export function InvoiceStep({
 
       <div className="rounded-xl border">
         <dl className="grid gap-3 p-5 text-sm sm:grid-cols-2">
-          <Item label="Customer" value={person.name} sub={[person.phone, PERSON_KIND[person.kind]].filter(Boolean).join(' · ')} />
+          <Item label="Customer" value={person.name} sub={[person.phone, person.kind === 'lead' && person.userId ? 'Lead · linked to the existing member account' : PERSON_KIND[person.kind]].filter(Boolean).join(' · ')} />
           <Item label="Branch" value={branchName || '—'} />
           <Item label="Plan" value={plan.planName} />
           <Item label="Runs" value={`${formatDay(startDate)} → ${formatDay(endDate)}`} />

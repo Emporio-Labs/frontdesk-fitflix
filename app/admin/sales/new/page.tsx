@@ -106,6 +106,12 @@ function renewPlan(locationId: string | null, current: LookupMembership): SalePl
   }
 }
 
+/** An unpopulated `userId` comes back without a name: keep the one the flow already knows. */
+function withPersonName(invoice: Invoice, name?: string): Invoice {
+  if (invoice.userId?.name || invoice.lead?.name || !name) return invoice
+  return { ...invoice, userId: { ...invoice.userId, name } }
+}
+
 /** After an invoice exists the account is resolved: carry it, so a re-raise can't create a second lead. */
 function personFromInvoice(invoice: Invoice, prev: SalePerson | null): SalePerson {
   const userId = invoice.userId?.id || ''
@@ -430,7 +436,7 @@ function NewSaleFlow({ leadId, userId, renew, invoiceId, onRestart }: FlowProps)
         idempotencyKey.current = newIdempotencyKey()
         res = await createInvoice.mutateAsync({ payload, idempotencyKey: idempotencyKey.current })
       }
-      setInvoice(res.invoice)
+      setInvoice(withPersonName(res.invoice, who.name))
       setPerson(personFromInvoice(res.invoice, who))
       setJustCreated(true)
       setPayError(null)
@@ -459,7 +465,7 @@ function NewSaleFlow({ leadId, userId, renew, invoiceId, onRestart }: FlowProps)
         id: invoice.id,
         payload: { paymentStatus: 'PAID', paymentMethod: method, ...(reference ? { paymentReference: reference } : {}) },
       })
-      setInvoice(res.invoice.id ? res.invoice : { ...invoice, paymentStatus: 'PAID' })
+      setInvoice(withPersonName(res.invoice.id ? res.invoice : { ...invoice, paymentStatus: 'PAID' }, invoice.userId?.name || invoice.lead?.name || person?.name))
       setMembership(res.membership ?? null)
       setPaidWith(method)
       setStep(5)
