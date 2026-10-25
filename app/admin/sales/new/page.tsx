@@ -172,6 +172,8 @@ function NewSaleFlow({ leadId, userId, renew, invoiceId, onRestart }: FlowProps)
   const [chosenPlan, setChosenPlan] = useState<MembershipPlan | null>(null)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [justCreated, setJustCreated] = useState(false)
+  // The buyer had no account before this invoice (backend created one).
+  const [accountCreated, setAccountCreated] = useState(false)
   const [paidWith, setPaidWith] = useState<InvoicePaymentMethod | null>(null)
   const [membership, setMembership] = useState<Membership | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -437,6 +439,7 @@ function NewSaleFlow({ leadId, userId, renew, invoiceId, onRestart }: FlowProps)
         res = await createInvoice.mutateAsync({ payload, idempotencyKey: idempotencyKey.current })
       }
       setInvoice(withPersonName(res.invoice, who.name))
+      setAccountCreated(who.kind === 'new' || (who.kind === 'lead' && !who.userId))
       setPerson(personFromInvoice(res.invoice, who))
       setJustCreated(true)
       setPayError(null)
@@ -614,7 +617,7 @@ function NewSaleFlow({ leadId, userId, renew, invoiceId, onRestart }: FlowProps)
         <PaymentStep
           invoice={invoice}
           justCreated={justCreated}
-          isNewAccount={justCreated && (person?.kind === 'new' || (person?.kind === 'lead' && !person.userId))}
+          isNewAccount={justCreated && accountCreated}
           branchName={branchName}
           planName={planName}
           startDate={startDate}

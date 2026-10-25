@@ -47,6 +47,7 @@ interface Props {
   invoice: Invoice
   /** True right after this flow created the invoice (vs. resumed from a link). */
   justCreated: boolean
+  /** The buyer came in as a lead or new person, so the invoice resolved (or created) their account. */
   isNewAccount: boolean
   branchName: string
   planName: string
@@ -96,7 +97,7 @@ export function PaymentStep({
           <IconCircleCheck className="mt-0.5 size-4 shrink-0" />
           <span>
             Invoice <b>{invoice.invoiceNumber}</b> created, <b>pending</b>.
-            {isNewAccount && ` Account created for ${name}${branchName ? ` (home club ${branchName})` : ''}.`} Nothing is active
+            {isNewAccount && ` ${name}'s account is set up and the lead is linked to it.`} Nothing is active
             until payment is recorded.
           </span>
         </div>
