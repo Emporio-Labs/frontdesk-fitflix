@@ -666,7 +666,7 @@ export default function UsersPage() {
 
         {/* ─── MEMBERS TAB ─── */}
         <TabsContent value="members" className="mt-4 space-y-4">
-          {/* Top Actions Row: Search + Refresh + Add Member */}
+          {/* Top Actions Row: Search + Refresh + New sale */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:max-w-sm">
               <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
@@ -693,14 +693,20 @@ export default function UsersPage() {
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex flex-wrap items-center justify-end gap-2 self-end sm:self-auto">
               <Button variant="outline" size="sm" onClick={() => refetchUsers()} className="h-9 px-3 text-xs">
                 <IconRefresh className="w-4 h-4 mr-1.5" /> Refresh
               </Button>
+              {/* A paying member comes through New sale; the bare account is the exception. */}
+              <Button asChild size="sm" className="h-9 px-3 text-xs font-semibold">
+                <Link href="/admin/sales/new">
+                  <IconPlus className="w-4 h-4 mr-1.5" /> New sale
+                </Link>
+              </Button>
               <Dialog open={isMemberDialogOpen} onOpenChange={(o) => { if (!o) handleCloseMemberDialog() }}>
                 <DialogTrigger asChild>
-                  <Button onClick={openCreateMemberModal} size="sm" className="h-9 px-3 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
-                    <IconPlus className="w-4 h-4 mr-1.5" /> Add Member
+                  <Button onClick={openCreateMemberModal} variant="outline" size="sm" className="h-9 px-3 text-xs">
+                    Create account without plan
                   </Button>
                 </DialogTrigger>
                 <DialogContent
@@ -1149,8 +1155,8 @@ export default function UsersPage() {
                               <div className="flex justify-end items-center gap-1.5">
                                 {!membership && (
                                   <Button asChild size="sm" className="h-8 px-2.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm">
-                                    <Link href={`/admin/memberships?assignUserId=${encodeURIComponent(user._id)}`}>
-                                      Assign Membership
+                                    <Link href={`/admin/sales/new?userId=${encodeURIComponent(user._id)}`}>
+                                      Sell plan
                                     </Link>
                                   </Button>
                                 )}

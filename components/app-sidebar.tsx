@@ -32,6 +32,8 @@ import {
   IconStethoscope,
   IconApple,
   IconVideo,
+  IconCirclePlus,
+  IconRefresh,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -57,9 +59,19 @@ const navGroups = [
     ],
   },
   {
+    label: "Sales",
+    items: [
+      { title: "New sale", url: "/admin/sales/new", icon: IconCirclePlus },
+      { title: "Leads", url: "/admin/leads", icon: IconTarget },
+      { title: "Renewals", url: "/admin/renewals", icon: IconRefresh },
+      { title: "Invoices", url: "/admin/invoices", icon: IconFileInvoice },
+    ],
+  },
+  {
     label: "People",
     items: [
-      { title: "Users", url: "/admin/users", icon: IconUsers },
+      { title: "Members", url: "/admin/users", icon: IconUsers },
+      { title: "Memberships", url: "/admin/memberships", icon: IconHeartHandshake },
       { title: "Trainers", url: "/admin/trainers", icon: IconRun },
     ],
   },
@@ -85,20 +97,10 @@ const navGroups = [
     ],
   },
   {
-    label: "Commerce",
-    items: [
-      { title: "Memberships", url: "/admin/memberships", icon: IconHeartHandshake },
-      { title: "Membership Plans", url: "/admin/membership-plans", icon: IconCards },
-      { title: "Credits", url: "/admin/credits", icon: IconCreditCard },
-      { title: "Invoices", url: "/admin/invoices", icon: IconFileInvoice },
-    ],
-  },
-  {
     label: "Insights",
     items: [
       { title: "Concierge Alerts", url: "/admin/alerts", icon: IconBellRinging },
       { title: "Funnels & Drop-offs", url: "/admin/analytics/funnels", icon: IconActivity },
-      { title: "Leads", url: "/admin/leads", icon: IconTarget },
       { title: "Promotions", url: "/admin/promotions", icon: IconSpeakerphone },
       { title: "App Copy", url: "/admin/content", icon: IconArticle },
       { title: "DNA Testing", url: "/admin/dna", icon: IconDna },
@@ -116,6 +118,8 @@ const navGroups = [
     label: "Admin",
     items: [
       { title: "Locations", url: "/admin/locations", icon: IconBuildingStore },
+      { title: "Membership Plans", url: "/admin/membership-plans", icon: IconCards },
+      { title: "Credits", url: "/admin/credits", icon: IconCreditCard },
       { title: "Settings", url: "/admin/settings", icon: IconSettings },
     ],
   },

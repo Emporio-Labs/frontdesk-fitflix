@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { Badge } from '@/components/ui/badge'
@@ -13,22 +14,20 @@ import {
 import { Lead, LeadTemperature } from '@/lib/services/lead.service'
 import {
   IconBrandWhatsapp,
-  IconCheck,
+  IconCreditCard,
   IconEdit,
   IconGripVertical,
   IconMessage,
   IconPhone,
-  IconFileInvoice,
+  IconShoppingCart,
 } from '@tabler/icons-react'
 
 interface KanbanCardProps {
   lead: Lead
-  onConvert: () => void
   onEdit: () => void
   onCall: () => void
   onWhatsApp: () => void
   onAddNote: () => void
-  onInvoice?: () => void
   isPending: boolean
   source: string
   isFollowUpToday: boolean
@@ -38,12 +37,10 @@ interface KanbanCardProps {
 
 export default function KanbanCard({
   lead,
-  onConvert,
   onEdit,
   onCall,
   onWhatsApp,
   onAddNote,
-  onInvoice,
   isPending,
   source,
   isFollowUpToday,
@@ -98,6 +95,11 @@ export default function KanbanCard({
     }
   }
 
+  const awaitingPayment = !!lead.pendingInvoiceId && lead.status !== 'converted'
+  const saleHref = lead.pendingInvoiceId
+    ? `/admin/sales/new?invoiceId=${encodeURIComponent(lead.pendingInvoiceId)}`
+    : `/admin/sales/new?leadId=${encodeURIComponent(lead.id)}`
+
   const handleAction = (actionFn: () => void) => {
     setIsDetailsOpen(false)
     actionFn()
@@ -140,6 +142,11 @@ export default function KanbanCard({
             {lead.status}
           </Badge>
           <Badge variant="outline">{lead.source}</Badge>
+          {awaitingPayment && (
+            <Badge className="bg-amber-100 text-amber-800" variant="secondary">
+              Awaiting payment
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -157,6 +164,11 @@ export default function KanbanCard({
                 {lead.status}
               </Badge>
               <Badge variant="outline">{lead.source}</Badge>
+              {awaitingPayment && (
+                <Badge className="bg-amber-100 text-amber-800" variant="secondary">
+                  Awaiting payment
+                </Badge>
+              )}
             </div>
           </DialogHeader>
 
@@ -272,30 +284,25 @@ export default function KanbanCard({
               <IconMessage className="w-4 h-4 mr-1.5" />
               Note
             </Button>
-            {lead.status !== 'converted' && onInvoice && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-blue-600 hover:text-blue-700 hover:bg-blue-100 flex-1 h-9"
-                disabled={isPending}
-                onClick={() => handleAction(onInvoice)}
-                title="Convert & Invoice"
-              >
-                <IconFileInvoice className="w-4 h-4 mr-1.5" />
-                Invoice
-              </Button>
-            )}
             {lead.status !== 'converted' && (
               <Button
                 size="sm"
-                variant="outline"
-                className="text-green-600 hover:text-green-700 hover:bg-green-100 flex-1 h-9"
-                disabled={isPending}
-                onClick={() => handleAction(onConvert)}
-                title="Convert lead"
+                className="flex-1 h-9"
+                asChild
               >
-                <IconCheck className="w-4 h-4 mr-1.5" />
-                Convert
+                <Link href={saleHref} onClick={() => setIsDetailsOpen(false)}>
+                  {awaitingPayment ? (
+                    <>
+                      <IconCreditCard className="w-4 h-4 mr-1.5" />
+                      Resume payment
+                    </>
+                  ) : (
+                    <>
+                      <IconShoppingCart className="w-4 h-4 mr-1.5" />
+                      Sell plan
+                    </>
+                  )}
+                </Link>
               </Button>
             )}
             <Button

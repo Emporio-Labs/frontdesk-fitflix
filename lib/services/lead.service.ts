@@ -54,6 +54,10 @@ export interface Lead {
    * in-app activity before someone calls them.
    */
   convertedUserId: string
+  /** Branch the lead is for (a `Location._id`), when one was recorded. */
+  locationId: string
+  /** The lead's unpaid sale invoice, when one is waiting for payment. */
+  pendingInvoiceId: string
   interactions: LeadInteraction[]
   fcmTokens: string[]
   stageHistory: LeadStageHistory[]
@@ -233,6 +237,8 @@ function normalizeLead(raw: any): Lead {
     isDeleted: Boolean(raw?.isDeleted),
     revision: Number(raw?.revision ?? 0),
     convertedUserId,
+    locationId: refId(raw?.locationId),
+    pendingInvoiceId: refId(raw?.pendingInvoiceId),
     interactions: Array.isArray(raw?.interactions)
       ? raw.interactions.map((item: any) => ({
           id: String(item?._id || item?.id || ''),
@@ -245,6 +251,12 @@ function normalizeLead(raw: any): Lead {
     fcmTokens: Array.isArray(raw?.fcmTokens) ? raw.fcmTokens.map((t: unknown) => String(t)) : [],
     stageHistory,
   }
+}
+
+/** An id that may arrive as a string or as a populated `{ _id }` object. */
+function refId(value: any): string {
+  if (!value) return ''
+  return typeof value === 'string' ? value : String(value?._id || value?.id || '')
 }
 
 function extractRawLeads(payload: any): any[] {

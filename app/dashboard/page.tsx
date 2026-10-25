@@ -11,6 +11,7 @@ import {
 import {
   IconUsers, IconRun, IconCalendarEvent,
   IconClock, IconTrendingUp, IconRefresh,
+  IconShoppingCart, IconCreditCard, IconRepeat, IconPhoneCall,
 } from '@tabler/icons-react'
 import { useMemo } from 'react'
 import { useUsers } from '@/hooks/use-users'
@@ -22,6 +23,15 @@ import { useTherapies } from '@/hooks/use-therapies'
 import { useGroupClasses } from '@/hooks/use-group-classes'
 import { BOOKING_STATUS } from '@/lib/services/booking.service'
 import { getBookingServiceName } from '@/lib/populated'
+import { useInvoices } from '@/hooks/use-invoices'
+import { useRenewalReminders } from '@/hooks/use-memberships'
+import { useLeadReminders } from '@/hooks/use-leads'
+import { useOptionalLocationScope } from '@/components/location-scope-provider'
+import type { Invoice } from '@/lib/services/invoice.service'
+
+function formatINR(amount: number) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
+}
 
 const STATUS_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6b7280']
 
@@ -33,6 +43,36 @@ export default function DashboardPage() {
   const { data: services = [] } = useServices()
   const { data: therapies = [] } = useTherapies()
   const { data: groupClasses = [] } = useGroupClasses()
+  const { data: invoices = [], isLoading: invoicesLoading, refetch: refetchInvoices } = useInvoices()
+  const { data: renewals, isLoading: renewalsLoading } = useRenewalReminders()
+  const { data: leadReminders, isLoading: leadRemindersLoading } = useLeadReminders()
+  const branchId = useOptionalLocationScope()?.selectedLocationId ?? null
+
+  // ── Desk queue (branch-scoped) ────────────────────────────────────────────────
+  // Invoices don't carry a branch on the client type yet, so fall back to the
+  // member's home club; anything with no known branch shows everywhere.
+  const homeClubByUserId = useMemo(
+    () => new Map(users.map((u) => [u.id, u.homeClubId ?? null] as const)),
+    [users]
+  )
+  const inBranch = (branch: string | null | undefined) => !branchId || !branch || branch === branchId
+  const awaitingPayment = useMemo(
+    () =>
+      invoices
+        .filter((inv) => inv.paymentStatus === 'DRAFT' || inv.paymentStatus === 'PENDING')
+        .filter((inv) =>
+          inBranch((inv as Invoice & { locationId?: string }).locationId ?? homeClubByUserId.get(inv.userId.id))
+        )
+        .sort((a, b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [invoices, homeClubByUserId, branchId]
+  )
+  const renewalsDue = useMemo(
+    () => (renewals?.dueThisWeek ?? []).filter((t) => inBranch(homeClubByUserId.get(t.userId))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [renewals, homeClubByUserId, branchId]
+  )
+  const followUpsToday = leadReminders?.today ?? []
 
   const itemNameById = useMemo(
     () =>
@@ -62,6 +102,7 @@ export default function DashboardPage() {
   const handleRefreshAll = () => {
     refetchUsers()
     refetchBookings()
+    refetchInvoices()
   }
 
   return (
@@ -76,6 +117,62 @@ export default function DashboardPage() {
         <Button variant="outline" size="sm" onClick={handleRefreshAll}>
           <IconRefresh className="w-4 h-4 mr-1" /> Refresh
         </Button>
+      </div>
+
+      {/* ── Desk queue ─────────────────────────────────────────────────────── */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <QueueCard
+          title="Awaiting payment"
+          description="Unpaid invoices — collect and activate"
+          icon={<IconCreditCard className="w-4 h-4 text-amber-600" />}
+          count={awaitingPayment.length}
+          loading={invoicesLoading}
+          viewAllHref="/admin/invoices"
+          empty="Nothing waiting on payment."
+          rows={awaitingPayment.slice(0, 5).map((inv) => ({
+            key: inv.id,
+            primary: inv.userId?.name || inv.lead?.name || 'Unknown',
+            secondary: `${inv.invoiceNumber} · ${formatINR(inv.total)}`,
+            actionLabel: 'Resume',
+            actionHref: `/admin/sales/new?invoiceId=${encodeURIComponent(inv.id)}`,
+          }))}
+        />
+        <QueueCard
+          title="Renewals due this week"
+          description="Memberships expiring in the next 7 days"
+          icon={<IconRepeat className="w-4 h-4 text-violet-600" />}
+          count={renewalsDue.length}
+          loading={renewalsLoading}
+          viewAllHref="/admin/renewals"
+          empty="No renewals due this week."
+          rows={renewalsDue.slice(0, 5).map((t) => ({
+            key: t.membershipId,
+            primary: t.memberName,
+            secondary: `${t.planName} · ends ${t.endDateIst}`,
+            actionLabel: 'Renew',
+            actionHref: t.memberUnknown
+              ? undefined
+              : `/admin/sales/new?userId=${encodeURIComponent(t.userId)}&mode=renew`,
+          }))}
+        />
+        <QueueCard
+          title="Lead follow-ups today"
+          description="Leads scheduled for a call today"
+          icon={<IconPhoneCall className="w-4 h-4 text-blue-600" />}
+          count={followUpsToday.length}
+          loading={leadRemindersLoading}
+          viewAllHref="/admin/leads"
+          empty="No follow-ups scheduled for today."
+          rows={followUpsToday.slice(0, 5).map((lead) => ({
+            key: lead.id,
+            primary: lead.name,
+            secondary: lead.phone || 'No phone',
+            actionLabel: lead.pendingInvoiceId ? 'Resume' : 'Sell plan',
+            actionHref: lead.pendingInvoiceId
+              ? `/admin/sales/new?invoiceId=${encodeURIComponent(lead.pendingInvoiceId)}`
+              : `/admin/sales/new?leadId=${encodeURIComponent(lead.id)}`,
+          }))}
+        />
       </div>
 
       {/* ── Operational Stats ──────────────────────────────────────────────── */}
@@ -166,8 +263,8 @@ export default function DashboardPage() {
           <CardDescription>Jump to common tasks</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-2">
-          <Button asChild variant="outline" className="h-12 text-sm">
-            <Link href="/admin/users"><IconUsers className="w-4 h-4 mr-2" />Add Member</Link>
+          <Button asChild className="h-12 text-sm">
+            <Link href="/admin/sales/new"><IconShoppingCart className="w-4 h-4 mr-2" />New sale</Link>
           </Button>
           <Button asChild variant="outline" className="h-12 text-sm">
             <Link href="/admin/bookings"><IconCalendarEvent className="w-4 h-4 mr-2" />New Booking</Link>
@@ -209,6 +306,59 @@ function StatCard({
         </CardContent>
       </Card>
     </Link>
+  )
+}
+
+function QueueCard({
+  title, description, icon, count, loading, viewAllHref, empty, rows,
+}: {
+  title: string
+  description: string
+  icon: React.ReactNode
+  count: number
+  loading: boolean
+  viewAllHref: string
+  empty: string
+  rows: Array<{ key: string; primary: string; secondary: string; actionLabel: string; actionHref?: string }>
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base">
+            {icon} {title}
+            {!loading && <Badge variant="secondary">{count}</Badge>}
+          </CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </div>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={viewAllHref}>View all →</Link>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
+        ) : rows.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">{empty}</p>
+        ) : (
+          <div className="space-y-1">
+            {rows.map((row) => (
+              <div key={row.key} className="flex items-center justify-between gap-2 border-b py-2 last:border-0">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{row.primary}</p>
+                  <p className="truncate text-xs text-muted-foreground">{row.secondary}</p>
+                </div>
+                {row.actionHref && (
+                  <Button size="sm" variant="outline" className="shrink-0" asChild>
+                    <Link href={row.actionHref}>{row.actionLabel}</Link>
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
