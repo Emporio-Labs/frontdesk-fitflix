@@ -17,6 +17,7 @@ import {
   IconClock,
   IconDna,
   IconHistory,
+  IconLogin,
   IconTarget,
   IconRun,
   IconCards,
@@ -37,7 +38,7 @@ import Image from 'next/image'
 
 import { NavMain } from '@/components/nav-main'
 import { NavUser } from '@/components/nav-user'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth, useCanAccess } from '@/hooks/use-auth'
 import { getRoleStartPage } from '@/app/context/auth-context'
 import {
   Sidebar,
@@ -159,9 +160,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: '/placeholder-user.jpg',
   }
 
+  const canViewLoginActivity = useCanAccess('login_activity', 'read')
   const isTrainer = user?.role === 'trainer'
   const isNutritionist = user?.role === 'nutritionist'
-  const groups = isTrainer ? navTrainerGroup : isNutritionist ? navNutritionistGroup : navGroups
+  const adminGroups = canViewLoginActivity
+    ? navGroups.map((g) =>
+        g.label === 'Insights'
+          ? { ...g, items: [...g.items, { title: 'Login Activity', url: '/admin/login-activity', icon: IconLogin }] }
+          : g
+      )
+    : navGroups
+  const groups = isTrainer ? navTrainerGroup : isNutritionist ? navNutritionistGroup : adminGroups
   const brandHref = isTrainer
     ? '/admin/personal-training/today'
     : isNutritionist
