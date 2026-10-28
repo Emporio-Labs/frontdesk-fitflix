@@ -45,6 +45,8 @@ export interface Location {
   email?: string
   timezone: string
   isActive: boolean
+  /** Opening day of a branch still in presale (ISO date); past or absent = open. */
+  opensOn?: string | null
   settings?: LocationSettings
   createdAt?: string
   updatedAt?: string

@@ -17,6 +17,27 @@ export function useMembershipPlans() {
   })
 }
 
+/**
+ * Active plans sellable at one branch, still within `availableUntil`,
+ * founding plans first. Filters client-side too, so a backend that ignores
+ * `?locationId=` still yields only this branch's and all-branch plans.
+ */
+export function useMembershipPlansForLocation(locationId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.membershipPlans.forLocation(locationId ?? ''),
+    queryFn: () => membershipPlanService.getForLocation(locationId as string),
+    enabled: !!locationId,
+    select: (data) => {
+      const today = new Date().toISOString().slice(0, 10)
+      return data.plans
+        .filter((p) => p.status === 'Active')
+        .filter((p) => !p.locationId || p.locationId === locationId)
+        .filter((p) => !p.availableUntil || p.availableUntil.slice(0, 10) >= today)
+        .sort((a, b) => Number(b.isFounding) - Number(a.isFounding) || a.totalPrice - b.totalPrice)
+    },
+  })
+}
+
 export function useMembershipPlan(id: string) {
   return useQuery({
     queryKey: queryKeys.membershipPlans.detail(id),
