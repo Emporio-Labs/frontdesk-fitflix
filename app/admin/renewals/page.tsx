@@ -9,12 +9,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { IconAlertTriangle, IconPhone, IconRefresh, IconRepeat } from '@tabler/icons-react'
 import { useRenewalReminders } from '@/hooks/use-memberships'
 import type { RenewalTarget } from '@/lib/services/membership.service'
+import { toIsoDay } from '@/components/sales/sale-utils'
 
+// Stored at branch (IST) midnight: read as an IST day, not a UTC slice.
 function formatDateOnly(value?: string) {
-  if (!value) return '-'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value.split('T')[0] || value
-  return d.toISOString().slice(0, 10)
+  return toIsoDay(value) || '-'
 }
 
 function renewalDayLabel(days: number) {
