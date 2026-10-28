@@ -39,6 +39,7 @@ import { UserDetailsDialog } from '@/components/users/user-details-dialog'
 import { useLocationScope } from '@/components/location-scope-provider'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { toIsoDay } from '@/components/sales/sale-utils'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -436,14 +437,8 @@ export default function UsersPage() {
     setMemberPage(1)
   }
 
-  const formatDateOnly = (value?: string) => {
-    if (!value) return '-'
-    const parsed = new Date(value)
-    if (Number.isNaN(parsed.getTime())) {
-      return value.split('T')[0] || value
-    }
-    return parsed.toISOString().slice(0, 10)
-  }
+  // Membership dates are stored at branch (IST) midnight: read them as IST days.
+  const formatDateOnly = (value?: string) => toIsoDay(value) || '-'
 
   const formatJoinedDate = (dateVal?: string) => {
     if (!dateVal) return '—'

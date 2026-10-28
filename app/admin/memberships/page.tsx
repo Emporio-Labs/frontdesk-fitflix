@@ -50,19 +50,16 @@ import {
 } from '@/hooks/use-memberships'
 import { useLocationScope } from '@/components/location-scope-provider'
 import { useAuth } from '@/hooks/use-auth'
+import { toIsoDay } from '@/components/sales/sale-utils'
 
+// Membership dates are stored at branch (IST) midnight, i.e. 18:30 UTC the day
+// before, so they must be read as IST calendar days, never sliced as UTC.
 function formatDateToInput(value?: string) {
-  if (!value) return ''
-  return value.split('T')[0] || ''
+  return toIsoDay(value)
 }
 
 function formatDateOnly(value?: string) {
-  if (!value) return '-'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) {
-    return value.split('T')[0] || value
-  }
-  return parsed.toISOString().slice(0, 10)
+  return toIsoDay(value) || '-'
 }
 
 function formatPrice(amount: number | string, currency?: string) {
