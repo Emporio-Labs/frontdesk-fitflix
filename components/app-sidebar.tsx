@@ -165,7 +165,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const isTrainer = user?.role === 'trainer'
   const isNutritionist = user?.role === 'nutritionist'
-  const groups = isTrainer ? navTrainerGroup : isNutritionist ? navNutritionistGroup : navGroups
+  // A trainer an admin has given lead access also gets the lead board.
+  const trainerGroups = user?.canAccessLeads
+    ? navTrainerGroup.map((g) => ({
+        ...g,
+        items: [...g.items.slice(0, 1), { title: "Leads", url: "/admin/leads", icon: IconTarget }, ...g.items.slice(1)],
+      }))
+    : navTrainerGroup
+  const groups = isTrainer ? trainerGroups : isNutritionist ? navNutritionistGroup : navGroups
   const brandHref = isTrainer
     ? '/admin/personal-training/today'
     : isNutritionist

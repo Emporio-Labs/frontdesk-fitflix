@@ -32,12 +32,11 @@ import {
 import { AlertSlaReportsView } from '@/components/alerts/alert-sla-reports-view'
 import {
   useLeads,
-  useUpdateLead,
-  useRecordLeadContactAttempt,
-  useAddLeadInteraction,
+  useLogLeadActivity,
 } from '@/hooks/use-leads'
 import { useUsers } from '@/hooks/use-users'
 import { Lead } from '@/lib/services/lead.service'
+import { LogOutcomeDialog } from '@/components/leads/log-outcome-dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -118,9 +117,9 @@ export default function ConciergeAlertsPage() {
 
   const { data: leads = [], isLoading: leadsLoading, refetch: refetchLeads } = useLeads()
   const { data: users = [] } = useUsers()
-  const updateLead = useUpdateLead()
-  const recordContact = useRecordLeadContactAttempt()
-  const addInteraction = useAddLeadInteraction()
+  const logActivity = useLogLeadActivity()
+  // "Done" on a callback asks what happened instead of just flipping status.
+  const [logLead, setLogLead] = useState<Lead | null>(null)
 
   // Real-time 1s tick
   useEffect(() => {
@@ -232,9 +231,9 @@ export default function ConciergeAlertsPage() {
   const handleSaveNote = async () => {
     if (!selectedLead || !noteText.trim()) return
     try {
-      await addInteraction.mutateAsync({
+      await logActivity.mutateAsync({
         id: selectedLead.id,
-        note: noteText.trim(),
+        payload: { type: 'note', note: noteText.trim() },
       })
       toast.success('Note added to lead timeline')
       setNoteDialogOpen(false)
@@ -750,19 +749,7 @@ export default function ConciergeAlertsPage() {
                             size="sm"
                             variant="default"
                             className="h-8 text-xs gap-1"
-                            onClick={async () => {
-                              await recordContact.mutateAsync({
-                                id: lead.id,
-                                channel: 'call',
-                              })
-                              await updateLead.mutateAsync({
-                                id: lead.id,
-                                payload: {
-                                  status: 'contacted',
-                                },
-                              })
-                              toast.success(`Contact recorded for ${lead.name}`)
-                            }}
+                            onClick={() => setLogLead(lead)}
                           >
                             <IconCheck className="h-3.5 w-3.5" />
                             Done
@@ -869,6 +856,8 @@ export default function ConciergeAlertsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LogOutcomeDialog lead={logLead} open={!!logLead} onOpenChange={(o) => !o && setLogLead(null)} />
     </div>
   )
 }

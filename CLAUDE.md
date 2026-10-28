@@ -222,3 +222,26 @@ instead of the drag-and-drop builder. Parsing and validation happen on the **bac
   `components/workouts/plan-builder-layout.tsx` toolbar (edit mode only; exports the last *saved* version).
 - `lib/download.ts` — `saveBlob(blob, filename)` and `fileSlug(name)` helpers for blob downloads.
 - The template's drop-downs/validation are generated server-side; no spreadsheet library in the frontdesk.
+
+---
+
+## Lead flow (outcomes + timeline)
+
+Staff never just "mark contacted": every call, WhatsApp or visit opens **"What happened?"**
+(`components/leads/log-outcome-dialog.tsx`) and the backend moves the lead.
+
+- Outcomes, lost reasons and rules come from `GET /leads/outcomes` (backend
+  `src/utils/lead-outcomes.ts` is the source of truth; don't hardcode outcome lists here).
+  "Something else…" takes free text, a target stage and a "we spoke" switch.
+- `POST /leads/:id/activities` logs a note or outcome; `GET /leads/:id/activities` is the
+  timeline (`components/leads/lead-timeline.tsx`). Every open outcome needs a next follow-up;
+  Lost needs a reason. 3 no-answers in a row → Cold; 6 over 7+ days → "Close as Lost?" prompt.
+- Stages: `new → contacted → visit_booked → qualified` (shown as **Visited**) → `converted`
+  (shown as **Joined**, payment only) / `lost`. Backend status `VisitBooked` needs `visitAt`.
+- Temperature is a real `Lead.temperature` field now (old `temperature:x` tags are read as a fallback).
+- `app/admin/leads/page.tsx`: tabs **Today** (overdue / visits today / due today / new not called /
+  awaiting payment), **Board** (dragging a card asks what happened), **All leads**, **Analytics**
+  (`GET /leads/analytics`, admin/front desk only).
+- Trainers: `Trainer.canAccessLeads` (admin switch on /admin/trainers, returned at login as
+  `user.canAccessLeads`). Without it they can add a referral lead but get 403 on everything else.
+- `lib/server/leads-store.ts` and `app/api/leads/*` are an old local store/proxy and unused by these pages.

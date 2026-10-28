@@ -85,6 +85,7 @@ export default function LoginPage() {
         name: apiUser?.email ?? email,
         email: apiUser?.email ?? email,
         role: mappedRole,
+        ...(mappedRole === 'trainer' ? { canAccessLeads: Boolean(apiUser?.canAccessLeads) } : {}),
       })
       toast.success('Welcome back!')
       // Redirect is handled inside login() via window.location.href

@@ -147,6 +147,10 @@ const statusConfig: Record<string, StatusStyle> = {
     badge: 'bg-indigo-50/60 text-indigo-700 border-indigo-200/50 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20',
     dot: 'bg-indigo-500',
   },
+  visit_booked: {
+    badge: 'bg-violet-50/60 text-violet-700 border-violet-200/50 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20',
+    dot: 'bg-violet-500',
+  },
 }
 
 export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {

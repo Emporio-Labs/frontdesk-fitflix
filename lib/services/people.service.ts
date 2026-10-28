@@ -167,7 +167,7 @@ export function buildLookupFallback(
         }
       }),
     leads: leads
-      .filter((l) => !l.isDeleted && l.status !== 'converted' && matches(l.name, l.phone))
+      .filter((l) => l.status !== 'converted' && matches(l.name, l.phone))
       .slice(0, 10)
       .map((l) => ({
         _id: l.id,

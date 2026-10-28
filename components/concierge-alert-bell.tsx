@@ -16,7 +16,8 @@ import {
   IconShield,
   IconChecklist,
 } from '@tabler/icons-react'
-import { useLeads, useUpdateLead, useRecordLeadContactAttempt } from '@/hooks/use-leads'
+import { useLeads } from '@/hooks/use-leads'
+import { LogOutcomeDialog } from '@/components/leads/log-outcome-dialog'
 import { Lead } from '@/lib/services/lead.service'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -54,8 +55,8 @@ export function ConciergeAlertBell() {
 
   // In-app purchase and concierge leads
   const { data: leads = [] } = useLeads()
-  const updateLead = useUpdateLead()
-  const recordContact = useRecordLeadContactAttempt()
+  // Marking a callback done asks what happened, like everywhere else.
+  const [logLead, setLogLead] = useState<Lead | null>(null)
 
   // Keep a 1-second interval for countdown timers
   useEffect(() => {
@@ -79,23 +80,7 @@ export function ConciergeAlertBell() {
 
   const totalUrgentCount = openAlerts.length + activeCallbacks.length
 
-  const handleMarkContacted = async (lead: Lead) => {
-    try {
-      await recordContact.mutateAsync({
-        id: lead.id,
-        channel: 'call',
-      })
-      await updateLead.mutateAsync({
-        id: lead.id,
-        payload: {
-          status: 'contacted',
-        },
-      })
-      toast.success(`Contact recorded for ${lead.name}`)
-    } catch {
-      toast.error('Failed to update lead status')
-    }
-  }
+  const handleMarkContacted = (lead: Lead) => setLogLead(lead)
 
   const formatTime = (iso?: string) => {
     if (!iso) return ''
@@ -108,6 +93,7 @@ export function ConciergeAlertBell() {
   }
 
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
@@ -373,5 +359,7 @@ export function ConciergeAlertBell() {
         </div>
       </PopoverContent>
     </Popover>
+    <LogOutcomeDialog lead={logLead} open={!!logLead} onOpenChange={(o) => !o && setLogLead(null)} />
+    </>
   )
 }

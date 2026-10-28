@@ -39,6 +39,7 @@ type TrainerFormState = {
   imageUrl: string
   keySentence: string
   isActive: boolean
+  canAccessLeads: boolean
 }
 
 function defaultTrainerForm(): TrainerFormState {
@@ -52,6 +53,7 @@ function defaultTrainerForm(): TrainerFormState {
     imageUrl: '',
     keySentence: '',
     isActive: true,
+    canAccessLeads: false,
   }
 }
 
@@ -105,7 +107,8 @@ export default function TrainersPage() {
         formData.specialitiesInput !== (editingTrainer.specialities?.join(', ') || '') ||
         formData.imageUrl !== (editingTrainer.imageUrl || '') ||
         formData.keySentence !== (editingTrainer.keySentence || '') ||
-        formData.isActive !== (editingTrainer.isActive !== false)
+        formData.isActive !== (editingTrainer.isActive !== false) ||
+        formData.canAccessLeads !== Boolean(editingTrainer.canAccessLeads)
       )
     }
     return Boolean(
@@ -188,6 +191,7 @@ export default function TrainersPage() {
       imageUrl: trainer.imageUrl || '',
       keySentence: trainer.keySentence || '',
       isActive: trainer.isActive !== false,
+      canAccessLeads: Boolean(trainer.canAccessLeads),
     })
     setIsDialogOpen(true)
   }
@@ -234,6 +238,7 @@ export default function TrainersPage() {
             imageUrl: formData.imageUrl,
             keySentence: formData.keySentence,
             isActive: formData.isActive,
+            canAccessLeads: formData.canAccessLeads,
             ...(formData.password.trim() ? { password: formData.password.trim() } : {}),
           },
         })
@@ -242,6 +247,7 @@ export default function TrainersPage() {
           trainerName: formData.trainerName, email: formData.email, phone: cleanPhone,
           password: formData.password, description: formData.description, specialities,
           imageUrl: formData.imageUrl, keySentence: formData.keySentence, isActive: formData.isActive,
+          canAccessLeads: formData.canAccessLeads,
         })
         clearTrainerDraft()
       }
@@ -385,6 +391,13 @@ export default function TrainersPage() {
                   </div>
                   <Switch checked={formData.isActive} onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })} />
                 </div>
+                <div className="flex items-center justify-between rounded-lg border p-3 shadow-xs">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Can work leads</label>
+                    <p className="text-xs text-muted-foreground">See the lead board, call leads and log what happened. Any trainer can still add a referral.</p>
+                  </div>
+                  <Switch aria-label="Can work leads" checked={formData.canAccessLeads} onCheckedChange={(checked) => setFormData({ ...formData, canAccessLeads: checked })} />
+                </div>
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" onClick={handleCloseTrainerDialog}>Cancel</Button>
                   <Button onClick={handleSubmit} disabled={isPending}>
@@ -498,9 +511,12 @@ export default function TrainersPage() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={trainer.isActive !== false ? "default" : "destructive"}>
-                                {trainer.isActive !== false ? "Active" : "Inactive"}
-                              </Badge>
+                              <div className="flex flex-wrap gap-1">
+                                <Badge variant={trainer.isActive !== false ? "default" : "destructive"}>
+                                  {trainer.isActive !== false ? "Active" : "Inactive"}
+                                </Badge>
+                                {trainer.canAccessLeads && <Badge variant="outline">Leads</Badge>}
+                              </div>
                             </TableCell>
                             <TableCell>{trainer.createdAt ? new Date(trainer.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
                             <TableCell className="text-right">

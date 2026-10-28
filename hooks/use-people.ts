@@ -31,7 +31,7 @@ export function usePeopleLookup(q: string) {
         if (!isLookupUnsupported(err)) throw err
         const [users, leads, memberships] = await Promise.all([
           qc.fetchQuery({ queryKey: queryKeys.users.all(), queryFn: userService.getAll, staleTime: 60_000 }),
-          qc.fetchQuery({ queryKey: queryKeys.leads.all(), queryFn: () => leadService.getAll(10), staleTime: 60_000 }),
+          qc.fetchQuery({ queryKey: queryKeys.leads.all(), queryFn: () => leadService.getAll(), staleTime: 60_000 }),
           qc.fetchQuery({ queryKey: queryKeys.memberships.all(), queryFn: membershipService.getAll, staleTime: 60_000 }),
         ])
         return buildLookupFallback(query, users.users, leads.leads, memberships.memberships)

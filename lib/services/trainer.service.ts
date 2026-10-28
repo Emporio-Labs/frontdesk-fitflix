@@ -12,6 +12,8 @@ export interface Trainer {
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
+  /** Admin-granted: may see and work the lead board. */
+  canAccessLeads?: boolean
   password?: string
 }
 
@@ -25,6 +27,7 @@ export interface CreateTrainerPayload {
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
+  canAccessLeads?: boolean
 }
 
 export interface UpdateTrainerPayload {
@@ -34,6 +37,7 @@ export interface UpdateTrainerPayload {
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
+  canAccessLeads?: boolean
 }
 
 export const trainerService = {

@@ -47,6 +47,8 @@ export interface AuthContextType {
     name: string
     email: string
     role: UserRole
+    /** Trainers only: an admin has let them work the lead board. */
+    canAccessLeads?: boolean
   } | null
   isAuthenticated: boolean
   setRole: (role: UserRole) => void

@@ -2,13 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   leadService,
   Lead,
-  LeadInteraction,
   CreateLeadPayload,
   UpdateLeadPayload,
   ConvertLeadPayload,
-  buildLeadAnalytics,
+  LogLeadActivityPayload,
   buildReminderSummary,
-  buildDailyDigest,
 } from '@/lib/services/lead.service'
 import { queryKeys } from '@/lib/query-keys'
 import { toast } from 'sonner'
@@ -17,19 +15,21 @@ export function useLeads(options?: { enabled?: boolean }) {
   const isEnabled = options?.enabled ?? true
   return useQuery({
     queryKey: queryKeys.leads.all(),
-    queryFn: () => leadService.getAll(10),
+    queryFn: () => leadService.getAll(),
     select: (data) => data.leads,
     enabled: isEnabled,
     staleTime: 0,
     refetchOnWindowFocus: isEnabled,
     refetchInterval: isEnabled ? 10000 : false,
+    // A trainer without lead access gets 403; don't hammer it.
+    retry: (count, err: any) => err?.response?.status !== 403 && count < 1,
   })
 }
 
 export function useLead(id: string) {
   return useQuery({
     queryKey: queryKeys.leads.detail(id),
-    queryFn: () => leadService.getById(id, 10),
+    queryFn: () => leadService.getById(id),
     select: (data) => data.lead,
     enabled: !!id,
     staleTime: 0,
@@ -37,46 +37,47 @@ export function useLead(id: string) {
   })
 }
 
-// These three hooks share queryKeys.leads.all() — the same key as useLeads().
-// React Query deduplicates the HTTP request: only one GET /leads fires even when
-// all four hooks are mounted simultaneously. `select` transforms the shared
-// cache entry locally without storing the derived value in a separate cache key.
-
+// Shares queryKeys.leads.all() with useLeads(), so only one GET /leads fires;
+// `select` derives the reminders locally.
 export function useLeadReminders() {
   return useQuery({
     queryKey: queryKeys.leads.all(),
-    queryFn: () => leadService.getAll(10),
+    queryFn: () => leadService.getAll(),
     select: (data) => buildReminderSummary(data.leads),
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchInterval: 10000,
+    retry: (count, err: any) => err?.response?.status !== 403 && count < 1,
   })
 }
 
-export function useLeadAnalytics() {
+/** The outcome list the "Log outcome" dialog offers. Changes only on deploy. */
+export function useLeadOutcomes() {
   return useQuery({
-    queryKey: queryKeys.leads.all(),
-    queryFn: () => leadService.getAll(10),
-    select: (data) => buildLeadAnalytics(data.leads),
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-    refetchInterval: 10000,
+    queryKey: queryKeys.leads.outcomes(),
+    queryFn: () => leadService.getOutcomes(),
+    staleTime: Infinity,
   })
 }
 
-export function useLeadDigest() {
+export function useLeadActivities(id: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.leads.all(),
-    queryFn: () => leadService.getAll(10),
-    select: (data) => buildDailyDigest(buildReminderSummary(data.leads)),
+    queryKey: queryKeys.leads.activities(id ?? ''),
+    queryFn: () => leadService.getActivities(id!),
+    enabled: !!id,
     staleTime: 0,
-    refetchOnWindowFocus: true,
-    refetchInterval: 10000,
   })
 }
 
-function replaceLeadInList(list: Lead[] | undefined, updated: Lead): Lead[] {
-  if (!Array.isArray(list)) return [updated]
+export function useLeadTeamAnalytics(params: { from?: string; to?: string; locationId?: string }, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.leads.teamAnalytics(params),
+    queryFn: () => leadService.getTeamAnalytics(params),
+    enabled,
+  })
+}
+
+function replaceLeadInList(list: Lead[], updated: Lead): Lead[] {
   return list.map((lead) => (lead.id === updated.id ? updated : lead))
 }
 
@@ -88,8 +89,23 @@ function getLeadListCache(data: unknown): Lead[] {
   return []
 }
 
-function setLeadListCache(data: unknown, updater: (current: Lead[]) => Lead[]): { leads: Lead[] } {
-  return { leads: updater(getLeadListCache(data)) }
+export function extractLeadErrorMessage(err: any, fallback: string): string {
+  const data = err?.response?.data
+  const base = data?.error || data?.message || fallback
+
+  const fieldMessages: string[] = []
+  const issues = Array.isArray(data?.details) ? data.details : Array.isArray(data?.errors) ? data.errors : null
+  if (issues) {
+    for (const issue of issues) {
+      if (!issue || typeof issue !== 'object') continue
+      const path = Array.isArray(issue.path) ? issue.path.join('.') : ''
+      if (typeof issue.message === 'string') {
+        fieldMessages.push(path ? `${path}: ${issue.message}` : issue.message)
+      }
+    }
+  }
+
+  return fieldMessages.length ? `${base} — ${fieldMessages.join('; ')}` : base
 }
 
 export function useCreateLead() {
@@ -107,41 +123,6 @@ export function useCreateLead() {
   })
 }
 
-function extractLeadErrorMessage(err: any, fallback: string): string {
-  const data = err?.response?.data
-  if (typeof console !== 'undefined') {
-    try {
-      console.error(
-        '[lead-error]',
-        'status=', err?.response?.status,
-        'request=', JSON.stringify(err?.config?.data),
-        'response=', JSON.stringify(data),
-      )
-    } catch {
-      console.error('[lead-error]', err?.response?.status, data)
-    }
-  }
-  const base = data?.error || data?.message || fallback
-
-  const fieldMessages: string[] = []
-  if (Array.isArray(data?.details)) {
-    for (const issue of data.details) {
-      if (!issue || typeof issue !== 'object') continue
-      const path = Array.isArray(issue.path) ? issue.path.join('.') : ''
-      if (typeof issue.message === 'string') {
-        fieldMessages.push(path ? `${path}: ${issue.message}` : issue.message)
-      }
-    }
-  } else if (data?.details && typeof data.details === 'object') {
-    for (const [key, value] of Object.entries(data.details)) {
-      if (key === 'debug') continue
-      if (typeof value === 'string') fieldMessages.push(`${key}: ${value}`)
-    }
-  }
-
-  return fieldMessages.length ? `${base} — ${fieldMessages.join('; ')}` : base
-}
-
 export function useUpdateLead() {
   const qc = useQueryClient()
 
@@ -149,49 +130,32 @@ export function useUpdateLead() {
     mutationFn: ({ id, payload }: { id: string; payload: UpdateLeadPayload }) =>
       leadService.update(id, payload),
     onMutate: async ({ id, payload }) => {
-      await qc.cancelQueries({ queryKey: queryKeys.leads.all() })
+      await qc.cancelQueries({ queryKey: queryKeys.leads.all(), exact: true })
       const prev = qc.getQueryData(queryKeys.leads.all())
-
       const prevLeads = getLeadListCache(prev)
       if (prevLeads.length > 0) {
-        const next = prevLeads.map((lead) => {
-          if (lead.id !== id) return lead
-          const nextStatus = payload.status ?? lead.status
-          const nextTemp =
-            nextStatus === 'qualified' || nextStatus === 'converted'
-              ? 'hot'
-              : nextStatus === 'contacted'
-                ? 'warm'
-                : 'cold'
-          return {
-            ...lead,
-            ...(payload.name !== undefined ? { name: payload.name } : {}),
-            ...(payload.email !== undefined ? { email: payload.email } : {}),
-            ...(payload.phone !== undefined ? { phone: payload.phone } : {}),
-            ...(payload.source !== undefined ? { source: payload.source } : {}),
-            ...(payload.interestedIn !== undefined ? { interestedIn: payload.interestedIn } : {}),
-            ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
-            ...(payload.followUpDate !== undefined ? { followUpDate: payload.followUpDate } : {}),
-            ...(payload.assignedStaffName !== undefined ? { assignedStaffName: payload.assignedStaffName } : {}),
-            status: nextStatus,
-            temperature: nextTemp,
-            updatedAt: new Date().toISOString(),
-          }
+        qc.setQueryData(queryKeys.leads.all(), {
+          leads: prevLeads.map((lead) =>
+            lead.id !== id
+              ? lead
+              : {
+                  ...lead,
+                  ...(payload.status !== undefined ? { status: payload.status } : {}),
+                  ...(payload.temperature !== undefined ? { temperature: payload.temperature } : {}),
+                  ...(payload.followUpDate !== undefined ? { followUpDate: payload.followUpDate } : {}),
+                  ...(payload.visitAt !== undefined ? { visitAt: payload.visitAt ?? undefined } : {}),
+                },
+          ),
         })
-        qc.setQueryData(queryKeys.leads.all(), { leads: next })
       }
-
       return { prev }
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: queryKeys.leads.all() })
-      qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })
       toast.success(data.message || 'Lead updated successfully')
     },
     onError: (err: any, _vars, ctx) => {
-      if (ctx?.prev) {
-        qc.setQueryData(queryKeys.leads.all(), ctx.prev)
-      }
+      if (ctx?.prev) qc.setQueryData(queryKeys.leads.all(), ctx.prev)
       toast.error(extractLeadErrorMessage(err, 'Failed to update lead'))
     },
   })
@@ -228,43 +192,29 @@ export function useConvertLead() {
   })
 }
 
-export function useAddLeadInteraction() {
+/**
+ * Log a note or an outcome. Puts the updated lead straight into the list so
+ * the card moves at once, and refreshes that lead's timeline.
+ */
+export function useLogLeadActivity() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id, note, type }: { id: string; note: string; type?: LeadInteraction['type'] }) =>
-      leadService.addInteraction(id, { note, type }),
-    onSuccess: (data) => {
-      qc.setQueryData(queryKeys.leads.all(), (current) =>
-        setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
-      )
-      qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })
-      toast.success(data.message || 'Interaction added')
-    },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to add interaction')
-    },
-  })
-}
-
-export function useRecordLeadContactAttempt() {
-  const qc = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ id, channel }: { id: string; channel: 'call' | 'whatsapp' | 'email' }) =>
-      leadService.recordContactAttempt(id, { channel }),
-    onSuccess: (data) => {
-      qc.setQueryData(queryKeys.leads.all(), (current) =>
-        setLeadListCache(current, (leads) => replaceLeadInList(leads, data.lead))
-      )
-      qc.invalidateQueries({ queryKey: queryKeys.leads.detail(data.lead.id) })
-      toast.success(data.message || 'Contact attempt recorded')
-    },
-    onError: (err: any) => {
-      if (err?.response?.status === 404 || err?.response?.status === 400) {
-        return
+    mutationFn: ({ id, payload }: { id: string; payload: LogLeadActivityPayload }) =>
+      leadService.logActivity(id, payload),
+    onSuccess: (data, { id }) => {
+      // Only a full lead goes into the list; never let a partial one blank a card.
+      if (data.lead?.id && data.lead.name) {
+        const updated = data.lead
+        qc.setQueryData(queryKeys.leads.all(), (current: unknown) =>
+          current ? { leads: replaceLeadInList(getLeadListCache(current), updated) } : current,
+        )
       }
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to record contact attempt')
+      qc.invalidateQueries({ queryKey: queryKeys.leads.activities(id) })
+      qc.invalidateQueries({ queryKey: queryKeys.leads.all(), exact: true })
+    },
+    onError: (err: any) => {
+      toast.error(extractLeadErrorMessage(err, 'Could not save'))
     },
   })
 }

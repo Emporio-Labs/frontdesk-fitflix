@@ -56,6 +56,9 @@ export function middleware(request: NextRequest) {
     '/admin/live-session',
     '/admin/slots',
     '/admin/me/notifications',
+    // Only useful to trainers an admin has given lead access; the page and
+    // the backend both check that.
+    '/admin/leads',
   ]
 
   if (isAuthed && role === 'trainer') {

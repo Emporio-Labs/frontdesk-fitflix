@@ -1,4 +1,3 @@
-import { isAxiosError } from 'axios'
 import { apiClient } from '@/lib/api-client'
 
 const IST_TIMEZONE = 'Asia/Kolkata'
@@ -9,21 +8,20 @@ const IST_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 })
 
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'converted' | 'lost'
+/**
+ * Board stages. `visit_booked` = a visit/trial is on the calendar;
+ * `qualified` is shown as "Visited" (came in, deciding or paying).
+ */
+export type LeadStatus = 'new' | 'contacted' | 'visit_booked' | 'qualified' | 'converted' | 'lost'
 export type LeadTemperature = 'cold' | 'warm' | 'hot'
 
-export interface LeadInteraction {
-  id: string
-  type: 'note' | 'call' | 'whatsapp' | 'email' | 'status-change' | 'system'
-  note: string
-  createdAt: string
-  createdBy?: string
-}
-
-export interface LeadStageHistory {
-  stage: LeadStatus
-  enteredAt: string
-  exitedAt?: string
+export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
+  new: 'New',
+  contacted: 'Contacted',
+  visit_booked: 'Visit booked',
+  qualified: 'Visited',
+  converted: 'Joined',
+  lost: 'Lost',
 }
 
 export interface Lead {
@@ -35,17 +33,25 @@ export interface Lead {
   status: LeadStatus
   notes: string
   interestedIn: string
-  temperature: LeadTemperature
+  /** null until someone (or an outcome) sets it. */
+  temperature: LeadTemperature | null
   tags: string[]
   ownerId: string
-  assignedStaffName: string
+  ownerName: string
   createdAt: string
   updatedAt: string
   followUpDate?: string
-  contactCount: number
+  visitAt?: string
+  attemptCount: number
+  noAnswerStreak: number
+  firstAttemptAt?: string
+  lastAttemptAt?: string
+  firstContactedAt?: string
   lastContactedAt?: string
-  isDeleted: boolean
-  revision: number
+  lastOutcome: string
+  lastOutcomeLabel: string
+  lostReason: string
+  isEscalated: boolean
   /**
    * The app account this lead is linked to, when there is one.
    *
@@ -58,9 +64,6 @@ export interface Lead {
   locationId: string
   /** The lead's unpaid sale invoice, when one is waiting for payment. */
   pendingInvoiceId: string
-  interactions: LeadInteraction[]
-  fcmTokens: string[]
-  stageHistory: LeadStageHistory[]
 }
 
 export interface CreateLeadPayload {
@@ -70,11 +73,9 @@ export interface CreateLeadPayload {
   source?: string
   status?: LeadStatus
   interestedIn?: string
-  temperature?: LeadTemperature
+  temperature?: LeadTemperature | null
   notes?: string
   tags?: string[]
-  ownerId?: string
-  assignedStaffName?: string
   followUpDate?: string
   /** Branch the lead is for (a `Location._id`). */
   locationId?: string
@@ -87,13 +88,12 @@ export interface UpdateLeadPayload {
   source?: string
   status?: LeadStatus
   interestedIn?: string
-  temperature?: LeadTemperature
+  temperature?: LeadTemperature | null
   notes?: string
   tags?: string[]
-  ownerId?: string
-  assignedStaffName?: string
   followUpDate?: string
-  expectedRevision?: number
+  visitAt?: string | null
+  lostReason?: string
 }
 
 export interface ConvertLeadPayload {
@@ -112,109 +112,146 @@ export interface LeadRemindersResponse {
   timezone: string
 }
 
-export interface LeadAnalyticsResponse {
-  stageCounts: Record<LeadStatus, number>
-  heatDistribution: Record<LeadTemperature, number>
-  dropOff: {
-    newToContacted: number
-    contactedToQualified: number
-    qualifiedToConverted: number
-  }
-  stageDurations: Record<LeadStatus, { totalDays: number; samples: number; averageDays: number }>
-  conversionTimeline: Array<{ month: string; converted: number }>
-  lifecycleMetrics: {
-    totalActiveLeads: number
-    convertedLeads: number
-    lostLeads: number
-    avgContactAttempts: number
-    avgLeadAgeDays: number
-  }
+// ── Timeline & outcomes ─────────────────────────────────────────────────────
+
+export type OutcomeChannel = 'call' | 'whatsapp' | 'visit'
+export type LeadActivityType = OutcomeChannel | 'note' | 'status_change' | 'system'
+
+export interface LeadOutcomeDefinition {
+  key: string
+  label: string
+  group: 'connected' | 'not_connected' | 'visit' | 'other'
+  channels: OutcomeChannel[]
+  connected: boolean
+  status?: string
+  temperature?: LeadTemperature | 'cooler'
+  requires: { followUp?: boolean; visitAt?: boolean; lostReason?: boolean; customLabel?: boolean }
+  suggestFollowUpHours?: number
+  lostReason?: string
 }
 
-function toUiStatus(value: unknown): LeadStatus {
+export interface LeadOutcomeCatalog {
+  outcomes: LeadOutcomeDefinition[]
+  lostReasons: Array<{ key: string; label: string }>
+  rules: { coldAfterNoAnswers: number; suggestLostAfterAttempts: number; suggestLostAfterDays: number }
+}
+
+export interface LeadActivity {
+  id: string
+  leadId: string
+  type: LeadActivityType
+  outcome: string
+  label: string
+  connected: boolean
+  note: string
+  statusFrom: LeadStatus | null
+  statusTo: LeadStatus | null
+  temperature: LeadTemperature | null
+  lostReason: string
+  nextFollowUpAt?: string
+  visitAt?: string
+  createdBy: { id: string | null; name: string; role: string }
+  createdAt: string
+}
+
+export interface LogLeadActivityPayload {
+  type: OutcomeChannel | 'note'
+  outcome?: string
+  customLabel?: string
+  customStatus?: LeadStatus
+  customConnected?: boolean
+  temperature?: LeadTemperature
+  note?: string
+  nextFollowUpAt?: string | null
+  visitAt?: string | null
+  lostReason?: string
+  lostReasonText?: string
+}
+
+export interface LogLeadActivityResult {
+  message: string
+  lead: Lead | null
+  activity: LeadActivity | null
+  suggestLost: boolean
+}
+
+export interface LeadTeamAnalytics {
+  range: { from: string; to: string }
+  totals: {
+    leads: number
+    contacted: number
+    contactRate: number
+    converted: number
+    conversionRate: number
+    avgAttemptsPerLead: number | null
+    medianHoursToFirstContact: number | null
+    neverAttempted: number
+  }
+  funnel: Array<{ stage: string; count: number }>
+  outcomes: Array<{ outcome: string; label: string; count: number }>
+  lostReasons: Array<{ reason: string; label: string; count: number }>
+  bySource: Array<{ source: string; leads: number; converted: number; conversionRate: number }>
+  staff: Array<{
+    staffId: string
+    name: string
+    attempts: number
+    connected: number
+    connectRate: number
+    leadsWorked: number
+    visitsBooked: number
+    lost: number
+    converted: number
+  }>
+}
+
+// ── Mapping ─────────────────────────────────────────────────────────────────
+
+const API_STATUS: Record<LeadStatus, string> = {
+  new: 'New',
+  contacted: 'Contacted',
+  visit_booked: 'VisitBooked',
+  qualified: 'Qualified',
+  converted: 'Converted',
+  lost: 'Lost',
+}
+
+export function toUiStatus(value: unknown): LeadStatus {
   const v = String(value ?? '').toLowerCase().trim()
-  if (v === 'new' || v === 'cold') return 'new'
-  if (v === 'contacted' || v === 'warm') return 'contacted'
-  if (v === 'qualified' || v === 'hot') return 'qualified'
+  if (v === 'visitbooked' || v === 'visit_booked') return 'visit_booked'
+  if (v === 'contacted' || v === 'warm' || v === 'hot' || v === 'cold') return 'contacted'
+  if (v === 'qualified') return 'qualified'
   if (v === 'converted') return 'converted'
   if (v === 'lost') return 'lost'
   return 'new'
 }
 
-function toApiStatus(value: LeadStatus | undefined): string | undefined {
-  if (!value) return undefined
-  const map: Record<LeadStatus, string> = {
-    new: 'New',
-    contacted: 'Contacted',
-    qualified: 'Qualified',
-    converted: 'Converted',
-    lost: 'Lost',
-  }
-  return map[value]
+export function toApiStatus(value: LeadStatus | undefined): string | undefined {
+  return value ? API_STATUS[value] : undefined
 }
 
-function getTemperatureFromTags(tags: string[], status: LeadStatus): LeadTemperature {
-  const match = tags.find((tag) => tag.toLowerCase().startsWith('temperature:'))
-  if (match) {
-    const parsed = match.split(':')[1]?.toLowerCase()
-    if (parsed === 'cold' || parsed === 'warm' || parsed === 'hot') {
-      return parsed
-    }
-  }
-
-  if (status === 'qualified') return 'hot'
-  if (status === 'contacted') return 'warm'
-  return 'cold'
+function asTemperature(value: unknown): LeadTemperature | null {
+  const v = String(value ?? '').toLowerCase()
+  return v === 'hot' || v === 'warm' || v === 'cold' ? v : null
 }
 
-function withoutTemperatureTags(tags: string[]): string[] {
-  return tags.filter((tag) => !tag.toLowerCase().startsWith('temperature:'))
+/** Older leads kept heat as a `temperature:x` tag (or a Hot/Warm/Cold status). */
+function legacyTemperature(raw: any, tags: string[]): LeadTemperature | null {
+  const tag = tags.find((t) => t.toLowerCase().startsWith('temperature:'))
+  return asTemperature(tag?.split(':')[1]) ?? asTemperature(raw?.status)
 }
 
-function withTemperatureTag(tags: string[], temperature?: LeadTemperature): string[] {
-  const base = withoutTemperatureTags(tags)
-  if (!temperature) return base
-  return [...base, `temperature:${temperature}`]
+const optionalDate = (value: unknown) => (value ? String(value) : undefined)
+
+/** An id that may arrive as a string or as a populated `{ _id }` object. */
+function refId(value: any): string {
+  if (!value) return ''
+  return typeof value === 'string' ? value : String(value?._id || value?.id || '')
 }
 
-function normalizeStageHistory(raw: any): LeadStageHistory[] {
-  if (!Array.isArray(raw)) return []
-
-  return raw
-    .map((entry) => {
-      const enteredAt = String(entry?.enteredAt || '')
-      if (!enteredAt) return undefined
-      return {
-        stage: toUiStatus(entry?.stage),
-        enteredAt,
-        ...(entry?.exitedAt ? { exitedAt: String(entry.exitedAt) } : {}),
-      }
-    })
-    .filter((entry): entry is LeadStageHistory => Boolean(entry))
-}
-
-function normalizeLead(raw: any): Lead {
-  const status = toUiStatus(raw?.status)
-  const tags = Array.isArray(raw?.tags) ? raw.tags.map((tag: unknown) => String(tag)) : []
-  const rawStatus = String(raw?.status || '').toLowerCase()
-  const heatFromStatus = rawStatus === 'hot' || rawStatus === 'warm' || rawStatus === 'cold' ? rawStatus : undefined
-  const heatSource = raw?.heat || raw?.temperature || heatFromStatus
-  const heat = ['cold', 'warm', 'hot'].includes(String(heatSource).toLowerCase())
-    ? (String(heatSource).toLowerCase() as LeadTemperature)
-    : getTemperatureFromTags(tags, status)
-  const followUpSource = raw?.followUpDate ?? raw?.followUp ?? raw?.followupDate ?? raw?.follow_up_date
-  const stageHistory = normalizeStageHistory(raw?.stageHistory)
-
+export function normalizeLead(raw: any): Lead {
+  const tags: string[] = Array.isArray(raw?.tags) ? raw.tags.map((tag: unknown) => String(tag)) : []
   const rawEmail = String(raw?.email || '')
   const email = rawEmail.startsWith('noemail-') && rawEmail.endsWith('@fitflix.in') ? '' : rawEmail
-
-  // The list endpoint populates convertedUser into an object; other paths
-  // leave it an id string. Take whichever shape arrived.
-  const convertedUser = raw?.convertedUser
-  const convertedUserId =
-    typeof convertedUser === 'string'
-      ? convertedUser
-      : String(convertedUser?._id || convertedUser?.id || '')
 
   return {
     id: String(raw?._id || raw?.id || ''),
@@ -222,41 +259,57 @@ function normalizeLead(raw: any): Lead {
     email,
     phone: String(raw?.phone || ''),
     source: String(raw?.source || 'other'),
-    status,
+    status: toUiStatus(raw?.status),
     notes: String(raw?.notes || ''),
     interestedIn: String(raw?.interestedIn || ''),
-    temperature: heat,
-    tags,
-    ownerId: String(raw?.ownerId || ''),
-    assignedStaffName: String(raw?.assignedStaffName || ''),
+    temperature: asTemperature(raw?.temperature) ?? legacyTemperature(raw, tags),
+    tags: tags.filter((t) => !t.toLowerCase().startsWith('temperature:')),
+    ownerId: refId(raw?.owner),
+    ownerName: String(raw?.ownerName || ''),
     createdAt: String(raw?.createdAt || ''),
     updatedAt: String(raw?.updatedAt || raw?.createdAt || ''),
-    followUpDate: followUpSource ? String(followUpSource) : undefined,
-    contactCount: Number(raw?.contactCount ?? 0),
-    lastContactedAt: raw?.lastContactedAt ? String(raw.lastContactedAt) : undefined,
-    isDeleted: Boolean(raw?.isDeleted),
-    revision: Number(raw?.revision ?? 0),
-    convertedUserId,
+    followUpDate: optionalDate(raw?.followUpDate),
+    visitAt: optionalDate(raw?.visitAt),
+    attemptCount: Number(raw?.attemptCount ?? 0),
+    noAnswerStreak: Number(raw?.noAnswerStreak ?? 0),
+    firstAttemptAt: optionalDate(raw?.firstAttemptAt),
+    lastAttemptAt: optionalDate(raw?.lastAttemptAt),
+    firstContactedAt: optionalDate(raw?.firstContactedAt),
+    lastContactedAt: optionalDate(raw?.lastContactedAt),
+    lastOutcome: String(raw?.lastOutcome || ''),
+    lastOutcomeLabel: String(raw?.lastOutcomeLabel || ''),
+    lostReason: String(raw?.lostReason || ''),
+    isEscalated: Boolean(raw?.isEscalated),
+    // The list endpoint populates convertedUser into an object; other paths
+    // leave it an id string.
+    convertedUserId: refId(raw?.convertedUser),
     locationId: refId(raw?.locationId),
     pendingInvoiceId: refId(raw?.pendingInvoiceId),
-    interactions: Array.isArray(raw?.interactions)
-      ? raw.interactions.map((item: any) => ({
-          id: String(item?._id || item?.id || ''),
-          type: String(item?.type || 'note') as LeadInteraction['type'],
-          note: String(item?.note || ''),
-          createdAt: String(item?.createdAt || ''),
-          ...(item?.createdBy ? { createdBy: String(item.createdBy) } : {}),
-        }))
-      : [],
-    fcmTokens: Array.isArray(raw?.fcmTokens) ? raw.fcmTokens.map((t: unknown) => String(t)) : [],
-    stageHistory,
   }
 }
 
-/** An id that may arrive as a string or as a populated `{ _id }` object. */
-function refId(value: any): string {
-  if (!value) return ''
-  return typeof value === 'string' ? value : String(value?._id || value?.id || '')
+function normalizeActivity(raw: any): LeadActivity {
+  return {
+    id: String(raw?._id || raw?.id || ''),
+    leadId: refId(raw?.leadId),
+    type: String(raw?.type || 'note') as LeadActivityType,
+    outcome: String(raw?.outcome || ''),
+    label: String(raw?.label || ''),
+    connected: Boolean(raw?.connected),
+    note: String(raw?.note || ''),
+    statusFrom: raw?.statusFrom ? toUiStatus(raw.statusFrom) : null,
+    statusTo: raw?.statusTo ? toUiStatus(raw.statusTo) : null,
+    temperature: asTemperature(raw?.temperature),
+    lostReason: String(raw?.lostReason || ''),
+    nextFollowUpAt: optionalDate(raw?.nextFollowUpAt),
+    visitAt: optionalDate(raw?.visitAt),
+    createdBy: {
+      id: raw?.createdBy?.id ?? null,
+      name: String(raw?.createdBy?.name || 'System'),
+      role: String(raw?.createdBy?.role || 'system'),
+    },
+    createdAt: String(raw?.createdAt || ''),
+  }
 }
 
 function extractRawLeads(payload: any): any[] {
@@ -271,166 +324,48 @@ function extractRawLead(payload: any): any {
   return payload?.lead ?? payload?.data?.lead ?? payload?.data ?? payload
 }
 
-function nowIstDateOnly(): string {
-  return IST_DATE_FORMATTER.format(new Date())
-}
+// ── Derived views ───────────────────────────────────────────────────────────
 
-function dateOnlyFromUtcInIst(utcIso?: string): string | undefined {
-  if (!utcIso) return undefined
-  const parsed = new Date(utcIso)
+export function istDateOnly(value?: string | Date): string | undefined {
+  if (!value) return undefined
+  const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return undefined
   return IST_DATE_FORMATTER.format(parsed)
 }
 
-function daysBetween(startIso: string, endIso: string): number {
-  const start = new Date(startIso)
-  const end = new Date(endIso)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0
-  const ms = end.getTime() - start.getTime()
-  return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)))
-}
-
-function mergeNotes(existing: string, next: string): string {
-  const existingValue = String(existing || '').trim()
-  const nextValue = String(next || '').trim()
-  if (!nextValue) return existingValue
-  if (!existingValue) return nextValue
-  return `${existingValue}\n${nextValue}`
-}
-
-function isUnsupportedEndpointError(error: unknown): boolean {
-  if (!isAxiosError(error)) return false
-  const status = error.response?.status
-  return status === 404 || status === 405 || status === 501
-}
+export const isOpenLead = (lead: Lead) => lead.status !== 'converted' && lead.status !== 'lost'
 
 export function buildReminderSummary(leads: Lead[]): LeadRemindersResponse {
-  const activeLeads = leads.filter((lead) => !lead.isDeleted)
-  const todayIst = nowIstDateOnly()
-
-  const today = activeLeads.filter((lead) => dateOnlyFromUtcInIst(lead.followUpDate) === todayIst)
-  const missed = activeLeads.filter((lead) => {
-    const due = dateOnlyFromUtcInIst(lead.followUpDate)
-    return !!due && due < todayIst && lead.status !== 'converted' && lead.status !== 'lost'
-  })
-
+  const todayIst = istDateOnly(new Date())!
+  const open = leads.filter(isOpenLead)
   return {
-    today,
-    missed,
+    today: open.filter((lead) => istDateOnly(lead.followUpDate) === todayIst),
+    missed: open.filter((lead) => {
+      const due = istDateOnly(lead.followUpDate)
+      return !!due && due < todayIst
+    }),
     generatedAt: new Date().toISOString(),
     timezone: IST_TIMEZONE,
   }
 }
 
-export function buildDailyDigest(summary: LeadRemindersResponse): Record<string, unknown> {
-  return {
-    title: 'Leads Daily Digest',
-    date: nowIstDateOnly(),
-    timezone: IST_TIMEZONE,
-    totals: {
-      todayFollowUps: summary.today.length,
-      missedFollowUps: summary.missed.length,
-    },
-    highlights: [
-      ...summary.missed.slice(0, 5).map((lead) => `Missed: ${lead.name} (${dateOnlyFromUtcInIst(lead.followUpDate)})`),
-      ...summary.today.slice(0, 5).map((lead) => `Today: ${lead.name}`),
-    ],
+/** Mirrors the backend rule: many unanswered tries over a week → offer Lost. */
+export function shouldSuggestLost(
+  lead: Lead,
+  rules: { suggestLostAfterAttempts: number; suggestLostAfterDays: number } = {
+    suggestLostAfterAttempts: 6,
+    suggestLostAfterDays: 7,
+  },
+): boolean {
+  if (!isOpenLead(lead) || lead.noAnswerStreak < rules.suggestLostAfterAttempts || !lead.firstAttemptAt) {
+    return false
   }
+  return Date.now() - new Date(lead.firstAttemptAt).getTime() >= rules.suggestLostAfterDays * 86_400_000
 }
 
-export function buildLeadAnalytics(leads: Lead[]): LeadAnalyticsResponse {
-  const activeLeads = leads.filter((lead) => !lead.isDeleted)
-  const stages: LeadStatus[] = ['new', 'contacted', 'qualified', 'converted', 'lost']
-
-  const stageCounts = stages.reduce<Record<LeadStatus, number>>((acc, stage) => {
-    acc[stage] = activeLeads.filter((lead) => lead.status === stage).length
-    return acc
-  }, { new: 0, contacted: 0, qualified: 0, converted: 0, lost: 0 })
-
-  const heatDistribution: Record<LeadTemperature, number> = {
-    cold: activeLeads.filter((lead) => lead.temperature === 'cold').length,
-    warm: activeLeads.filter((lead) => lead.temperature === 'warm').length,
-    hot: activeLeads.filter((lead) => lead.temperature === 'hot').length,
-  }
-
-  const dropOff = {
-    newToContacted: Math.max(stageCounts.new - stageCounts.contacted, 0),
-    contactedToQualified: Math.max(stageCounts.contacted - stageCounts.qualified, 0),
-    qualifiedToConverted: Math.max(stageCounts.qualified - stageCounts.converted, 0),
-  }
-
-  const stageDurations: Record<LeadStatus, { totalDays: number; samples: number; averageDays: number }> = {
-    new: { totalDays: 0, samples: 0, averageDays: 0 },
-    contacted: { totalDays: 0, samples: 0, averageDays: 0 },
-    qualified: { totalDays: 0, samples: 0, averageDays: 0 },
-    converted: { totalDays: 0, samples: 0, averageDays: 0 },
-    lost: { totalDays: 0, samples: 0, averageDays: 0 },
-  }
-
-  activeLeads.forEach((lead) => {
-    const stageHistory = lead.stageHistory.length
-      ? lead.stageHistory
-      : lead.createdAt
-        ? [{ stage: lead.status, enteredAt: lead.createdAt, exitedAt: lead.updatedAt || undefined }]
-        : []
-
-    stageHistory.forEach((entry) => {
-      const end = entry.exitedAt || lead.updatedAt || new Date().toISOString()
-      const days = daysBetween(entry.enteredAt, end)
-      stageDurations[entry.stage].totalDays += days
-      stageDurations[entry.stage].samples += 1
-    })
-  })
-
-  ;(Object.keys(stageDurations) as LeadStatus[]).forEach((stage) => {
-    const metric = stageDurations[stage]
-    metric.averageDays = metric.samples > 0 ? Number((metric.totalDays / metric.samples).toFixed(2)) : 0
-  })
-
-  const conversionTimelineMap: Record<string, number> = {}
-  activeLeads
-    .filter((lead) => lead.status === 'converted')
-    .forEach((lead) => {
-      const source = lead.updatedAt || lead.createdAt
-      const month = String(source || '').slice(0, 7)
-      if (/^\d{4}-\d{2}$/.test(month)) {
-        conversionTimelineMap[month] = (conversionTimelineMap[month] || 0) + 1
-      }
-    })
-
-  const conversionTimeline = Object.keys(conversionTimelineMap)
-    .sort()
-    .map((month) => ({ month, converted: conversionTimelineMap[month] }))
-
-  const nowIso = new Date().toISOString()
-  const lifecycleMetrics = {
-    totalActiveLeads: activeLeads.filter((lead) => lead.status !== 'converted' && lead.status !== 'lost').length,
-    convertedLeads: stageCounts.converted,
-    lostLeads: stageCounts.lost,
-    avgContactAttempts: activeLeads.length
-      ? Number((activeLeads.reduce((sum, lead) => sum + (lead.contactCount || 0), 0) / activeLeads.length).toFixed(2))
-      : 0,
-    avgLeadAgeDays: activeLeads.length
-      ? Number((activeLeads.reduce((sum, lead) => sum + daysBetween(lead.createdAt, nowIso), 0) / activeLeads.length).toFixed(2))
-      : 0,
-  }
-
-  return {
-    stageCounts,
-    heatDistribution,
-    dropOff,
-    stageDurations,
-    conversionTimeline,
-    lifecycleMetrics,
-  }
-}
+// ── Payloads ────────────────────────────────────────────────────────────────
 
 function toCreatePayload(payload: CreateLeadPayload) {
-  const tags = withTemperatureTag(payload.tags ?? [], payload.temperature)
-  const followUp = payload.followUpDate
-    ? { followUpDate: payload.followUpDate, followUp: payload.followUpDate }
-    : {}
-
   const cleanPhone = (payload.phone || '').replace(/\D/g, '') || String(Date.now())
   const validEmail = payload.email && payload.email.trim()
     ? payload.email.trim()
@@ -444,20 +379,14 @@ function toCreatePayload(payload: CreateLeadPayload) {
     ...(payload.status ? { status: toApiStatus(payload.status) } : {}),
     ...(payload.interestedIn ? { interestedIn: payload.interestedIn } : {}),
     ...(payload.notes ? { notes: payload.notes } : {}),
-    ...(tags.length ? { tags } : {}),
-    ...(payload.ownerId ? { ownerId: payload.ownerId } : {}),
-    ...(payload.assignedStaffName ? { assignedStaffName: payload.assignedStaffName } : {}),
+    ...(payload.tags?.length ? { tags: payload.tags } : {}),
+    ...(payload.temperature ? { temperature: payload.temperature } : {}),
     ...(payload.locationId ? { locationId: payload.locationId } : {}),
-    ...followUp,
+    ...(payload.followUpDate ? { followUpDate: payload.followUpDate } : {}),
   }
 }
 
 function toUpdatePayload(payload: UpdateLeadPayload) {
-  const tags = payload.tags !== undefined ? withTemperatureTag(payload.tags, payload.temperature) : undefined
-  const followUp = payload.followUpDate !== undefined
-    ? { followUpDate: payload.followUpDate, followUp: payload.followUpDate }
-    : {}
-
   const emailPayload = payload.email !== undefined
     ? (payload.email.trim() || (payload.phone ? `noemail-${payload.phone.replace(/\D/g, '')}@fitflix.in` : undefined))
     : undefined
@@ -470,23 +399,22 @@ function toUpdatePayload(payload: UpdateLeadPayload) {
     ...(payload.status !== undefined ? { status: toApiStatus(payload.status) } : {}),
     ...(payload.interestedIn !== undefined ? { interestedIn: payload.interestedIn } : {}),
     ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
-    ...(tags !== undefined ? { tags } : {}),
-    ...(payload.ownerId !== undefined ? { ownerId: payload.ownerId } : {}),
-    ...(payload.assignedStaffName !== undefined ? { assignedStaffName: payload.assignedStaffName } : {}),
-    ...(payload.expectedRevision !== undefined ? { expectedRevision: payload.expectedRevision } : {}),
-    ...followUp,
+    ...(payload.tags !== undefined ? { tags: payload.tags } : {}),
+    ...(payload.temperature !== undefined ? { temperature: payload.temperature } : {}),
+    ...(payload.followUpDate !== undefined ? { followUpDate: payload.followUpDate } : {}),
+    ...(payload.visitAt !== undefined ? { visitAt: payload.visitAt } : {}),
+    ...(payload.lostReason !== undefined ? { lostReason: payload.lostReason } : {}),
   }
 }
 
 export const leadService = {
-  getAll: async (notesLimit = 10): Promise<{ leads: Lead[] }> => {
-    const { data } = await apiClient.get('/leads', { params: { notesLimit } })
-    const list = extractRawLeads(data)
-    return { leads: list.map(normalizeLead) }
+  getAll: async (): Promise<{ leads: Lead[] }> => {
+    const { data } = await apiClient.get('/leads')
+    return { leads: extractRawLeads(data).map(normalizeLead) }
   },
 
-  getById: async (id: string, notesLimit = 10): Promise<{ lead: Lead }> => {
-    const { data } = await apiClient.get(`/leads/${id}`, { params: { notesLimit } })
+  getById: async (id: string): Promise<{ lead: Lead }> => {
+    const { data } = await apiClient.get(`/leads/${id}`)
     return { lead: normalizeLead(extractRawLead(data)) }
   },
 
@@ -520,122 +448,39 @@ export const leadService = {
     }
   },
 
-  addInteraction: async (
-    id: string,
-    payload: { note: string; type?: LeadInteraction['type']; createdBy?: string }
-  ): Promise<{ message: string; lead: Lead }> => {
-    const note = String(payload.note || '').trim()
-    if (!note) {
-      throw new Error('note is required')
-    }
-
-    try {
-      const { data } = await apiClient.post(`/leads/${id}/interactions`, payload)
-      return {
-        message: data?.message || 'Interaction added',
-        lead: normalizeLead(extractRawLead(data)),
-      }
-    } catch (error) {
-      if (!isUnsupportedEndpointError(error)) {
-        throw error
-      }
-
-      const current = await leadService.getById(id, 10)
-      const { data } = await apiClient.patch(`/leads/${id}`, {
-        notes: mergeNotes(current.lead.notes, note),
-      })
-
-      return {
-        message: data?.message || 'Interaction added',
-        lead: normalizeLead(extractRawLead(data) || current.lead),
-      }
+  /** What the "Log outcome" dialog offers, from the backend's catalog. */
+  getOutcomes: async (): Promise<LeadOutcomeCatalog> => {
+    const { data } = await apiClient.get('/leads/outcomes')
+    return {
+      outcomes: Array.isArray(data?.outcomes) ? data.outcomes : [],
+      lostReasons: Array.isArray(data?.lostReasons) ? data.lostReasons : [],
+      rules: data?.rules ?? { coldAfterNoAnswers: 3, suggestLostAfterAttempts: 6, suggestLostAfterDays: 7 },
     }
   },
 
-  recordContactAttempt: async (
-    id: string,
-    payload: { channel?: 'call' | 'whatsapp' | 'email'; note?: string; createdBy?: string }
-  ): Promise<{ message: string; lead: Lead }> => {
-    try {
-      const { data } = await apiClient.post(`/leads/${id}/contact-attempt`, payload)
-      return {
-        message: data?.message || 'Contact attempt recorded',
-        lead: normalizeLead(extractRawLead(data)),
-      }
-    } catch (error) {
-      if (!isUnsupportedEndpointError(error)) {
-        throw error
-      }
+  /** The lead's timeline, newest first. */
+  getActivities: async (id: string): Promise<LeadActivity[]> => {
+    const { data } = await apiClient.get(`/leads/${id}/activities`)
+    return (Array.isArray(data?.items) ? data.items : []).map(normalizeActivity)
+  },
 
-      const current = await leadService.getById(id, 10)
-      const channel = payload.channel || 'call'
-      const note = String(payload.note || `Contact attempt via ${channel}`).trim()
-      const nextStatus: LeadStatus = current.lead.status === 'new' ? 'contacted' : current.lead.status
-
-      const { data } = await apiClient.patch(`/leads/${id}`, {
-        status: toApiStatus(nextStatus),
-        notes: mergeNotes(current.lead.notes, note),
-      })
-
-      return {
-        message: data?.message || 'Contact attempt recorded',
-        lead: normalizeLead(extractRawLead(data) || current.lead),
-      }
+  /** Log a note, or a call/WhatsApp/visit outcome (which moves the lead). */
+  logActivity: async (id: string, payload: LogLeadActivityPayload): Promise<LogLeadActivityResult> => {
+    const { data } = await apiClient.post(`/leads/${id}/activities`, {
+      ...payload,
+      ...(payload.customStatus ? { customStatus: toApiStatus(payload.customStatus) } : {}),
+    })
+    return {
+      message: data?.message || 'Saved',
+      lead: data?.lead ? normalizeLead(data.lead) : null,
+      activity: data?.activity ? normalizeActivity(data.activity) : null,
+      suggestLost: Boolean(data?.suggestLost),
     }
   },
 
-  getReminders: async (): Promise<LeadRemindersResponse> => {
-    const { leads } = await leadService.getAll(10)
-    return buildReminderSummary(leads)
-  },
-
-  getDigest: async (): Promise<Record<string, unknown>> => {
-    const summary = await leadService.getReminders()
-    return buildDailyDigest(summary)
-  },
-
-  getAnalytics: async (): Promise<LeadAnalyticsResponse> => {
-    const { leads } = await leadService.getAll(10)
-    return buildLeadAnalytics(leads)
-  },
-
-  saveFcmToken: async (id: string, token: string): Promise<{ message: string; lead: Lead }> => {
-    try {
-      const { data } = await apiClient.post(`/leads/${id}/fcm-token`, { token })
-      return {
-        message: data?.message || 'FCM token saved',
-        lead: normalizeLead(extractRawLead(data)),
-      }
-    } catch (error) {
-      if (!isUnsupportedEndpointError(error)) {
-        throw error
-      }
-
-      const { lead } = await leadService.getById(id, 10)
-      return {
-        message: 'FCM token saved',
-        lead,
-      }
-    }
-  },
-
-  removeFcmToken: async (id: string, token: string): Promise<{ message: string; lead: Lead }> => {
-    try {
-      const { data } = await apiClient.delete(`/leads/${id}/fcm-token`, { data: { token } })
-      return {
-        message: data?.message || 'FCM token removed',
-        lead: normalizeLead(extractRawLead(data)),
-      }
-    } catch (error) {
-      if (!isUnsupportedEndpointError(error)) {
-        throw error
-      }
-
-      const { lead } = await leadService.getById(id, 10)
-      return {
-        message: 'FCM token removed',
-        lead,
-      }
-    }
+  /** Funnel, outcome and per-staff numbers built from the timeline. */
+  getTeamAnalytics: async (params: { from?: string; to?: string; locationId?: string }): Promise<LeadTeamAnalytics> => {
+    const { data } = await apiClient.get('/leads/analytics', { params })
+    return data as LeadTeamAnalytics
   },
 }
