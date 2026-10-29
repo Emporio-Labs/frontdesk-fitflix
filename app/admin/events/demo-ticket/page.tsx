@@ -52,7 +52,7 @@ const DEFAULT_PREVIEW_TIERS: TicketTier[] = [
     tierId: 'tier_vip_gold',
     name: 'All-Inclusive VIP Recovery Pass',
     badgeLabel: 'ALL ACCESS VIP',
-    badgeColor: '#B08D57', // Luxury Brass
+    badgeColor: '#D97706', // Warm Amber / VIP Brass
     type: 'paid',
     price: 1499,
     totalQuantity: 30,
@@ -67,7 +67,7 @@ const DEFAULT_PREVIEW_TIERS: TicketTier[] = [
     tierId: 'tier_super_early_bird',
     name: 'Super Early Bird Pass',
     badgeLabel: 'SUPER EARLY BIRD',
-    badgeColor: '#8A965A', // Sage Olive
+    badgeColor: '#059669', // Emerald Mint
     type: 'paid',
     price: 299,
     totalQuantity: 50,
@@ -78,13 +78,13 @@ const DEFAULT_PREVIEW_TIERS: TicketTier[] = [
     ],
   },
   {
-    tierId: 'tier_general_runner',
-    name: 'General Admission Pass',
-    badgeLabel: 'RUNNER PASS',
-    badgeColor: '#5C6B34', // Deep Olive
+    tierId: 'tier_early_bird',
+    name: 'Early Bird Pass',
+    badgeLabel: 'EARLY BIRD',
+    badgeColor: '#2563EB', // Vibrant Blue
     type: 'paid',
     price: 499,
-    totalQuantity: 150,
+    totalQuantity: 100,
     perks: [
       'Official Fitflix Runner T-Shirt',
       'Finisher Medal',
@@ -95,7 +95,7 @@ const DEFAULT_PREVIEW_TIERS: TicketTier[] = [
     tierId: 'tier_member_community',
     name: 'Fitflix Member Community Pass',
     badgeLabel: 'MEMBER ACCESS',
-    badgeColor: '#C2674E', // Terracotta
+    badgeColor: '#9333EA', // Lavender Purple
     type: 'free',
     price: 0,
     totalQuantity: 100,
@@ -127,7 +127,7 @@ function DemoTicketContent() {
   const [collabEnabled, setCollabEnabled] = useState(true)
   const [collabName, setCollabName] = useState('Chapter 5 Speciality Coffee')
   const [collabRole, setCollabRole] = useState('Co-Host & Roastery Partner')
-  const [collabLogo, setCollabLogo] = useState('/events/chapter-5-logo.jpg')
+  const [collabLogo, setCollabLogo] = useState('/events/chapter-5-logo.jpg?v=2')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -142,7 +142,7 @@ function DemoTicketContent() {
             ? data.find(
                 (e) => e.id === preselectedEventId || e._id === preselectedEventId
               ) || data[0]
-            : data[0]
+            : data.find((e) => e.title.toLowerCase().includes('chapter 5')) || data[0]
           setSelectedEventId(initial.id || initial._id || '')
         }
       })
@@ -186,17 +186,21 @@ function DemoTicketContent() {
       setCollabEnabled(true)
       setCollabName(first.name)
       setCollabRole(first.role || 'Co-Host')
-      setCollabLogo(first.logoUrl || '/events/chapter-5.svg')
+      const initialLogo =
+        first.name.toLowerCase().includes('chapter')
+          ? '/events/chapter-5-logo.jpg?v=2'
+          : first.logoUrl || '/events/chapter-5-logo.jpg?v=2'
+      setCollabLogo(initialLogo)
+    } else if (currentEvent.title.toLowerCase().includes('chapter 5')) {
+      setCollabEnabled(true)
+      setCollabName('Chapter 5 Speciality Coffee')
+      setCollabRole('Co-Host & Roastery Partner')
+      setCollabLogo('/events/chapter-5-logo.jpg?v=2')
     } else if (currentEvent.title.toLowerCase().includes('red bull')) {
       setCollabEnabled(true)
       setCollabName('Red Bull')
       setCollabRole('Official Energy Partner')
       setCollabLogo('/events/red-bull.svg')
-    } else if (currentEvent.title.toLowerCase().includes('chapter 5')) {
-      setCollabEnabled(true)
-      setCollabName('Chapter 5 Speciality Coffee')
-      setCollabRole('Co-Host & Roastery Partner')
-      setCollabLogo('/events/chapter-5.svg')
     } else {
       setCollabEnabled(false)
       setCollabName('')
@@ -212,14 +216,22 @@ function DemoTicketContent() {
 
     try {
       setUploadingLogo(true)
-      // Instant local preview
+      // Instant local preview via Blob URL (reliable in browser with zero network latency)
       const localUrl = URL.createObjectURL(file)
       setCollabLogo(localUrl)
 
-      // Upload to server S3 / local static storage
+      // Upload to server S3 / local static storage in background
       const uploadedUrl = await uploadEventImage(file, 'collaborator')
       if (uploadedUrl) {
-        setCollabLogo(uploadedUrl)
+        // Pre-validate that browser can fetch uploadedUrl before swapping away from local preview
+        const testImg = new Image()
+        testImg.onload = () => {
+          setCollabLogo(uploadedUrl)
+        }
+        testImg.onerror = () => {
+          console.warn('Uploaded image URL not directly accessible; retaining local blob preview:', uploadedUrl)
+        }
+        testImg.src = uploadedUrl
       }
       toast.success('Partner logo uploaded successfully!')
     } catch {
@@ -479,7 +491,23 @@ function DemoTicketContent() {
                     <Label className="text-xs font-medium">Partner Brand Name</Label>
                     <Input
                       value={collabName}
-                      onChange={(e) => setCollabName(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setCollabName(val)
+                        if (
+                          val.toLowerCase().includes('chapter') &&
+                          (!collabLogo || collabLogo.includes('red-bull'))
+                        ) {
+                          setCollabLogo('/events/chapter-5-logo.jpg?v=2')
+                          setCollabRole('Co-Host & Roastery Partner')
+                        } else if (
+                          val.toLowerCase().includes('red bull') &&
+                          (!collabLogo || collabLogo.includes('chapter'))
+                        ) {
+                          setCollabLogo('/events/red-bull.svg')
+                          setCollabRole('Official Energy Partner')
+                        }
+                      }}
                       className="h-8 text-xs font-semibold"
                       placeholder="e.g. Red Bull / Chapter 5 Coffee"
                     />
@@ -515,7 +543,15 @@ function DemoTicketContent() {
                           alt="Partner logo"
                           className="h-7 w-auto max-w-[80px] object-contain rounded bg-white p-1 border border-border"
                           onError={(e) => {
-                            ;(e.target as HTMLElement).style.display = 'none'
+                            const target = e.target as HTMLImageElement
+                            if (
+                              collabName.toLowerCase().includes('chapter') &&
+                              !target.src.includes('chapter-5-logo.jpg')
+                            ) {
+                              target.src = '/events/chapter-5-logo.jpg'
+                              return
+                            }
+                            target.style.display = 'none'
                           }}
                         />
                         <div className="min-w-0">
@@ -597,7 +633,7 @@ function DemoTicketContent() {
                         applyPreset({
                           name: 'Chapter 5 Speciality Coffee',
                           role: 'Co-Host & Roastery Partner',
-                          logoUrl: '/events/chapter-5-logo.jpg',
+                          logoUrl: '/events/chapter-5-logo.jpg?v=2',
                         })
                       }
                       className="h-7 text-xs gap-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20 font-semibold"

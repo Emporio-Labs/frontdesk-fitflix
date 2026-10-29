@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import QRCode from 'qrcode'
 import {
   IconCalendar,
@@ -9,7 +9,6 @@ import {
   IconShieldCheck,
   IconShare,
   IconDownload,
-  IconCheck,
   IconExternalLink,
 } from '@tabler/icons-react'
 import { Badge } from '@/components/ui/badge'
@@ -36,6 +35,57 @@ export const FITFLIX_TOKENS = {
   clay: '#C2674E', // Terracotta
 }
 
+// Brand Hang Tag Color Mapping per Pass Tier Preset
+export const getHangTagStyle = (label: string, fallbackColor?: string) => {
+  const norm = (label || '').toUpperCase().trim()
+  if (norm.includes('SUPER EARLY')) {
+    return {
+      bg: '#D1FAE5',
+      text: '#065F46',
+      border: '#34D399',
+      cord: '#059669',
+    }
+  }
+  if (norm.includes('EARLY')) {
+    return {
+      bg: '#DBEAFE',
+      text: '#1E40AF',
+      border: '#60A5FA',
+      cord: '#2563EB',
+    }
+  }
+  if (norm.includes('MEMBER')) {
+    return {
+      bg: '#F3E8FF',
+      text: '#6B21A8',
+      border: '#C084FC',
+      cord: '#9333EA',
+    }
+  }
+  if (norm.includes('VIP') || norm.includes('ALL ACCESS')) {
+    return {
+      bg: '#FEF3C7',
+      text: '#92400E',
+      border: '#FBBF24',
+      cord: '#D97706',
+    }
+  }
+  if (norm.includes('RUNNER') || norm.includes('GENERAL')) {
+    return {
+      bg: '#ECFDF5',
+      text: '#166534',
+      border: '#6EE7B7',
+      cord: '#059669',
+    }
+  }
+  return {
+    bg: fallbackColor ? `${fallbackColor}18` : '#F4F4F5',
+    text: fallbackColor || '#18181B',
+    border: fallbackColor ? `${fallbackColor}50` : '#E4E4E7',
+    cord: fallbackColor || '#71717A',
+  }
+}
+
 export interface FitflixEventPassProps {
   passData: DigitalPassResponse
   showActions?: boolean
@@ -55,9 +105,33 @@ export function FitflixEventPass({
 
   // Use tier's specific badge color for the tier badge, defaulting to Brass or Sage
   const tierColor = pass.badgeColor || FITFLIX_TOKENS.brass
+  const hangTagStyle = useMemo(
+    () => getHangTagStyle(pass.badgeLabel || pass.tierName || '', pass.badgeColor),
+    [pass.badgeLabel, pass.tierName, pass.badgeColor]
+  )
   const collaborators = event.collaborators || []
   const hasCollaborator = collaborators.length > 0
   const primaryCollab = hasCollaborator ? collaborators[0] : null
+
+  // Smart partner logo resolver: defaults Chapter 5 to the official high-res logo
+  const partnerLogoSrc = useMemo(() => {
+    if (!primaryCollab) return ''
+    const raw = primaryCollab.logoUrl?.trim()
+    const nameLower = (primaryCollab.name || '').toLowerCase()
+
+    if (nameLower.includes('chapter') || nameLower.includes('coffee') || raw?.includes('chapter')) {
+      if (!raw || raw.endsWith('.svg') || raw.includes('chapter-5-logo.jpg')) {
+        return '/events/chapter-5-logo.jpg?v=2'
+      }
+      return raw
+    }
+
+    if (nameLower.includes('red bull') || raw?.includes('red-bull')) {
+      return raw || '/events/red-bull.svg'
+    }
+
+    return raw || ''
+  }, [primaryCollab])
 
   useEffect(() => {
     if (pass.qrPayload || pass.ticketId) {
@@ -147,6 +221,41 @@ export function FitflixEventPass({
             : 'bg-white border-[#E7E0D2] text-[#1B2A1F]'
         } border rounded-3xl overflow-hidden relative select-none transition-colors duration-200`}
       >
+        {/* Sleek Retail Brand Hang Tag (Suspended from Top Right Edge) */}
+        <div className="absolute top-0 right-5 sm:right-6 z-20 flex flex-col items-center pointer-events-none select-none">
+          {/* Braided Cord / Suspension Thread */}
+          <div
+            style={{ backgroundColor: hangTagStyle.cord }}
+            className="w-[1.5px] h-3 shadow-2xs"
+          />
+
+          {/* Cardstock Hang Tag Body */}
+          <div
+            style={{
+              backgroundColor: hangTagStyle.bg,
+              borderColor: hangTagStyle.border,
+              color: hangTagStyle.text,
+              boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.16), 0 2px 4px -2px rgba(0, 0, 0, 0.08)',
+            }}
+            className="relative flex flex-col items-center justify-center px-2 pt-1.5 pb-1 rounded-b-md border border-t-0 min-w-[72px] max-w-[84px] text-center"
+          >
+            {/* Metallic Eyelet (Grommet) Punch Hole */}
+            <div className="w-2 h-2 rounded-full border border-black/30 bg-[#18181B] shadow-inner flex items-center justify-center -mt-0.5 mb-1">
+              <div className="w-0.5 h-0.5 rounded-full bg-white/40" />
+            </div>
+
+            {/* Pass Tier Ticket Text */}
+            <span className="font-black text-[8.5px] leading-tight tracking-wider uppercase">
+              {pass.badgeLabel || 'GENERAL PASS'}
+            </span>
+
+            {/* Micro Retail Stamp */}
+            <span className="text-[6px] font-mono tracking-widest opacity-60 uppercase pt-0.5">
+              PASS TIER
+            </span>
+          </div>
+        </div>
+
         {/* Top Header Branding Section */}
         <div
           style={{
@@ -157,15 +266,15 @@ export function FitflixEventPass({
           }}
           className="p-5 sm:p-6 space-y-3"
         >
-          {/* Row 1: Brand Logos Lockup (Big Size, Zero Extra Background) + Pass Tier Badge */}
-          <div className="flex items-center justify-between gap-3">
+          {/* Row 1: Brand Logos Lockup (Big Size, Full Span, Zero Collision with Hang Tag) */}
+          <div className="flex items-center gap-3 pr-20">
             {hasCollaborator && primaryCollab ? (
               /* Co-Branded Layout: Company 1 Logo × Company 2 Logo */
               <div className="flex items-center gap-2.5 min-w-0">
                 {/* Company 1: Official Fitflix Logo */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/fitflix_logo.png"
+                  src="/events/fitflix-full-logo.png"
                   alt="Fitflix"
                   className="h-8 sm:h-9 w-auto object-contain shrink-0"
                 />
@@ -180,23 +289,32 @@ export function FitflixEventPass({
 
                 {/* Company 2: Partner Brand Logo */}
                 <div className="flex items-center min-w-0">
-                  {primaryCollab.logoUrl ? (
+                  {partnerLogoSrc ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
-                      src={primaryCollab.logoUrl}
+                      src={partnerLogoSrc}
                       alt={primaryCollab.name}
-                      className="h-7 sm:h-8 w-auto max-w-[130px] sm:max-w-[170px] object-contain shrink-0 mix-blend-multiply"
+                      className="h-9 sm:h-10 w-auto max-w-[170px] sm:max-w-[220px] object-contain shrink-0 mix-blend-multiply"
                       onError={(e) => {
-                        ;(e.target as HTMLElement).style.display = 'none'
-                        const fallback = (e.target as HTMLElement)
-                          .nextElementSibling as HTMLElement
+                        const target = e.target as HTMLImageElement
+                        // If it's Chapter 5, try the verified local logo before hiding
+                        if (
+                          (primaryCollab.name.toLowerCase().includes('chapter') ||
+                            primaryCollab.name.toLowerCase().includes('coffee')) &&
+                          !target.src.includes('chapter-5-logo.jpg')
+                        ) {
+                          target.src = '/events/chapter-5-logo.jpg?v=2'
+                          return
+                        }
+                        target.style.display = 'none'
+                        const fallback = target.nextElementSibling as HTMLElement
                         if (fallback) fallback.style.display = 'inline-block'
                       }}
                     />
                   ) : null}
                   <span
                     style={{
-                      display: primaryCollab.logoUrl ? 'none' : 'inline-block',
+                      display: partnerLogoSrc ? 'none' : 'inline-block',
                       color: isDark ? '#FFFFFF' : FITFLIX_TOKENS.textPrimary,
                     }}
                     className="font-black text-sm sm:text-base tracking-tight truncate max-w-[150px] sm:max-w-[190px]"
@@ -210,28 +328,16 @@ export function FitflixEventPass({
               <div className="flex items-center gap-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/fitflix_logo.png"
+                  src="/events/fitflix-full-logo.png"
                   alt="Fitflix"
                   className="h-8 sm:h-9 w-auto object-contain shrink-0"
                 />
               </div>
             )}
-
-            {/* Pass Tier Badge (Top Right) */}
-            <Badge
-              style={{
-                backgroundColor: tierColor,
-                color: '#FFFFFF',
-                boxShadow: `0 2px 8px ${tierColor}40`,
-              }}
-              className="font-black text-[10px] tracking-wider uppercase border-none px-2.5 py-1 shrink-0"
-            >
-              {pass.badgeLabel || 'GENERAL PASS'}
-            </Badge>
           </div>
 
-          {/* Row 2: Event Title & Tagline */}
-          <div className="space-y-0.5 pt-0.5">
+          {/* Row 2: Event Title & Tagline (Padded to clear the hang tag smoothly) */}
+          <div className="space-y-0.5 pt-0.5 pr-20">
             <h2
               style={{ color: isDark ? '#FFFFFF' : FITFLIX_TOKENS.textPrimary }}
               className="text-base sm:text-lg font-black tracking-tight leading-snug"
@@ -451,38 +557,7 @@ export function FitflixEventPass({
             </div>
           </div>
 
-          {/* Tier Perks Checklist */}
-          {pass.perks && pass.perks.length > 0 && (
-            <div
-              style={{
-                backgroundColor: isDark ? 'rgba(24, 24, 27, 0.5)' : FITFLIX_TOKENS.surfaceHighlight,
-                borderColor: isDark ? '#27272a' : FITFLIX_TOKENS.border,
-              }}
-              className="rounded-xl p-3 border space-y-1"
-            >
-              <span
-                style={{ color: isDark ? FITFLIX_TOKENS.primary : FITFLIX_TOKENS.primaryDark }}
-                className="text-[10px] uppercase font-bold tracking-wider block mb-1"
-              >
-                INCLUDED PASS PERKS
-              </span>
-              {pass.perks.map((perk, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-1.5 text-xs font-medium"
-                  style={{ color: isDark ? '#e4e4e7' : FITFLIX_TOKENS.textPrimary }}
-                >
-                  <IconCheck
-                    style={{ color: FITFLIX_TOKENS.primaryDark }}
-                    className="h-3.5 w-3.5 shrink-0 stroke-[2.5]"
-                  />
-                  <span>{perk}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Sponsors Footer Strip */}
+          {/* Optional Community Partners & Sponsors Footer Strip (renders only when event has sponsors) */}
           {event.sponsors && event.sponsors.length > 0 && (
             <div
               style={{ borderColor: isDark ? '#27272a' : FITFLIX_TOKENS.border }}

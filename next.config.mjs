@@ -27,7 +27,7 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https:",
+              "img-src 'self' data: blob: http: https: http://localhost:3000 http://127.0.0.1:3000",
               "font-src 'self' data:",
               "connect-src 'self' http://localhost:3000 https:",
               "media-src 'self' blob:",
@@ -51,7 +51,7 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-eval needed for Next.js dev; tighten in prod
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https:",
+              "img-src 'self' data: blob: http: https: http://localhost:3000 http://127.0.0.1:3000",
               "font-src 'self' data:",
               // wss: required for ZEGOCLOUD real-time signalling (accesshub/weblogger sockets on *.coolbcloud.com / coolzcloud.com / coolgcloud.com). https: does NOT cover the wss: scheme.
               "connect-src 'self' http://localhost:3000 https: wss: https://*.zego.im wss://*.zego.im https://*.coolzcloud.com wss://*.coolzcloud.com https://*.coolbcloud.com wss://*.coolbcloud.com https://*.coolgcloud.com wss://*.coolgcloud.com",
