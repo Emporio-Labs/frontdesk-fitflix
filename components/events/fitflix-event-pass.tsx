@@ -122,15 +122,15 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
           className="p-5 sm:p-6 space-y-3"
         >
           {/* Row 1: Brand Logos Lockup + Pass Tier Badge */}
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2.5">
             {hasCollaborator && primaryCollab ? (
               /* Co-Branded Layout: Company 1 Logo × Company 2 Logo */
-              <div className="flex items-center gap-2 bg-black/60 border border-zinc-700/60 px-3 py-1.5 rounded-full shadow-inner">
-                {/* Fitflix Wordmark Logo */}
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2 bg-black/75 border border-zinc-700/80 px-3 py-1.5 rounded-full shadow-lg backdrop-blur-xs min-w-0">
+                {/* Company 1: Fitflix Official Emblem & Wordmark */}
+                <div className="flex items-center gap-1.5 shrink-0">
                   <span
                     style={{ backgroundColor: accentColor }}
-                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0"
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0 shadow-xs"
                   >
                     F
                   </span>
@@ -139,46 +139,62 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
                   </span>
                 </div>
 
-                {/* Multiply Separator */}
-                <span className="text-zinc-400 text-xs font-bold px-0.5">×</span>
+                {/* Multiplier / Cross Separator */}
+                <span className="text-zinc-400 text-xs font-black px-0.5 shrink-0">×</span>
 
-                {/* Partner / Collaborator Logo & Name */}
-                <div className="flex items-center gap-1.5">
-                  {primaryCollab.logoUrl && (
+                {/* Company 2: Partner Brand Logo & Name */}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {primaryCollab.logoUrl ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
                       src={primaryCollab.logoUrl}
                       alt={primaryCollab.name}
-                      className="h-4 w-auto max-w-[65px] object-contain rounded shrink-0 bg-white/10"
+                      className="h-4 w-auto max-w-[70px] object-contain rounded shrink-0 bg-white/10 p-0.5"
                       onError={(e) => {
                         ;(e.target as HTMLElement).style.display = 'none'
+                        const fallback = (e.target as HTMLElement).nextElementSibling as HTMLElement
+                        if (fallback) fallback.style.display = 'flex'
                       }}
                     />
-                  )}
-                  <span className="font-bold text-xs text-zinc-200 truncate max-w-[110px]">
+                  ) : null}
+                  {/* Fallback initials badge if no logoUrl or image error */}
+                  <span
+                    style={{ display: primaryCollab.logoUrl ? 'none' : 'flex' }}
+                    className="w-4 h-4 rounded-full bg-zinc-800 border border-zinc-700 items-center justify-center text-[8px] font-black text-zinc-200 shrink-0"
+                  >
+                    {primaryCollab.name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="font-bold text-xs text-zinc-100 truncate max-w-[150px] sm:max-w-[190px]">
                     {primaryCollab.name}
                   </span>
                 </div>
               </div>
             ) : (
-              /* Single Company Event Layout: Official Fitflix Logo Badge */
-              <div className="flex items-center gap-2 bg-black/60 border border-zinc-700/60 px-3 py-1.5 rounded-full shadow-inner">
+              /* Single Company Event: Official Fitflix Emblem & Wordmark */
+              <div className="flex items-center gap-2 bg-black/75 border border-zinc-700/80 px-3 py-1.5 rounded-full shadow-lg backdrop-blur-xs">
                 <span
                   style={{ backgroundColor: accentColor }}
-                  className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0"
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0 shadow-xs"
                 >
                   F
                 </span>
                 <span className="font-black text-xs tracking-widest text-white">
                   FITFLIX
                 </span>
-                <span className="text-[9px] uppercase tracking-wider text-zinc-400 font-bold px-1.5 py-0.5 rounded bg-zinc-800/80">
+                <span
+                  style={{
+                    borderColor: `${accentColor}40`,
+                    color: accentColor,
+                    backgroundColor: `${accentColor}15`,
+                  }}
+                  className="text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded border"
+                >
                   OFFICIAL
                 </span>
               </div>
             )}
 
-            {/* Pass Tier Badge (Accent Color) */}
+            {/* Pass Tier Badge (Top Right) */}
             <Badge
               style={{
                 backgroundColor: accentColor,

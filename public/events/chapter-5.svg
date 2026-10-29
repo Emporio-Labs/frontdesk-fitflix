@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 60" width="220" height="60">
+  <rect width="220" height="60" rx="10" fill="#2b1810" />
+  <circle cx="35" cy="30" r="18" fill="#d4a373" />
+  <text x="35" y="37" font-family="'Georgia', serif" font-weight="900" font-size="20" text-anchor="middle" fill="#2b1810">5</text>
+  <text x="65" y="37" font-family="'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="16" fill="#fefae0" letter-spacing="1">CHAPTER 5</text>
+</svg>
