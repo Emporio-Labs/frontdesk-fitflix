@@ -370,7 +370,7 @@ export default function EventsAdminPage() {
                     </Link>
                   </div>
 
-                  <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -384,18 +384,6 @@ export default function EventsAdminPage() {
                       <IconQrcode className="h-3.5 w-3.5" />
                       Flyer QR
                     </Button>
-
-                    <Link href={`/admin/events/demo-ticket?eventId=${id}`} className="flex-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-1.5 text-xs border-zinc-700 hover:bg-accent"
-                        title="Preview How Attendee Digital Ticket Looks"
-                      >
-                        <IconTicket className="h-3.5 w-3.5 text-emerald-500" />
-                        Pass Studio
-                      </Button>
-                    </Link>
 
                     {/* Delete Confirmation Dialog */}
                     <AlertDialog>

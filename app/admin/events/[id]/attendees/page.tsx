@@ -368,13 +368,6 @@ export default function EventAttendeesPage() {
             Refresh
           </Button>
 
-          <Link href={`/admin/events/demo-ticket?eventId=${event.id || event._id}`}>
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-              <IconTicket className="h-3.5 w-3.5 text-emerald-500" />
-              Demo Pass
-            </Button>
-          </Link>
-
           <Button
             variant="outline"
             size="sm"
