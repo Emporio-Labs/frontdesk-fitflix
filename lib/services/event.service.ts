@@ -111,14 +111,21 @@ export async function deleteEvent(id: string): Promise<void> {
   await apiClient.delete(`/events/${id}`)
 }
 
-export async function uploadEventImage(file: File): Promise<string> {
+export async function uploadEventImage(
+  file: File,
+  type: 'cover' | 'collaborator' | 'sponsor' | 'badge' = 'cover'
+): Promise<string> {
   const formData = new FormData()
   formData.append('image', file)
-  const response = await apiClient.post<{ url: string }>('/events/upload-image', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  })
+  const response = await apiClient.post<{ url: string }>(
+    `/events/upload-image?type=${type}`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  )
   return response.data.url
 }
 
