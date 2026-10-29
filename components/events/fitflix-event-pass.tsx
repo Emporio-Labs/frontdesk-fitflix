@@ -157,107 +157,63 @@ export function FitflixEventPass({
           }}
           className="p-5 sm:p-6 space-y-3"
         >
-          {/* Row 1: Brand Logos Lockup + Pass Tier Badge */}
-          <div className="flex items-center justify-between gap-2.5">
+          {/* Row 1: Brand Logos Lockup (Big Size, Zero Extra Background) + Pass Tier Badge */}
+          <div className="flex items-center justify-between gap-3">
             {hasCollaborator && primaryCollab ? (
               /* Co-Branded Layout: Company 1 Logo × Company 2 Logo */
-              <div
-                style={{
-                  backgroundColor: isDark ? 'rgba(0,0,0,0.75)' : FITFLIX_TOKENS.surfaceAlt,
-                  borderColor: isDark ? '#3f3f46' : FITFLIX_TOKENS.borderStrong,
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full min-w-0 border shadow-xs"
-              >
-                {/* Company 1: Fitflix Official Emblem & Wordmark */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span
-                    style={{ backgroundColor: FITFLIX_TOKENS.primaryDark }}
-                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0 shadow-xs"
-                  >
-                    F
-                  </span>
-                  <span
-                    style={{ color: isDark ? '#FFFFFF' : FITFLIX_TOKENS.textPrimary }}
-                    className="font-black text-xs tracking-wider"
-                  >
-                    FITFLIX
-                  </span>
-                </div>
+              <div className="flex items-center gap-2.5 min-w-0">
+                {/* Company 1: Official Fitflix Logo */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/fitflix_logo.png"
+                  alt="Fitflix"
+                  className="h-8 sm:h-9 w-auto object-contain shrink-0"
+                />
 
                 {/* Multiplier / Cross Separator */}
                 <span
-                  style={{ color: isDark ? '#a1a1aa' : FITFLIX_TOKENS.textSecondary }}
-                  className="text-xs font-black px-0.5 shrink-0"
+                  style={{ color: isDark ? '#a1a1aa' : '#71717A' }}
+                  className="text-base sm:text-lg font-black px-0.5 select-none shrink-0"
                 >
                   ×
                 </span>
 
-                {/* Company 2: Partner Brand Logo & Name */}
-                <div className="flex items-center gap-1.5 min-w-0">
+                {/* Company 2: Partner Brand Logo */}
+                <div className="flex items-center min-w-0">
                   {primaryCollab.logoUrl ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
                       src={primaryCollab.logoUrl}
                       alt={primaryCollab.name}
-                      className="h-4 w-auto max-w-[70px] object-contain rounded shrink-0 bg-white/20 p-0.5"
+                      className="h-7 sm:h-8 w-auto max-w-[130px] sm:max-w-[170px] object-contain shrink-0 mix-blend-multiply"
                       onError={(e) => {
                         ;(e.target as HTMLElement).style.display = 'none'
                         const fallback = (e.target as HTMLElement)
                           .nextElementSibling as HTMLElement
-                        if (fallback) fallback.style.display = 'flex'
+                        if (fallback) fallback.style.display = 'inline-block'
                       }}
                     />
                   ) : null}
-                  {/* Fallback initials badge if no logoUrl or image error */}
                   <span
                     style={{
-                      display: primaryCollab.logoUrl ? 'none' : 'flex',
-                      backgroundColor: isDark ? '#27272a' : '#E0D8C8',
-                      color: isDark ? '#f4f4f5' : FITFLIX_TOKENS.textPrimary,
+                      display: primaryCollab.logoUrl ? 'none' : 'inline-block',
+                      color: isDark ? '#FFFFFF' : FITFLIX_TOKENS.textPrimary,
                     }}
-                    className="w-4 h-4 rounded-full border border-black/10 items-center justify-center text-[8px] font-black shrink-0"
-                  >
-                    {primaryCollab.name.slice(0, 2).toUpperCase()}
-                  </span>
-                  <span
-                    style={{ color: isDark ? '#f4f4f5' : FITFLIX_TOKENS.textPrimary }}
-                    className="font-bold text-xs truncate max-w-[150px] sm:max-w-[190px]"
+                    className="font-black text-sm sm:text-base tracking-tight truncate max-w-[150px] sm:max-w-[190px]"
                   >
                     {primaryCollab.name}
                   </span>
                 </div>
               </div>
             ) : (
-              /* Single Company Event: Official Fitflix Emblem & Wordmark */
-              <div
-                style={{
-                  backgroundColor: isDark ? 'rgba(0,0,0,0.75)' : FITFLIX_TOKENS.surfaceAlt,
-                  borderColor: isDark ? '#3f3f46' : FITFLIX_TOKENS.borderStrong,
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-xs"
-              >
-                <span
-                  style={{ backgroundColor: FITFLIX_TOKENS.primaryDark }}
-                  className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0 shadow-xs"
-                >
-                  F
-                </span>
-                <span
-                  style={{ color: isDark ? '#FFFFFF' : FITFLIX_TOKENS.textPrimary }}
-                  className="font-black text-xs tracking-widest"
-                >
-                  FITFLIX
-                </span>
-                <span
-                  style={{
-                    borderColor: isDark ? '#3f3f46' : FITFLIX_TOKENS.border,
-                    color: FITFLIX_TOKENS.primaryDark,
-                    backgroundColor: isDark ? 'rgba(92,107,52,0.2)' : FITFLIX_TOKENS.surfaceMuted,
-                  }}
-                  className="text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded border"
-                >
-                  OFFICIAL
-                </span>
+              /* Single Company Event: Official Fitflix Logo */
+              <div className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/fitflix_logo.png"
+                  alt="Fitflix"
+                  className="h-8 sm:h-9 w-auto object-contain shrink-0"
+                />
               </div>
             )}
 

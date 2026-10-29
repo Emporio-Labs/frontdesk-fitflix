@@ -125,9 +125,9 @@ function DemoTicketContent() {
 
   // Co-Branding & Partner Customizer State
   const [collabEnabled, setCollabEnabled] = useState(true)
-  const [collabName, setCollabName] = useState('Red Bull')
-  const [collabRole, setCollabRole] = useState('Official Energy Partner')
-  const [collabLogo, setCollabLogo] = useState('/events/red-bull.svg')
+  const [collabName, setCollabName] = useState('Chapter 5 Speciality Coffee')
+  const [collabRole, setCollabRole] = useState('Co-Host & Roastery Partner')
+  const [collabLogo, setCollabLogo] = useState('/events/chapter-5-logo.jpg')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -597,7 +597,7 @@ function DemoTicketContent() {
                         applyPreset({
                           name: 'Chapter 5 Speciality Coffee',
                           role: 'Co-Host & Roastery Partner',
-                          logoUrl: '/events/chapter-5.svg',
+                          logoUrl: '/events/chapter-5-logo.jpg',
                         })
                       }
                       className="h-7 text-xs gap-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20 font-semibold"
