@@ -46,27 +46,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 
-// Default fallback tiers if an event has 0 custom tiers in the database
+// Default fallback tiers if an event has 0 custom tiers in the database (Harmonized with Fitflix Design System)
 const DEFAULT_PREVIEW_TIERS: TicketTier[] = [
-  {
-    tierId: 'tier_super_early_bird',
-    name: 'Super Early Bird Pass',
-    badgeLabel: 'SUPER EARLY BIRD',
-    badgeColor: '#10b981',
-    type: 'paid',
-    price: 299,
-    totalQuantity: 50,
-    perks: [
-      'Official Fitflix Dri-FIT Running Tee',
-      'RFID Timing Chip & Finisher Medal',
-      'Post-Run Cold Plunge & Protein Shake',
-    ],
-  },
   {
     tierId: 'tier_vip_gold',
     name: 'All-Inclusive VIP Recovery Pass',
     badgeLabel: 'ALL ACCESS VIP',
-    badgeColor: '#f59e0b',
+    badgeColor: '#B08D57', // Luxury Brass
     type: 'paid',
     price: 1499,
     totalQuantity: 30,
@@ -78,10 +64,24 @@ const DEFAULT_PREVIEW_TIERS: TicketTier[] = [
     ],
   },
   {
+    tierId: 'tier_super_early_bird',
+    name: 'Super Early Bird Pass',
+    badgeLabel: 'SUPER EARLY BIRD',
+    badgeColor: '#8A965A', // Sage Olive
+    type: 'paid',
+    price: 299,
+    totalQuantity: 50,
+    perks: [
+      'Official Fitflix Dri-FIT Running Tee',
+      'RFID Timing Chip & Finisher Medal',
+      'Post-Run Cold Plunge & Protein Shake',
+    ],
+  },
+  {
     tierId: 'tier_general_runner',
     name: 'General Admission Pass',
     badgeLabel: 'RUNNER PASS',
-    badgeColor: '#3b82f6',
+    badgeColor: '#5C6B34', // Deep Olive
     type: 'paid',
     price: 499,
     totalQuantity: 150,
@@ -95,7 +95,7 @@ const DEFAULT_PREVIEW_TIERS: TicketTier[] = [
     tierId: 'tier_member_community',
     name: 'Fitflix Member Community Pass',
     badgeLabel: 'MEMBER ACCESS',
-    badgeColor: '#8b5cf6',
+    badgeColor: '#C2674E', // Terracotta
     type: 'free',
     price: 0,
     totalQuantity: 100,
@@ -269,7 +269,7 @@ function DemoTicketContent() {
         tierId: selectedTier.tierId,
         tierName: selectedTier.name,
         badgeLabel: selectedTier.badgeLabel || 'GENERAL PASS',
-        badgeColor: selectedTier.badgeColor || '#10b981',
+        badgeColor: selectedTier.badgeColor || '#8A965A',
         perks: selectedTier.perks || [
           'Official Event Kit',
           'Access to Workout & Community Zones',
@@ -655,7 +655,7 @@ function DemoTicketContent() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {activeTiersList.map((tier) => {
                   const isSelected = selectedTier?.tierId === tier.tierId
-                  const badgeColor = tier.badgeColor || '#10b981'
+                  const badgeColor = tier.badgeColor || '#8A965A'
                   return (
                     <button
                       key={tier.tierId}
@@ -825,8 +825,14 @@ function DemoTicketContent() {
             </div>
           </div>
 
-          {/* Showcase Canvas Frame */}
-          <div className="w-full p-4 sm:p-6 rounded-2xl border border-border bg-muted/20 flex flex-col items-center justify-center shadow-xs">
+          {/* Showcase Canvas Frame (Harmonized Warm Ivory #F4F1E9 Scaffold) */}
+          <div
+            style={{
+              backgroundColor: passTheme === 'dark' ? '#18181b' : '#F4F1E9',
+              borderColor: passTheme === 'dark' ? '#27272a' : '#E7E0D2',
+            }}
+            className="w-full p-4 sm:p-6 rounded-3xl border flex flex-col items-center justify-center shadow-xs transition-colors duration-200"
+          >
             {livePassData ? (
               <FitflixEventPass
                 passData={livePassData}
