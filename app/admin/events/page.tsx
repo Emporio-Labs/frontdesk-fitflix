@@ -40,7 +40,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/empty-state'
 import { FlyerQrDialog } from '@/components/events/flyer-qr-dialog'
-import { IconQrcode } from '@tabler/icons-react'
+import { IconQrcode, IconScan } from '@tabler/icons-react'
 import {
   getEvents,
   deleteEvent,
@@ -384,6 +384,18 @@ export default function EventsAdminPage() {
                       <IconQrcode className="h-3.5 w-3.5" />
                       Flyer QR
                     </Button>
+
+                    <Link href={`/admin/events/${id}/scanner`} className="flex-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/10 font-medium"
+                        title="Open Entrance Live QR Scanner"
+                      >
+                        <IconScan className="h-3.5 w-3.5" />
+                        Scanner
+                      </Button>
+                    </Link>
 
                     {/* Delete Confirmation Dialog */}
                     <AlertDialog>

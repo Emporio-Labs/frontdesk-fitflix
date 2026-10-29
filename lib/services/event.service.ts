@@ -290,3 +290,44 @@ export async function getDigitalPass(ticketId: string): Promise<DigitalPassRespo
   const response = await apiClient.get<DigitalPassResponse>(`/events/pass/${ticketId}`)
   return response.data
 }
+
+export interface CheckInVerificationResponse {
+  status: 'VALID' | 'ALREADY_CHECKED_IN' | 'WRONG_EVENT' | 'INVALID'
+  message?: string
+  error?: string
+  registration?: {
+    id: string
+    ticketId: string
+    attendeeName: string
+    attendeeEmail: string
+    attendeePhone: string
+    tierName: string
+    badgeLabel?: string
+    badgeColor?: string
+    perks?: string[]
+    checkedIn: boolean
+    checkedInAt?: string
+  }
+  event?: {
+    id: string
+    title: string
+  }
+}
+
+export async function verifyEventCheckIn(payload: {
+  payload: string
+  eventId?: string
+}): Promise<CheckInVerificationResponse> {
+  try {
+    const response = await apiClient.post<CheckInVerificationResponse>(
+      '/events/verify-checkin',
+      payload
+    )
+    return response.data
+  } catch (err: any) {
+    if (err?.response?.data) {
+      return err.response.data
+    }
+    throw err
+  }
+}

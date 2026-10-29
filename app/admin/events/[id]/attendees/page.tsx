@@ -356,6 +356,16 @@ export default function EventAttendeesPage() {
 
         {/* Header Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <Link href={`/admin/events/${eventId}/scanner`}>
+            <Button
+              size="sm"
+              className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-xs"
+            >
+              <IconQrcode className="h-4 w-4" />
+              Live QR Scanner
+            </Button>
+          </Link>
+
           <Button
             variant="outline"
             size="sm"
