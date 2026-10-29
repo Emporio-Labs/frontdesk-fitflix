@@ -191,7 +191,7 @@ export function CoBrandingManager({
         </CardContent>
       </Card>
 
-      {/* 2. Sponsors Strip (DevFest style bottom bar) */}
+      {/* 2. Sponsors Strip (Event Pass bottom bar) */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -199,7 +199,7 @@ export function CoBrandingManager({
             Sponsors & Partners Strip ({sponsors.length})
           </CardTitle>
           <CardDescription>
-            Sponsor logos printed along the bottom bar of DevFest-style attendee passes.
+            Sponsor logos printed along the bottom bar of official attendee event passes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

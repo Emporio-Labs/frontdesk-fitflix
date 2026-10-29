@@ -146,12 +146,20 @@ export default function EventsAdminPage() {
             Manage physical summits, marathons, workshops, pass tiers, and digital check-ins.
           </p>
         </div>
-        <Link href="/admin/events/new">
-          <Button className="gap-2">
-            <IconPlus className="h-4 w-4" />
-            Create Event
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/events/demo-ticket">
+            <Button variant="outline" className="gap-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10">
+              <IconTicket className="h-4 w-4" />
+              Demo Pass Studio
+            </Button>
+          </Link>
+          <Link href="/admin/events/new">
+            <Button className="gap-2">
+              <IconPlus className="h-4 w-4" />
+              Create Event
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Search and Tabs Filter Bar */}
@@ -357,6 +365,18 @@ export default function EventsAdminPage() {
                     <IconQrcode className="h-3.5 w-3.5" />
                     Flyer QR
                   </Button>
+
+                  <Link href={`/admin/events/demo-ticket?eventId=${id}`}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs border-zinc-700 hover:bg-accent"
+                      title="Preview How Attendee Digital Ticket Looks"
+                    >
+                      <IconTicket className="h-3.5 w-3.5 text-emerald-500" />
+                      Preview Pass
+                    </Button>
+                  </Link>
 
                   {/* Delete Confirmation Dialog */}
                   <AlertDialog>

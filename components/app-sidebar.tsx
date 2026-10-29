@@ -34,6 +34,7 @@ import {
   IconVideo,
   IconCirclePlus,
   IconRefresh,
+  IconTicket,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -112,6 +113,7 @@ const navGroups = [
     label: "Events & Community",
     items: [
       { title: "Fitflix Events", url: "/admin/events", icon: IconCalendarEvent },
+      { title: "Demo Pass Studio", url: "/admin/events/demo-ticket", icon: IconTicket },
       { title: "Community", url: "/admin/community", icon: IconMessage2 },
     ],
   },

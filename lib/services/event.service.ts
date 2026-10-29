@@ -182,3 +182,45 @@ export async function getEventRegistrations(
   )
   return response.data
 }
+
+export interface DigitalPassResponse {
+  pass: {
+    id: string
+    ticketId: string
+    tierId: string
+    tierName: string
+    badgeLabel: string
+    badgeColor: string
+    perks: string[]
+    attendeeName: string
+    attendeeEmail: string
+    attendeePhone: string
+    answers?: Record<string, string>
+    checkedIn: boolean
+    checkedInAt?: string
+    paymentStatus: string
+    amountPaid: number
+    verificationToken: string
+    qrPayload: string
+    createdAt: string
+  }
+  event: {
+    id: string
+    title: string
+    slug: string
+    tagline?: string
+    description?: string
+    startDate: string
+    endDate: string
+    reportingTime: string
+    venue: EventVenue
+    coverImageUrl?: string
+    collaborators?: Collaborator[]
+    sponsors?: Sponsor[]
+  }
+}
+
+export async function getDigitalPass(ticketId: string): Promise<DigitalPassResponse> {
+  const response = await apiClient.get<DigitalPassResponse>(`/events/pass/${ticketId}`)
+  return response.data
+}
