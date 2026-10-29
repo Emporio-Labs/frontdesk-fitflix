@@ -172,14 +172,73 @@ export async function registerForEvent(slug: string, payload: RegisterEventPaylo
   return response.data
 }
 
+export interface TierBreakdownItem {
+  tierId: string
+  name: string
+  badgeLabel: string
+  badgeColor: string
+  price: number
+  totalQuantity: number
+  bookedCount: number
+  soldQuantity: number
+  isSoldOut: boolean
+}
+
+export interface RosterSummary {
+  totalRegistered: number
+  totalCapacity: number
+  totalCheckedIn: number
+  totalPending: number
+  checkedInPercentage: number
+  totalRevenue: number
+  tierBreakdown: TierBreakdownItem[]
+}
+
+export interface GetRegistrationsResponse {
+  event?: {
+    id: string
+    title: string
+    slug: string
+    startDate: string
+    reportingTime: string
+    venue: EventVenue
+  }
+  summary?: RosterSummary
+  total: number
+  registrations: EventRegistration[]
+}
+
 export async function getEventRegistrations(
   id: string,
-  params?: { checkedIn?: boolean; tierId?: string; search?: string }
-): Promise<{ total: number; registrations: EventRegistration[] }> {
-  const response = await apiClient.get<{ total: number; registrations: EventRegistration[] }>(
+  params?: { checkedIn?: boolean; tierId?: string; paymentStatus?: string; search?: string }
+): Promise<GetRegistrationsResponse> {
+  const response = await apiClient.get<GetRegistrationsResponse>(
     `/events/${id}/registrations`,
     { params }
   )
+  return response.data
+}
+
+export async function toggleRegistrationCheckIn(registrationId: string): Promise<{
+  message: string
+  registration: {
+    id: string
+    ticketId: string
+    attendeeName: string
+    checkedIn: boolean
+    checkedInAt?: string
+  }
+}> {
+  const response = await apiClient.patch<{
+    message: string
+    registration: {
+      id: string
+      ticketId: string
+      attendeeName: string
+      checkedIn: boolean
+      checkedInAt?: string
+    }
+  }>(`/events/registrations/${registrationId}/toggle-checkin`)
   return response.data
 }
 

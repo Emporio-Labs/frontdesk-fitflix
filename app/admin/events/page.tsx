@@ -318,9 +318,14 @@ export default function EventsAdminPage() {
                         {evt.venue?.name}, {evt.venue?.city}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <IconUsers className="h-4 w-4 text-primary shrink-0" />
-                      <span>Capacity: {evt.totalCapacity} attendees</span>
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <IconUsers className="h-4 w-4 text-primary shrink-0" />
+                        <span>Capacity: {evt.totalCapacity}</span>
+                      </div>
+                      <Badge variant="secondary" className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20">
+                        {evt.totalRegistered || 0} Booked
+                      </Badge>
                     </div>
 
                     {/* Step 3: Co-Host & Tiers badges */}
@@ -344,52 +349,66 @@ export default function EventsAdminPage() {
                 </div>
 
                 {/* Card Action Footer */}
-                <div className="p-4 pt-2 border-t flex items-center justify-between gap-2">
-                  <Link href={`/admin/events/${id}/edit`} className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs">
-                      <IconEdit className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                  </Link>
+                <div className="p-4 pt-2 border-t flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Link href={`/admin/events/${id}/attendees`} className="flex-1">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="w-full gap-1.5 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                        title="View Attendee List and Manage Bookings"
+                      >
+                        <IconUsers className="h-3.5 w-3.5" />
+                        Bookings ({evt.totalRegistered || 0})
+                      </Button>
+                    </Link>
+                    <Link href={`/admin/events/${id}/edit`} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs">
+                        <IconEdit className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                    </Link>
+                  </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedQrEvent(evt)
-                      setQrDialogOpen(true)
-                    }}
-                    className="gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
-                    title="View Flyer QR Code & Share Link"
-                  >
-                    <IconQrcode className="h-3.5 w-3.5" />
-                    Flyer QR
-                  </Button>
-
-                  <Link href={`/admin/events/demo-ticket?eventId=${id}`}>
+                  <div className="flex items-center justify-between gap-1.5">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 text-xs border-zinc-700 hover:bg-accent"
-                      title="Preview How Attendee Digital Ticket Looks"
+                      onClick={() => {
+                        setSelectedQrEvent(evt)
+                        setQrDialogOpen(true)
+                      }}
+                      className="flex-1 gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                      title="View Flyer QR Code & Share Link"
                     >
-                      <IconTicket className="h-3.5 w-3.5 text-emerald-500" />
-                      Preview Pass
+                      <IconQrcode className="h-3.5 w-3.5" />
+                      Flyer QR
                     </Button>
-                  </Link>
 
-                  {/* Delete Confirmation Dialog */}
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                    <Link href={`/admin/events/demo-ticket?eventId=${id}`} className="flex-1">
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        title="Delete event"
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-1.5 text-xs border-zinc-700 hover:bg-accent"
+                        title="Preview How Attendee Digital Ticket Looks"
                       >
-                        <IconTrash className="h-4 w-4" />
+                        <IconTicket className="h-3.5 w-3.5 text-emerald-500" />
+                        Pass Studio
                       </Button>
-                    </AlertDialogTrigger>
+                    </Link>
+
+                    {/* Delete Confirmation Dialog */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                          title="Delete event"
+                        >
+                          <IconTrash className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete this event?</AlertDialogTitle>
@@ -410,6 +429,7 @@ export default function EventsAdminPage() {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                  </div>
                 </div>
               </Card>
             )
