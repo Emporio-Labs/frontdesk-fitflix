@@ -27,6 +27,7 @@ export interface CreateEventPayload {
 
 export interface FitflixEvent {
   id: string
+  _id?: string
   title: string
   slug: string
   tagline?: string
@@ -51,13 +52,28 @@ export async function createEvent(payload: CreateEventPayload): Promise<{ messag
   return response.data
 }
 
-export async function getEvents(): Promise<FitflixEvent[]> {
+export async function getEvents(status?: string): Promise<FitflixEvent[]> {
   try {
-    const response = await apiClient.get<{ events?: FitflixEvent[]; data?: FitflixEvent[] }>('/events')
+    const params = status && status !== 'all' ? { status } : {}
+    const response = await apiClient.get<{ events?: FitflixEvent[]; data?: FitflixEvent[] }>('/events', { params })
     return response.data.events || response.data.data || []
   } catch {
     return []
   }
+}
+
+export async function getEventById(id: string): Promise<FitflixEvent> {
+  const response = await apiClient.get<{ event: FitflixEvent }>(`/events/${id}`)
+  return response.data.event
+}
+
+export async function updateEvent(id: string, payload: Partial<CreateEventPayload>): Promise<FitflixEvent> {
+  const response = await apiClient.patch<{ message: string; event: FitflixEvent }>(`/events/${id}`, payload)
+  return response.data.event
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  await apiClient.delete(`/events/${id}`)
 }
 
 export async function uploadEventImage(file: File): Promise<string> {
