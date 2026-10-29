@@ -98,3 +98,15 @@ export function useDeletePromotion() {
       ),
   })
 }
+
+export function useUploadPromotionImage() {
+  return useMutation({
+    mutationFn: (file: File) => promotionService.uploadImage(file),
+    onError: (err: any) =>
+      toast.error(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          'Failed to upload image'
+      ),
+  })
+}

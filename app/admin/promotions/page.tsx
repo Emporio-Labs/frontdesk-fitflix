@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   IconAlertTriangle,
   IconEdit,
@@ -8,6 +8,7 @@ import {
   IconSpeakerphone,
   IconPlus,
   IconTrash,
+  IconUpload,
 } from '@tabler/icons-react'
 import {
   AlertDialog,
@@ -65,6 +66,7 @@ import {
   useDeletePromotion,
   usePromotions,
   useUpdatePromotion,
+  useUploadPromotionImage,
 } from '@/hooks/use-promotions'
 import { useTherapies } from '@/hooks/use-therapies'
 import {
@@ -141,8 +143,15 @@ const formatWindow = (iso: string): string => {
   })
 }
 
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024
+
 const emptyForm = {
   title: '',
+  // An uploaded image (imageKey + a signed preview) or a pasted URL.
+  imageSource: 'upload' as 'upload' | 'url',
+  imageKey: '',
+  imagePreview: '',
   imageUrl: '',
   subtext: '',
   tag: '',
@@ -176,6 +185,8 @@ export default function PromotionsPage() {
   const createPromotion = useCreatePromotion()
   const updatePromotion = useUpdatePromotion()
   const deletePromotion = useDeletePromotion()
+  const uploadImage = useUploadPromotionImage()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Promotion | null>(null)
@@ -232,7 +243,10 @@ export default function PromotionsPage() {
     setError(null)
     setForm({
       title: promotion.title,
-      imageUrl: promotion.imageUrl,
+      imageSource: promotion.imageKey ? 'upload' : 'url',
+      imageKey: promotion.imageKey ?? '',
+      imagePreview: promotion.imageKey ? promotion.imageUrl : '',
+      imageUrl: promotion.imageKey ? '' : promotion.imageUrl,
       subtext: promotion.subtext,
       tag: promotion.tag,
       mode: promotion.mode ?? 'both',
@@ -257,7 +271,9 @@ export default function PromotionsPage() {
    */
   const validate = (): string | null => {
     if (!form.title.trim()) return 'A title is required'
-    if (!form.imageUrl.trim()) return 'An image URL is required'
+    if (form.imageSource === 'upload' ? !form.imageKey : !form.imageUrl.trim()) {
+      return 'Add an image — upload one or paste a URL'
+    }
     if (form.linkType === 'url') {
       if (!form.url.trim()) return 'An external URL is required for a URL link'
     } else if (!form.targetId.trim()) {
@@ -285,7 +301,9 @@ export default function PromotionsPage() {
     const payload: CreatePromotionPayload = {
       locationId: form.locationId === 'all' ? null : form.locationId,
       title: form.title.trim(),
-      imageUrl: form.imageUrl.trim(),
+      ...(form.imageSource === 'upload'
+        ? { imageKey: form.imageKey }
+        : { imageUrl: form.imageUrl.trim() }),
       subtext: form.subtext.trim(),
       tag: form.tag.trim(),
       mode: form.mode === 'both' ? null : form.mode,
@@ -341,6 +359,30 @@ export default function PromotionsPage() {
     id ? (locations.find((l) => l._id === id)?.name ?? 'Unknown branch') : 'All branches'
 
   const isSaving = createPromotion.isPending || updatePromotion.isPending
+
+  const onPickImage = async (file: File | undefined) => {
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (!file) return
+    if (!IMAGE_TYPES.includes(file.type)) {
+      setError('Choose a JPG, PNG or WebP image')
+      return
+    }
+    if (file.size > IMAGE_MAX_BYTES) {
+      setError('Image must be 5 MB or smaller')
+      return
+    }
+    setError(null)
+    try {
+      const uploaded = await uploadImage.mutateAsync(file)
+      setForm((f) => ({
+        ...f,
+        imageKey: uploaded.imageKey,
+        imagePreview: uploaded.imageUrl,
+      }))
+    } catch {
+      // The hook already surfaced the server message as a toast.
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4 p-4 lg:p-6">
@@ -545,20 +587,91 @@ export default function PromotionsPage() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="imageUrl">Image URL</Label>
-              <Input
-                id="imageUrl"
-                value={form.imageUrl}
-                onChange={(e) => set('imageUrl', e.target.value)}
-                placeholder="https://cdn.fitflix.in/promos/summer.jpg"
-              />
-              {form.imageUrl.trim() !== '' && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={form.imageUrl}
-                  alt=""
-                  className="mt-1 h-28 w-full rounded-md border object-cover bg-muted"
-                />
+              <div className="flex items-center justify-between">
+                <Label htmlFor={form.imageSource === 'url' ? 'imageUrl' : undefined}>
+                  Image
+                </Label>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                  onClick={() =>
+                    set('imageSource', form.imageSource === 'upload' ? 'url' : 'upload')
+                  }
+                >
+                  {form.imageSource === 'upload' ? 'Paste a URL instead' : 'Upload a file instead'}
+                </button>
+              </div>
+
+              {form.imageSource === 'upload' ? (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={IMAGE_TYPES.join(',')}
+                    className="hidden"
+                    onChange={(e) => onPickImage(e.target.files?.[0])}
+                  />
+                  {form.imagePreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={form.imagePreview}
+                      alt=""
+                      className="h-28 w-full rounded-md border object-cover bg-muted"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadImage.isPending}
+                      className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed text-sm text-muted-foreground hover:bg-muted/50 disabled:opacity-60"
+                    >
+                      <IconUpload className="size-5" />
+                      {uploadImage.isPending ? 'Uploading…' : 'Upload image'}
+                      <span className="text-xs">JPG, PNG or WebP · up to 5 MB</span>
+                    </button>
+                  )}
+                  {form.imagePreview && (
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadImage.isPending}
+                      >
+                        {uploadImage.isPending ? 'Uploading…' : 'Replace'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setForm((f) => ({ ...f, imageKey: '', imagePreview: '' }))
+                        }
+                        disabled={uploadImage.isPending}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Input
+                    id="imageUrl"
+                    value={form.imageUrl}
+                    onChange={(e) => set('imageUrl', e.target.value)}
+                    placeholder="https://cdn.fitflix.in/promos/summer.jpg"
+                  />
+                  {form.imageUrl.trim() !== '' && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={form.imageUrl}
+                      alt=""
+                      className="mt-1 h-28 w-full rounded-md border object-cover bg-muted"
+                    />
+                  )}
+                </>
               )}
             </div>
 
@@ -826,7 +939,7 @@ export default function PromotionsPage() {
             <Button variant="outline" onClick={() => setFormOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={submit} disabled={isSaving}>
+            <Button onClick={submit} disabled={isSaving || uploadImage.isPending}>
               {isSaving ? 'Saving…' : editing ? 'Save changes' : 'Create'}
             </Button>
           </DialogFooter>

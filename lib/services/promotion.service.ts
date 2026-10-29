@@ -62,7 +62,10 @@ export interface Promotion {
   /** Null means company-wide — shown at every branch. */
   locationId: string | null
   title: string
+  /** Always renderable — for an uploaded image the backend signs it (1 h). */
   imageUrl: string
+  /** Set when the image was uploaded; null for a hand-typed URL. */
+  imageKey: string | null
   subtext: string
   tag: string
   mode: PromotionMode
@@ -81,7 +84,9 @@ export interface Promotion {
 export interface CreatePromotionPayload {
   locationId?: string | null
   title: string
-  imageUrl: string
+  /** Send one of `imageKey` (from `uploadImage`) or `imageUrl`. */
+  imageUrl?: string | null
+  imageKey?: string | null
   subtext?: string
   tag?: string
   mode?: PromotionMode
@@ -108,6 +113,7 @@ const normalizePromotion = (raw: any): Promotion => ({
   locationId: raw?.locationId ?? null,
   title: raw?.title ?? '',
   imageUrl: raw?.imageUrl ?? '',
+  imageKey: raw?.imageKey ?? null,
   subtext: raw?.subtext ?? '',
   tag: raw?.tag ?? '',
   // Absent and null both mean "matches both audiences"; don't coerce to a string.
@@ -151,6 +157,21 @@ export const promotionService = {
     return {
       promotions: (data?.promotions ?? []).map(normalizePromotion),
     }
+  },
+
+  /**
+   * Upload a banner to S3. The returned `imageKey` goes into the create/update
+   * body; `imageUrl` is a signed preview.
+   */
+  uploadImage: async (
+    file: File
+  ): Promise<{ imageKey: string; imageUrl: string }> => {
+    const form = new FormData()
+    form.append('image', file)
+    const { data } = await apiClient.post('/api/v1/promotions/image', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return { imageKey: data?.imageKey ?? '', imageUrl: data?.imageUrl ?? '' }
   },
 
   getById: async (id: string): Promise<{ promotion: Promotion }> => {
