@@ -35,7 +35,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createEvent, uploadEventImage, type CreateEventPayload } from '@/lib/services/event.service'
+import {
+  createEvent,
+  uploadEventImage,
+  type CreateEventPayload,
+  type TicketTier,
+  type Collaborator,
+  type Sponsor,
+} from '@/lib/services/event.service'
+import { TierManager } from '@/components/events/tier-manager'
+import { CoBrandingManager } from '@/components/events/co-branding-manager'
 
 const EVENT_TYPES = [
   { value: 'community_meetup', label: 'Community Meetup' },
@@ -74,6 +83,45 @@ export default function CreateEventPage() {
   const [coverImageUrl, setCoverImageUrl] = useState('/events/commune-part-2.png')
   const [imagePreview, setImagePreview] = useState<string | null>('/events/commune-part-2.png')
 
+  // Step 3: Tiers, Collaborators & Sponsors State
+  const [ticketTiers, setTicketTiers] = useState<TicketTier[]>([
+    {
+      tierId: 'super_early_bird',
+      name: 'Super Early Bird Pass',
+      badgeLabel: 'SUPER EARLY BIRD',
+      badgeColor: '#10b981',
+      type: 'paid',
+      price: 299,
+      totalQuantity: 50,
+      perks: ['Official Event Jersey', 'Priority Entrance Gate', 'Fitflix Shaker'],
+    },
+    {
+      tierId: 'early_bird',
+      name: 'Early Bird Pass',
+      badgeLabel: 'EARLY BIRD',
+      badgeColor: '#3b82f6',
+      type: 'paid',
+      price: 499,
+      totalQuantity: 75,
+      perks: ['Official Event T-Shirt', 'Energy Drink'],
+    },
+  ])
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([
+    {
+      name: 'Chapter 5 Speciality Coffee',
+      role: 'Co-Host & Roastery Partner',
+      logoUrl: 'https://api.fitflix.in/uploads/collaborators/chapter-5.png',
+      websiteUrl: 'https://chapter5coffee.com',
+    },
+  ])
+  const [sponsors, setSponsors] = useState<Sponsor[]>([
+    {
+      name: 'Fitflix Nutrition',
+      logoUrl: 'https://api.fitflix.in/uploads/collaborators/fitflix.png',
+      tier: 'Title Partner',
+    },
+  ])
+
   // Computed slug preview
   const slugPreview = title
     .toLowerCase()
@@ -86,7 +134,6 @@ export default function CreateEventPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Quick client-side preview
     const objectUrl = URL.createObjectURL(file)
     setImagePreview(objectUrl)
 
@@ -95,9 +142,8 @@ export default function CreateEventPage() {
       const uploadedUrl = await uploadEventImage(file)
       setCoverImageUrl(uploadedUrl)
       toast.success('Event photo uploaded successfully!')
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to upload image to server, using local preview.')
-      // Keep local preview if offline
       setCoverImageUrl(objectUrl)
     } finally {
       setUploadingImage(false)
@@ -159,6 +205,9 @@ export default function CreateEventPage() {
         },
         totalCapacity: capacityNum,
         coverImageUrl: coverImageUrl.trim() || undefined,
+        ticketTiers,
+        collaborators,
+        sponsors,
       }
 
       const res = await createEvent(payload)
@@ -187,10 +236,10 @@ export default function CreateEventPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <IconCalendarEvent className="h-6 w-6 text-primary" />
-            Create Offline Event
+            Create Offline Event & Passes
           </h1>
           <p className="text-sm text-muted-foreground">
-            Configure offline fitness expos, workshops, and community fests with DevFest-style passes.
+            Configure offline fitness expos, multi-tier passes (Super Early Bird, VIP), and co-branding partners.
           </p>
         </div>
       </div>
@@ -268,7 +317,18 @@ export default function CreateEventPage() {
           </CardContent>
         </Card>
 
-        {/* Section 2: Event Photo / Flyer Upload */}
+        {/* Section 2: Step 3 Pass & Ticket Tiers */}
+        <TierManager tiers={ticketTiers} onChange={setTicketTiers} />
+
+        {/* Section 3: Step 3 Co-Branding & Sponsors */}
+        <CoBrandingManager
+          collaborators={collaborators}
+          sponsors={sponsors}
+          onCollaboratorsChange={setCollaborators}
+          onSponsorsChange={setSponsors}
+        />
+
+        {/* Section 4: Event Photo / Flyer Upload */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -347,7 +407,7 @@ export default function CreateEventPage() {
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Click to upload event photo or drag and drop</p>
                   <p className="text-xs text-muted-foreground">
-                    PNG, JPG, or WEBP up to 10MB (recommended aspect ratio: 4:5 or 16:9)
+                    PNG, JPG, or WEBP up to 10MB
                   </p>
                 </div>
                 <Button type="button" variant="outline" size="sm">
@@ -355,27 +415,10 @@ export default function CreateEventPage() {
                 </Button>
               </div>
             )}
-
-            <div className="pt-2">
-              <Label htmlFor="coverImageUrlInput" className="text-xs text-muted-foreground">
-                Or enter image URL directly:
-              </Label>
-              <Input
-                id="coverImageUrlInput"
-                type="url"
-                placeholder="https://.../event-photo.png"
-                value={coverImageUrl}
-                onChange={(e) => {
-                  setCoverImageUrl(e.target.value)
-                  setImagePreview(e.target.value || null)
-                }}
-                className="mt-1 text-xs font-mono"
-              />
-            </div>
           </CardContent>
         </Card>
 
-        {/* Section 3: Date & Reporting Time */}
+        {/* Section 5: Date & Reporting Time */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -420,14 +463,11 @@ export default function CreateEventPage() {
                 onChange={(e) => setReportingTime(e.target.value)}
                 required
               />
-              <p className="text-xs text-muted-foreground">
-                Crucial for on-site queue management, gear inspection, and kit distribution.
-              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Section 4: Offline Venue Details */}
+        {/* Section 6: Offline Venue Details */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -499,7 +539,7 @@ export default function CreateEventPage() {
           </CardContent>
         </Card>
 
-        {/* Section 5: Capacity */}
+        {/* Section 7: Capacity */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -539,7 +579,7 @@ export default function CreateEventPage() {
             ) : (
               <>
                 <IconBuildingCommunity className="h-4 w-4" />
-                Create Event
+                Create Event & Passes
               </>
             )}
           </Button>

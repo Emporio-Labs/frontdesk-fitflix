@@ -53,8 +53,12 @@ import {
   deleteEvent,
   uploadEventImage,
   type CreateEventPayload,
-  type FitflixEvent,
+  type TicketTier,
+  type Collaborator,
+  type Sponsor,
 } from '@/lib/services/event.service'
+import { TierManager } from '@/components/events/tier-manager'
+import { CoBrandingManager } from '@/components/events/co-branding-manager'
 
 const EVENT_TYPES = [
   { value: 'community_meetup', label: 'Community Meetup' },
@@ -109,6 +113,11 @@ export default function EditEventPage() {
   const [coverImageUrl, setCoverImageUrl] = useState('')
   const [imagePreview, setImagePreview] = useState<string | null>(null)
 
+  // Step 3: Tiers, Collaborators & Sponsors State
+  const [ticketTiers, setTicketTiers] = useState<TicketTier[]>([])
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([])
+  const [sponsors, setSponsors] = useState<Sponsor[]>([])
+
   // Load existing event data
   useEffect(() => {
     async function loadEvent() {
@@ -123,7 +132,7 @@ export default function EditEventPage() {
         setEventType(evt.eventType || 'community_meetup')
         setStatus(evt.status || 'published')
 
-        // Format dates for datetime-local input (YYYY-MM-DDTHH:mm)
+        // Format dates for datetime-local input
         if (evt.startDate) {
           const d = new Date(evt.startDate)
           setStartDate(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16))
@@ -142,6 +151,11 @@ export default function EditEventPage() {
         setTotalCapacity(String(evt.totalCapacity || 150))
         setCoverImageUrl(evt.coverImageUrl || '')
         setImagePreview(evt.coverImageUrl || null)
+
+        // Step 3 fields
+        setTicketTiers(evt.ticketTiers || [])
+        setCollaborators(evt.collaborators || [])
+        setSponsors(evt.sponsors || [])
       } catch (err) {
         toast.error('Failed to load event details')
         router.push('/admin/events')
@@ -153,7 +167,6 @@ export default function EditEventPage() {
     loadEvent()
   }, [eventId, router])
 
-  // Handle Photo File Selection
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -230,10 +243,13 @@ export default function EditEventPage() {
         },
         totalCapacity: capacityNum,
         coverImageUrl: coverImageUrl.trim() || undefined,
+        ticketTiers,
+        collaborators,
+        sponsors,
       }
 
       await updateEvent(eventId, payload)
-      toast.success('Event updated successfully!')
+      toast.success('Event and pass tiers updated successfully!')
       router.push('/admin/events')
     } catch (err: any) {
       const msg =
@@ -281,10 +297,10 @@ export default function EditEventPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
               <IconCalendarEvent className="h-6 w-6 text-primary" />
-              Edit Offline Event
+              Edit Offline Event & Passes
             </h1>
             <p className="text-sm text-muted-foreground">
-              Modify event schedule, offline venue, registration capacity, and poster photos.
+              Modify event schedule, pass tiers (Super Early Bird, VIP), sponsor strips, and venues.
             </p>
           </div>
         </div>
@@ -408,7 +424,18 @@ export default function EditEventPage() {
           </CardContent>
         </Card>
 
-        {/* Section 2: Photo / Poster */}
+        {/* Section 2: Step 3 Pass & Ticket Tiers */}
+        <TierManager tiers={ticketTiers} onChange={setTicketTiers} />
+
+        {/* Section 3: Step 3 Co-Branding & Sponsors */}
+        <CoBrandingManager
+          collaborators={collaborators}
+          sponsors={sponsors}
+          onCollaboratorsChange={setCollaborators}
+          onSponsorsChange={setSponsors}
+        />
+
+        {/* Section 4: Photo / Poster */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -498,7 +525,7 @@ export default function EditEventPage() {
           </CardContent>
         </Card>
 
-        {/* Section 3: Date & Reporting Time */}
+        {/* Section 5: Date & Reporting Time */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -546,7 +573,7 @@ export default function EditEventPage() {
           </CardContent>
         </Card>
 
-        {/* Section 4: Offline Venue Details */}
+        {/* Section 6: Offline Venue Details */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -613,7 +640,7 @@ export default function EditEventPage() {
           </CardContent>
         </Card>
 
-        {/* Section 5: Capacity */}
+        {/* Section 7: Capacity */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">

@@ -9,6 +9,35 @@ export interface EventVenue {
   locationId?: string
 }
 
+export interface TicketTier {
+  tierId: string
+  name: string
+  badgeLabel: string
+  badgeColor: string
+  type: 'free' | 'rsvp' | 'paid'
+  price: number
+  creditCost?: number
+  totalQuantity: number
+  soldQuantity?: number
+  validFrom?: string
+  validUntil?: string
+  perks: string[]
+  maxTicketsPerUser?: number
+}
+
+export interface Collaborator {
+  name: string
+  role: string
+  logoUrl: string
+  websiteUrl?: string
+}
+
+export interface Sponsor {
+  name: string
+  logoUrl: string
+  tier: string
+}
+
 export interface CreateEventPayload {
   title: string
   slug?: string
@@ -23,6 +52,9 @@ export interface CreateEventPayload {
   totalCapacity: number
   coverImageUrl?: string
   badgeWatermarkUrl?: string
+  ticketTiers?: TicketTier[]
+  collaborators?: Collaborator[]
+  sponsors?: Sponsor[]
 }
 
 export interface FitflixEvent {
@@ -43,6 +75,9 @@ export interface FitflixEvent {
   totalCheckedIn: number
   coverImageUrl?: string
   badgeWatermarkUrl?: string
+  ticketTiers?: TicketTier[]
+  collaborators?: Collaborator[]
+  sponsors?: Sponsor[]
   createdAt: string
   updatedAt: string
 }

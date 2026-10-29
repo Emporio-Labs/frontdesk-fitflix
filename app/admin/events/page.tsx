@@ -14,7 +14,7 @@ import {
   IconTrash,
   IconCopy,
   IconCheck,
-  IconExternalLink,
+  IconBuildingStore,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -76,7 +76,6 @@ export default function EventsAdminPage() {
     loadEvents()
   }, [])
 
-  // Filter events by tab and search query
   const filteredEvents = useMemo(() => {
     return events.filter((evt) => {
       const matchesTab =
@@ -140,7 +139,7 @@ export default function EventsAdminPage() {
             Fitflix Offline Events
           </h1>
           <p className="text-sm text-muted-foreground">
-            Manage physical summits, marathons, workshops, and digital attendance passes.
+            Manage physical summits, marathons, workshops, pass tiers, and digital check-ins.
           </p>
         </div>
         <Link href="/admin/events/new">
@@ -218,6 +217,9 @@ export default function EventsAdminPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredEvents.map((evt) => {
             const id = evt.id || evt._id || ''
+            const tiers = evt.ticketTiers || []
+            const collaborators = evt.collaborators || []
+
             return (
               <Card
                 key={id}
@@ -308,6 +310,24 @@ export default function EventsAdminPage() {
                       <IconUsers className="h-4 w-4 text-primary shrink-0" />
                       <span>Capacity: {evt.totalCapacity} attendees</span>
                     </div>
+
+                    {/* Step 3: Co-Host & Tiers badges */}
+                    <div className="pt-2 border-t mt-3 flex flex-wrap items-center gap-1.5">
+                      {collaborators.length > 0 && (
+                        <Badge variant="secondary" className="text-[11px] font-normal gap-1 bg-primary/10 text-primary">
+                          <IconBuildingStore className="h-3 w-3" />
+                          × {collaborators[0].name}
+                        </Badge>
+                      )}
+                      {tiers.length > 0 ? (
+                        <Badge variant="outline" className="text-[11px] font-normal gap-1">
+                          <IconTicket className="h-3 w-3 text-emerald-500" />
+                          {tiers.length} Pass Tier{tiers.length > 1 ? 's' : ''}
+                        </Badge>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground italic">No pass tiers yet</span>
+                      )}
+                    </div>
                   </CardContent>
                 </div>
 
@@ -316,7 +336,7 @@ export default function EventsAdminPage() {
                   <Link href={`/admin/events/${id}/edit`} className="flex-1">
                     <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs">
                       <IconEdit className="h-3.5 w-3.5" />
-                      Edit Event
+                      Edit Event & Passes
                     </Button>
                   </Link>
 
