@@ -774,12 +774,12 @@ function DemoTicketContent() {
                   <Label className="text-xs font-semibold text-foreground block">
                     {isCheckedIn
                       ? 'Status: CHECKED IN AT ENTRANCE'
-                      : 'Status: READY FOR ON-SITE SCANNING'}
+                      : 'Status: ACTIVE / UNCHECKED'}
                   </Label>
                   <p className="text-[11px] text-muted-foreground">
                     {isCheckedIn
                       ? 'Pass displays verified green check-in stamp with timestamp.'
-                      : 'Pass displays active scan-ready indicator for desk cameras.'}
+                      : 'Pass displays clean layout ready for entrance check-in.'}
                   </p>
                 </div>
                 <Switch

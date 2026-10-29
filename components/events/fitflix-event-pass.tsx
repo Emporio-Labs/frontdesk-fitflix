@@ -398,9 +398,9 @@ export function FitflixEventPass({
             </div>
           </div>
 
-          {/* Live Check-in Status Stamp */}
-          <div className="flex items-center justify-center pt-0.5">
-            {pass.checkedIn ? (
+          {/* Live Check-in Status Stamp (Only displayed when checked in) */}
+          {pass.checkedIn && (
+            <div className="flex items-center justify-center pt-0.5">
               <div
                 className={`border-2 font-black px-4 py-1.5 rounded-full text-xs tracking-wider uppercase flex items-center gap-1.5 animate-pulse ${
                   isDark
@@ -417,23 +417,8 @@ export function FitflixEventPass({
                     })
                   : 'ENTRANCE'}
               </div>
-            ) : (
-              <div
-                style={{
-                  borderColor: isDark ? '#3f3f46' : FITFLIX_TOKENS.borderStrong,
-                  backgroundColor: isDark ? 'rgba(92,107,52,0.15)' : FITFLIX_TOKENS.surfaceAlt,
-                  color: isDark ? FITFLIX_TOKENS.primary : FITFLIX_TOKENS.primaryDark,
-                }}
-                className="border font-bold px-3 py-1 rounded-full text-[11px] tracking-wider uppercase flex items-center gap-1.5 shadow-2xs"
-              >
-                <span
-                  style={{ backgroundColor: FITFLIX_TOKENS.primaryDark }}
-                  className="h-2 w-2 rounded-full animate-ping"
-                />
-                READY FOR ON-SITE SCANNING
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Event Logistics & Venue Card */}
           <div
