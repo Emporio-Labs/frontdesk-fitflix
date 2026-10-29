@@ -109,8 +109,9 @@ const navGroups = [
     ],
   },
   {
-    label: "Community",
+    label: "Events & Community",
     items: [
+      { title: "Fitflix Events", url: "/admin/events", icon: IconCalendarEvent },
       { title: "Community", url: "/admin/community", icon: IconMessage2 },
     ],
   },
