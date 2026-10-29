@@ -205,11 +205,119 @@ export function FitflixEventPass({
     toast.success('Event added to calendar (.ics downloaded)!')
   }
 
+  const handlePrintPass = () => {
+    if (!ticketRef.current) {
+      window.print()
+      return
+    }
+
+    // 1. Remove any previous print mount if lingering
+    const oldMount = document.getElementById('fitflix-print-mount')
+    if (oldMount) oldMount.remove()
+
+    // 2. Create clean direct body child for printing with full main-window styles
+    const printMount = document.createElement('div')
+    printMount.id = 'fitflix-print-mount'
+
+    // Clone the pass credential node
+    const clone = ticketRef.current.cloneNode(true) as HTMLElement
+    clone.style.boxShadow = 'none'
+    clone.style.margin = '0 auto'
+    printMount.appendChild(clone)
+    document.body.appendChild(printMount)
+
+    // 3. Mark body as printing
+    document.body.classList.add('printing-fitflix-pass')
+
+    // 4. Cleanup function after print dialog closes
+    const cleanup = () => {
+      document.body.classList.remove('printing-fitflix-pass')
+      if (document.body.contains(printMount)) {
+        document.body.removeChild(printMount)
+      }
+      window.removeEventListener('afterprint', cleanup)
+    }
+
+    window.addEventListener('afterprint', cleanup)
+
+    // 5. Trigger native print on current window (100% styled)
+    window.print()
+
+    // Fallback cleanup in case afterprint does not fire in some environments
+    setTimeout(cleanup, 2500)
+  }
+
   return (
     <div className="w-full max-w-md mx-auto space-y-4">
+      {/* Global Print Isolation Styles */}
+      <style>{`
+        @media print {
+          @page {
+            size: portrait;
+            margin: 10mm;
+          }
+
+          html, body {
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            overflow: visible !important;
+          }
+
+          /* Hide ALL other elements on the page when printing */
+          body.printing-fitflix-pass > *:not(#fitflix-print-mount) {
+            display: none !important;
+          }
+
+          /* Show ONLY the mounted pass card */
+          body.printing-fitflix-pass #fitflix-print-mount {
+            display: flex !important;
+            justify-content: center !important;
+            align-items: flex-start !important;
+            width: 100% !important;
+            background: #ffffff !important;
+            padding-top: 10px !important;
+          }
+
+          body.printing-fitflix-pass #fitflix-print-mount > div {
+            width: 420px !important;
+            max-width: 420px !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* Fallback when printing with Ctrl+P */
+          body:not(.printing-fitflix-pass) * {
+            visibility: hidden !important;
+          }
+          body:not(.printing-fitflix-pass) #fitflix-printable-pass,
+          body:not(.printing-fitflix-pass) #fitflix-printable-pass * {
+            visibility: visible !important;
+          }
+          body:not(.printing-fitflix-pass) #fitflix-printable-pass {
+            position: fixed !important;
+            left: 50% !important;
+            top: 16px !important;
+            transform: translateX(-50%) !important;
+            width: 420px !important;
+            max-width: 420px !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}</style>
+
       {/* Fitflix Official Pass Credential Container */}
       <div
         ref={ticketRef}
+        id="fitflix-printable-pass"
         style={{
           boxShadow: isDark
             ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
@@ -222,10 +330,13 @@ export function FitflixEventPass({
         } border rounded-3xl overflow-hidden relative select-none transition-colors duration-200`}
       >
         {/* Sleek Retail Brand Hang Tag (Suspended from Top Right Edge) */}
-        <div className="absolute top-0 right-5 sm:right-6 z-20 flex flex-col items-center pointer-events-none select-none">
+        <div
+          style={{ position: 'absolute', top: 0, right: '20px', zIndex: 20 }}
+          className="absolute top-0 right-5 sm:right-6 z-20 flex flex-col items-center pointer-events-none select-none"
+        >
           {/* Braided Cord / Suspension Thread */}
           <div
-            style={{ backgroundColor: hangTagStyle.cord }}
+            style={{ backgroundColor: hangTagStyle.cord, width: '1.5px', height: '12px' }}
             className="w-[1.5px] h-3 shadow-2xs"
           />
 
@@ -236,21 +347,35 @@ export function FitflixEventPass({
               borderColor: hangTagStyle.border,
               color: hangTagStyle.text,
               boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.16), 0 2px 4px -2px rgba(0, 0, 0, 0.08)',
+              minWidth: '72px',
+              maxWidth: '84px',
             }}
             className="relative flex flex-col items-center justify-center px-2 pt-1.5 pb-1 rounded-b-md border border-t-0 min-w-[72px] max-w-[84px] text-center"
           >
             {/* Metallic Eyelet (Grommet) Punch Hole */}
-            <div className="w-2 h-2 rounded-full border border-black/30 bg-[#18181B] shadow-inner flex items-center justify-center -mt-0.5 mb-1">
-              <div className="w-0.5 h-0.5 rounded-full bg-white/40" />
+            <div
+              style={{ width: '8px', height: '8px', borderRadius: '9999px', backgroundColor: '#18181B' }}
+              className="w-2 h-2 rounded-full border border-black/30 bg-[#18181B] shadow-inner flex items-center justify-center -mt-0.5 mb-1"
+            >
+              <div
+                style={{ width: '2px', height: '2px', borderRadius: '9999px', backgroundColor: 'rgba(255,255,255,0.4)' }}
+                className="w-0.5 h-0.5 rounded-full bg-white/40"
+              />
             </div>
 
             {/* Pass Tier Ticket Text */}
-            <span className="font-black text-[8.5px] leading-tight tracking-wider uppercase">
+            <span
+              style={{ fontSize: '8.5px', fontWeight: 900, lineHeight: 1.1, letterSpacing: '0.05em', textTransform: 'uppercase' }}
+              className="font-black text-[8.5px] leading-tight tracking-wider uppercase"
+            >
               {pass.badgeLabel || 'GENERAL PASS'}
             </span>
 
             {/* Micro Retail Stamp */}
-            <span className="text-[6px] font-mono tracking-widest opacity-60 uppercase pt-0.5">
+            <span
+              style={{ fontSize: '6px', fontFamily: 'monospace', letterSpacing: '0.1em', opacity: 0.6, textTransform: 'uppercase', paddingTop: '2px' }}
+              className="text-[6px] font-mono tracking-widest opacity-60 uppercase pt-0.5"
+            >
               PASS TIER
             </span>
           </div>
@@ -276,6 +401,7 @@ export function FitflixEventPass({
                 <img
                   src="/events/fitflix-full-logo.png"
                   alt="Fitflix"
+                  style={{ height: '36px', width: 'auto' }}
                   className="h-8 sm:h-9 w-auto object-contain shrink-0"
                 />
 
@@ -294,6 +420,7 @@ export function FitflixEventPass({
                     <img
                       src={partnerLogoSrc}
                       alt={primaryCollab.name}
+                      style={{ height: '38px', width: 'auto', maxWidth: '200px' }}
                       className="h-9 sm:h-10 w-auto max-w-[170px] sm:max-w-[220px] object-contain shrink-0 mix-blend-multiply"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
@@ -330,6 +457,7 @@ export function FitflixEventPass({
                 <img
                   src="/events/fitflix-full-logo.png"
                   alt="Fitflix"
+                  style={{ height: '36px', width: 'auto' }}
                   className="h-8 sm:h-9 w-auto object-contain shrink-0"
                 />
               </div>
@@ -437,6 +565,7 @@ export function FitflixEventPass({
               <img
                 src={qrCodeDataUrl}
                 alt={`QR code for ticket ${pass.ticketId}`}
+                style={{ width: '208px', height: '208px' }}
                 className="w-52 h-52 object-contain"
               />
             ) : (
@@ -619,7 +748,7 @@ export function FitflixEventPass({
             {copied ? 'Link Copied!' : 'Share Pass'}
           </Button>
           <Button
-            onClick={() => window.print()}
+            onClick={handlePrintPass}
             style={{
               backgroundColor: FITFLIX_TOKENS.primaryDark,
               color: '#FFFFFF',
