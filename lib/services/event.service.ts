@@ -121,3 +121,64 @@ export async function uploadEventImage(file: File): Promise<string> {
   })
   return response.data.url
 }
+
+export interface RegisterEventPayload {
+  tierId: string
+  attendeeName: string
+  attendeeEmail: string
+  attendeePhone: string
+  answers?: Record<string, string>
+  paymentReference?: string
+}
+
+export interface EventRegistration {
+  id: string
+  _id?: string
+  ticketId: string
+  tierId: string
+  tierName: string
+  attendeeName: string
+  attendeeEmail: string
+  attendeePhone: string
+  paymentStatus: string
+  amountPaid: number
+  verificationToken: string
+  checkedIn?: boolean
+  checkedInAt?: string
+  createdAt: string
+}
+
+export interface RegisterEventResponse {
+  message: string
+  registration: EventRegistration
+  event: {
+    id: string
+    title: string
+    slug: string
+    startDate: string
+    reportingTime: string
+    venue: EventVenue
+    coverImageUrl?: string
+  }
+}
+
+export async function getPublicEvent(slug: string): Promise<FitflixEvent> {
+  const response = await apiClient.get<{ event: FitflixEvent }>(`/events/public/${slug}`)
+  return response.data.event
+}
+
+export async function registerForEvent(slug: string, payload: RegisterEventPayload): Promise<RegisterEventResponse> {
+  const response = await apiClient.post<RegisterEventResponse>(`/events/${slug}/register`, payload)
+  return response.data
+}
+
+export async function getEventRegistrations(
+  id: string,
+  params?: { checkedIn?: boolean; tierId?: string; search?: string }
+): Promise<{ total: number; registrations: EventRegistration[] }> {
+  const response = await apiClient.get<{ total: number; registrations: EventRegistration[] }>(
+    `/events/${id}/registrations`,
+    { params }
+  )
+  return response.data
+}

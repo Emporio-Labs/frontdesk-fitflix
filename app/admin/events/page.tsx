@@ -39,6 +39,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/empty-state'
+import { FlyerQrDialog } from '@/components/events/flyer-qr-dialog'
+import { IconQrcode } from '@tabler/icons-react'
 import {
   getEvents,
   deleteEvent,
@@ -61,6 +63,8 @@ export default function EventsAdminPage() {
   const [selectedTab, setSelectedTab] = useState('all')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [selectedQrEvent, setSelectedQrEvent] = useState<FitflixEvent | null>(null)
+  const [qrDialogOpen, setQrDialogOpen] = useState(false)
 
   const loadEvents = async () => {
     try {
@@ -336,9 +340,23 @@ export default function EventsAdminPage() {
                   <Link href={`/admin/events/${id}/edit`} className="flex-1">
                     <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs">
                       <IconEdit className="h-3.5 w-3.5" />
-                      Edit Event & Passes
+                      Edit
                     </Button>
                   </Link>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedQrEvent(evt)
+                      setQrDialogOpen(true)
+                    }}
+                    className="gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                    title="View Flyer QR Code & Share Link"
+                  >
+                    <IconQrcode className="h-3.5 w-3.5" />
+                    Flyer QR
+                  </Button>
 
                   {/* Delete Confirmation Dialog */}
                   <AlertDialog>
@@ -378,6 +396,11 @@ export default function EventsAdminPage() {
           })}
         </div>
       )}
+      <FlyerQrDialog
+        event={selectedQrEvent}
+        open={qrDialogOpen}
+        onOpenChange={setQrDialogOpen}
+      />
     </div>
   )
 }
