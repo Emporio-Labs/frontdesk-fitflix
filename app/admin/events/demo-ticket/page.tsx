@@ -121,6 +121,7 @@ function DemoTicketContent() {
   const [attendeePhone, setAttendeePhone] = useState('+91 98765 43210')
   const [ticketNumber, setTicketNumber] = useState('FFX-COM2-9842')
   const [isCheckedIn, setIsCheckedIn] = useState(false)
+  const [passTheme, setPassTheme] = useState<'light' | 'dark'>('light')
 
   // Co-Branding & Partner Customizer State
   const [collabEnabled, setCollabEnabled] = useState(true)
@@ -798,18 +799,40 @@ function DemoTicketContent() {
               <IconQrcode className="h-4 w-4 text-primary" />
               Live Attendee Ticket View
             </span>
-            <Badge
-              variant="secondary"
-              className="text-[10px] font-mono font-medium"
-            >
-              Anti-Aliased High-Contrast QR
-            </Badge>
+            <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border">
+              <button
+                type="button"
+                onClick={() => setPassTheme('light')}
+                className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all ${
+                  passTheme === 'light'
+                    ? 'bg-background text-foreground shadow-xs font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Light Pass
+              </button>
+              <button
+                type="button"
+                onClick={() => setPassTheme('dark')}
+                className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all ${
+                  passTheme === 'dark'
+                    ? 'bg-background text-foreground shadow-xs font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Dark Pass
+              </button>
+            </div>
           </div>
 
           {/* Showcase Canvas Frame */}
           <div className="w-full p-4 sm:p-6 rounded-2xl border border-border bg-muted/20 flex flex-col items-center justify-center shadow-xs">
             {livePassData ? (
-              <FitflixEventPass passData={livePassData} showActions={true} />
+              <FitflixEventPass
+                passData={livePassData}
+                showActions={true}
+                passTheme={passTheme}
+              />
             ) : (
               <div className="p-12 text-center text-muted-foreground border border-dashed rounded-2xl w-full">
                 No event selected

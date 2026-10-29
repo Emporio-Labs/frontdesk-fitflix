@@ -21,10 +21,16 @@ import type { DigitalPassResponse } from '@/lib/services/event.service'
 export interface FitflixEventPassProps {
   passData: DigitalPassResponse
   showActions?: boolean
+  passTheme?: 'light' | 'dark'
 }
 
-export function FitflixEventPass({ passData, showActions = true }: FitflixEventPassProps) {
+export function FitflixEventPass({
+  passData,
+  showActions = true,
+  passTheme = 'light',
+}: FitflixEventPassProps) {
   const { pass, event } = passData
+  const isDark = passTheme === 'dark'
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('')
   const [copied, setCopied] = useState(false)
   const ticketRef = useRef<HTMLDivElement>(null)
@@ -111,13 +117,19 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
       {/* Fitflix Official Pass Credential Container */}
       <div
         ref={ticketRef}
-        className="bg-[#0b0d10] border border-zinc-800/90 rounded-3xl overflow-hidden shadow-2xl relative select-none"
+        className={`${
+          isDark
+            ? 'bg-[#0b0d10] border-zinc-800/90 text-white shadow-2xl'
+            : 'bg-white border-zinc-200/90 text-zinc-950 shadow-xl shadow-zinc-950/5'
+        } border rounded-3xl overflow-hidden relative select-none transition-colors duration-200`}
       >
         {/* Top Header Branding Section */}
         <div
           style={{
             borderBottom: `2px solid ${accentColor}`,
-            background: `linear-gradient(180deg, ${accentColor}18 0%, rgba(11, 13, 16, 0.98) 100%)`,
+            background: isDark
+              ? `linear-gradient(180deg, ${accentColor}18 0%, rgba(11, 13, 16, 0.98) 100%)`
+              : `linear-gradient(180deg, ${accentColor}16 0%, #ffffff 100%)`,
           }}
           className="p-5 sm:p-6 space-y-3"
         >
@@ -125,7 +137,13 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
           <div className="flex items-center justify-between gap-2.5">
             {hasCollaborator && primaryCollab ? (
               /* Co-Branded Layout: Company 1 Logo × Company 2 Logo */
-              <div className="flex items-center gap-2 bg-black/75 border border-zinc-700/80 px-3 py-1.5 rounded-full shadow-lg backdrop-blur-xs min-w-0">
+              <div
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full min-w-0 ${
+                  isDark
+                    ? 'bg-black/75 border border-zinc-700/80 shadow-lg backdrop-blur-xs'
+                    : 'bg-white/95 border border-zinc-200/90 shadow-xs'
+                }`}
+              >
                 {/* Company 1: Fitflix Official Emblem & Wordmark */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span
@@ -134,13 +152,19 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
                   >
                     F
                   </span>
-                  <span className="font-black text-xs tracking-wider text-white">
+                  <span
+                    className={`font-black text-xs tracking-wider ${
+                      isDark ? 'text-white' : 'text-zinc-950'
+                    }`}
+                  >
                     FITFLIX
                   </span>
                 </div>
 
                 {/* Multiplier / Cross Separator */}
-                <span className="text-zinc-400 text-xs font-black px-0.5 shrink-0">×</span>
+                <span className="text-zinc-400 text-xs font-black px-0.5 shrink-0">
+                  ×
+                </span>
 
                 {/* Company 2: Partner Brand Logo & Name */}
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -152,7 +176,8 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
                       className="h-4 w-auto max-w-[70px] object-contain rounded shrink-0 bg-white/10 p-0.5"
                       onError={(e) => {
                         ;(e.target as HTMLElement).style.display = 'none'
-                        const fallback = (e.target as HTMLElement).nextElementSibling as HTMLElement
+                        const fallback = (e.target as HTMLElement)
+                          .nextElementSibling as HTMLElement
                         if (fallback) fallback.style.display = 'flex'
                       }}
                     />
@@ -160,25 +185,43 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
                   {/* Fallback initials badge if no logoUrl or image error */}
                   <span
                     style={{ display: primaryCollab.logoUrl ? 'none' : 'flex' }}
-                    className="w-4 h-4 rounded-full bg-zinc-800 border border-zinc-700 items-center justify-center text-[8px] font-black text-zinc-200 shrink-0"
+                    className={`w-4 h-4 rounded-full border items-center justify-center text-[8px] font-black shrink-0 ${
+                      isDark
+                        ? 'bg-zinc-800 border-zinc-700 text-zinc-200'
+                        : 'bg-zinc-100 border-zinc-200 text-zinc-800'
+                    }`}
                   >
                     {primaryCollab.name.slice(0, 2).toUpperCase()}
                   </span>
-                  <span className="font-bold text-xs text-zinc-100 truncate max-w-[150px] sm:max-w-[190px]">
+                  <span
+                    className={`font-bold text-xs truncate max-w-[150px] sm:max-w-[190px] ${
+                      isDark ? 'text-zinc-100' : 'text-zinc-900'
+                    }`}
+                  >
                     {primaryCollab.name}
                   </span>
                 </div>
               </div>
             ) : (
               /* Single Company Event: Official Fitflix Emblem & Wordmark */
-              <div className="flex items-center gap-2 bg-black/75 border border-zinc-700/80 px-3 py-1.5 rounded-full shadow-lg backdrop-blur-xs">
+              <div
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
+                  isDark
+                    ? 'bg-black/75 border border-zinc-700/80 shadow-lg backdrop-blur-xs'
+                    : 'bg-white/95 border border-zinc-200/90 shadow-xs'
+                }`}
+              >
                 <span
                   style={{ backgroundColor: accentColor }}
                   className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0 shadow-xs"
                 >
                   F
                 </span>
-                <span className="font-black text-xs tracking-widest text-white">
+                <span
+                  className={`font-black text-xs tracking-widest ${
+                    isDark ? 'text-white' : 'text-zinc-950'
+                  }`}
+                >
                   FITFLIX
                 </span>
                 <span
@@ -209,17 +252,27 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
 
           {/* Row 2: Event Title & Tagline */}
           <div className="space-y-0.5 pt-0.5">
-            <h2 className="text-base sm:text-lg font-black text-white tracking-tight leading-snug">
+            <h2
+              className={`text-base sm:text-lg font-black tracking-tight leading-snug ${
+                isDark ? 'text-white' : 'text-zinc-950'
+              }`}
+            >
               {event.title}
             </h2>
             {event.tagline && (
-              <p className="text-xs text-zinc-400 line-clamp-1">{event.tagline}</p>
+              <p
+                className={`text-xs line-clamp-1 ${
+                  isDark ? 'text-zinc-400' : 'text-zinc-600 font-medium'
+                }`}
+              >
+                {event.tagline}
+              </p>
             )}
           </div>
         </div>
 
         {/* Card Body */}
-        <div className="p-5 sm:p-6 space-y-4">
+        <div className={`p-5 sm:p-6 space-y-4 ${isDark ? 'bg-[#0b0d10]' : 'bg-white'}`}>
           {/* Attendee Identity & Ticket Number */}
           <div className="flex justify-between items-start gap-3">
             <div className="space-y-0.5 min-w-0">
@@ -229,16 +282,28 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
               >
                 ATTENDEE
               </span>
-              <p className="text-xl font-black text-white uppercase tracking-tight truncate">
+              <p
+                className={`text-xl font-black uppercase tracking-tight truncate ${
+                  isDark ? 'text-white' : 'text-zinc-950'
+                }`}
+              >
                 {pass.attendeeName}
               </p>
-              <p className="text-xs text-zinc-400 font-mono truncate">
+              <p
+                className={`text-xs font-mono truncate ${
+                  isDark ? 'text-zinc-400' : 'text-zinc-500'
+                }`}
+              >
                 {pass.attendeeEmail}
               </p>
             </div>
 
             <div className="text-right space-y-0.5 shrink-0">
-              <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider block">
+              <span
+                className={`text-[10px] uppercase font-bold tracking-wider block ${
+                  isDark ? 'text-zinc-500' : 'text-zinc-400'
+                }`}
+              >
                 TICKET NUMBER
               </span>
               <span
@@ -260,12 +325,30 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
               style={{ borderColor: `${accentColor}35` }}
               className="border-t-2 border-dashed w-full"
             />
-            <div className="absolute -left-9 -top-3 w-6 h-6 bg-[#0b0d10] rounded-full border-r border-zinc-800" />
-            <div className="absolute -right-9 -top-3 w-6 h-6 bg-[#0b0d10] rounded-full border-l border-zinc-800" />
+            <div
+              className={`absolute -left-9 -top-3 w-6 h-6 rounded-full border-r ${
+                isDark
+                  ? 'bg-[#0b0d10] border-zinc-800'
+                  : 'bg-zinc-100 border-zinc-200'
+              }`}
+            />
+            <div
+              className={`absolute -right-9 -top-3 w-6 h-6 rounded-full border-l ${
+                isDark
+                  ? 'bg-[#0b0d10] border-zinc-800'
+                  : 'bg-zinc-100 border-zinc-200'
+              }`}
+            />
           </div>
 
-          {/* High-Contrast Central QR Code Window */}
-          <div className="flex flex-col items-center justify-center p-5 bg-white rounded-2xl shadow-inner border border-zinc-200">
+          {/* Central QR Code Window */}
+          <div
+            className={`flex flex-col items-center justify-center p-5 rounded-2xl border ${
+              isDark
+                ? 'bg-white border-zinc-200 shadow-inner'
+                : 'bg-zinc-50/80 border-zinc-200/80 shadow-xs'
+            }`}
+          >
             {qrCodeDataUrl ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
@@ -291,7 +374,13 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
           {/* Live Check-in Status Stamp */}
           <div className="flex items-center justify-center pt-0.5">
             {pass.checkedIn ? (
-              <div className="bg-emerald-500/15 border-2 border-emerald-500 text-emerald-400 font-black px-4 py-1.5 rounded-full text-xs tracking-wider uppercase flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 animate-pulse">
+              <div
+                className={`border-2 font-black px-4 py-1.5 rounded-full text-xs tracking-wider uppercase flex items-center gap-1.5 animate-pulse ${
+                  isDark
+                    ? 'bg-emerald-500/15 border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-950/40'
+                    : 'bg-emerald-500/10 border-emerald-500 text-emerald-600 shadow-xs'
+                }`}
+              >
                 <IconShieldCheck className="h-4 w-4" />
                 CHECKED IN AT{' '}
                 {pass.checkedInAt
@@ -320,16 +409,32 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
           </div>
 
           {/* Event Logistics & Venue Card */}
-          <div className="bg-zinc-950/80 rounded-2xl p-4 border border-zinc-800/80 space-y-2 text-xs text-zinc-300 shadow-xs">
+          <div
+            className={`rounded-2xl p-4 border space-y-2 text-xs shadow-xs ${
+              isDark
+                ? 'bg-zinc-950/80 border-zinc-800/80 text-zinc-300'
+                : 'bg-zinc-50/90 border-zinc-200/80 text-zinc-700'
+            }`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <IconCalendar
                   style={{ color: accentColor }}
                   className="h-4 w-4 shrink-0"
                 />
-                <span className="font-semibold text-white">{formattedDate}</span>
+                <span
+                  className={`font-semibold ${
+                    isDark ? 'text-white' : 'text-zinc-950'
+                  }`}
+                >
+                  {formattedDate}
+                </span>
               </div>
-              <div className="flex items-center gap-1.5 text-zinc-400 font-mono">
+              <div
+                className={`flex items-center gap-1.5 font-mono ${
+                  isDark ? 'text-zinc-400' : 'text-zinc-600'
+                }`}
+              >
                 <IconClock
                   style={{ color: accentColor }}
                   className="h-3.5 w-3.5 shrink-0"
@@ -338,15 +443,29 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
               </div>
             </div>
 
-            <div className="flex items-start justify-between gap-2 pt-1 border-t border-zinc-800/60">
+            <div
+              className={`flex items-start justify-between gap-2 pt-1 border-t ${
+                isDark ? 'border-zinc-800/60' : 'border-zinc-200/80'
+              }`}
+            >
               <div className="flex items-start gap-2 truncate">
                 <IconMapPin
                   style={{ color: accentColor }}
                   className="h-4 w-4 shrink-0 mt-0.5"
                 />
                 <div className="truncate">
-                  <p className="font-bold text-white truncate">{event.venue.name}</p>
-                  <p className="text-[11px] text-zinc-400 truncate">
+                  <p
+                    className={`font-bold truncate ${
+                      isDark ? 'text-white' : 'text-zinc-950'
+                    }`}
+                  >
+                    {event.venue.name}
+                  </p>
+                  <p
+                    className={`text-[11px] truncate ${
+                      isDark ? 'text-zinc-400' : 'text-zinc-500'
+                    }`}
+                  >
                     {event.venue.address}, {event.venue.city}
                   </p>
                 </div>
@@ -371,7 +490,13 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
 
           {/* Tier Perks Checklist */}
           {pass.perks && pass.perks.length > 0 && (
-            <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/60 space-y-1">
+            <div
+              className={`rounded-xl p-3 border space-y-1 ${
+                isDark
+                  ? 'bg-zinc-950/50 border-zinc-800/60'
+                  : 'bg-zinc-50/90 border-zinc-200/80'
+              }`}
+            >
               <span
                 style={{ color: accentColor }}
                 className="text-[10px] uppercase font-bold tracking-wider block mb-1"
@@ -379,7 +504,12 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
                 INCLUDED PASS PERKS
               </span>
               {pass.perks.map((perk, i) => (
-                <div key={i} className="flex items-center gap-1.5 text-xs text-zinc-300">
+                <div
+                  key={i}
+                  className={`flex items-center gap-1.5 text-xs ${
+                    isDark ? 'text-zinc-300' : 'text-zinc-800 font-medium'
+                  }`}
+                >
                   <IconCheck
                     style={{ color: accentColor }}
                     className="h-3.5 w-3.5 shrink-0"
@@ -392,15 +522,27 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
 
           {/* Sponsors Footer Strip */}
           {event.sponsors && event.sponsors.length > 0 && (
-            <div className="pt-2 text-center border-t border-zinc-800/60 space-y-1.5">
-              <span className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold block">
+            <div
+              className={`pt-2 text-center border-t space-y-1.5 ${
+                isDark ? 'border-zinc-800/60' : 'border-zinc-200/80'
+              }`}
+            >
+              <span
+                className={`text-[9px] uppercase tracking-widest font-bold block ${
+                  isDark ? 'text-zinc-500' : 'text-zinc-400'
+                }`}
+              >
                 COMMUNITY PARTNERS & SPONSORS
               </span>
               <div className="flex flex-wrap justify-center gap-2">
                 {event.sponsors.map((s, idx) => (
                   <span
                     key={idx}
-                    className="text-[10px] font-mono font-medium text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800/80"
+                    className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded border ${
+                      isDark
+                        ? 'text-zinc-400 bg-zinc-950 border-zinc-800/80'
+                        : 'text-zinc-700 bg-white border-zinc-200/90 shadow-xs'
+                    }`}
                   >
                     {s.name}
                   </span>
@@ -417,7 +559,11 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
           <Button
             variant="outline"
             onClick={handleDownloadIcs}
-            className="border-zinc-800 bg-zinc-900/90 hover:bg-zinc-800 text-xs gap-1.5 text-zinc-200"
+            className={`text-xs gap-1.5 ${
+              isDark
+                ? 'border-zinc-800 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200'
+                : 'border-zinc-200 bg-white hover:bg-zinc-100 text-zinc-800 shadow-xs'
+            }`}
           >
             <IconCalendar style={{ color: accentColor }} className="h-4 w-4" />
             Add to Calendar
@@ -425,7 +571,11 @@ export function FitflixEventPass({ passData, showActions = true }: FitflixEventP
           <Button
             variant="outline"
             onClick={handleShare}
-            className="border-zinc-800 bg-zinc-900/90 hover:bg-zinc-800 text-xs gap-1.5 text-zinc-200"
+            className={`text-xs gap-1.5 ${
+              isDark
+                ? 'border-zinc-800 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200'
+                : 'border-zinc-200 bg-white hover:bg-zinc-100 text-zinc-800 shadow-xs'
+            }`}
           >
             <IconShare style={{ color: accentColor }} className="h-4 w-4" />
             {copied ? 'Link Copied!' : 'Share Pass'}
