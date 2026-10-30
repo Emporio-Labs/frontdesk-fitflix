@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IconReceiptTax, IconLoader2 } from '@tabler/icons-react'
@@ -71,14 +72,14 @@ export function BillingSettingsCard() {
                 Default GST Rate (%)
               </Label>
               <div className="relative mt-1">
-                <Input
+                <NumberInput
                   id="tax-rate-percent"
-                  type="number"
+                  integer={false}
                   min={0}
                   max={100}
                   step={0.1}
                   value={taxRatePercent}
-                  onChange={(e) => setTaxRatePercent(parseFloat(e.target.value) || 0)}
+                  onValueChange={setTaxRatePercent}
                   className="pr-8"
                   required
                 />
