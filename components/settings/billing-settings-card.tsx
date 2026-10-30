@@ -6,28 +6,24 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconReceiptTax, IconLoader2, IconCheck } from '@tabler/icons-react'
+import { IconReceiptTax, IconLoader2 } from '@tabler/icons-react'
 import {
   useBillingSettings,
   useUpdateBillingSettings,
 } from '@/hooks/use-billing-settings'
 
 export function BillingSettingsCard() {
-  const { data: settings, isLoading, isError } = useBillingSettings()
+  const { data: settings, isLoading } = useBillingSettings()
   const updateSettings = useUpdateBillingSettings()
 
   const [taxRatePercent, setTaxRatePercent] = useState<number>(5)
   const [gstin, setGstin] = useState<string>('')
-  const [currency, setCurrency] = useState<string>('INR')
-  const [sacCode, setSacCode] = useState<string>('999723')
   const [syncLocations, setSyncLocations] = useState<boolean>(true)
 
   useEffect(() => {
     if (settings) {
       setTaxRatePercent(typeof settings.taxRatePercent === 'number' ? settings.taxRatePercent : 5)
       setGstin(settings.gstin ?? '')
-      setCurrency(settings.currency ?? 'INR')
-      setSacCode(settings.sacCode ?? '999723')
     }
   }, [settings])
 
@@ -36,8 +32,6 @@ export function BillingSettingsCard() {
     await updateSettings.mutateAsync({
       taxRatePercent: Number(taxRatePercent),
       gstin: gstin.trim(),
-      currency: currency.trim() || 'INR',
-      sacCode: sacCode.trim() || '999723',
       syncLocations,
     })
   }
@@ -62,15 +56,15 @@ export function BillingSettingsCard() {
         <div className="flex items-center gap-2">
           <IconReceiptTax className="w-5 h-5 text-primary" />
           <div>
-            <CardTitle>Billing & Tax Settings</CardTitle>
+            <CardTitle>Billing & GST Settings</CardTitle>
             <CardDescription>
-              Configure the default GST percentage applied automatically to all membership sales and invoices
+              Configure the GST percentage applied automatically to every membership invoice across all branches.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSave} className="space-y-4">
+        <form onSubmit={handleSave} className="space-y-4 max-w-xl">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="tax-rate-percent" className="text-sm font-medium">
@@ -93,7 +87,7 @@ export function BillingSettingsCard() {
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Set once, and this value is used to calculate GST on every invoice across all branches.
+                Once set, this value automatically updates every invoice.
               </p>
             </div>
 
@@ -110,44 +104,12 @@ export function BillingSettingsCard() {
                 className="mt-1 uppercase"
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Printed on member tax invoices and receipts.
+                Optional business GSTIN for invoices and receipts.
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="sac-code" className="text-sm font-medium">
-                SAC / HSN Code
-              </Label>
-              <Input
-                id="sac-code"
-                type="text"
-                placeholder="999723"
-                value={sacCode}
-                onChange={(e) => setSacCode(e.target.value)}
-                className="mt-1"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Service Accounting Code for fitness & health club services.
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="currency" className="text-sm font-medium">
-                Billing Currency
-              </Label>
-              <Input
-                id="currency"
-                type="text"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-2">
+          <div className="flex items-center gap-2 pt-1">
             <input
               id="sync-locations"
               type="checkbox"
@@ -156,7 +118,7 @@ export function BillingSettingsCard() {
               className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
             />
             <Label htmlFor="sync-locations" className="text-sm font-normal text-muted-foreground">
-              Also apply this GST rate across all existing branches
+              Apply this GST rate across all existing branches
             </Label>
           </div>
 
@@ -168,7 +130,7 @@ export function BillingSettingsCard() {
                   Saving...
                 </>
               ) : (
-                'Save Billing Settings'
+                'Save GST Settings'
               )}
             </Button>
           </div>
