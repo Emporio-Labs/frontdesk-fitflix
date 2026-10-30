@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -618,11 +619,7 @@ function NumberField({
   return (
     <div className="grid gap-1.5">
       <Label className="text-xs">{label}</Label>
-      <Input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
+      <NumberInput integer={false} value={value} onValueChange={onChange} />
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   )

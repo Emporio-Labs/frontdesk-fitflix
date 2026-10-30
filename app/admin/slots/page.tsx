@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -207,11 +208,10 @@ export default function SlotsPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Capacity</label>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min={1}
                     value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: Number.parseInt(e.target.value, 10) || 1 })}
+                    onValueChange={(capacity) => setFormData({ ...formData, capacity })}
                   />
                 </div>
                 <div className="flex gap-2 pt-2">

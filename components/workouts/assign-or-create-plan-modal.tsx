@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -299,12 +300,11 @@ export function AssignOrCreatePlanModal({
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-bold">Program Duration (Weeks)</Label>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={52}
                     value={customDuration}
-                    onChange={(e) => setCustomDuration(Number(e.target.value))}
+                    onValueChange={setCustomDuration}
                     className="text-xs"
                   />
                   <p className="text-[10px] text-muted-foreground">Total length of the program lifecycle.</p>

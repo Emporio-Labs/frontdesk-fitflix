@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { IconAlertTriangle, IconGripVertical, IconLoader2, IconTrash } from '@tabler/icons-react'
@@ -202,11 +203,11 @@ function InlineInput({
       <span className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">
         {label}
       </span>
-      <Input
-        type="number"
-        inputMode="numeric"
+      <NumberInput
+        min={0}
+        integer={false}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        onValueChange={onChange}
         className="w-full min-w-0 sm:w-14 h-9 sm:h-7 text-center text-xs px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />
     </div>

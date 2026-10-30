@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Label } from '@/components/ui/label'
 import {
   Dialog,
@@ -366,28 +367,28 @@ export default function MemberLiveWorkoutPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div>
                   <Label className="text-xs">Target Sets</Label>
-                  <Input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     value={newTargetSets}
-                    onChange={(e) => setNewTargetSets(Number(e.target.value))}
+                    onValueChange={setNewTargetSets}
                     className="mt-1"
                   />
                 </div>
                 <div>
                   <Label className="text-xs">Target Reps</Label>
-                  <Input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     value={newTargetReps}
-                    onChange={(e) => setNewTargetReps(Number(e.target.value))}
+                    onValueChange={setNewTargetReps}
                     className="mt-1"
                   />
                 </div>
                 <div>
                   <Label className="text-xs">Target Wt (kg)</Label>
-                  <Input
-                    type="number"
+                  <NumberInput
+                    min={0} integer={false}
                     value={newTargetWeight}
-                    onChange={(e) => setNewTargetWeight(Number(e.target.value))}
+                    onValueChange={setNewTargetWeight}
                     className="mt-1"
                   />
                 </div>
@@ -608,28 +609,28 @@ function ExerciseLoggingCard({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               <div>
                 <Label className="text-[10px] text-muted-foreground uppercase">Target Sets</Label>
-                <Input
-                  type="number"
+                <NumberInput
+                  min={0}
                   value={editSets}
-                  onChange={(e) => setEditSets(Number(e.target.value))}
+                  onValueChange={setEditSets}
                   className="h-8 text-xs font-semibold mt-1"
                 />
               </div>
               <div>
                 <Label className="text-[10px] text-muted-foreground uppercase">Target Reps</Label>
-                <Input
-                  type="number"
+                <NumberInput
+                  min={0}
                   value={editReps}
-                  onChange={(e) => setEditReps(Number(e.target.value))}
+                  onValueChange={setEditReps}
                   className="h-8 text-xs font-semibold mt-1"
                 />
               </div>
               <div>
                 <Label className="text-[10px] text-muted-foreground uppercase">Target Wt (kg)</Label>
-                <Input
-                  type="number"
+                <NumberInput
+                  min={0} integer={false}
                   value={editWeight}
-                  onChange={(e) => setEditWeight(Number(e.target.value))}
+                  onValueChange={setEditWeight}
                   className="h-8 text-xs font-semibold mt-1"
                 />
               </div>

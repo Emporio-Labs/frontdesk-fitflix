@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -840,45 +841,37 @@ export default function MemberSchedulePage() {
                           <div className="grid w-full md:w-auto grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
                             <div>
                               <Label className="text-[10px] text-muted-foreground uppercase">Target Sets</Label>
-                              <Input
-                                type="number"
+                              <NumberInput
+                                min={0}
                                 value={ex.targetSets}
-                                onChange={(e) =>
-                                  updateExerciseField(index, 'targetSets', Number(e.target.value))
-                                }
+                                onValueChange={(v) => updateExerciseField(index, 'targetSets', v)}
                                 className="h-9 sm:h-8 text-sm sm:text-xs font-semibold"
                               />
                             </div>
                             <div>
                               <Label className="text-[10px] text-muted-foreground uppercase">Target Reps</Label>
-                              <Input
-                                type="number"
+                              <NumberInput
+                                min={0}
                                 value={ex.targetReps}
-                                onChange={(e) =>
-                                  updateExerciseField(index, 'targetReps', Number(e.target.value))
-                                }
+                                onValueChange={(v) => updateExerciseField(index, 'targetReps', v)}
                                 className="h-9 sm:h-8 text-sm sm:text-xs font-semibold"
                               />
                             </div>
                             <div>
                               <Label className="text-[10px] text-muted-foreground uppercase">Target Weight (kg)</Label>
-                              <Input
-                                type="number"
+                              <NumberInput
+                                min={0} integer={false}
                                 value={ex.targetWeightKg}
-                                onChange={(e) =>
-                                  updateExerciseField(index, 'targetWeightKg', Number(e.target.value))
-                                }
+                                onValueChange={(v) => updateExerciseField(index, 'targetWeightKg', v)}
                                 className="h-9 sm:h-8 text-sm sm:text-xs font-semibold"
                               />
                             </div>
                             <div>
                               <Label className="text-[10px] text-muted-foreground uppercase">Rest (sec)</Label>
-                              <Input
-                                type="number"
+                              <NumberInput
+                                min={0}
                                 value={ex.restSeconds}
-                                onChange={(e) =>
-                                  updateExerciseField(index, 'restSeconds', Number(e.target.value))
-                                }
+                                onValueChange={(v) => updateExerciseField(index, 'restSeconds', v)}
                                 className="h-9 sm:h-8 text-sm sm:text-xs font-semibold"
                               />
                             </div>
