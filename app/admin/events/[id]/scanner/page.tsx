@@ -178,7 +178,7 @@ export default function EventScannerPage() {
 
   // Process a scan or manual verification
   const handleVerifyPayload = useCallback(
-    async (rawPayload: string) => {
+    async (rawPayload: string, manual = false) => {
       const trimmed = rawPayload.trim()
       if (!trimmed || isVerifying) return
 
@@ -187,6 +187,7 @@ export default function EventScannerPage() {
         const response = await verifyEventCheckIn({
           payload: trimmed,
           eventId: event?.id || event?._id || eventId,
+          manual,
         })
 
         setLatestResult(response)
@@ -353,7 +354,8 @@ export default function EventScannerPage() {
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!manualCode.trim()) return
-    handleVerifyPayload(manualCode)
+    // Typed codes skip the QR token check, so staff should check the attendee's ID
+    handleVerifyPayload(manualCode, true)
     setManualCode('')
   }
 

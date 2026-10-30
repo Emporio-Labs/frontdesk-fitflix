@@ -320,6 +320,8 @@ export interface CheckInVerificationResponse {
 export async function verifyEventCheckIn(payload: {
   payload: string
   eventId?: string
+  /** Typed by staff rather than scanned; the backend then skips the QR token check. */
+  manual?: boolean
 }): Promise<CheckInVerificationResponse> {
   try {
     const response = await apiClient.post<CheckInVerificationResponse>(
