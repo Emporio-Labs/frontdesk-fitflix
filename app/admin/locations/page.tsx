@@ -454,7 +454,7 @@ function LocationSettingsDialog({
             <div className="grid grid-cols-2 gap-3">
               <NumberField
                 label="Tax rate %"
-                value={settings.taxRatePercent ?? 18}
+                value={settings.taxRatePercent ?? 5}
                 onChange={(v) => field('taxRatePercent', v)}
               />
               <NumberField

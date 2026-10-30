@@ -8,6 +8,21 @@ export interface ConferenceSettings {
   layoutTemplates: string[]
 }
 
+export interface BillingSettings {
+  taxRatePercent: number
+  gstin?: string
+  currency?: string
+  sacCode?: string
+}
+
+export interface UpdateBillingSettingsPayload {
+  taxRatePercent?: number
+  gstin?: string
+  currency?: string
+  sacCode?: string
+  syncLocations?: boolean
+}
+
 export const settingsService = {
   getConferenceSettings: async (): Promise<{ settings: ConferenceSettings }> => {
     const { data } = await apiClient.get('/api/v1/admin/settings/rooms')
@@ -28,6 +43,28 @@ export const settingsService = {
     const { data } = await apiClient.put('/api/v1/admin/settings/rooms', payload)
     return {
       message: data?.message || 'Conference settings updated successfully',
+      settings: data?.settings,
+    }
+  },
+
+  getBillingSettings: async (): Promise<{ settings: BillingSettings }> => {
+    const { data } = await apiClient.get('/api/v1/admin/settings/billing')
+    return {
+      settings: data?.settings ?? {
+        taxRatePercent: 5,
+        currency: 'INR',
+        sacCode: '999723',
+        gstin: '',
+      },
+    }
+  },
+
+  updateBillingSettings: async (
+    payload: UpdateBillingSettingsPayload,
+  ): Promise<{ message: string; settings: BillingSettings }> => {
+    const { data } = await apiClient.put('/api/v1/admin/settings/billing', payload)
+    return {
+      message: data?.message || 'Billing settings updated successfully',
       settings: data?.settings,
     }
   },

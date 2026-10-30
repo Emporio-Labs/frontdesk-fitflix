@@ -45,7 +45,7 @@ export interface SalePlanState {
   homeClubAck: boolean
 }
 
-export const DEFAULT_TAX_PERCENT = 18
+export const DEFAULT_TAX_PERCENT = 5
 
 export const PAYMENT_METHODS: { value: InvoicePaymentMethod; label: string }[] = [
   { value: 'CASH', label: 'Cash' },
