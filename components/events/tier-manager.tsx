@@ -99,6 +99,8 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
   const [tierType, setTierType] = useState<'free' | 'rsvp' | 'paid'>('paid')
   const [price, setPrice] = useState('499')
   const [quantity, setQuantity] = useState('50')
+  const [memberPrice, setMemberPrice] = useState('0')
+  const [membersOnly, setMembersOnly] = useState(false)
   const [perksText, setPerksText] = useState('')
 
   const handleApplyPreset = (preset: typeof TIER_PRESETS[0]) => {
@@ -107,6 +109,8 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
     setBadgeColor(preset.badgeColor)
     setTierType(preset.type)
     setPrice(String(preset.price))
+    setMemberPrice('0')
+    setMembersOnly(false)
     setQuantity(String(preset.totalQuantity))
     setPerksText(preset.perks.join(', '))
   }
@@ -116,6 +120,7 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
     if (!tierName.trim()) return
 
     const tierId = tierName.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+    const parsedMemberPrice = parseFloat(memberPrice) || 0
     const newTier: TicketTier = {
       tierId: `${tierId}_${Date.now()}`,
       name: tierName.trim(),
@@ -123,6 +128,9 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
       badgeColor,
       type: tierType,
       price: tierType === 'free' || tierType === 'rsvp' ? 0 : parseFloat(price) || 0,
+      memberPrice: parsedMemberPrice,
+      isMemberIncluded: true,
+      membersOnly,
       totalQuantity: parseInt(quantity, 10) || 50,
       soldQuantity: 0,
       perks: perksText
@@ -137,6 +145,8 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
     setOpen(false)
     // Reset form
     setTierName('')
+    setMemberPrice('0')
+    setMembersOnly(false)
     setPerksText('')
   }
 
@@ -283,6 +293,41 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="tMemberPrice">Member Price (₹)</Label>
+                  <Input
+                    id="tMemberPrice"
+                    type="number"
+                    min="0"
+                    placeholder="0 = Free for Members"
+                    value={memberPrice}
+                    onChange={(e) => setMemberPrice(e.target.value)}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    0 = Free for members; &gt;0 = fee for swag/kit.
+                  </p>
+                </div>
+
+                <div className="flex flex-col justify-center space-y-1 pt-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      id="tMembersOnly"
+                      type="checkbox"
+                      checked={membersOnly}
+                      onChange={(e) => setMembersOnly(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                    />
+                    <Label htmlFor="tMembersOnly" className="cursor-pointer text-sm">
+                      Members Only Tier
+                    </Label>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Restricts this pass exclusively to active members.
+                  </p>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="tPerks">Perks / Inclusions (comma-separated)</Label>
                 <Input
@@ -344,12 +389,20 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
                     </Button>
                   </div>
 
-                  <div className="flex items-center gap-4 mt-3 text-sm">
+                  <div className="flex items-center gap-3 mt-3 text-sm">
                     <div className="flex items-center gap-1 font-semibold text-foreground">
                       <IconCoins className="h-4 w-4 text-amber-500" />
                       <span>{t.price === 0 ? 'FREE' : `₹${t.price}`}</span>
                     </div>
-                    <div className="text-muted-foreground text-xs">
+                    <div className="text-xs text-emerald-600 font-medium">
+                      Member: {typeof t.memberPrice === 'number' && t.memberPrice > 0 ? `₹${t.memberPrice}` : 'FREE'}
+                    </div>
+                    {t.membersOnly && (
+                      <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">
+                        Members Only
+                      </span>
+                    )}
+                    <div className="text-muted-foreground text-xs ml-auto">
                       Allotment: <span className="font-semibold text-foreground">{t.totalQuantity} seats</span>
                     </div>
                   </div>

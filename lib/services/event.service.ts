@@ -16,6 +16,9 @@ export interface TicketTier {
   badgeColor: string
   type: 'free' | 'rsvp' | 'paid'
   price: number
+  memberPrice?: number
+  isMemberIncluded?: boolean
+  membersOnly?: boolean
   creditCost?: number
   totalQuantity: number
   soldQuantity?: number
