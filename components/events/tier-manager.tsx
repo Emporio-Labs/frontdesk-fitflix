@@ -117,6 +117,9 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
 
   const handleAddTier = (e: React.FormEvent) => {
     e.preventDefault()
+    // The dialog is portalled, but React still bubbles its submit to the
+    // event page's own <form>, which would save (or create) the event early.
+    e.stopPropagation()
     if (!tierName.trim()) return
 
     const tierId = tierName.toLowerCase().replace(/[^a-z0-9]+/g, '_')

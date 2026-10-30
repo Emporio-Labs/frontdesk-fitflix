@@ -330,8 +330,11 @@ export async function verifyEventCheckIn(payload: {
     )
     return response.data
   } catch (err: any) {
-    if (err?.response?.data) {
-      return err.response.data
+    const data = err?.response?.data
+    if (data) {
+      // The backend's error normaliser keeps only { error, code, details } on
+      // 4xx, so the scan status, attendee and event come back under details.
+      return { ...(data.details ?? {}), ...data }
     }
     throw err
   }
