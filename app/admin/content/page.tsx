@@ -195,17 +195,17 @@ export default function ContentPage() {
   return (
     <div className="w-full flex-1 space-y-6 p-6 md:p-8 pt-6 max-w-7xl mx-auto">
       {/* Top Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-zinc-800 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-border pb-5">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#b8e925] flex items-center justify-center text-black font-black text-sm">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-sm">
               <IconSparkles className="w-4 h-4" />
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
               App Copy Studio
             </h1>
           </div>
-          <p className="text-xs md:text-sm text-zinc-400 mt-1">
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">
             Visual editor to update and preview mobile app text, CTAs, and WhatsApp prompts in real time.
           </p>
         </div>
@@ -215,7 +215,7 @@ export default function ContentPage() {
             variant="outline"
             size="sm"
             onClick={() => refetch()}
-            className="border-zinc-800 hover:bg-zinc-900 text-zinc-300 text-xs h-9"
+            className="text-xs h-9 border-border hover:bg-muted text-foreground rounded-xl"
           >
             <IconRefresh className="w-3.5 h-3.5 mr-1.5" />
             Refresh
@@ -224,7 +224,7 @@ export default function ContentPage() {
           <Button
             size="sm"
             onClick={() => handleOpenCreate()}
-            className="bg-[#b8e925] hover:bg-[#a6d41f] text-black font-semibold text-xs h-9 px-3.5"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 px-3.5 rounded-xl shadow-xs"
           >
             <IconPlus className="w-4 h-4 mr-1" />
             New Override
@@ -233,30 +233,30 @@ export default function ContentPage() {
       </div>
 
       {/* Mode Switcher & Filter Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-zinc-950/60 p-2.5 rounded-2xl border border-zinc-800/80">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-card p-2.5 rounded-2xl border border-border shadow-xs">
         {/* View Mode Tabs */}
-        <div className="flex items-center gap-1 bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
+        <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
           <Button
             size="sm"
-            variant={viewMode === 'studio' ? 'default' : 'ghost'}
+            variant="ghost"
             onClick={() => setViewMode('studio')}
-            className={`text-xs h-8 px-3 rounded-lg ${
+            className={`text-xs h-8 px-3 rounded-lg font-medium transition-all ${
               viewMode === 'studio'
-                ? 'bg-[#b8e925] text-black font-semibold shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+                ? 'bg-background text-foreground font-bold shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <IconDeviceMobile className="w-3.5 h-3.5 mr-1.5" />
+            <IconDeviceMobile className="w-3.5 h-3.5 mr-1.5 text-emerald-600 dark:text-emerald-400" />
             Visual Studio
           </Button>
           <Button
             size="sm"
-            variant={viewMode === 'cards' ? 'default' : 'ghost'}
+            variant="ghost"
             onClick={() => setViewMode('cards')}
-            className={`text-xs h-8 px-3 rounded-lg ${
+            className={`text-xs h-8 px-3 rounded-lg font-medium transition-all ${
               viewMode === 'cards'
-                ? 'bg-[#b8e925] text-black font-semibold shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+                ? 'bg-background text-foreground font-bold shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <IconLayoutCards className="w-3.5 h-3.5 mr-1.5" />
@@ -264,12 +264,12 @@ export default function ContentPage() {
           </Button>
           <Button
             size="sm"
-            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            variant="ghost"
             onClick={() => setViewMode('table')}
-            className={`text-xs h-8 px-3 rounded-lg ${
+            className={`text-xs h-8 px-3 rounded-lg font-medium transition-all ${
               viewMode === 'table'
-                ? 'bg-[#b8e925] text-black font-semibold shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+                ? 'bg-background text-foreground font-bold shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <IconTable className="w-3.5 h-3.5 mr-1.5" />
@@ -280,20 +280,20 @@ export default function ContentPage() {
         {/* Search & Platform Filter (for Cards & Table view) */}
         <div className="flex items-center gap-2 w-full lg:w-auto">
           <div className="relative flex-1 lg:flex-none lg:w-64">
-            <IconSearch className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <IconSearch className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search copy or keys..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 bg-zinc-900 border-zinc-800 text-xs h-8 text-zinc-200 placeholder:text-zinc-500"
+              className="pl-8 bg-background border-border text-xs h-9 rounded-xl text-foreground placeholder:text-muted-foreground focus-visible:ring-emerald-500"
             />
           </div>
 
           <Select value={platformFilter} onValueChange={setPlatformFilter}>
-            <SelectTrigger className="w-32 bg-zinc-900 border-zinc-800 text-xs h-8">
+            <SelectTrigger className="w-36 bg-background border-border text-xs h-9 rounded-xl text-foreground font-medium shadow-xs">
               <SelectValue placeholder="Platform" />
             </SelectTrigger>
-            <SelectContent className="bg-zinc-950 border-zinc-800 text-xs">
+            <SelectContent className="bg-popover border-border text-xs shadow-lg rounded-xl">
               <SelectItem value="all">All Platforms</SelectItem>
               <SelectItem value="general">General Only</SelectItem>
               <SelectItem value="ios">iOS Only</SelectItem>

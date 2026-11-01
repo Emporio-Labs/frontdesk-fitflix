@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <rect width="200" height="60" rx="10" fill="#0f172a" />
+  <circle cx="35" cy="30" r="18" fill="#06b6d4" />
+  <text x="35" y="37" font-family="'Arial Black', sans-serif" font-weight="900" font-size="18" text-anchor="middle" fill="#ffffff">X</text>
+  <text x="65" y="38" font-family="'Inter', sans-serif" font-weight="900" font-size="18" fill="#ffffff" letter-spacing="1.5">ACTIVEX</text>
+</svg>
