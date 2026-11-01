@@ -1,8 +1,10 @@
 "use client"
 
+import Link from 'next/link'
 import {
   IconDotsVertical,
   IconLogout,
+  IconUser,
 } from "@tabler/icons-react"
 
 import {
@@ -37,7 +39,7 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
-  const { logout } = useAuth()
+  const { logout, role } = useAuth()
 
   // Derive initials from name: "John Doe" → "JD", "Admin" → "A"
   const initials = user.name
@@ -90,8 +92,16 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={logout}>
-                <IconLogout />
+              {role === 'trainer' && (
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/trainer/profile" className="flex items-center gap-2 cursor-pointer">
+                    <IconUser className="size-4" />
+                    My Profile
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={logout} className="cursor-pointer">
+                <IconLogout className="size-4" />
                 Log out
               </DropdownMenuItem>
             </DropdownMenuGroup>

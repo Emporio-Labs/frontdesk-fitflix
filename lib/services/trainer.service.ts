@@ -7,6 +7,7 @@ export interface Trainer {
   phone: string
   description: string
   specialities: string[]
+  certifications?: string[]
   createdAt: string
   updatedAt: string
   imageUrl?: string
@@ -15,6 +16,7 @@ export interface Trainer {
   /** Admin-granted: may see and work the lead board. */
   canAccessLeads?: boolean
   password?: string
+  locationId?: any
 }
 
 export interface CreateTrainerPayload {
@@ -24,6 +26,7 @@ export interface CreateTrainerPayload {
   password: string
   description: string
   specialities: string[]
+  certifications?: string[]
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
@@ -34,6 +37,7 @@ export interface UpdateTrainerPayload {
   trainerName?: string
   description?: string
   specialities?: string[]
+  certifications?: string[]
   imageUrl?: string
   keySentence?: string
   isActive?: boolean
@@ -47,6 +51,28 @@ export const trainerService = {
   },
   getById: async (id: string): Promise<{ trainer: Trainer }> => {
     const { data } = await apiClient.get(`/trainers/${id}`)
+    return data
+  },
+  getMe: async (): Promise<{ trainer: Trainer }> => {
+    const { data } = await apiClient.get('/trainers/me')
+    return data
+  },
+  updateMe: async (
+    payload: UpdateTrainerPayload & { password?: string; email?: string }
+  ): Promise<{ message: string; trainer: Trainer }> => {
+    const { data } = await apiClient.patch('/trainers/me', payload)
+    return data
+  },
+  uploadImage: async (
+    file: File
+  ): Promise<{ message: string; imageUrl: string; s3Key?: string }> => {
+    const formData = new FormData()
+    formData.append('image', file)
+    const { data } = await apiClient.post('/trainers/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
     return data
   },
   getPublicAll: async (): Promise<{ trainers: Trainer[] }> => {

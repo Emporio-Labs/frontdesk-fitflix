@@ -25,7 +25,8 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { IconPlus, IconEdit, IconTrash, IconRefresh, IconEye, IconEyeOff } from '@tabler/icons-react'
 import { useTrainers, useCreateTrainer, useUpdateTrainer, useDeleteTrainer } from '@/hooks/use-trainers'
-import { Trainer } from '@/lib/services/trainer.service'
+import { trainerService, Trainer } from '@/lib/services/trainer.service'
+import { ImageUploader } from '@/components/ui/image-uploader'
 
 const TRAINER_DRAFT_KEY = 'add_trainer_form_draft'
 
@@ -36,6 +37,7 @@ type TrainerFormState = {
   password: string
   description: string
   specialitiesInput: string
+  certificationsInput: string
   imageUrl: string
   keySentence: string
   isActive: boolean
@@ -50,6 +52,7 @@ function defaultTrainerForm(): TrainerFormState {
     password: '',
     description: '',
     specialitiesInput: '',
+    certificationsInput: '',
     imageUrl: '',
     keySentence: '',
     isActive: true,
@@ -188,6 +191,7 @@ export default function TrainersPage() {
       trainerName: trainer.trainerName || '', email: trainer.email || '', phone: trainer.phone || '',
       password: '', description: trainer.description || '',
       specialitiesInput: (trainer.specialities || []).join(', '),
+      certificationsInput: (trainer.certifications || []).join(', '),
       imageUrl: trainer.imageUrl || '',
       keySentence: trainer.keySentence || '',
       isActive: trainer.isActive !== false,
@@ -225,6 +229,7 @@ export default function TrainersPage() {
   const handleSubmit = async () => {
     if (!validateForm()) return
     const specialities = formData.specialitiesInput.split(',').map(s => s.trim()).filter(Boolean)
+    const certifications = formData.certificationsInput.split(',').map(s => s.trim()).filter(Boolean)
     const cleanPhone = formData.phone.replace(/[\s\-()]/g, '')
     
     try {
@@ -235,6 +240,7 @@ export default function TrainersPage() {
             trainerName: formData.trainerName,
             description: formData.description,
             specialities,
+            certifications,
             imageUrl: formData.imageUrl,
             keySentence: formData.keySentence,
             isActive: formData.isActive,
@@ -246,6 +252,7 @@ export default function TrainersPage() {
         await createTrainer.mutateAsync({
           trainerName: formData.trainerName, email: formData.email, phone: cleanPhone,
           password: formData.password, description: formData.description, specialities,
+          certifications,
           imageUrl: formData.imageUrl, keySentence: formData.keySentence, isActive: formData.isActive,
           canAccessLeads: formData.canAccessLeads,
         })
@@ -377,9 +384,16 @@ export default function TrainersPage() {
                   <Input value={formData.specialitiesInput} onChange={(e) => setFormData({ ...formData, specialitiesInput: e.target.value })} placeholder="HIIT, Yoga, Strength Training" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Image URL</label>
-                  <Input value={formData.imageUrl} onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })} placeholder="https://images.unsplash.com/photo-..." />
+                  <label className="text-sm font-medium">Certifications (comma-separated, optional)</label>
+                  <Input value={formData.certificationsInput} onChange={(e) => setFormData({ ...formData, certificationsInput: e.target.value })} placeholder="NASM-CPT, ACE, CSCS, CrossFit L1" />
                 </div>
+                <ImageUploader
+                  label="Profile Photo"
+                  value={formData.imageUrl}
+                  onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                  onUpload={trainerService.uploadImage}
+                  fallbackText={formData.trainerName ? formData.trainerName.slice(0, 2).toUpperCase() : 'TR'}
+                />
                 <div>
                   <label className="text-sm font-medium">Key Sentence</label>
                   <Input value={formData.keySentence} onChange={(e) => setFormData({ ...formData, keySentence: e.target.value })} placeholder="Dedicated to helping you reach your peak performance." />

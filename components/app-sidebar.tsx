@@ -35,6 +35,7 @@ import {
   IconCirclePlus,
   IconRefresh,
   IconTicket,
+  IconUser,
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
@@ -138,6 +139,7 @@ const navTrainerGroup = [
       { title: "Exercise Library", url: "/dashboard/workouts/exercises", icon: IconActivity },
       { title: "Live Sessions", url: "/dashboard/workouts/sessions", icon: IconClock },
       { title: "Notifications", url: "/admin/me/notifications", icon: IconBellRinging },
+      { title: "My Profile", url: "/admin/trainer/profile", icon: IconUser },
     ],
   },
 ]

@@ -16,6 +16,7 @@ export const queryKeys = {
   trainers: {
     all: () => ['trainers'] as const,
     detail: (id: string) => ['trainers', id] as const,
+    profile: () => ['trainers', 'me'] as const,
     myMembers: () => ['trainers', 'me', 'members'] as const,
     publicAll: () => ['trainers', 'public'] as const,
     publicDetail: (id: string) => ['trainers', 'public', id] as const,

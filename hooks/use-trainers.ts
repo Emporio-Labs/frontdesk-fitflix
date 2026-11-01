@@ -20,6 +20,42 @@ export function useTrainer(id: string) {
   })
 }
 
+export function useTrainerProfile() {
+  return useQuery({
+    queryKey: queryKeys.trainers.profile(),
+    queryFn: trainerService.getMe,
+    select: (data) => data.trainer,
+  })
+}
+
+export function useUpdateTrainerProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: UpdateTrainerPayload & { password?: string; email?: string }) =>
+      trainerService.updateMe(payload),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.trainers.profile() })
+      qc.invalidateQueries({ queryKey: queryKeys.trainers.all() })
+      if (data.trainer?._id) {
+        qc.invalidateQueries({ queryKey: queryKeys.trainers.detail(data.trainer._id) })
+      }
+      toast.success(data.message || 'Profile updated successfully')
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || err?.response?.data?.message || 'Failed to update profile')
+    },
+  })
+}
+
+export function useUploadTrainerImage() {
+  return useMutation({
+    mutationFn: (file: File) => trainerService.uploadImage(file),
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || err?.response?.data?.message || 'Failed to upload image')
+    },
+  })
+}
+
 export function useCreateTrainer() {
   const qc = useQueryClient()
   return useMutation({

@@ -17,6 +17,7 @@ const TRAINER_ALLOWED_ADMIN_ROUTES = [
   '/admin/personal-training',
   '/admin/live-session',
   '/admin/slots',
+  '/admin/trainer/profile',
 ]
 
 const NUTRITIONIST_ALLOWED_ADMIN_ROUTES = [
@@ -50,12 +51,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Trainer role access: Trainers can access Personal Training hub and live session rooms
+  // Trainer role access: Trainers can access Personal Training hub, profile, and live session rooms
   const TRAINER_ALLOWED_ADMIN_ROUTES = [
     '/admin/personal-training',
     '/admin/live-session',
     '/admin/slots',
     '/admin/me/notifications',
+    '/admin/trainer/profile',
     // Only useful to trainers an admin has given lead access; the page and
     // the backend both check that.
     '/admin/leads',
