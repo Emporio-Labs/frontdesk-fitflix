@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import {
   Dialog,
   DialogContent,
@@ -1455,22 +1456,20 @@ export default function TherapiesPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Time (minutes)</label>
-                  <Input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     value={formData.time}
-                    onChange={(e) => setFormData({ ...formData, time: Number.parseInt(e.target.value, 10) || 0 })}
+                    onValueChange={(time) => setFormData({ ...formData, time })}
                     placeholder="120"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Credit Cost</label>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min={1}
+                    emptyValue={0}
                     value={formData.creditCost}
-                    onChange={(e) =>
-                      setFormData({ ...formData, creditCost: Number.parseInt(e.target.value, 10) || 0 })
-                    }
+                    onValueChange={(creditCost) => setFormData({ ...formData, creditCost })}
                     placeholder="2"
                   />
                 </div>
@@ -1507,33 +1506,21 @@ export default function TherapiesPage() {
                   <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">Capacity / Slot</label>
-                      <Input
-                        type="number"
+                      <NumberInput
                         min={1}
                         disabled={isGeneratingSlots}
                         value={slotPlan.capacityPerHour}
-                        onChange={(e) =>
-                          setSlotPlan({
-                            ...slotPlan,
-                            capacityPerHour: Number.parseInt(e.target.value, 10) || 1,
-                          })
-                        }
+                        onValueChange={(capacityPerHour) => setSlotPlan({ ...slotPlan, capacityPerHour })}
                       />
                     </div>
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">Buffer (mins)</label>
-                      <Input
-                        type="number"
+                      <NumberInput
                         min={0}
                         placeholder="0"
                         disabled={isGeneratingSlots}
                         value={slotPlan.bufferMinutes}
-                        onChange={(e) =>
-                          setSlotPlan({
-                            ...slotPlan,
-                            bufferMinutes: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
-                          })
-                        }
+                        onValueChange={(bufferMinutes) => setSlotPlan({ ...slotPlan, bufferMinutes })}
                       />
                     </div>
                     <div>
@@ -2333,12 +2320,11 @@ export default function TherapiesPage() {
                       Duration (mins)
                       {renderModifiedBadge('durationMinutes')}
                     </label>
-                    <Input
-                      type="number"
+                    <NumberInput
                       min={1}
+                      emptyValue={0}
                       value={gcForm.durationMinutes}
-                      onChange={(e) => {
-                        const val = Number.parseInt(e.target.value, 10) || 0
+                      onValueChange={(val) => {
                         setGcForm({ ...gcForm, durationMinutes: val })
                         setGcSchedule((prev) => ({
                           ...prev,
@@ -2362,12 +2348,11 @@ export default function TherapiesPage() {
                       Credits Required
                       {renderModifiedBadge('creditsRequired')}
                     </label>
-                    <Input
-                      type="number"
+                    <NumberInput
                       min={0}
                       value={gcForm.creditsRequired}
-                      onChange={(e) => {
-                        setGcForm({ ...gcForm, creditsRequired: Number.parseInt(e.target.value, 10) || 0 })
+                      onValueChange={(creditsRequired) => {
+                        setGcForm({ ...gcForm, creditsRequired })
                         if (gcErrors.creditsRequired) setGcErrors({ ...gcErrors, creditsRequired: '' })
                       }}
                       placeholder="1"
@@ -2392,12 +2377,11 @@ export default function TherapiesPage() {
                       Max Capacity (Seats)
                       {renderModifiedBadge('maxParticipants')}
                     </label>
-                    <Input
-                      type="number"
+                    <NumberInput
                       min={1}
+                      emptyValue={0}
                       value={gcForm.maxParticipants}
-                      onChange={(e) => {
-                        const val = Number.parseInt(e.target.value, 10) || 0
+                      onValueChange={(val) => {
                         setGcForm({ ...gcForm, maxParticipants: val })
                         setSlotPlan((prev) => ({ ...prev, capacityPerHour: val }))
                         if (gcErrors.maxParticipants) setGcErrors({ ...gcErrors, maxParticipants: '' })
@@ -2423,15 +2407,14 @@ export default function TherapiesPage() {
                       {renderModifiedBadge('bookingWindowValue')}
                     </label>
                     <div className="flex gap-1.5">
-                      <Input
-                        type="number"
+                      <NumberInput
                         min={0}
                         className={cn(
                           "h-8 text-xs w-20",
                           isFieldChanged('bookingWindowValue') && "border-amber-500 ring-amber-500/20 focus-visible:ring-amber-500"
                         )}
                         value={gcForm.bookingWindowValue}
-                        onChange={(e) => setGcForm({ ...gcForm, bookingWindowValue: parseInt(e.target.value) || 0 })}
+                        onValueChange={(bookingWindowValue) => setGcForm({ ...gcForm, bookingWindowValue })}
                         disabled={isGcPending}
                       />
                       <select
@@ -2829,15 +2812,13 @@ export default function TherapiesPage() {
                         <div className="flex items-center pl-6">
                           {gcSchedule.limitMode === 'occurrences' ? (
                             <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
+                              <NumberInput
                                 min={1}
                                 max={90}
                                 className="w-20 h-8"
                                 value={gcSchedule.occurrences}
-                                onChange={(e) => {
-                                  const v = parseInt(e.target.value, 10)
-                                  setGcSchedule({ ...gcSchedule, occurrences: isNaN(v) ? 1 : v })
+                                onValueChange={(occurrences) => {
+                                  setGcSchedule({ ...gcSchedule, occurrences })
                                   setShowPreview(true)
                                 }}
                               />

@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Textarea } from '@/components/ui/textarea'
 import { useCompletePtBooking } from '@/hooks/use-personal-training'
 import type { UnifiedBookingDto } from '@/lib/services/personal-training.service'
@@ -124,32 +125,32 @@ export function LogWorkoutDialog({
                 </div>
                 <div className="col-span-1 sm:col-span-2">
                   <span className="mb-0.5 block text-[10px] text-muted-foreground sm:hidden">Sets</span>
-                  <Input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     aria-label="Sets"
                     placeholder="Sets"
                     value={ex.sets}
-                    onChange={(e) => handleExerciseChange(idx, 'sets', Number(e.target.value))}
+                    onValueChange={(v) => handleExerciseChange(idx, 'sets', v)}
                   />
                 </div>
                 <div className="col-span-1 sm:col-span-2">
                   <span className="mb-0.5 block text-[10px] text-muted-foreground sm:hidden">Reps</span>
-                  <Input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     aria-label="Reps"
                     placeholder="Reps"
                     value={ex.reps}
-                    onChange={(e) => handleExerciseChange(idx, 'reps', Number(e.target.value))}
+                    onValueChange={(v) => handleExerciseChange(idx, 'reps', v)}
                   />
                 </div>
                 <div className="col-span-1 sm:col-span-2">
                   <span className="mb-0.5 block text-[10px] text-muted-foreground sm:hidden">Weight (kg)</span>
-                  <Input
-                    type="number"
+                  <NumberInput
+                    min={0} integer={false}
                     aria-label="Weight (kg)"
                     placeholder="Weight (kg)"
                     value={ex.weight}
-                    onChange={(e) => handleExerciseChange(idx, 'weight', Number(e.target.value))}
+                    onValueChange={(v) => handleExerciseChange(idx, 'weight', v)}
                   />
                 </div>
                 <div className="col-span-1 flex justify-end">

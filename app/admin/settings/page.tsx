@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { IconSettings, IconBell, IconLock, IconPalette } from '@tabler/icons-react'
 import { ConferenceSettingsCard } from '@/components/settings/conference-settings-card'
+import { BillingSettingsCard } from '@/components/settings/billing-settings-card'
 import { AlertRulesSettingsCard } from '@/components/settings/alert-rules-settings-card'
 
 export default function SettingsPage() {
@@ -97,6 +98,10 @@ export default function SettingsPage() {
           <Button onClick={handleSaveClinicInfo}>Save Changes</Button>
         </CardContent>
       </Card>
+
+      {/* Session Layout & Conference Configuration Defaults */}
+      {/* Billing & Tax Settings (GST %) */}
+      <BillingSettingsCard />
 
       {/* Session Layout & Conference Configuration Defaults */}
       <ConferenceSettingsCard />

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -207,16 +208,12 @@ export function ConferenceSettingsCard() {
               <IconUsers className="w-4 h-4 text-muted-foreground" />
               Max Participant Limit
             </label>
-            <Input
-              type="number"
+            <NumberInput
               min={1}
               max={500}
               value={form.maxParticipantsPerSession}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  maxParticipantsPerSession: Number(e.target.value) || 1,
-                }))
+              onValueChange={(maxParticipantsPerSession) =>
+                setForm((prev) => ({ ...prev, maxParticipantsPerSession }))
               }
               disabled={updateSettings.isPending}
             />

@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import {
   Select,
   SelectContent,
@@ -353,16 +354,11 @@ export function AlertRulesSettingsCard() {
                     <IconClock className="h-3.5 w-3.5 text-indigo-500" />
                     Grace Period (Minutes)
                   </label>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min={0}
                     max={60}
                     value={activeGracePeriod}
-                    onChange={(e) =>
-                      setDraftGracePeriod(
-                        Math.max(0, parseInt(e.target.value, 10) || 0)
-                      )
-                    }
+                    onValueChange={setDraftGracePeriod}
                     className="text-xs h-9"
                   />
                   <p className="text-[11px] text-muted-foreground">
@@ -432,18 +428,11 @@ export function AlertRulesSettingsCard() {
 
                         <span className="text-xs text-muted-foreground">if unacknowledged after</span>
                         <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
+                          <NumberInput
                             min={1}
                             max={1440}
                             value={step.afterMinutes}
-                            onChange={(e) =>
-                              handleUpdateLadderStep(
-                                idx,
-                                'afterMinutes',
-                                Math.max(1, parseInt(e.target.value) || 1)
-                              )
-                            }
+                            onValueChange={(v) => handleUpdateLadderStep(idx, 'afterMinutes', v)}
                             className="w-20 h-8 text-xs text-center"
                           />
                           <span className="text-xs text-muted-foreground">mins</span>

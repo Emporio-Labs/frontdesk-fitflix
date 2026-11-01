@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import {
   Table,
   TableBody,
@@ -378,19 +379,7 @@ export default function CreditsPage() {
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Amount</label>
-            <Input
-              type="number"
-              min={1}
-              value={topUpAmount}
-              onChange={(e) => {
-                const parsed = Number.parseInt(e.target.value, 10)
-                if (Number.isNaN(parsed)) {
-                  setTopUpAmount(1)
-                  return
-                }
-                setTopUpAmount(Math.max(1, parsed))
-              }}
-            />
+            <NumberInput min={1} value={topUpAmount} onValueChange={setTopUpAmount} />
           </div>
 
           <div className="space-y-2">

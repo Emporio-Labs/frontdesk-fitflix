@@ -1,6 +1,7 @@
 'use client'
 
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
@@ -72,12 +73,11 @@ export function PlanConfigPanel({
 
           <div className="space-y-1.5">
             <Label className="text-xs">Duration (weeks)</Label>
-            <Input
-              type="number"
+            <NumberInput
               min={1}
               max={52}
               value={currentPlan.duration || 4}
-              onChange={(e) => setPlanField('duration', Number(e.target.value) || 1)}
+              onValueChange={(v) => setPlanField('duration', v)}
               className="h-9 text-xs"
             />
           </div>

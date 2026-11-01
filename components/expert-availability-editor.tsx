@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -428,13 +429,13 @@ export function ExpertAvailabilityEditor({
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Session Length (Minutes)
                 </label>
-                <Input
-                  type="number"
+                <NumberInput
                   min={15}
                   max={120}
+                  emptyValue={45}
                   value={slotDuration}
                   disabled={!allowDurationEdit}
-                  onChange={(e) => setSlotDuration(Number(e.target.value) || 45)}
+                  onValueChange={setSlotDuration}
                   className="mt-1 bg-background"
                 />
               </div>
@@ -442,13 +443,12 @@ export function ExpertAvailabilityEditor({
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Buffer Between Sessions (Minutes)
                 </label>
-                <Input
-                  type="number"
+                <NumberInput
                   min={0}
                   max={60}
                   value={bufferMinutes}
                   disabled={!allowDurationEdit}
-                  onChange={(e) => setBufferMinutes(Number(e.target.value) || 0)}
+                  onValueChange={setBufferMinutes}
                   className="mt-1 bg-background"
                 />
               </div>
@@ -456,12 +456,12 @@ export function ExpertAvailabilityEditor({
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Shift Duration (Hours)
                 </label>
-                <Input
-                  type="number"
+                <NumberInput
                   min={1}
                   max={16}
+                  emptyValue={8}
                   value={shiftDurationHours}
-                  onChange={(e) => handleShiftDurationChange(Number(e.target.value) || 8)}
+                  onValueChange={handleShiftDurationChange}
                   className="mt-1 bg-background font-medium"
                   placeholder="8"
                 />

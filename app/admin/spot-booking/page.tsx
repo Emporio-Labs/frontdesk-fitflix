@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberInput } from '@/components/ui/number-input'
 import {
   Select,
   SelectContent,
@@ -792,14 +793,10 @@ export default function SpotBookingPage() {
                 <p className="text-xs font-bold text-slate-800">Admin Top-Up</p>
                 <div className="space-y-1">
                   <label className="text-[11px] font-medium text-slate-500">Amount</label>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min={1}
                     value={topUpAmount}
-                    onChange={(e) => {
-                      const parsed = Number.parseInt(e.target.value, 10)
-                      setTopUpAmount(Number.isNaN(parsed) ? 1 : Math.max(1, parsed))
-                    }}
+                    onValueChange={setTopUpAmount}
                     className="h-8 text-xs"
                   />
                 </div>
