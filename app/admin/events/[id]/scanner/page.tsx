@@ -152,7 +152,60 @@ export default function EventScannerPage() {
     }
   }, [soundEnabled, getAudioContext])
 
-  // Load initial event and attendance statistics
+  // Synced storage helper
+  const updateLatestResult = useCallback(
+    (result: CheckInVerificationResponse | null) => {
+      setLatestResult(result)
+      if (typeof window !== 'undefined' && eventId) {
+        try {
+          if (result) {
+            sessionStorage.setItem(`fitflix_scanner_latest_${eventId}`, JSON.stringify(result))
+          } else {
+            sessionStorage.removeItem(`fitflix_scanner_latest_${eventId}`)
+          }
+        } catch {
+          // ignore
+        }
+      }
+    },
+    [eventId]
+  )
+
+  const appendScanEntry = useCallback(
+    (entry: ScanAuditEntry) => {
+      setRecentScans((prev) => {
+        // Prevent duplicate entries by registrationId or ticketId
+        const filtered = prev.filter((s) => {
+          if (entry.registrationId && s.registrationId === entry.registrationId) return false
+          if (entry.ticketId && s.ticketId === entry.ticketId) return false
+          return s.id !== entry.id
+        })
+        const updated = [entry, ...filtered].slice(0, 30)
+        if (typeof window !== 'undefined' && eventId) {
+          try {
+            sessionStorage.setItem(`fitflix_scanner_logs_${eventId}`, JSON.stringify(updated))
+          } catch {
+            // ignore
+          }
+        }
+        return updated
+      })
+    },
+    [eventId]
+  )
+
+  const handleClearHistory = useCallback(() => {
+    setRecentScans([])
+    if (typeof window !== 'undefined' && eventId) {
+      try {
+        sessionStorage.removeItem(`fitflix_scanner_logs_${eventId}`)
+      } catch {
+        // ignore
+      }
+    }
+  }, [eventId])
+
+  // Load initial event and attendance statistics + hydrate checked-in roster history
   const loadEventData = useCallback(async () => {
     if (!eventId) return
     try {
@@ -164,6 +217,83 @@ export default function EventScannerPage() {
       setEvent(evt)
       setTotalCheckedIn(roster.summary?.totalCheckedIn ?? evt.totalCheckedIn ?? 0)
       setTotalRegistered(roster.summary?.totalRegistered ?? evt.totalRegistered ?? 0)
+
+      // 1. Hydrate Checked-in Attendees from Database Roster
+      const checkedInAttendees = (roster.registrations || []).filter((r) => r.checkedIn)
+      checkedInAttendees.sort((a, b) => {
+        const timeA = a.checkedInAt ? new Date(a.checkedInAt).getTime() : 0
+        const timeB = b.checkedInAt ? new Date(b.checkedInAt).getTime() : 0
+        return timeB - timeA
+      })
+
+      const serverAuditEntries: ScanAuditEntry[] = checkedInAttendees.map((reg) => {
+        const regId = (reg as any)._id?.toString() || reg.id
+        const timeStr = reg.checkedInAt
+          ? new Date(reg.checkedInAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })
+          : 'Checked In'
+
+        return {
+          id: `db-${regId}`,
+          timestamp: timeStr,
+          ticketId: reg.ticketId,
+          attendeeName: reg.attendeeName,
+          status: 'VALID',
+          tierName: reg.tierName,
+          registrationId: regId,
+        }
+      })
+
+      // 2. Read any transient session scan attempts (warnings/duplicates) from sessionStorage
+      let sessionLogs: ScanAuditEntry[] = []
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = sessionStorage.getItem(`fitflix_scanner_logs_${eventId}`)
+          if (raw) {
+            sessionLogs = JSON.parse(raw)
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // 3. Merge: keep session warnings, validate checked-in entries against server, and add server records
+      const validRegIds = new Set(serverAuditEntries.map((e) => e.registrationId).filter(Boolean))
+      const validTicketIds = new Set(serverAuditEntries.map((e) => e.ticketId))
+
+      const preservedSessionLogs = sessionLogs.filter((log) => {
+        if (log.status !== 'VALID') return true
+        return (
+          (log.registrationId && validRegIds.has(log.registrationId)) ||
+          validTicketIds.has(log.ticketId)
+        )
+      })
+
+      const seenKeys = new Set(
+        preservedSessionLogs.map((s) => s.registrationId || s.ticketId)
+      )
+
+      const missingServerEntries = serverAuditEntries.filter(
+        (s) => !seenKeys.has(s.registrationId || s.ticketId)
+      )
+
+      const mergedLogs = [...preservedSessionLogs, ...missingServerEntries].slice(0, 30)
+      setRecentScans(mergedLogs)
+
+      // 4. Restore latest verified scan card if present in sessionStorage
+      if (typeof window !== 'undefined') {
+        try {
+          const savedLatest = sessionStorage.getItem(`fitflix_scanner_latest_${eventId}`)
+          if (savedLatest) {
+            setLatestResult(JSON.parse(savedLatest))
+          }
+        } catch {
+          // ignore
+        }
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load event data'
       toast.error(msg)
@@ -190,7 +320,7 @@ export default function EventScannerPage() {
           manual,
         })
 
-        setLatestResult(response)
+        updateLatestResult(response)
 
         const timeStr = new Date().toLocaleTimeString([], {
           hour: '2-digit',
@@ -203,62 +333,50 @@ export default function EventScannerPage() {
           setTotalCheckedIn((prev) => prev + 1)
           toast.success(response.message || 'Check-in verified!')
 
-          setRecentScans((prev) => [
-            {
-              id: `${Date.now()}-${Math.random()}`,
-              timestamp: timeStr,
-              ticketId: response.registration?.ticketId || trimmed,
-              attendeeName: response.registration?.attendeeName || 'Attendee',
-              status: 'VALID',
-              tierName: response.registration?.tierName,
-              registrationId: response.registration?.id,
-            },
-            ...prev.slice(0, 19),
-          ])
+          appendScanEntry({
+            id: `${Date.now()}-${Math.random()}`,
+            timestamp: timeStr,
+            ticketId: response.registration?.ticketId || trimmed,
+            attendeeName: response.registration?.attendeeName || 'Attendee',
+            status: 'VALID',
+            tierName: response.registration?.tierName,
+            registrationId: response.registration?.id,
+          })
         } else if (response.status === 'ALREADY_CHECKED_IN') {
           playWarningChime()
           toast.warning(response.error || 'Already checked in!')
 
-          setRecentScans((prev) => [
-            {
-              id: `${Date.now()}-${Math.random()}`,
-              timestamp: timeStr,
-              ticketId: response.registration?.ticketId || trimmed,
-              attendeeName: response.registration?.attendeeName || 'Attendee',
-              status: 'ALREADY_CHECKED_IN',
-              tierName: response.registration?.tierName,
-              registrationId: response.registration?.id,
-            },
-            ...prev.slice(0, 19),
-          ])
+          appendScanEntry({
+            id: `${Date.now()}-${Math.random()}`,
+            timestamp: timeStr,
+            ticketId: response.registration?.ticketId || trimmed,
+            attendeeName: response.registration?.attendeeName || 'Attendee',
+            status: 'ALREADY_CHECKED_IN',
+            tierName: response.registration?.tierName,
+            registrationId: response.registration?.id,
+          })
         } else if (response.status === 'WRONG_EVENT') {
           playWarningChime()
           toast.error(response.error || 'Ticket belongs to a different event!')
 
-          setRecentScans((prev) => [
-            {
-              id: `${Date.now()}-${Math.random()}`,
-              timestamp: timeStr,
-              ticketId: trimmed,
-              attendeeName: 'Wrong Event Ticket',
-              status: 'WRONG_EVENT',
-            },
-            ...prev.slice(0, 19),
-          ])
+          appendScanEntry({
+            id: `${Date.now()}-${Math.random()}`,
+            timestamp: timeStr,
+            ticketId: trimmed,
+            attendeeName: 'Wrong Event Ticket',
+            status: 'WRONG_EVENT',
+          })
         } else {
           playWarningChime()
           toast.error(response.error || 'Ticket not found in system')
 
-          setRecentScans((prev) => [
-            {
-              id: `${Date.now()}-${Math.random()}`,
-              timestamp: timeStr,
-              ticketId: trimmed,
-              attendeeName: 'Invalid / Unrecognized',
-              status: 'INVALID',
-            },
-            ...prev.slice(0, 19),
-          ])
+          appendScanEntry({
+            id: `${Date.now()}-${Math.random()}`,
+            timestamp: timeStr,
+            ticketId: trimmed,
+            attendeeName: 'Invalid / Unrecognized',
+            status: 'INVALID',
+          })
         }
       } catch (err: unknown) {
         playWarningChime()
@@ -268,7 +386,7 @@ export default function EventScannerPage() {
         setIsVerifying(false)
       }
     },
-    [event, eventId, isVerifying, playSuccessChime, playWarningChime]
+    [event, eventId, isVerifying, playSuccessChime, playWarningChime, updateLatestResult, appendScanEntry]
   )
 
   // Start html5-qrcode camera instance
@@ -367,9 +485,22 @@ export default function EventScannerPage() {
       toast.info(res.message)
       setTotalCheckedIn((prev) => Math.max(0, prev - 1))
       // Remove or mark undone
-      setRecentScans((prev) => prev.filter((s) => s.id !== scan.id))
+      setRecentScans((prev) => {
+        const updated = prev.filter(
+          (s) => s.registrationId !== scan.registrationId && s.id !== scan.id
+        )
+        if (typeof window !== 'undefined' && eventId) {
+          try {
+            sessionStorage.setItem(`fitflix_scanner_logs_${eventId}`, JSON.stringify(updated))
+          } catch {
+            // ignore
+          }
+        }
+        return updated
+      })
+
       if (latestResult?.registration?.id === scan.registrationId) {
-        setLatestResult(null)
+        updateLatestResult(null)
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to undo check-in'
@@ -761,17 +892,17 @@ export default function EventScannerPage() {
               <div>
                 <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <IconClock className="h-3.5 w-3.5" />
-                  Recent Scans Stream ({recentScans.length})
+                  Recent Check-Ins & Scans ({recentScans.length})
                 </CardTitle>
               </div>
               {recentScans.length > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setRecentScans([])}
+                  onClick={handleClearHistory}
                   className="text-[10px] h-6 px-2 text-muted-foreground hover:text-foreground"
                 >
-                  Clear History
+                  Clear List
                 </Button>
               )}
             </CardHeader>
@@ -779,7 +910,7 @@ export default function EventScannerPage() {
             <CardContent className="p-0 max-h-72 overflow-y-auto divide-y divide-border">
               {recentScans.length === 0 ? (
                 <div className="p-6 text-center text-xs text-muted-foreground">
-                  No scan events recorded yet during this session.
+                  No check-ins or scan events recorded yet.
                 </div>
               ) : (
                 recentScans.map((scan) => (

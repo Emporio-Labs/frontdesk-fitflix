@@ -73,39 +73,43 @@ export function FlyerQrDialog({ event, open, onOpenChange }: FlyerQrDialogProps)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-zinc-950 border-zinc-800 text-white">
+      <DialogContent className="sm:max-w-md bg-card text-card-foreground border-border rounded-3xl shadow-xl">
         <DialogHeader>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400">
               <IconQrcode className="h-5 w-5" />
             </div>
-            <DialogTitle className="text-lg font-bold">Event Flyer QR & Public Link</DialogTitle>
+            <DialogTitle className="text-lg font-bold tracking-tight text-foreground">
+              Event Flyer QR & Public Link
+            </DialogTitle>
           </div>
-          <DialogDescription className="text-zinc-400 text-sm">
+          <DialogDescription className="text-muted-foreground text-xs leading-relaxed">
             Share this link online or download the high-resolution QR code to print directly on offline event banners and flyers.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
+        <div className="space-y-4 pt-1">
           {/* QR Code Container */}
-          <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-inner border border-zinc-200">
-            {qrDataUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={qrDataUrl}
-                alt={`QR code for ${event.title}`}
-                className="w-56 h-56 object-contain"
-              />
-            ) : (
-              <div className="w-56 h-56 flex items-center justify-center text-zinc-400">
-                Generating QR...
-              </div>
-            )}
-            <div className="mt-2 text-center">
-              <span className="text-xs font-semibold tracking-wider uppercase text-zinc-800">
+          <div className="flex flex-col items-center justify-center p-5 bg-muted/40 rounded-2xl border border-border">
+            <div className="p-3 bg-white rounded-xl shadow-xs border border-border/80">
+              {qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={qrDataUrl}
+                  alt={`QR code for ${event.title}`}
+                  className="w-52 h-52 object-contain"
+                />
+              ) : (
+                <div className="w-52 h-52 flex items-center justify-center text-muted-foreground text-xs">
+                  Generating QR...
+                </div>
+              )}
+            </div>
+            <div className="mt-3 text-center">
+              <span className="text-xs font-bold tracking-wider uppercase text-foreground">
                 Scan to Register & Get Pass
               </span>
-              <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
+              <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
                 fitflix.in/events/{event.slug}
               </p>
             </div>
@@ -113,27 +117,28 @@ export function FlyerQrDialog({ event, open, onOpenChange }: FlyerQrDialogProps)
 
           {/* Copyable Public Link Input */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Public Landing Page URL</label>
-            <div className="flex gap-2">
+            <label className="text-xs font-semibold text-muted-foreground">Public Landing Page URL</label>
+            <div className="flex gap-2 items-center">
               <Input
                 readOnly
                 value={publicUrl}
-                className="bg-zinc-900 border-zinc-800 text-xs font-mono text-zinc-300 focus-visible:ring-emerald-500"
+                className="bg-muted/50 border-border text-xs font-mono text-foreground focus-visible:ring-emerald-500 rounded-xl h-9"
               />
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleCopy}
-                className="shrink-0 border-zinc-800 hover:bg-zinc-800 hover:text-white"
+                className="shrink-0 rounded-xl h-9 px-3 gap-1.5 border-border hover:bg-muted font-medium text-xs text-foreground shadow-xs"
               >
                 {copied ? (
                   <>
-                    <IconCheck className="h-4 w-4 text-emerald-400 mr-1" />
-                    Copied
+                    <IconCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Copied</span>
                   </>
                 ) : (
                   <>
-                    <IconCopy className="h-4 w-4 mr-1" />
+                    <IconCopy className="h-4 w-4 text-muted-foreground" />
                     Copy
                   </>
                 )}
@@ -142,18 +147,19 @@ export function FlyerQrDialog({ event, open, onOpenChange }: FlyerQrDialogProps)
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-2 pt-2">
+          <div className="grid grid-cols-2 gap-2.5 pt-1">
             <Button
+              type="button"
               variant="outline"
               onClick={handleDownloadQr}
-              className="w-full border-zinc-800 hover:bg-zinc-800 hover:text-white text-xs gap-1.5"
+              className="w-full rounded-xl border-border hover:bg-muted text-foreground text-xs font-medium gap-2 h-10 shadow-xs"
             >
-              <IconDownload className="h-4 w-4 text-emerald-400" />
+              <IconDownload className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               Download Flyer QR
             </Button>
             <Button
               asChild
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5"
+              className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium gap-2 h-10 shadow-xs"
             >
               <a href={publicUrl} target="_blank" rel="noopener noreferrer">
                 <IconExternalLink className="h-4 w-4" />
