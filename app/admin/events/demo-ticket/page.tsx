@@ -130,7 +130,7 @@ const DEFAULT_PREVIEW_TIERS: TicketTier[] = [
   },
 ]
 
-export const DEFAULT_DEMO_EVENT: FitflixEvent = {
+const DEFAULT_DEMO_EVENT: FitflixEvent = {
   id: 'demo-commune-part-2',
   _id: 'demo-commune-part-2',
   title: 'COMMUNE PART 2 — FITFLIX × CHAPTER 5 COFFEE',
