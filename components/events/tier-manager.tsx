@@ -5,6 +5,7 @@ import {
   IconPlus,
   IconTicket,
   IconTrash,
+  IconEdit,
   IconCheck,
   IconSparkles,
   IconCoins,
@@ -20,6 +21,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -27,7 +29,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import {
   Select,
@@ -42,6 +43,19 @@ interface TierManagerProps {
   tiers: TicketTier[]
   onChange: (tiers: TicketTier[]) => void
 }
+
+const DEFAULT_PERKS = [
+  'Official Event Jersey',
+  'Official Event T-Shirt',
+  'Fitflix Shaker Bottle',
+  'Priority Entrance Gate',
+  'Energy Snack & Drink',
+  'Post-Workout Specialty Coffee & Meal',
+  '1:1 Nutritionist Voucher',
+  'VIP Front-Row Zone Access',
+  'General Admission & Workout Zone',
+  'Finisher Medal / Certificate',
+]
 
 const TIER_PRESETS = [
   {
@@ -72,7 +86,7 @@ const TIER_PRESETS = [
     type: 'free' as const,
     price: 0,
     totalQuantity: 150,
-    perks: ['General Admission', 'Community Workout Zone Access'],
+    perks: ['General Admission & Workout Zone'],
   },
   {
     tierId: 'vip_all_access',
@@ -83,8 +97,9 @@ const TIER_PRESETS = [
     price: 999,
     totalQuantity: 25,
     perks: [
-      'VIP Front-Row Zone',
-      'Full Swag & Apparel Kit',
+      'VIP Front-Row Zone Access',
+      'Official Event Jersey',
+      'Fitflix Shaker Bottle',
       'Post-Workout Specialty Coffee & Meal',
       '1:1 Nutritionist Voucher',
     ],
@@ -93,6 +108,7 @@ const TIER_PRESETS = [
 
 export function TierManager({ tiers, onChange }: TierManagerProps) {
   const [open, setOpen] = useState(false)
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [tierName, setTierName] = useState('')
   const [badgeLabel, setBadgeLabel] = useState('ALL ACCESS PASS')
   const [badgeColor, setBadgeColor] = useState('#10b981')
@@ -101,7 +117,52 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
   const [quantity, setQuantity] = useState('50')
   const [memberPrice, setMemberPrice] = useState('0')
   const [membersOnly, setMembersOnly] = useState(false)
-  const [perksText, setPerksText] = useState('')
+
+  // Checkbox-based perks state
+  const [availablePerks, setAvailablePerks] = useState<string[]>(DEFAULT_PERKS)
+  const [selectedPerks, setSelectedPerks] = useState<string[]>([])
+  const [customPerkInput, setCustomPerkInput] = useState('')
+
+  const handleOpenAdd = () => {
+    setEditingIndex(null)
+    setTierName('')
+    setBadgeLabel('PASS')
+    setBadgeColor('#10b981')
+    setTierType('paid')
+    setPrice('499')
+    setQuantity('50')
+    setMemberPrice('0')
+    setMembersOnly(false)
+    setSelectedPerks([])
+    setCustomPerkInput('')
+    setOpen(true)
+  }
+
+  const handleOpenEdit = (index: number) => {
+    const tier = tiers[index]
+    if (!tier) return
+    setEditingIndex(index)
+    setTierName(tier.name || '')
+    setBadgeLabel(tier.badgeLabel || 'PASS')
+    setBadgeColor(tier.badgeColor || '#10b981')
+    setTierType(tier.type || 'paid')
+    setPrice(String(tier.price ?? 0))
+    setQuantity(String(tier.totalQuantity ?? 50))
+    setMemberPrice(String(tier.memberPrice ?? 0))
+    setMembersOnly(Boolean(tier.membersOnly))
+
+    const tierPerks = tier.perks || []
+    setSelectedPerks(tierPerks)
+    setAvailablePerks((prev) => {
+      const merged = [...prev]
+      for (const p of tierPerks) {
+        if (!merged.includes(p)) merged.push(p)
+      }
+      return merged
+    })
+    setCustomPerkInput('')
+    setOpen(true)
+  }
 
   const handleApplyPreset = (preset: typeof TIER_PRESETS[0]) => {
     setTierName(preset.name)
@@ -112,51 +173,100 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
     setMemberPrice('0')
     setMembersOnly(false)
     setQuantity(String(preset.totalQuantity))
-    setPerksText(preset.perks.join(', '))
+
+    setSelectedPerks(preset.perks)
+    setAvailablePerks((prev) => {
+      const merged = [...prev]
+      for (const p of preset.perks) {
+        if (!merged.includes(p)) merged.push(p)
+      }
+      return merged
+    })
   }
 
-  const handleAddTier = (e: React.FormEvent) => {
+  const handleTogglePerk = (perk: string) => {
+    setSelectedPerks((prev) =>
+      prev.includes(perk) ? prev.filter((p) => p !== perk) : [...prev, perk]
+    )
+  }
+
+  const handleAddCustomPerk = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    const trimmed = customPerkInput.trim()
+    if (!trimmed) return
+
+    if (!availablePerks.includes(trimmed)) {
+      setAvailablePerks((prev) => [...prev, trimmed])
+    }
+    if (!selectedPerks.includes(trimmed)) {
+      setSelectedPerks((prev) => [...prev, trimmed])
+    }
+    setCustomPerkInput('')
+  }
+
+  const handleSaveTier = (e: React.FormEvent) => {
     e.preventDefault()
     // The dialog is portalled, but React still bubbles its submit to the
     // event page's own <form>, which would save (or create) the event early.
     e.stopPropagation()
     if (!tierName.trim()) return
 
-    const tierId = tierName.toLowerCase().replace(/[^a-z0-9]+/g, '_')
     const parsedMemberPrice = parseFloat(memberPrice) || 0
-    const newTier: TicketTier = {
-      tierId: `${tierId}_${Date.now()}`,
-      name: tierName.trim(),
-      badgeLabel: badgeLabel.trim() || 'PASS',
-      badgeColor,
-      type: tierType,
-      price: tierType === 'free' || tierType === 'rsvp' ? 0 : parseFloat(price) || 0,
-      memberPrice: parsedMemberPrice,
-      isMemberIncluded: true,
-      membersOnly,
-      totalQuantity: parseInt(quantity, 10) || 50,
-      soldQuantity: 0,
-      perks: perksText
-        ? perksText
-            .split(',')
-            .map((p) => p.trim())
-            .filter(Boolean)
-        : [],
+    const perks = selectedPerks
+
+    if (editingIndex !== null && tiers[editingIndex]) {
+      const currentTier = tiers[editingIndex]
+      const updatedTier: TicketTier = {
+        ...currentTier,
+        name: tierName.trim(),
+        badgeLabel: badgeLabel.trim() || 'PASS',
+        badgeColor,
+        type: tierType,
+        price: tierType === 'free' || tierType === 'rsvp' ? 0 : parseFloat(price) || 0,
+        memberPrice: parsedMemberPrice,
+        membersOnly,
+        totalQuantity: parseInt(quantity, 10) || 50,
+        perks,
+      }
+      const updated = [...tiers]
+      updated[editingIndex] = updatedTier
+      onChange(updated)
+    } else {
+      const tierId = tierName.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+      const newTier: TicketTier = {
+        tierId: `${tierId}_${Date.now()}`,
+        name: tierName.trim(),
+        badgeLabel: badgeLabel.trim() || 'PASS',
+        badgeColor,
+        type: tierType,
+        price: tierType === 'free' || tierType === 'rsvp' ? 0 : parseFloat(price) || 0,
+        memberPrice: parsedMemberPrice,
+        isMemberIncluded: true,
+        membersOnly,
+        totalQuantity: parseInt(quantity, 10) || 50,
+        soldQuantity: 0,
+        perks,
+      }
+      onChange([...tiers, newTier])
     }
 
-    onChange([...tiers, newTier])
     setOpen(false)
-    // Reset form
-    setTierName('')
-    setMemberPrice('0')
-    setMembersOnly(false)
-    setPerksText('')
+    setEditingIndex(null)
   }
 
   const handleRemoveTier = (index: number) => {
     const updated = [...tiers]
     updated.splice(index, 1)
     onChange(updated)
+    if (editingIndex === index) {
+      setOpen(false)
+      setEditingIndex(null)
+    } else if (editingIndex !== null && editingIndex > index) {
+      setEditingIndex(editingIndex - 1)
+    }
   }
 
   return (
@@ -172,21 +282,27 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
           </CardDescription>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5">
-              <IconPlus className="h-4 w-4" />
-              Add Ticket Tier
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
+        <Dialog
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v)
+            if (!v) setEditingIndex(null)
+          }}
+        >
+          <Button size="sm" className="gap-1.5" onClick={handleOpenAdd}>
+            <IconPlus className="h-4 w-4" />
+            Add Ticket Tier
+          </Button>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <IconSparkles className="h-5 w-5 text-amber-500" />
-                Add Ticket Tier
+                {editingIndex !== null ? 'Edit Ticket Tier' : 'Add Ticket Tier'}
               </DialogTitle>
               <DialogDescription>
-                Choose a 1-click preset or customize your pass tier.
+                {editingIndex !== null
+                  ? 'Modify pass pricing, seats allotment, badge styling, and perks.'
+                  : 'Choose a 1-click preset or customize your pass tier.'}
               </DialogDescription>
             </DialogHeader>
 
@@ -213,7 +329,7 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
               </div>
             </div>
 
-            <form onSubmit={handleAddTier} className="space-y-4 pt-2">
+            <form onSubmit={handleSaveTier} className="space-y-4 pt-2">
               <div className="space-y-2">
                 <Label htmlFor="tName">Tier Name *</Label>
                 <Input
@@ -331,21 +447,96 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="tPerks">Perks / Inclusions (comma-separated)</Label>
-                <Input
-                  id="tPerks"
-                  placeholder="Official Jersey, Goodie Kit, Post-workout meal"
-                  value={perksText}
-                  onChange={(e) => setPerksText(e.target.value)}
-                />
+              {/* Checkbox-based Perks & Inclusions */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">
+                    Perks & Inclusions
+                  </Label>
+                  {selectedPerks.length > 0 && (
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      {selectedPerks.length} selected
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Check the inclusions for this ticket tier, or add custom perks below.
+                </p>
+
+                {/* Perks Checkboxes Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2.5 rounded-lg border bg-muted/20">
+                  {availablePerks.map((perk) => {
+                    const isChecked = selectedPerks.includes(perk)
+                    const perkId = `perk-${perk.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+                    return (
+                      <div
+                        key={perk}
+                        className={`flex items-start space-x-2.5 p-1.5 rounded-md transition-colors cursor-pointer hover:bg-muted/50 ${
+                          isChecked ? 'bg-primary/5 font-medium' : ''
+                        }`}
+                        onClick={() => handleTogglePerk(perk)}
+                      >
+                        <Checkbox
+                          id={perkId}
+                          checked={isChecked}
+                          onCheckedChange={() => handleTogglePerk(perk)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-0.5"
+                        />
+                        <Label
+                          htmlFor={perkId}
+                          className="text-xs cursor-pointer select-none leading-tight"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {perk}
+                        </Label>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Add Custom Perk Input */}
+                <div className="flex items-center gap-2 pt-1">
+                  <Input
+                    placeholder="Add custom perk (e.g. Free Physiotherapy Screen)..."
+                    value={customPerkInput}
+                    onChange={(e) => setCustomPerkInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleAddCustomPerk()
+                      }
+                    }}
+                    className="h-8 text-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs px-3 shrink-0"
+                    onClick={handleAddCustomPerk}
+                    disabled={!customPerkInput.trim()}
+                  >
+                    <IconPlus className="h-3.5 w-3.5 mr-1" />
+                    Add
+                  </Button>
+                </div>
               </div>
 
               <DialogFooter className="pt-2">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setOpen(false)
+                    setEditingIndex(null)
+                  }}
+                >
                   Cancel
                 </Button>
-                <Button type="submit">Add Pass Tier</Button>
+                <Button type="submit">
+                  {editingIndex !== null ? 'Save Changes' : 'Add Pass Tier'}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -380,16 +571,28 @@ export function TierManager({ tiers, onChange }: TierManagerProps) {
                         </span>
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemoveTier(idx)}
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      title="Remove tier"
-                    >
-                      <IconTrash className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenEdit(idx)}
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        title="Edit tier"
+                      >
+                        <IconEdit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveTier(idx)}
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        title="Remove tier"
+                      >
+                        <IconTrash className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-3 mt-3 text-sm">

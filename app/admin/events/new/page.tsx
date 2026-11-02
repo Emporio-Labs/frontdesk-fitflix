@@ -67,9 +67,9 @@ export default function CreateEventPage() {
   const [tagline, setTagline] = useState('')
   const [description, setDescription] = useState('')
   const [eventType, setEventType] = useState('marathon_run')
-  const [startDate, setStartDate] = useState('2026-10-31T06:00')
-  const [endDate, setEndDate] = useState('2026-10-31T10:00')
-  const [reportingTime, setReportingTime] = useState('06:00 AM IST')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [reportingTime, setReportingTime] = useState('')
   
   // Venue State
   const [venueName, setVenueName] = useState('')
@@ -80,8 +80,8 @@ export default function CreateEventPage() {
   
   // Capacity & Assets
   const [totalCapacity, setTotalCapacity] = useState('150')
-  const [coverImageUrl, setCoverImageUrl] = useState('/events/commune-part-2.png')
-  const [imagePreview, setImagePreview] = useState<string | null>('/events/commune-part-2.png')
+  const [coverImageUrl, setCoverImageUrl] = useState('')
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
 
   // Step 3: Tiers, Collaborators & Sponsors State
   const [ticketTiers, setTicketTiers] = useState<TicketTier[]>([

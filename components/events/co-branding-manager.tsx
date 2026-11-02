@@ -11,6 +11,7 @@ import {
   IconX,
   IconCheck,
   IconLink,
+  IconEdit,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -42,19 +43,21 @@ export function CoBrandingManager({
   onCollaboratorsChange,
   onSponsorsChange,
 }: CoBrandingManagerProps) {
-  // New Collaborator Input state
+  // Collaborator Input state
+  const [editingCIndex, setEditingCIndex] = useState<number | null>(null)
   const [cName, setCName] = useState('')
-  const [cRole, setCRole] = useState('Co-Host & Nutrition Partner')
+  const [cRole, setCRole] = useState('')
   const [cLogo, setCLogo] = useState('')
   const [cWeb, setCWeb] = useState('')
   const [uploadingCLogo, setUploadingCLogo] = useState(false)
   const [showCManualUrl, setShowCManualUrl] = useState(false)
   const cFileInputRef = useRef<HTMLInputElement>(null)
 
-  // New Sponsor Input state
+  // Sponsor Input state
+  const [editingSIndex, setEditingSIndex] = useState<number | null>(null)
   const [sName, setSName] = useState('')
   const [sLogo, setSLogo] = useState('')
-  const [sTier, setSTier] = useState('Partner')
+  const [sTier, setSTier] = useState('')
   const [uploadingSLogo, setUploadingSLogo] = useState(false)
   const [showSManualUrl, setShowSManualUrl] = useState(false)
   const sFileInputRef = useRef<HTMLInputElement>(null)
@@ -97,7 +100,7 @@ export function CoBrandingManager({
     }
   }
 
-  const handleAddCollaborator = () => {
+  const handleAddOrUpdateCollaborator = () => {
     if (!cName.trim()) {
       toast.error('Partner brand name is required')
       return
@@ -106,16 +109,47 @@ export function CoBrandingManager({
       toast.error('Please upload or provide a partner logo')
       return
     }
-    onCollaboratorsChange([
-      ...collaborators,
-      {
-        name: cName.trim(),
-        role: cRole.trim() || 'Co-Host',
-        logoUrl: cLogo.trim(),
-        websiteUrl: cWeb.trim() || undefined,
-      },
-    ])
+
+    const partnerData: Collaborator = {
+      name: cName.trim(),
+      role: cRole.trim() || 'Co-Host',
+      logoUrl: cLogo.trim(),
+      websiteUrl: cWeb.trim() || undefined,
+    }
+
+    if (editingCIndex !== null && collaborators[editingCIndex]) {
+      const updated = [...collaborators]
+      updated[editingCIndex] = partnerData
+      onCollaboratorsChange(updated)
+      setEditingCIndex(null)
+      toast.success('Partner updated successfully!')
+    } else {
+      onCollaboratorsChange([...collaborators, partnerData])
+      toast.success('Partner added successfully!')
+    }
+
     setCName('')
+    setCRole('')
+    setCLogo('')
+    setCWeb('')
+    setShowCManualUrl(false)
+  }
+
+  const handleEditCollaborator = (index: number) => {
+    const item = collaborators[index]
+    if (!item) return
+    setEditingCIndex(index)
+    setCName(item.name || '')
+    setCRole(item.role || '')
+    setCLogo(item.logoUrl || '')
+    setCWeb(item.websiteUrl || '')
+    setShowCManualUrl(false)
+  }
+
+  const handleCancelEditCollaborator = () => {
+    setEditingCIndex(null)
+    setCName('')
+    setCRole('')
     setCLogo('')
     setCWeb('')
     setShowCManualUrl(false)
@@ -125,9 +159,14 @@ export function CoBrandingManager({
     const updated = [...collaborators]
     updated.splice(index, 1)
     onCollaboratorsChange(updated)
+    if (editingCIndex === index) {
+      handleCancelEditCollaborator()
+    } else if (editingCIndex !== null && editingCIndex > index) {
+      setEditingCIndex(editingCIndex - 1)
+    }
   }
 
-  const handleAddSponsor = () => {
+  const handleAddOrUpdateSponsor = () => {
     if (!sName.trim()) {
       toast.error('Sponsor name is required')
       return
@@ -136,16 +175,45 @@ export function CoBrandingManager({
       toast.error('Please upload or provide a sponsor logo')
       return
     }
-    onSponsorsChange([
-      ...sponsors,
-      {
-        name: sName.trim(),
-        logoUrl: sLogo.trim(),
-        tier: sTier.trim() || 'Partner',
-      },
-    ])
+
+    const sponsorData: Sponsor = {
+      name: sName.trim(),
+      logoUrl: sLogo.trim(),
+      tier: sTier.trim() || 'Partner',
+    }
+
+    if (editingSIndex !== null && sponsors[editingSIndex]) {
+      const updated = [...sponsors]
+      updated[editingSIndex] = sponsorData
+      onSponsorsChange(updated)
+      setEditingSIndex(null)
+      toast.success('Sponsor updated successfully!')
+    } else {
+      onSponsorsChange([...sponsors, sponsorData])
+      toast.success('Sponsor added successfully!')
+    }
+
     setSName('')
     setSLogo('')
+    setSTier('')
+    setShowSManualUrl(false)
+  }
+
+  const handleEditSponsor = (index: number) => {
+    const item = sponsors[index]
+    if (!item) return
+    setEditingSIndex(index)
+    setSName(item.name || '')
+    setSLogo(item.logoUrl || '')
+    setSTier(item.tier || '')
+    setShowSManualUrl(false)
+  }
+
+  const handleCancelEditSponsor = () => {
+    setEditingSIndex(null)
+    setSName('')
+    setSLogo('')
+    setSTier('')
     setShowSManualUrl(false)
   }
 
@@ -153,6 +221,11 @@ export function CoBrandingManager({
     const updated = [...sponsors]
     updated.splice(index, 1)
     onSponsorsChange(updated)
+    if (editingSIndex === index) {
+      handleCancelEditSponsor()
+    } else if (editingSIndex !== null && editingSIndex > index) {
+      setEditingSIndex(editingSIndex - 1)
+    }
   }
 
   return (
@@ -258,7 +331,7 @@ export function CoBrandingManager({
               )}
             </div>
 
-            {/* 4. Website & Add Button */}
+            {/* 4. Website & Add/Save Button */}
             <div className="space-y-1 flex items-end gap-2">
               <div className="flex-1 space-y-1">
                 <Label className="text-xs font-medium">Website (Optional)</Label>
@@ -269,26 +342,53 @@ export function CoBrandingManager({
                   className="text-xs h-8"
                 />
               </div>
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleAddCollaborator}
-                className="h-8 text-xs shrink-0 gap-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-              >
-                <IconPlus className="h-3.5 w-3.5" /> Add
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {editingCIndex !== null && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelEditCollaborator}
+                    className="h-8 text-xs shrink-0"
+                  >
+                    Cancel
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAddOrUpdateCollaborator}
+                  className="h-8 text-xs shrink-0 gap-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+                >
+                  {editingCIndex !== null ? (
+                    <>
+                      <IconCheck className="h-3.5 w-3.5" /> Save
+                    </>
+                  ) : (
+                    <>
+                      <IconPlus className="h-3.5 w-3.5" /> Add
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 
           {/* Collaborators List */}
-          {collaborators.length > 0 && (
+          {collaborators.length === 0 ? (
+            <div className="border border-dashed rounded-lg p-5 text-center text-xs text-muted-foreground">
+              No co-hosts or collaborating brands added yet. Enter partner details above and click + Add to display co-branding on event passes.
+            </div>
+          ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {collaborators.map((c, idx) => (
                 <div
                   key={idx}
-                  className="border rounded-lg p-3 flex items-center justify-between gap-3 bg-card shadow-sm"
+                  className={`border rounded-lg p-3 flex items-center justify-between gap-3 bg-card shadow-sm transition-all ${
+                    editingCIndex === idx ? 'ring-2 ring-primary border-primary' : ''
+                  }`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded border bg-white p-1 flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -300,9 +400,9 @@ export function CoBrandingManager({
                         }}
                       />
                     </div>
-                    <div>
-                      <h5 className="font-semibold text-sm leading-tight">{c.name}</h5>
-                      <span className="text-xs text-muted-foreground block">{c.role}</span>
+                    <div className="truncate">
+                      <h5 className="font-semibold text-sm leading-tight truncate">{c.name}</h5>
+                      <span className="text-xs text-muted-foreground block truncate">{c.role}</span>
                       {c.websiteUrl && (
                         <a
                           href={c.websiteUrl}
@@ -315,16 +415,28 @@ export function CoBrandingManager({
                       )}
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => handleRemoveCollaborator(idx)}
-                    title="Remove partner"
-                  >
-                    <IconTrash className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={() => handleEditCollaborator(idx)}
+                      title="Edit partner"
+                    >
+                      <IconEdit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleRemoveCollaborator(idx)}
+                      title="Remove partner"
+                    >
+                      <IconTrash className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -422,7 +534,7 @@ export function CoBrandingManager({
               )}
             </div>
 
-            {/* 3. Sponsor Tier & Add Button */}
+            {/* 3. Sponsor Tier & Add/Save Button */}
             <div className="space-y-1 flex items-end gap-2">
               <div className="flex-1 space-y-1">
                 <Label className="text-xs font-medium">Sponsor Tier</Label>
@@ -433,26 +545,53 @@ export function CoBrandingManager({
                   className="text-xs h-8"
                 />
               </div>
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleAddSponsor}
-                className="h-8 text-xs shrink-0 gap-1 bg-amber-600 hover:bg-amber-700 text-white font-medium"
-              >
-                <IconPlus className="h-3.5 w-3.5" /> Add
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {editingSIndex !== null && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelEditSponsor}
+                    className="h-8 text-xs shrink-0"
+                  >
+                    Cancel
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAddOrUpdateSponsor}
+                  className="h-8 text-xs shrink-0 gap-1 bg-amber-600 hover:bg-amber-700 text-white font-medium"
+                >
+                  {editingSIndex !== null ? (
+                    <>
+                      <IconCheck className="h-3.5 w-3.5" /> Save
+                    </>
+                  ) : (
+                    <>
+                      <IconPlus className="h-3.5 w-3.5" /> Add
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 
           {/* Sponsors Strip Preview */}
-          {sponsors.length > 0 && (
+          {sponsors.length === 0 ? (
+            <div className="border border-dashed rounded-lg p-5 text-center text-xs text-muted-foreground">
+              No sponsors configured yet. Add sponsor names and logos above to print them on the attendee pass footer bar.
+            </div>
+          ) : (
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Pass Sponsor Strip Preview:</Label>
-              <div className="p-3 border rounded-xl bg-card flex flex-wrap items-center gap-4">
+              <div className="p-3 border rounded-xl bg-card flex flex-wrap items-center gap-3">
                 {sponsors.map((s, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center gap-2 border bg-muted/20 px-2.5 py-1.5 rounded-md text-xs group"
+                    className={`flex items-center gap-2 border bg-muted/20 px-2.5 py-1.5 rounded-md text-xs group transition-all ${
+                      editingSIndex === idx ? 'ring-2 ring-amber-500 border-amber-500' : ''
+                    }`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -467,8 +606,16 @@ export function CoBrandingManager({
                     <span className="text-[10px] text-muted-foreground font-mono">({s.tier})</span>
                     <button
                       type="button"
+                      onClick={() => handleEditSponsor(idx)}
+                      className="text-muted-foreground hover:text-foreground ml-1"
+                      title="Edit sponsor"
+                    >
+                      <IconEdit className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleRemoveSponsor(idx)}
-                      className="text-muted-foreground hover:text-destructive ml-1"
+                      className="text-muted-foreground hover:text-destructive"
                       title="Remove sponsor"
                     >
                       <IconX className="h-3 w-3" />
