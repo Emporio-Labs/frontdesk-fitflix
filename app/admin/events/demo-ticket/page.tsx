@@ -130,16 +130,54 @@ const DEFAULT_PREVIEW_TIERS: TicketTier[] = [
   },
 ]
 
+export const DEFAULT_DEMO_EVENT: FitflixEvent = {
+  id: 'demo-commune-part-2',
+  _id: 'demo-commune-part-2',
+  title: 'COMMUNE PART 2 — FITFLIX × CHAPTER 5 COFFEE',
+  slug: 'commune-part-2-hyderabad',
+  tagline: '5K Run, Specialty Coffee & Ice Bath Recovery Morning',
+  description:
+    'Join us for a morning 5K community run, followed by specialty coffee and cold plunge recovery at Chapter 5.',
+  eventType: 'fitness_challenge',
+  status: 'published',
+  startDate: '2026-10-31T06:00:00.000Z',
+  endDate: '2026-10-31T11:00:00.000Z',
+  reportingTime: '06:00 AM IST',
+  venue: {
+    name: 'Chapter 5 Speciality Coffee & Roastery',
+    address: 'Plot 14, 5th Avenue, Defence Colony, Sainikpuri',
+    city: 'Hyderabad',
+    googleMapsUrl: 'https://maps.google.com/?q=Chapter+5+Coffee+Hyderabad',
+  },
+  coverImageUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&q=80',
+  collaborators: [
+    {
+      name: 'Chapter 5 Speciality Coffee',
+      role: 'Co-Host & Roastery Partner',
+      logoUrl: '/events/chapter-5-logo.jpg?v=2',
+    },
+  ],
+  sponsors: [],
+  ticketTiers: DEFAULT_PREVIEW_TIERS,
+  totalCapacity: 250,
+  totalRegistered: 124,
+  totalCheckedIn: 42,
+  customPassTemplateHtml: null,
+  passTemplateMode: 'default',
+  createdAt: '2026-03-01T00:00:00.000Z',
+  updatedAt: '2026-03-01T00:00:00.000Z',
+}
+
 function DemoTicketContent() {
   const searchParams = useSearchParams()
   const preselectedEventId = searchParams?.get('eventId')
 
-  const [events, setEvents] = useState<FitflixEvent[]>([])
-  const [selectedEventId, setSelectedEventId] = useState<string>('')
-  const [loading, setLoading] = useState(true)
+  const [events, setEvents] = useState<FitflixEvent[]>([DEFAULT_DEMO_EVENT])
+  const [selectedEventId, setSelectedEventId] = useState<string>(DEFAULT_DEMO_EVENT.id)
+  const [loading, setLoading] = useState(false)
 
   // Interactive Live Customizer State
-  const [selectedTier, setSelectedTier] = useState<TicketTier | null>(null)
+  const [selectedTier, setSelectedTier] = useState<TicketTier | null>(DEFAULT_PREVIEW_TIERS[0])
   const [attendeeName, setAttendeeName] = useState('')
   const [attendeeEmail, setAttendeeEmail] = useState('')
   const [attendeePhone, setAttendeePhone] = useState('')
@@ -169,32 +207,38 @@ function DemoTicketContent() {
 
   // 1. Load active events
   useEffect(() => {
-    setLoading(true)
     getEvents()
       .then((data) => {
-        setEvents(data)
         if (data.length > 0) {
+          // Merge database events with canonical demo event so both are readily available
+          const combined = [...data, DEFAULT_DEMO_EVENT]
+          setEvents(combined)
           const initial = preselectedEventId
-            ? data.find(
+            ? combined.find(
                 (e) => e.id === preselectedEventId || e._id === preselectedEventId
-              ) || data[0]
-            : data.find((e) => e.title.toLowerCase().includes('chapter 5')) || data[0]
-          setSelectedEventId(initial.id || initial._id || '')
+              ) || combined[0]
+            : combined.find((e) => e.title.toLowerCase().includes('chapter 5')) || combined[0]
+          setSelectedEventId(initial.id || initial._id || DEFAULT_DEMO_EVENT.id)
+        } else {
+          setEvents([DEFAULT_DEMO_EVENT])
+          setSelectedEventId(DEFAULT_DEMO_EVENT.id)
         }
       })
       .catch((err) => {
-        console.error('Failed to load events:', err)
-        toast.error('Failed to load events catalog')
+        console.warn('Could not fetch events catalog from server, using demo event:', err)
+        setEvents([DEFAULT_DEMO_EVENT])
+        setSelectedEventId(DEFAULT_DEMO_EVENT.id)
       })
-      .finally(() => setLoading(false))
   }, [preselectedEventId])
 
-  // Current active event
+  // Current active event (guaranteed non-null fallback to DEFAULT_DEMO_EVENT)
   const currentEvent = useMemo(() => {
     return (
       events.find(
         (e) => e.id === selectedEventId || e._id === selectedEventId
-      ) || null
+      ) ||
+      events[0] ||
+      DEFAULT_DEMO_EVENT
     )
   }, [events, selectedEventId])
 
@@ -505,6 +549,14 @@ function DemoTicketContent() {
           updatedAt: new Date().toISOString(),
         })
       )
+
+      if (eventId.startsWith('demo-')) {
+        currentEvent.customPassTemplateHtml =
+          renderMode === 'custom_html' ? customHtmlContent : null
+        currentEvent.passTemplateMode = renderMode
+        toast.success('Pass design saved locally for Demo Event!')
+        return
+      }
 
       // 2. Persist to MongoDB backend via updateEvent API
       await updateEvent(eventId, {
@@ -888,20 +940,26 @@ function DemoTicketContent() {
             <CardContent className="space-y-3.5">
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Select Event</Label>
-                <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+                <Select
+                  value={selectedEventId || currentEvent.id || DEFAULT_DEMO_EVENT.id}
+                  onValueChange={setSelectedEventId}
+                >
                   <SelectTrigger className="h-9 text-xs">
                     <SelectValue placeholder="Choose an event" />
                   </SelectTrigger>
                   <SelectContent>
-                    {events.map((evt) => (
-                      <SelectItem
-                        key={evt.id || evt._id}
-                        value={evt.id || evt._id || ''}
-                        className="text-xs"
-                      >
-                        {evt.title} ({evt.venue?.city})
-                      </SelectItem>
-                    ))}
+                    {events.map((evt) => {
+                      const isDemo = evt.id === DEFAULT_DEMO_EVENT.id
+                      return (
+                        <SelectItem
+                          key={evt.id || evt._id}
+                          value={evt.id || evt._id || ''}
+                          className="text-xs"
+                        >
+                          {evt.title} {isDemo ? '(Interactive Demo Event)' : `(${evt.venue?.city || ''})`}
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -1445,16 +1503,36 @@ function DemoTicketContent() {
                   sandbox="allow-scripts allow-downloads allow-same-origin allow-popups allow-modals"
                 />
               </div>
-            ) : livePassData ? (
+            ) : (
               <FitflixEventPass
-                passData={livePassData}
+                passData={livePassData || {
+                  pass: {
+                    id: 'mock-pass-preview-id',
+                    ticketId: defaultEventTicketId,
+                    tierId: DEFAULT_PREVIEW_TIERS[0].tierId,
+                    tierName: DEFAULT_PREVIEW_TIERS[0].name,
+                    badgeLabel: DEFAULT_PREVIEW_TIERS[0].badgeLabel,
+                    badgeColor: DEFAULT_PREVIEW_TIERS[0].badgeColor,
+                    perks: DEFAULT_PREVIEW_TIERS[0].perks,
+                    attendeeName: attendeeName.trim() || 'Rahul Raju',
+                    attendeeEmail: attendeeEmail.trim() || 'rahul.raju@fitflix.in',
+                    attendeePhone: attendeePhone.trim() || '+91 98765 43210',
+                    checkedIn: isCheckedIn,
+                    paymentStatus: 'paid',
+                    amountPaid: DEFAULT_PREVIEW_TIERS[0].price,
+                    verificationToken: 'token_mock_preview_123',
+                    qrPayload: JSON.stringify({
+                      ticketId: defaultEventTicketId,
+                      eventId: DEFAULT_DEMO_EVENT.id,
+                      token: 'token_mock_preview_123',
+                    }),
+                    createdAt: new Date().toISOString(),
+                  },
+                  event: DEFAULT_DEMO_EVENT,
+                }}
                 showActions={true}
                 passTheme={passTheme}
               />
-            ) : (
-              <div className="p-12 text-center text-muted-foreground border border-dashed rounded-2xl w-full">
-                No event selected
-              </div>
             )}
           </div>
         </div>
