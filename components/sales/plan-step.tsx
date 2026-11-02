@@ -51,7 +51,6 @@ export function planBlocker(
   if (needsBranch && !plan.locationId) return 'Pick the branch'
   if (!selected) return 'Pick a plan'
   if (!plan.startDate) return 'Pick a start date'
-  if (plan.startDate < todayIso()) return 'Start date is in the past'
   const totals = computeTotals(selected.totalPrice, plan.discount, 0)
   if (totals.discount > 0 && !plan.discountReason.trim()) return 'Add a reason for the discount'
   if (homeClubMismatch(person, plan) && !plan.homeClubAck) return 'Confirm the branch differs from the home club'
@@ -252,7 +251,6 @@ export function PlanStep({
             <Input
               type="date"
               aria-label="Start date"
-              min={today}
               value={plan.startDate}
               onChange={(e) => onChange({ startDate: e.target.value })}
               className="w-48"
