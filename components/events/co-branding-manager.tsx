@@ -461,7 +461,7 @@ export function CoBrandingManager({
             <div className="space-y-1">
               <Label className="text-xs font-medium">Sponsor Name *</Label>
               <Input
-                placeholder="e.g. Red Bull / Orkes / Stream"
+                placeholder="e.g. Chapter 5 Coffee / Blue Tokai"
                 value={sName}
                 onChange={(e) => setSName(e.target.value)}
                 className="text-xs h-8"

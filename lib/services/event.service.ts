@@ -58,6 +58,8 @@ export interface CreateEventPayload {
   ticketTiers?: TicketTier[]
   collaborators?: Collaborator[]
   sponsors?: Sponsor[]
+  customPassTemplateHtml?: string | null
+  passTemplateMode?: 'default' | 'custom_html'
 }
 
 export interface FitflixEvent {
@@ -81,6 +83,8 @@ export interface FitflixEvent {
   ticketTiers?: TicketTier[]
   collaborators?: Collaborator[]
   sponsors?: Sponsor[]
+  customPassTemplateHtml?: string | null
+  passTemplateMode?: 'default' | 'custom_html'
   createdAt: string
   updatedAt: string
 }
