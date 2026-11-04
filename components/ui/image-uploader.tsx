@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { optimizeImageForUpload } from '@/lib/utils/image-compression'
 import { toast } from 'sonner'
+import { resolveAssetUrl } from '@/lib/asset-url'
 
 export interface ImageUploaderProps {
   value?: string
@@ -155,7 +156,7 @@ export function ImageUploader({
             {value ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={value}
+                src={resolveAssetUrl(value)}
                 alt="Preview"
                 className={cn(
                   'h-full w-full object-cover',
@@ -255,7 +256,7 @@ export function ImageUploader({
           {value && (
             <div className="flex items-center gap-3 pt-1">
               <Avatar className="h-10 w-10">
-                <AvatarImage src={value} alt="Preview" />
+                <AvatarImage src={resolveAssetUrl(value)} alt="Preview" />
                 <AvatarFallback>{fallbackText}</AvatarFallback>
               </Avatar>
               <span className="text-xs text-muted-foreground truncate max-w-xs">

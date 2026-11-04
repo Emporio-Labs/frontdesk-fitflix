@@ -1,8 +1,19 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocations } from '@/hooks/use-locations'
+import { useAuth } from '@/hooks/use-auth'
+import { setActiveLocationId } from '@/lib/api-client'
+import type { UserRole } from '@/lib/rbac'
 import type { Location } from '@/lib/services/location.service'
+
+/** Only admins look across branches; everyone else works in their own. */
+const BRANCH_PICKER_ROLES: UserRole[] = ['super_admin', 'clinic_admin']
+
+export function canPickBranch(role?: UserRole | null): boolean {
+  return !!role && BRANCH_PICKER_ROLES.includes(role)
+}
 
 /**
  * Which branch the admin console is currently looking at.
@@ -25,6 +36,8 @@ type LocationScopeValue = {
   setSelectedLocationId: (id: string | null) => void
   /** True while there is nothing to choose between. */
   isSingleLocation: boolean
+  /** Whether this user may switch branches (admins only). */
+  canSwitch: boolean
   /**
    * Fold the active scope into a query key.
    *   queryKey: scopedKey(queryKeys.bookings.all())
@@ -44,6 +57,8 @@ export function LocationScopeProvider({
   children: React.ReactNode
 }) {
   const { data: locations, isLoading } = useLocations()
+  const { user } = useAuth()
+  const canSwitch = canPickBranch(user?.role)
   const [selectedLocationId, setSelectedLocationIdState] = useState<
     string | null
   >(null)
@@ -85,9 +100,13 @@ export function LocationScopeProvider({
 
   const value = useMemo<LocationScopeValue>(() => {
     const isSingleLocation = list.length <= 1
+    // A non-admin never carries a picked branch — not even one an admin left
+    // in localStorage on a shared desk browser. The backend scopes them by
+    // their own account instead.
+    const picked = canSwitch ? selectedLocationId : null
     // With one branch the effective scope is that branch, selected or not.
     const effectiveId =
-      selectedLocationId ?? (list.length === 1 ? (list[0]?._id ?? null) : null)
+      picked ?? (list.length === 1 ? (list[0]?._id ?? null) : null)
 
     return {
       locations: list,
@@ -96,10 +115,25 @@ export function LocationScopeProvider({
       selectedLocation: list.find((l) => l._id === effectiveId) ?? null,
       setSelectedLocationId,
       isSingleLocation,
+      canSwitch,
       scopedKey: (key) => [...key, effectiveId ?? 'all'] as const,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list, isLoading, selectedLocationId])
+  }, [list, isLoading, selectedLocationId, canSwitch])
+
+  // Hand the pick to the API client before children render their queries,
+  // so a request never goes out tagged with the previous branch.
+  setActiveLocationId(canSwitch ? value.selectedLocationId : null)
+
+  // Most caches aren't keyed by branch, so a switch refetches everything
+  // rather than showing the last branch's rows under the new name.
+  const queryClient = useQueryClient()
+  const lastScope = useRef(value.selectedLocationId)
+  useEffect(() => {
+    if (lastScope.current === value.selectedLocationId) return
+    lastScope.current = value.selectedLocationId
+    queryClient.invalidateQueries()
+  }, [queryClient, value.selectedLocationId])
 
   return (
     <LocationScopeContext.Provider value={value}>

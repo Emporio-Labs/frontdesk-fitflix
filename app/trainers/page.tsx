@@ -10,6 +10,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePublicTrainers } from '@/hooks/use-trainers'
 import { IconSearch, IconArrowRight, IconQuote, IconRun } from '@tabler/icons-react'
+import { resolveAssetUrl } from '@/lib/asset-url'
 
 // Beautiful gradients to use as abstract backgrounds when trainers don't have images
 const GRADIENTS = [
@@ -174,7 +175,7 @@ export default function PublicTrainersDirectory() {
                         {trainer.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={trainer.imageUrl}
+                            src={resolveAssetUrl(trainer.imageUrl)}
                             alt={trainer.trainerName || 'Trainer'}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                           />

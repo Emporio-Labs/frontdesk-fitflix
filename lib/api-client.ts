@@ -47,6 +47,23 @@ export function clearToken() {
   if (typeof window !== 'undefined') localStorage.removeItem('hh_token')
 }
 
+// Branch the admin picked in the header switcher. Sent as X-Location-Id so
+// every list endpoint scopes to it without each page threading a param; the
+// backend ignores it for non-admins and holds them to their own branch.
+let activeLocationId: string | null = null
+export function setActiveLocationId(id: string | null) {
+  activeLocationId = id
+}
+
+apiClient.interceptors.request.use((config) => {
+  if (activeLocationId) {
+    const headers = AxiosHeaders.from(config.headers)
+    if (!headers.has('X-Location-Id')) headers.set('X-Location-Id', activeLocationId)
+    config.headers = headers
+  }
+  return config
+})
+
 // Inject Authorization (prefer Bearer, fall back to Basic)
 apiClient.interceptors.request.use((config) => {
   const requestPath = config.url ?? ''

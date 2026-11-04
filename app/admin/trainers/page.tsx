@@ -27,6 +27,7 @@ import { IconPlus, IconEdit, IconTrash, IconRefresh, IconEye, IconEyeOff } from 
 import { useTrainers, useCreateTrainer, useUpdateTrainer, useDeleteTrainer } from '@/hooks/use-trainers'
 import { trainerService, Trainer } from '@/lib/services/trainer.service'
 import { ImageUploader } from '@/components/ui/image-uploader'
+import { resolveAssetUrl } from '@/lib/asset-url'
 
 const TRAINER_DRAFT_KEY = 'add_trainer_form_draft'
 
@@ -502,7 +503,7 @@ export default function TrainersPage() {
                               <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0 border">
                                 {trainer.imageUrl ? (
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={trainer.imageUrl} alt={trainer.trainerName || 'Trainer'} className="w-full h-full object-cover" />
+                                  <img src={resolveAssetUrl(trainer.imageUrl)} alt={trainer.trainerName || 'Trainer'} className="w-full h-full object-cover" />
                                 ) : (
                                   <span className="text-sm font-bold text-muted-foreground">
                                     {(trainer.trainerName || 'T').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}

@@ -40,6 +40,7 @@ import { useTrainerProfile, useUpdateTrainerProfile } from '@/hooks/use-trainers
 import { trainerService } from '@/lib/services/trainer.service'
 import { optimizeImageForUpload } from '@/lib/utils/image-compression'
 import { toast } from 'sonner'
+import { resolveAssetUrl } from '@/lib/asset-url'
 
 const POPULAR_SPECIALITIES = [
   'HIIT',
@@ -371,7 +372,9 @@ export default function TrainerProfilePage() {
                   {form.imageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={form.imageUrl}
+                      // Remount per URL so a failed earlier image doesn't keep the new one hidden.
+                      key={form.imageUrl}
+                      src={resolveAssetUrl(form.imageUrl)}
                       alt={form.trainerName || 'Trainer'}
                       className="h-full w-full object-cover absolute inset-0"
                       onError={(e) => {

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { usePublicTrainer } from '@/hooks/use-trainers'
 import { IconChevronLeft, IconQuote, IconCheck, IconRun } from '@tabler/icons-react'
+import { resolveAssetUrl } from '@/lib/asset-url'
 
 // Beautiful gradients to use as abstract backgrounds when trainers don't have images
 const GRADIENTS = [
@@ -121,7 +122,7 @@ export default function PublicTrainerDetail({ params }: { params: any }) {
               {trainer.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={trainer.imageUrl}
+                  src={resolveAssetUrl(trainer.imageUrl)}
                   alt={trainer.trainerName}
                   className="w-full h-full object-cover"
                 />

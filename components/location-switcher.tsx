@@ -25,7 +25,9 @@ export function LocationSwitcher() {
   // Tolerant: this header is shared across layouts, and chrome must never be
   // able to crash a page just because its subtree has no scope provider.
   const scope = useOptionalLocationScope()
-  if (!scope) return null
+  // Branch switching is an admin tool; trainers and other staff work in their
+  // own branch and shouldn't see a picker that suggests otherwise.
+  if (!scope || !scope.canSwitch) return null
 
   const {
     locations,
