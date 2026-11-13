@@ -55,6 +55,7 @@ import { getBookingServiceName, getBookingTimeSlotLabel } from '@/lib/populated'
 import { StatusBadge } from '@/components/status-badge'
 import { MemberOnboardingWorkflow } from '@/components/member-onboarding-workflow'
 import { MemberBcaMetrics } from '@/components/member-bca-metrics'
+import { MemberProgressPhotosSection } from '@/components/progress-photos/member-progress-photos-section'
 import { EmptyState } from '@/components/empty-state'
 import { SkeletonTable } from '@/components/skeleton-loader'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -466,6 +467,9 @@ export default function UserDetailPage() {
 
           {/* ─── BODY COMPOSITION (ACTIVE X) ─── */}
           <MemberBcaMetrics userId={userId} />
+
+          {/* ─── PROGRESS PHOTOS (FRONT / SIDE / BACK) ─── */}
+          <MemberProgressPhotosSection userId={userId} memberName={user.username} />
 
           {/* ─── REPORTS (DNA + MEMBER UPLOADS) ─── */}
           <MemberReportsCard userId={userId} member={user} />

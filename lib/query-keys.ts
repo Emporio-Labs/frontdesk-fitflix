@@ -4,6 +4,9 @@ export const queryKeys = {
     detail: (id: string) => ['users', id] as const,
     bcaMetrics: (id: string) => ['users', id, 'bca-metrics'] as const,
     reports: (id: string) => ['users', id, 'reports'] as const,
+    progressPhotos: (id: string) => ['users', id, 'progress-photos'] as const,
+    photoComparison: (id: string, dateA: string, dateB: string, pose?: string) =>
+      ['users', id, 'progress-photos', 'compare', dateA, dateB, pose ?? 'all'] as const,
   },
   admins: {
     all: () => ['admins'] as const,
