@@ -3,16 +3,23 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
+  IconActivity,
   IconArrowLeft,
   IconBan,
+  IconBarbell,
   IconDotsVertical,
   IconFlag,
+  IconFlame,
   IconLock,
   IconRefresh,
+  IconScale,
   IconSend2,
+  IconThumbUp,
   IconTrash,
+  IconTrophy,
 } from '@tabler/icons-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -33,6 +40,7 @@ import {
   useMarkChatRead,
   useReportChat,
   useSendChatMessage,
+  useToggleChatReaction,
 } from '@/hooks/use-chat'
 import { resolveAssetUrl } from '@/lib/asset-url'
 import {
@@ -78,6 +86,120 @@ export const dayOf = (iso: string): string => {
   return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+export const REACTION_CONFIG: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+  fire: { label: 'Fire', icon: IconFlame },
+  muscle: { label: 'Strong', icon: IconBarbell },
+  trophy: { label: 'Trophy', icon: IconTrophy },
+  thumbs_up: { label: 'Thumbs Up', icon: IconThumbUp },
+}
+
+export function formatDuration(seconds?: number): string {
+  if (!seconds || seconds <= 0) return '0m'
+  const m = Math.floor(seconds / 60)
+  const h = Math.floor(m / 60)
+  const remainingM = m % 60
+  if (h > 0) return `${h}h ${remainingM}m`
+  return `${m}m`
+}
+
+export function WorkoutActivityCard({
+  payload,
+  message,
+  me,
+  onToggleReaction,
+}: {
+  payload: any
+  message: ChatMessage
+  me?: ChatMe
+  onToggleReaction?: (reaction: string) => void
+}) {
+  const workoutTitle = payload?.workoutTitle || 'Workout Session'
+  const duration = formatDuration(payload?.durationSeconds)
+  const exercises = payload?.exercisesCount ?? 0
+  const sets = payload?.totalSets ?? 0
+  const volume = payload?.totalVolumeKg ?? 0
+  const rpe = payload?.rpe
+  const reflection = payload?.reflection
+
+  return (
+    <div className="w-full min-w-[280px] max-w-sm rounded-2xl border bg-card p-3.5 text-card-foreground shadow-sm space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <IconActivity className="size-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Workout Logged</p>
+            <h4 className="truncate font-semibold text-xs text-foreground">{workoutTitle}</h4>
+          </div>
+        </div>
+        <span className="text-[10px] text-muted-foreground shrink-0">{timeOf(message.createdAt)}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-muted/50 p-2 text-center">
+        <div>
+          <p className="text-[9px] text-muted-foreground uppercase font-medium">Time</p>
+          <p className="text-xs font-bold">{duration}</p>
+        </div>
+        <div>
+          <p className="text-[9px] text-muted-foreground uppercase font-medium">Exercises</p>
+          <p className="text-xs font-bold">{exercises} ({sets}s)</p>
+        </div>
+        <div>
+          <p className="text-[9px] text-muted-foreground uppercase font-medium">Volume</p>
+          <p className="text-xs font-bold">{volume > 0 ? `${volume} kg` : '—'}</p>
+        </div>
+      </div>
+
+      {rpe && (
+        <div className="flex items-center justify-between rounded-lg bg-muted/30 px-2.5 py-1.5 text-xs">
+          <span className="text-[11px] text-muted-foreground">Effort (RPE)</span>
+          <Badge
+            variant={rpe >= 8 ? 'destructive' : rpe >= 5 ? 'secondary' : 'outline'}
+            className="text-[10px] h-5 px-1.5 font-semibold"
+          >
+            {rpe} / 10
+          </Badge>
+        </div>
+      )}
+
+      {reflection && (
+        <div className="rounded-lg border-l-2 border-primary/60 bg-muted/40 px-2.5 py-1.5 text-xs italic text-muted-foreground">
+          &ldquo;{reflection}&rdquo;
+        </div>
+      )}
+
+      <div className="flex items-center justify-between border-t pt-2">
+        <span className="text-[10px] font-medium text-muted-foreground">React:</span>
+        <div className="flex items-center gap-1">
+          {Object.entries(REACTION_CONFIG).map(([key, config]) => {
+            const Icon = config.icon
+            const hasMyReaction = message.reactions?.some((r) => r.userId === me?.id && r.reaction === key)
+            const count = message.reactions?.filter((r) => r.reaction === key).length ?? 0
+            return (
+              <Button
+                key={key}
+                type="button"
+                variant={hasMyReaction ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  'h-6 px-1.5 text-xs gap-1 rounded-full transition-transform active:scale-95',
+                  hasMyReaction && 'bg-primary/15 text-primary border border-primary/30',
+                )}
+                onClick={() => onToggleReaction?.(key)}
+                title={config.label}
+              >
+                <Icon className={cn('size-3.5', hasMyReaction ? 'text-primary' : 'text-muted-foreground')} />
+                {count > 0 && <span className="text-[10px] font-semibold">{count}</span>}
+              </Button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ChatAvatar({ name, avatarUrl, className }: { name: string; avatarUrl?: string; className?: string }) {
   return (
     <Avatar className={cn('size-9 shrink-0', className)}>
@@ -99,6 +221,7 @@ export function ChatThread({ conversation, me, onBack }: ChatThreadProps) {
   const send = useSendChatMessage(conversation.id, me)
   const markRead = useMarkChatRead()
   const remove = useDeleteChatMessage()
+  const toggleReaction = useToggleChatReaction(conversation.id)
   const block = useBlockChatPeer()
   const [draft, setDraft] = useState('')
   // null = closed; { messageId } = reporting one message; {} = the conversation
@@ -223,6 +346,7 @@ export function ChatThread({ conversation, me, onBack }: ChatThreadProps) {
                   key={m.id}
                   message={m}
                   mine={mine}
+                  me={me}
                   showDay={i === 0 || dayOf(messages[i - 1].createdAt) !== dayOf(m.createdAt)}
                   grouped={i > 0 && messages[i - 1].senderId === m.senderId}
                   onRetry={
@@ -233,6 +357,7 @@ export function ChatThread({ conversation, me, onBack }: ChatThreadProps) {
                   onDiscard={m.failed ? () => discardLocalMessage(qc, conversation.id, m.id) : undefined}
                   onDelete={mine && !m.pending && !m.failed && !m.deleted ? () => remove.mutate(m.id) : undefined}
                   onReport={!mine && canModerate && !m.deleted ? () => setReporting({ messageId: m.id }) : undefined}
+                  onToggleReaction={(rx) => toggleReaction.mutate({ messageId: m.id, reaction: rx })}
                 />
               )
             })}
@@ -292,23 +417,29 @@ export function ChatThread({ conversation, me, onBack }: ChatThreadProps) {
 export function MessageBubble({
   message,
   mine,
+  me,
   showDay,
   grouped,
   onRetry,
   onDiscard,
   onDelete,
   onReport,
+  onToggleReaction,
 }: {
   message: ChatMessage
   mine: boolean
+  me?: ChatMe
   showDay: boolean
   grouped: boolean
   onRetry?: () => void
   onDiscard?: () => void
   onDelete?: () => void
   onReport?: () => void
+  onToggleReaction?: (reaction: string) => void
 }) {
   const hasActions = !!(onDelete || onReport)
+  const isActivityCard = message.kind === 'activity_card' && message.payload?.type === 'WORKOUT_COMPLETED'
+
   return (
     <>
       {showDay && (
@@ -318,33 +449,76 @@ export function MessageBubble({
       )}
       <div
         className={cn(
-          'group flex items-center gap-1',
+          'group flex items-start gap-1',
           mine ? 'flex-row-reverse' : 'flex-row',
           !grouped && !showDay && 'mt-2',
         )}
       >
-        <div
-          className={cn(
-            'max-w-[78%] rounded-2xl px-3.5 py-2 text-sm sm:max-w-[65%]',
-            mine ? 'bg-primary text-primary-foreground' : 'bg-muted',
-            message.deleted && 'bg-transparent text-muted-foreground ring-1 ring-border',
-            message.pending && 'opacity-60',
-            message.failed && 'bg-destructive/15 text-destructive',
-          )}
-        >
+        <div className="flex flex-col max-w-[85%] sm:max-w-[70%]">
           {message.deleted ? (
-            <p className="italic">Message deleted</p>
+            <div className="rounded-2xl px-3.5 py-2 text-sm bg-transparent text-muted-foreground ring-1 ring-border">
+              <p className="italic">Message deleted</p>
+            </div>
+          ) : isActivityCard ? (
+            <WorkoutActivityCard
+              payload={message.payload}
+              message={message}
+              me={me}
+              onToggleReaction={onToggleReaction}
+            />
           ) : (
-            <p className="whitespace-pre-wrap break-words">{message.body}</p>
+            <div
+              className={cn(
+                'rounded-2xl px-3.5 py-2 text-sm',
+                mine ? 'bg-primary text-primary-foreground' : 'bg-muted',
+                message.pending && 'opacity-60',
+                message.failed && 'bg-destructive/15 text-destructive',
+              )}
+            >
+              <p className="whitespace-pre-wrap break-words">{message.body}</p>
+              <p
+                className={cn(
+                  'mt-0.5 text-right text-[10px]',
+                  mine && !message.failed ? 'text-primary-foreground/70' : 'text-muted-foreground',
+                )}
+              >
+                {message.failed ? 'Not sent' : message.pending ? 'Sending…' : timeOf(message.createdAt)}
+              </p>
+            </div>
           )}
-          <p
-            className={cn(
-              'mt-0.5 text-right text-[10px]',
-              mine && !message.failed && !message.deleted ? 'text-primary-foreground/70' : 'text-muted-foreground',
-            )}
-          >
-            {message.failed ? 'Not sent' : message.pending ? 'Sending…' : timeOf(message.createdAt)}
-          </p>
+
+          {/* Reaction chips for text messages */}
+          {!isActivityCard && !message.deleted && message.reactions && message.reactions.length > 0 && (
+            <div className={cn('flex flex-wrap gap-1 mt-1', mine ? 'justify-end' : 'justify-start')}>
+              {Object.entries(
+                message.reactions.reduce<Record<string, { count: number; hasMine: boolean }>>((acc, r) => {
+                  if (!acc[r.reaction]) acc[r.reaction] = { count: 0, hasMine: false }
+                  acc[r.reaction].count += 1
+                  if (r.userId === me?.id) acc[r.reaction].hasMine = true
+                  return acc
+                }, {}),
+              ).map(([rx, info]) => {
+                const config = REACTION_CONFIG[rx]
+                const Icon = config?.icon ?? IconFlame
+                return (
+                  <button
+                    key={rx}
+                    type="button"
+                    onClick={() => onToggleReaction?.(rx)}
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium border transition-colors',
+                      info.hasMine
+                        ? 'bg-primary/15 border-primary/30 text-primary'
+                        : 'bg-background border-border text-muted-foreground hover:bg-muted',
+                    )}
+                  >
+                    <Icon className="size-3" />
+                    <span>{info.count}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {message.failed && (

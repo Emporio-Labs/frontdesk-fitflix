@@ -32,6 +32,13 @@ export interface ChatPeer {
   avatarUrl: string
 }
 
+export interface ChatReaction {
+  userId: string
+  senderKind: ChatParticipantKind
+  reaction: string
+  reactedAt: string
+}
+
 export interface ChatMessage {
   id: string
   conversationId: string
@@ -47,6 +54,9 @@ export interface ChatMessage {
   /** Client-only: an optimistic bubble that has not been confirmed yet. */
   pending?: boolean
   failed?: boolean
+  kind?: 'text' | 'activity_card'
+  payload?: Record<string, any>
+  reactions?: ChatReaction[]
 }
 
 export type ChatBlockedReason =
@@ -180,6 +190,19 @@ export const chatService = {
   deleteMessage: async (messageId: string) => {
     const { data } = await apiClient.delete(`/chat/messages/${messageId}`)
     return data as { conversationId: string; messageId: string }
+  },
+  toggleReaction: async (conversationId: string, messageId: string, reaction: string) => {
+    const { data } = await apiClient.post(
+      `/chat/conversations/${conversationId}/messages/${messageId}/reactions`,
+      { reaction }
+    )
+    return data as { reactions: ChatReaction[] }
+  },
+  deleteReaction: async (conversationId: string, messageId: string) => {
+    const { data } = await apiClient.delete(
+      `/chat/conversations/${conversationId}/messages/${messageId}/reactions`
+    )
+    return data as { reactions: ChatReaction[] }
   },
   block: async (peer: { kind: ChatParticipantKind; id: string }) => {
     const { data } = await apiClient.post('/chat/blocks', peer)

@@ -20,6 +20,7 @@ import {
   type ChatMessage,
   type ChatParticipantKind,
   type ChatPersonAccess,
+  type ChatReaction,
   type ChatReportReason,
   type ChatRole,
   type ChatRuleMode,
@@ -121,6 +122,22 @@ export function useChatRealtime() {
       markDeleted(qc, payload.conversationId, payload.messageId)
       qc.invalidateQueries({ queryKey: queryKeys.chat.conversations() })
     }
+    const onReaction = (payload: { conversationId: string; messageId: string; reactions: ChatReaction[] }) => {
+      if (!payload?.messageId) return
+      qc.setQueryData<MessagesData>(queryKeys.chat.messages(payload.conversationId), (data) =>
+        data
+          ? {
+              ...data,
+              pages: data.pages.map((p) => ({
+                ...p,
+                messages: p.messages.map((m) =>
+                  m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m,
+                ),
+              })),
+            }
+          : data,
+      )
+    }
     const onRead = () => {
       qc.invalidateQueries({ queryKey: queryKeys.chat.conversations() })
       qc.invalidateQueries({ queryKey: queryKeys.chat.unread() })
@@ -135,6 +152,7 @@ export function useChatRealtime() {
 
     s.on('chat:message', onMessage)
     s.on('chat:message_deleted', onDeleted)
+    s.on('chat:reaction', onReaction)
     s.on('chat:read', onRead)
     s.on('connect', onSocketConnect)
     s.io.on('reconnect', onConnect)
@@ -144,6 +162,7 @@ export function useChatRealtime() {
     return () => {
       s.off('chat:message', onMessage)
       s.off('chat:message_deleted', onDeleted)
+      s.off('chat:reaction', onReaction)
       s.off('chat:read', onRead)
       s.off('connect', onSocketConnect)
       s.io.off('reconnect', onConnect)
@@ -338,6 +357,30 @@ export function useDeleteChatMessage() {
       qc.invalidateQueries({ queryKey: queryKeys.chat.adminConversation(conversationId) })
     },
     onError: (err) => toast.error(errorMessage(err, 'Could not delete the message')),
+  })
+}
+
+export function useToggleChatReaction(conversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ messageId, reaction }: { messageId: string; reaction: string }) =>
+      chatService.toggleReaction(conversationId, messageId, reaction),
+    onSuccess: (result, variables) => {
+      qc.setQueryData<MessagesData>(queryKeys.chat.messages(conversationId), (data) =>
+        data
+          ? {
+              ...data,
+              pages: data.pages.map((p) => ({
+                ...p,
+                messages: p.messages.map((m) =>
+                  m.id === variables.messageId ? { ...m, reactions: result.reactions } : m,
+                ),
+              })),
+            }
+          : data,
+      )
+    },
+    onError: (err) => toast.error(errorMessage(err, 'Could not update reaction')),
   })
 }
 
