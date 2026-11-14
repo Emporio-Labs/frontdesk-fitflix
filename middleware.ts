@@ -58,6 +58,7 @@ export function middleware(request: NextRequest) {
     '/admin/slots',
     '/admin/me/notifications',
     '/admin/trainer/profile',
+    '/admin/chat',
     // Only useful to trainers an admin has given lead access; the page and
     // the backend both check that.
     '/admin/leads',
@@ -81,6 +82,7 @@ export function middleware(request: NextRequest) {
     '/admin/nutrition/diet-plans',  // diet-plan templates (read)
     '/admin/nutrition/foods',       // food catalog (read)
     '/admin/me/notifications',      // FX-25 push settings
+    '/admin/chat',                  // messages
   ]
   // Allow /admin/nutrition only when going to the appointments / food-catalog tabs;
   // block bare /admin/nutrition (would show full admin workspace).

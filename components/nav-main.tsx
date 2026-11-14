@@ -19,6 +19,8 @@ export interface NavItem {
   title: string
   url: string
   icon?: Icon
+  /** Count shown beside the title (unread messages). Hidden at 0. */
+  badge?: number
 }
 
 export interface NavGroup {
@@ -86,6 +88,16 @@ export function NavMain({ groups }: { groups: NavGroup[] }) {
                       <Link href={item.url}>
                         {item.icon && <item.icon />}
                         <span>{item.title}</span>
+                        {!!item.badge && (
+                          <span
+                            className={cn(
+                              "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold group-data-[collapsible=icon]:hidden",
+                              isActive ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground"
+                            )}
+                          >
+                            {item.badge > 99 ? '99+' : item.badge}
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

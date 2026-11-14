@@ -27,6 +27,7 @@ import {
   IconFileInvoice,
   IconTemplate,
   IconMessage2,
+  IconMessages,
   IconDumbbell,
   IconBellRinging,
   IconStethoscope,
@@ -39,7 +40,8 @@ import {
 } from "@tabler/icons-react"
 import Image from 'next/image'
 
-import { NavMain } from '@/components/nav-main'
+import { NavMain, type NavGroup } from '@/components/nav-main'
+import { useChatRealtime, useChatUnreadCount } from '@/hooks/use-chat'
 import { NavUser } from '@/components/nav-user'
 import { useAuth } from '@/hooks/use-auth'
 import { getRoleStartPage } from '@/app/context/auth-context'
@@ -53,11 +55,14 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 
+const CHAT_URL = '/admin/chat'
+
 const navGroups = [
   {
     items: [
       { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
       { title: "Operations Board", url: "/admin/overview", icon: IconBuildingStore },
+      { title: "Messages", url: CHAT_URL, icon: IconMessages },
     ],
   },
   {
@@ -134,6 +139,7 @@ const navTrainerGroup = [
       { title: "Today", url: "/admin/personal-training/today", icon: IconCalendarEvent },
       { title: "Personal Training", url: "/admin/personal-training", icon: IconDumbbell },
       { title: "My Members", url: "/dashboard/workouts/members", icon: IconUsers },
+      { title: "Messages", url: CHAT_URL, icon: IconMessages },
       { title: "Workout Plans", url: "/dashboard/workouts/plans", icon: IconBarbell },
       { title: "Workout Templates", url: "/dashboard/workouts/templates", icon: IconTemplate },
       { title: "Exercise Library", url: "/dashboard/workouts/exercises", icon: IconActivity },
@@ -149,6 +155,7 @@ const navNutritionistGroup = [
     items: [
       { title: "Nutrition", url: "/admin/nutrition", icon: IconSalad },
       { title: "Appointments", url: "/admin/nutrition?tab=appointments", icon: IconCalendarEvent },
+      { title: "Messages", url: CHAT_URL, icon: IconMessages },
       { title: "Diet Plans", url: "/admin/nutrition/diet-plans", icon: IconTemplate },
       { title: "Food Catalog", url: "/admin/nutrition/foods", icon: IconApple },
       { title: "Availability", url: "/admin/nutritionist", icon: IconClock },
@@ -176,7 +183,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         items: [...g.items.slice(0, 1), { title: "Leads", url: "/admin/leads", icon: IconTarget }, ...g.items.slice(1)],
       }))
     : navTrainerGroup
-  const groups = isTrainer ? trainerGroups : isNutritionist ? navNutritionistGroup : navGroups
+  const roleGroups: NavGroup[] = isTrainer ? trainerGroups : isNutritionist ? navNutritionistGroup : navGroups
+
+  // The sidebar is on every staff page, so it owns the chat socket and the
+  // unread badge.
+  useChatRealtime()
+  const { data: unreadChats = 0 } = useChatUnreadCount()
+  const groups = roleGroups.map((g) => ({
+    ...g,
+    items: g.items.map((item) => (item.url === CHAT_URL ? { ...item, badge: unreadChats } : item)),
+  }))
   const brandHref = isTrainer
     ? '/admin/personal-training/today'
     : isNutritionist

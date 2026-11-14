@@ -229,4 +229,16 @@ export const queryKeys = {
   alertReports: {
     sla: (params?: Record<string, any>) => ['alert-reports', 'sla', params ?? {}] as const,
   },
+  chat: {
+    all: () => ['chat'] as const,
+    conversations: () => ['chat', 'conversations'] as const,
+    unread: () => ['chat', 'unread'] as const,
+    messages: (conversationId: string) => ['chat', 'messages', conversationId] as const,
+    contacts: (search?: string) => ['chat', 'contacts', search ?? ''] as const,
+    policy: () => ['chat', 'policy'] as const,
+    people: (role?: string, search?: string) => ['chat', 'people', role ?? 'staff', search ?? ''] as const,
+    reports: (status?: string) => ['chat', 'reports', status ?? 'all'] as const,
+    adminConversations: (search?: string) => ['chat', 'admin-conversations', search ?? ''] as const,
+    adminConversation: (id: string) => ['chat', 'admin-conversation', id] as const,
+  },
 }
