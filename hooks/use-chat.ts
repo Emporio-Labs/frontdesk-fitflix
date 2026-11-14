@@ -241,9 +241,21 @@ export function useOpenConversation() {
 export function useSendChatMessage(conversationId: string | null, me: ChatMe | undefined) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ body, clientMessageId }: { body: string; clientMessageId: string }) =>
-      chatService.sendMessage(conversationId!, body, clientMessageId),
-    onMutate: ({ body, clientMessageId }) => {
+    mutationFn: ({
+      body,
+      clientMessageId,
+      kind,
+      media,
+      payload,
+    }: {
+      body: string
+      clientMessageId: string
+      kind?: string
+      media?: any
+      payload?: Record<string, any>
+    }) =>
+      chatService.sendMessage(conversationId!, body, clientMessageId, { kind, media, payload }),
+    onMutate: ({ body, clientMessageId, kind, media, payload }) => {
       if (!conversationId || !me) return
       upsertMessage(qc, {
         id: clientMessageId,
@@ -256,13 +268,16 @@ export function useSendChatMessage(conversationId: string | null, me: ChatMe | u
         clientMessageId,
         createdAt: new Date().toISOString(),
         pending: true,
+        kind: (kind as any) ?? 'text',
+        media,
+        payload,
       })
     },
     onSuccess: ({ message }) => {
       upsertMessage(qc, message)
       qc.invalidateQueries({ queryKey: queryKeys.chat.conversations() })
     },
-    onError: (err, { body, clientMessageId }) => {
+    onError: (err, { body, clientMessageId, kind, media, payload }) => {
       if (conversationId && me) {
         upsertMessage(qc, {
           id: clientMessageId,
@@ -275,6 +290,9 @@ export function useSendChatMessage(conversationId: string | null, me: ChatMe | u
           clientMessageId,
           createdAt: new Date().toISOString(),
           failed: true,
+          kind: (kind as any) ?? 'text',
+          media,
+          payload,
         })
       }
       toast.error(errorMessage(err, 'Message not sent'))

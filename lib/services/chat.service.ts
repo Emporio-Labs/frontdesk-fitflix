@@ -39,6 +39,17 @@ export interface ChatReaction {
   reactedAt: string
 }
 
+export interface ChatMedia {
+  s3Key: string
+  url: string
+  thumbnailUrl?: string
+  mimeType: string
+  byteSize: number
+  durationSeconds?: number
+  width?: number
+  height?: number
+}
+
 export interface ChatMessage {
   id: string
   conversationId: string
@@ -54,8 +65,9 @@ export interface ChatMessage {
   /** Client-only: an optimistic bubble that has not been confirmed yet. */
   pending?: boolean
   failed?: boolean
-  kind?: 'text' | 'activity_card'
+  kind?: 'text' | 'activity_card' | 'image' | 'video' | 'audio' | 'exercise_share'
   payload?: Record<string, any>
+  media?: ChatMedia
   reactions?: ChatReaction[]
 }
 
@@ -176,12 +188,34 @@ export const chatService = {
     })
     return data as { messages: ChatMessage[]; hasMore: boolean }
   },
-  sendMessage: async (conversationId: string, body: string, clientMessageId: string) => {
+  sendMessage: async (
+    conversationId: string,
+    body: string,
+    clientMessageId: string,
+    extra?: { kind?: string; payload?: Record<string, any>; media?: ChatMedia }
+  ) => {
     const { data } = await apiClient.post(`/chat/conversations/${conversationId}/messages`, {
       body,
       clientMessageId,
+      ...extra,
     })
     return data as { message: ChatMessage }
+  },
+  presignMedia: async (
+    conversationId: string,
+    params: { fileName: string; mimeType: string; byteSize: number; kind: string }
+  ) => {
+    const { data } = await apiClient.post(
+      `/chat/conversations/${conversationId}/media/presign`,
+      params
+    )
+    return data as {
+      uploadUrl: string
+      downloadUrl: string
+      s3Key: string
+      mimeType: string
+      kind: string
+    }
   },
   markRead: async (conversationId: string) => {
     const { data } = await apiClient.post(`/chat/conversations/${conversationId}/read`)

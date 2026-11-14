@@ -11,12 +11,14 @@ import {
   IconFlag,
   IconFlame,
   IconLock,
+  IconPaperclip,
   IconRefresh,
   IconScale,
   IconSend2,
   IconThumbUp,
   IconTrash,
   IconTrophy,
+  IconVolume,
 } from '@tabler/icons-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -51,8 +53,10 @@ import {
   type ChatMessage,
   type ChatReportReason,
   chatRoleLabel,
+  chatService,
 } from '@/lib/services/chat.service'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 const BLOCKED_COPY: Record<ChatBlockedReason, string> = {
   SELF: 'You cannot message yourself.',
@@ -224,6 +228,9 @@ export function ChatThread({ conversation, me, onBack }: ChatThreadProps) {
   const toggleReaction = useToggleChatReaction(conversation.id)
   const block = useBlockChatPeer()
   const [draft, setDraft] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   // null = closed; { messageId } = reporting one message; {} = the conversation
   const [reporting, setReporting] = useState<{ messageId?: string } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -260,6 +267,58 @@ export function ChatThread({ conversation, me, onBack }: ChatThreadProps) {
     stickToBottom.current = true
     send.mutate({ body, clientMessageId: crypto.randomUUID() })
     setDraft('')
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !conversation.canSend) return
+    e.target.value = ''
+
+    let kind = 'image'
+    if (file.type.startsWith('video/')) kind = 'video'
+    else if (file.type.startsWith('audio/')) kind = 'audio'
+
+    setIsUploading(true)
+    try {
+      const presign = await chatService.presignMedia(conversation.id, {
+        fileName: file.name,
+        mimeType: file.type || (kind === 'video' ? 'video/mp4' : 'image/jpeg'),
+        byteSize: file.size,
+        kind,
+      })
+
+      const uploadRes = await fetch(presign.uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type || (kind === 'video' ? 'video/mp4' : 'image/jpeg'),
+        },
+      })
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed with status ${uploadRes.status}`)
+      }
+
+      const clientMessageId = crypto.randomUUID()
+      const caption = draft.trim()
+      setDraft('')
+      stickToBottom.current = true
+
+      send.mutate({
+        body: caption,
+        clientMessageId,
+        kind,
+        media: {
+          s3Key: presign.s3Key,
+          url: presign.downloadUrl,
+          mimeType: presign.mimeType,
+          byteSize: file.size,
+        },
+      })
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to upload media')
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   // "Seen" belongs under my message only while it is the last thing said.
@@ -358,6 +417,7 @@ export function ChatThread({ conversation, me, onBack }: ChatThreadProps) {
                   onDelete={mine && !m.pending && !m.failed && !m.deleted ? () => remove.mutate(m.id) : undefined}
                   onReport={!mine && canModerate && !m.deleted ? () => setReporting({ messageId: m.id }) : undefined}
                   onToggleReaction={(rx) => toggleReaction.mutate({ messageId: m.id, reaction: rx })}
+                  onOpenLightbox={(url) => setLightboxImage(url)}
                 />
               )
             })}
@@ -374,6 +434,28 @@ export function ChatThread({ conversation, me, onBack }: ChatThreadProps) {
             submit()
           }}
         >
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept="image/*,video/*,audio/*"
+            onChange={handleFileSelect}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            disabled={isUploading}
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach photo, video or audio"
+          >
+            {isUploading ? (
+              <IconRefresh className="size-5 animate-spin text-muted-foreground" />
+            ) : (
+              <IconPaperclip className="size-5 text-muted-foreground" />
+            )}
+          </Button>
           <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -388,7 +470,7 @@ export function ChatThread({ conversation, me, onBack }: ChatThreadProps) {
             maxLength={4000}
             className="max-h-36 min-h-10 resize-none"
           />
-          <Button type="submit" size="icon" disabled={!draft.trim()} aria-label="Send message">
+          <Button type="submit" size="icon" disabled={!draft.trim() && !isUploading} aria-label="Send message">
             <IconSend2 className="size-5" />
           </Button>
         </form>
@@ -403,6 +485,14 @@ export function ChatThread({ conversation, me, onBack }: ChatThreadProps) {
           )}
         </div>
       )}
+
+      <Dialog open={!!lightboxImage} onOpenChange={(open) => !open && setLightboxImage(null)}>
+        <DialogContent className="max-w-3xl p-2 bg-black/95 border-none">
+          {lightboxImage && (
+            <img src={lightboxImage} alt="Enlarged" className="max-h-[80vh] w-full object-contain mx-auto rounded-lg" />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <ReportDialog
         conversationId={conversation.id}
@@ -425,6 +515,7 @@ export function MessageBubble({
   onDelete,
   onReport,
   onToggleReaction,
+  onOpenLightbox,
 }: {
   message: ChatMessage
   mine: boolean
@@ -436,6 +527,7 @@ export function MessageBubble({
   onDelete?: () => void
   onReport?: () => void
   onToggleReaction?: (reaction: string) => void
+  onOpenLightbox?: (url: string) => void
 }) {
   const hasActions = !!(onDelete || onReport)
   const isActivityCard = message.kind === 'activity_card' && message.payload?.type === 'WORKOUT_COMPLETED'
@@ -469,13 +561,48 @@ export function MessageBubble({
           ) : (
             <div
               className={cn(
-                'rounded-2xl px-3.5 py-2 text-sm',
+                'rounded-2xl px-3.5 py-2 text-sm flex flex-col gap-1.5',
                 mine ? 'bg-primary text-primary-foreground' : 'bg-muted',
                 message.pending && 'opacity-60',
                 message.failed && 'bg-destructive/15 text-destructive',
               )}
             >
-              <p className="whitespace-pre-wrap break-words">{message.body}</p>
+              {message.media && (
+                <div className="overflow-hidden rounded-xl">
+                  {message.media.mimeType.startsWith('image/') ? (
+                    <img
+                      src={message.media.url}
+                      alt={message.body || 'Shared image'}
+                      className="max-h-60 max-w-full rounded-xl object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                      onClick={() => onOpenLightbox?.(message.media!.url)}
+                    />
+                  ) : message.media.mimeType.startsWith('video/') ? (
+                    <video
+                      src={message.media.url}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="max-h-64 max-w-full rounded-xl bg-black"
+                    />
+                  ) : message.media.mimeType.startsWith('audio/') ? (
+                    <div className="flex flex-col gap-1 rounded-xl bg-background/60 p-2.5 text-foreground border border-border/50 min-w-[220px]">
+                      <div className="flex items-center justify-between text-xs font-semibold">
+                        <div className="flex items-center gap-1.5">
+                          <IconVolume className="size-3.5 text-primary" />
+                          <span>Voice memo</span>
+                        </div>
+                        {message.media.durationSeconds && (
+                          <span className="text-[11px] text-muted-foreground">
+                            {Math.round(message.media.durationSeconds)}s
+                          </span>
+                        )}
+                      </div>
+                      <audio src={message.media.url} controls preload="metadata" className="h-8 w-full mt-1" />
+                    </div>
+                  ) : null}
+                </div>
+              )}
+              {message.body && <p className="whitespace-pre-wrap break-words">{message.body}</p>}
               <p
                 className={cn(
                   'mt-0.5 text-right text-[10px]',
