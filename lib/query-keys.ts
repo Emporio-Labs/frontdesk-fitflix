@@ -7,6 +7,8 @@ export const queryKeys = {
     progressPhotos: (id: string) => ['users', id, 'progress-photos'] as const,
     photoComparison: (id: string, dateA: string, dateB: string, pose?: string) =>
       ['users', id, 'progress-photos', 'compare', dateA, dateB, pose ?? 'all'] as const,
+    agenda: (id: string, from?: string, to?: string) =>
+      ['users', id, 'agenda', from ?? '', to ?? ''] as const,
   },
   admins: {
     all: () => ['admins'] as const,

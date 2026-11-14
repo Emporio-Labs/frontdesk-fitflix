@@ -56,6 +56,7 @@ import { StatusBadge } from '@/components/status-badge'
 import { MemberOnboardingWorkflow } from '@/components/member-onboarding-workflow'
 import { MemberBcaMetrics } from '@/components/member-bca-metrics'
 import { MemberProgressPhotosSection } from '@/components/progress-photos/member-progress-photos-section'
+import { MemberAgendaSection } from '@/components/agenda/member-agenda-section'
 import { EmptyState } from '@/components/empty-state'
 import { SkeletonTable } from '@/components/skeleton-loader'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -464,6 +465,9 @@ export default function UserDetailPage() {
                 : undefined
             }
           />
+
+          {/* ─── MEMBER SCHEDULE & AGENDA ─── */}
+          <MemberAgendaSection userId={userId} memberName={user.username} />
 
           {/* ─── BODY COMPOSITION (ACTIVE X) ─── */}
           <MemberBcaMetrics userId={userId} />
