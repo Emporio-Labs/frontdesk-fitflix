@@ -55,7 +55,7 @@ const nextConfig = {
               "img-src 'self' data: blob: https: http://localhost:3000 http://127.0.0.1:3000",
               "font-src 'self' data: https://fonts.gstatic.com",
               // wss: required for ZEGOCLOUD real-time signalling (accesshub/weblogger sockets on *.coolbcloud.com / coolzcloud.com / coolgcloud.com). https: does NOT cover the wss: scheme.
-              "connect-src 'self' http://localhost:3000 https: wss: https://*.zego.im wss://*.zego.im https://*.coolzcloud.com wss://*.coolzcloud.com https://*.coolbcloud.com wss://*.coolbcloud.com https://*.coolgcloud.com wss://*.coolgcloud.com",
+              "connect-src 'self' http://localhost:3000 ws://localhost:3000 https: wss: https://*.zego.im wss://*.zego.im https://*.coolzcloud.com wss://*.coolzcloud.com https://*.coolbcloud.com wss://*.coolbcloud.com https://*.coolgcloud.com wss://*.coolgcloud.com",
               "frame-ancestors 'none'",
             ].join('; '),
           },

@@ -9,6 +9,7 @@ import { IconSettings, IconBell, IconLock, IconPalette } from '@tabler/icons-rea
 import { ConferenceSettingsCard } from '@/components/settings/conference-settings-card'
 import { BillingSettingsCard } from '@/components/settings/billing-settings-card'
 import { AlertRulesSettingsCard } from '@/components/settings/alert-rules-settings-card'
+import { ChatRulesSettingsCard } from '@/components/settings/chat-rules-settings-card'
 
 export default function SettingsPage() {
   const [clinicName, setClinicName] = useState('Healing Heights Clinic')
@@ -108,6 +109,9 @@ export default function SettingsPage() {
 
       {/* Operational Alert Rules & Escalation Matrix (FX-36) */}
       <AlertRulesSettingsCard />
+
+      {/* Who can message whom */}
+      <ChatRulesSettingsCard />
 
       {/* Notification Settings */}
       <Card>
