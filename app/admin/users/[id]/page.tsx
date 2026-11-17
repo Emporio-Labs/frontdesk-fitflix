@@ -56,6 +56,7 @@ import { StatusBadge } from '@/components/status-badge'
 import { MemberOnboardingWorkflow } from '@/components/member-onboarding-workflow'
 import { MemberBcaMetrics } from '@/components/member-bca-metrics'
 import { MemberProgressPhotosSection } from '@/components/progress-photos/member-progress-photos-section'
+import { MemberWearablesCard } from '@/components/wearables/member-wearables-card'
 import { MemberAgendaSection } from '@/components/agenda/member-agenda-section'
 import { EmptyState } from '@/components/empty-state'
 import { SkeletonTable } from '@/components/skeleton-loader'
@@ -471,6 +472,9 @@ export default function UserDetailPage() {
 
           {/* ─── BODY COMPOSITION (ACTIVE X) ─── */}
           <MemberBcaMetrics userId={userId} />
+
+          {/* ─── WEARABLES (only if the member shared with their coach) ─── */}
+          <MemberWearablesCard userId={userId} />
 
           {/* ─── PROGRESS PHOTOS (FRONT / SIDE / BACK) ─── */}
           <MemberProgressPhotosSection userId={userId} memberName={user.username} />

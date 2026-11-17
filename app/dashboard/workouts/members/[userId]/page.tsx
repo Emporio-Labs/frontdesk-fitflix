@@ -41,6 +41,7 @@ import { useUser } from '@/hooks/use-users'
 import { useExercises } from '@/hooks/use-exercises'
 import { trainerWorkoutService } from '@/lib/services/trainer-workout.service'
 import { MemberWorkoutJourney } from '@/components/workouts/member-workout-journey'
+import { MemberWearablesCard } from '@/components/wearables/member-wearables-card'
 import { AssignOrCreatePlanModal } from '@/components/workouts/assign-or-create-plan-modal'
 import { OnboardingReportsDialog } from '@/components/onboarding-reports-dialog'
 import { useCanAccessMemberReports } from '@/hooks/use-can-access-reports'
@@ -913,6 +914,9 @@ export default function MemberSchedulePage() {
 
       {/* What the member has actually done, as opposed to what they're scheduled to do */}
       <MemberWorkoutJourney userId={userId} />
+
+      {/* Watch data — only shows numbers if the member shared with their coach */}
+      <MemberWearablesCard userId={userId} />
 
       {/* Add Exercise Dialog */}
       <Dialog open={addExerciseDialogOpen} onOpenChange={setAddExerciseDialogOpen}>
