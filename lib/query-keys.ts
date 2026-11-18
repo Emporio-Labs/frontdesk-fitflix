@@ -5,6 +5,7 @@ export const queryKeys = {
     bcaMetrics: (id: string) => ['users', id, 'bca-metrics'] as const,
     reports: (id: string) => ['users', id, 'reports'] as const,
     progressPhotos: (id: string) => ['users', id, 'progress-photos'] as const,
+    wearables: (id: string, days: number) => ['users', id, 'wearables', days] as const,
     photoComparison: (id: string, dateA: string, dateB: string, pose?: string) =>
       ['users', id, 'progress-photos', 'compare', dateA, dateB, pose ?? 'all'] as const,
     agenda: (id: string, from?: string, to?: string) =>

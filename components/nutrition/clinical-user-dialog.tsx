@@ -48,6 +48,7 @@ import { useNutritionistWorkspace } from '@/stores/nutritionist-workspace-store'
 import { useCanAccessMemberReports } from '@/hooks/use-can-access-reports'
 import { MedicalReportViewerModal } from '@/components/medical-report-viewer-modal'
 import type { ExpertAppointment, MedicalReport } from '@/lib/services/onboarding.service'
+import { MemberWearablesCard } from '@/components/wearables/member-wearables-card'
 
 interface ClinicalUserDialogProps {
   userId: string | null
@@ -336,6 +337,9 @@ export function ClinicalUserDialog({
                   </div>
                 )}
               </Section>
+
+              {/* Watch data — only shows numbers if the member shared with their coach */}
+              <MemberWearablesCard userId={userId} />
 
               {/* 6. Internal Notes */}
               <Section icon={IconNotes} title="Internal Notes">
