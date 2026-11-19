@@ -47,6 +47,7 @@ export interface AuthContextType {
     name: string
     email: string
     role: UserRole
+    homeLocationId?: string | null
     /** Trainers only: an admin has let them work the lead board. */
     canAccessLeads?: boolean
   } | null
@@ -60,7 +61,7 @@ export interface AuthContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<UserRole>('clinic_admin')
+  const [role, setRole] = useState<UserRole>('super_admin')
   const [user, setUser] = useState<AuthContextType['user']>(null)
 
   // Restore session from localStorage on mount
@@ -71,12 +72,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if ((stored || token) && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser)
+        // Auto-migrate legacy roles if present in stored session
+        if (parsedUser.role === 'clinic_admin') parsedUser.role = 'admin'
+        if (parsedUser.role === 'clinician') parsedUser.role = 'doctor'
+        if (parsedUser.role === 'staff' || parsedUser.role === 'frontdesk') parsedUser.role = 'manager'
+
         const validRoles: UserRole[] = [
+          'admin',
           'super_admin',
-          'clinic_admin',
-          'staff',
-          'clinician',
-          'sales',
+          'manager',
+          'doctor',
           'trainer',
           'nutritionist',
           'sports_scientist',
@@ -123,12 +128,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('hh_user', JSON.stringify(userData))
     }
     setUser(userData)
-    setRole(userData?.role ?? 'clinic_admin')
+    setRole(userData?.role ?? 'super_admin')
     // Hard redirect — ensures middleware sees the new cookie immediately
     if (typeof window !== 'undefined') {
       let target = '/dashboard'
       if (userData?.role === 'trainer') target = '/admin/personal-training/today'
       else if (userData?.role === 'nutritionist') target = '/admin/nutrition/my-clients'
+      else if (userData?.role === 'manager') target = '/dashboard'
       window.location.href = target
     }
   }
@@ -144,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.location.href = '/login'
     }
     setUser(null)
-    setRole('clinic_admin')
+    setRole('super_admin')
   }
 
   return (

@@ -82,24 +82,25 @@ describe('Feature 1: Authentication & Session Management', () => {
 
   describe('Role Mapping Logic (Frontdesk <-> Backend contract)', () => {
     const roleMap: Record<string, string> = {
-      admin: 'clinic_admin',
-      clinic_admin: 'clinic_admin',
+      admin: 'admin',
       super_admin: 'super_admin',
-      frontdesk: 'staff',
-      staff: 'staff',
-      doctor: 'clinician',
-      clinician: 'clinician',
-      sales: 'sales',
+      clinic_admin: 'admin',
+      manager: 'manager',
+      doctor: 'doctor',
+      clinician: 'doctor',
       trainer: 'trainer',
       nutritionist: 'nutritionist',
       sports_scientist: 'sports_scientist',
       'sports-scientist': 'sports_scientist',
+      frontdesk: 'manager',
+      staff: 'manager',
     }
 
     it('maps backend roles to expected frontdesk roles', () => {
-      expect(roleMap['admin']).toBe('clinic_admin')
-      expect(roleMap['frontdesk']).toBe('staff')
-      expect(roleMap['doctor']).toBe('clinician')
+      expect(roleMap['admin']).toBe('admin')
+      expect(roleMap['super_admin']).toBe('super_admin')
+      expect(roleMap['manager']).toBe('manager')
+      expect(roleMap['doctor']).toBe('doctor')
       expect(roleMap['trainer']).toBe('trainer')
       expect(roleMap['nutritionist']).toBe('nutritionist')
     })

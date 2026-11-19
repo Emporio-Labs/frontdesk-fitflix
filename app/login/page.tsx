@@ -48,18 +48,18 @@ export default function LoginPage() {
         })
       }
       const roleMap: Record<string, UserRole> = {
-        admin: 'clinic_admin',
-        clinic_admin: 'clinic_admin',
+        admin: 'admin',
         super_admin: 'super_admin',
-        frontdesk: 'staff',
-        staff: 'staff',
-        doctor: 'clinician',
-        clinician: 'clinician',
-        sales: 'sales',
+        clinic_admin: 'admin',
+        manager: 'manager',
+        doctor: 'doctor',
+        clinician: 'doctor',
         trainer: 'trainer',
         nutritionist: 'nutritionist',
         sports_scientist: 'sports_scientist',
         'sports-scientist': 'sports_scientist',
+        frontdesk: 'manager',
+        staff: 'manager',
       }
 
       const rawRole = (apiUser?.staffRole || apiUser?.role || '')
@@ -85,6 +85,7 @@ export default function LoginPage() {
         name: apiUser?.email ?? email,
         email: apiUser?.email ?? email,
         role: mappedRole,
+        homeLocationId: apiUser?.homeLocationId ?? null,
         ...(mappedRole === 'trainer' ? { canAccessLeads: Boolean(apiUser?.canAccessLeads) } : {}),
       })
       toast.success('Welcome back!')

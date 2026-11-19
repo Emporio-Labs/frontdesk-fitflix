@@ -43,7 +43,7 @@ import type { MedicalReport } from '@/lib/services/onboarding.service'
 
 // The backend lets only admin and frontdesk file a DNA report; these are the
 // portal roles those sign in as (see the role map in app/login/page.tsx).
-const DNA_UPLOAD_ROLES: UserRole[] = ['super_admin', 'clinic_admin', 'staff']
+const DNA_UPLOAD_ROLES: UserRole[] = ['admin', 'super_admin', 'manager']
 
 function formatDate(value?: string | null) {
   if (!value) return '—'

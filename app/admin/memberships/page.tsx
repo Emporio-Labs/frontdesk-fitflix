@@ -108,7 +108,7 @@ function MembershipsPageContent() {
   // A membership without an invoice bypasses billing, so only admins may make
   // one (the backend enforces this too); everyone else sells through New sale.
   const { role } = useAuth()
-  const isAdmin = role === 'super_admin' || role === 'clinic_admin'
+  const isAdmin = role === 'admin' || role === 'super_admin'
 
   const assignUserId = searchParams.get('assignUserId') || ''
 

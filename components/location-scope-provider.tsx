@@ -9,7 +9,7 @@ import type { UserRole } from '@/lib/rbac'
 import type { Location } from '@/lib/services/location.service'
 
 /** Only admins look across branches; everyone else works in their own. */
-const BRANCH_PICKER_ROLES: UserRole[] = ['super_admin', 'clinic_admin']
+const BRANCH_PICKER_ROLES: UserRole[] = ['admin', 'super_admin']
 
 export function canPickBranch(role?: UserRole | null): boolean {
   return !!role && BRANCH_PICKER_ROLES.includes(role)

@@ -80,13 +80,11 @@ export default function OperationsOverviewPage() {
   const [sessionModalBranch, setSessionModalBranch] = useState<BranchBoardItem | null>(null)
 
   const isClubAdmin =
-    role === 'super_admin' ||
-    role === 'clinic_admin' ||
-    role === ('admin' as any)
+    role === 'admin' ||
+    role === 'super_admin'
   const isAuthorized =
     isClubAdmin ||
-    role === 'staff' ||
-    role === ('frontdesk' as any)
+    role === 'manager'
 
   const effectiveBranchFilter =
     selectedBranchFilter === 'all' ? undefined : selectedBranchFilter

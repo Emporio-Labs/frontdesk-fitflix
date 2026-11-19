@@ -5,7 +5,14 @@ export interface UserFormData {
   name: string
   email: string
   phone?: string
-  role: 'super_admin' | 'clinic_admin' | 'staff' | 'clinician' | 'sales'
+  role:
+    | 'admin'
+    | 'super_admin'
+    | 'manager'
+    | 'doctor'
+    | 'trainer'
+    | 'nutritionist'
+    | 'sports_scientist'
   status: 'active' | 'inactive'
 }
 
@@ -29,7 +36,8 @@ export interface TherapyFormData {
 
 export interface BookingFormData {
   therapyId: string
-  clinicianId: string
+  staffId?: string
+  clinicianId?: string
   memberId: string
   date: string
   time: string

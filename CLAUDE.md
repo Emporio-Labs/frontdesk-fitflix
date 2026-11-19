@@ -48,7 +48,7 @@ Auth is a React Context (`app/context/auth-context.tsx`), **not Zustand**.
 - On refresh, `AuthProvider` restores state from localStorage and reinstates the cookie.
 - Logout: clears localStorage, clears cookie, hard-navigates to `/login`.
 
-Roles defined in `lib/rbac.ts`: `super_admin | clinic_admin | staff | clinician | sales`. The dashboard targets `clinic_admin` / `super_admin`.
+Roles defined in `lib/rbac.ts`: `admin | super_admin | manager | trainer | nutritionist | sports_scientist | doctor | user`. The dashboard targets `admin` / `super_admin` / `manager`.
 
 ### API client
 
@@ -190,7 +190,7 @@ the manual-useState dialogs elsewhere are unchanged.
 
 **Files extended:**
 - `lib/query-keys.ts` — `nutrition` namespace (foods/templates/plans/mealLogs/hydration/adherence/progress).
-- `lib/rbac.ts` — single `nutrition` resource. `super_admin`/`clinic_admin` = CRUD, `clinician` = read/update, `staff` = read, `sales` = none. **No `nutritionist` role added to the `UserRole` union** — UI gates via `useCanAccess('nutrition', action)`.
+- `lib/rbac.ts` — single `nutrition` resource. `admin`/`super_admin`/`manager`/`nutritionist` = CRUD, `doctor`/`trainer` = read/update. UI gates via `useCanAccess('nutrition', action)`.
 - `components/status-badge.tsx` — added `assigned`, `on_track`, `behind`, `off_track`.
 - `components/app-sidebar.tsx` — "Nutrition" (`/admin/nutrition`) and "My Nutrition" (`/dashboard/nutrition`) nav entries (reuse `IconSalad`).
 

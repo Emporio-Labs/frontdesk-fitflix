@@ -38,10 +38,12 @@ FrontDesk FitFlix is a full-featured admin dashboard built with **Next.js 15** a
 FrontDesk FitFlix bridges the gap between fitness clinic operations and modern web technology. It gives clinic administrators and staff a single, intuitive interface to manage every aspect of their facility — without juggling multiple tools.
 
 **Who is this for?**
-- 🏢 Clinic administrators managing day-to-day operations
-- 💼 Front-desk staff handling bookings and member queries
-- 🩺 Clinicians tracking member health progress
-- 📊 Sales teams converting leads into memberships
+- 🏢 Administrators managing multi-branch operations
+- 🏢 Branch Managers running single-club operations
+- 💼 Front-desk team handling bookings and member queries
+- 🩺 Doctors tracking member health progress & medical reports
+- 🥗 Nutritionists creating diet plans & consultations
+- 🏃 Fitness Trainers tracking client workouts
 
 ---
 
@@ -194,11 +196,14 @@ Authentication uses a JWT token stored in `localStorage` (`hh_token`). The middl
 
 | Role | Access Level |
 |---|---|
-| `super_admin` | Full access to all modules |
-| `clinic_admin` | Full admin access |
-| `staff` | Read access to most modules |
-| `clinician` | Read + update clinical data |
-| `sales` | Lead management focus |
+| `admin` | Full system administrator. Multi-branch oversight, staff monitoring, global settings |
+| `super_admin` | Full system administrator (same capabilities as admin) |
+| `manager` | Branch Manager. Single-branch operations (sales, memberships, leads, attendance) |
+| `trainer` | Fitness trainer (PT sessions, workouts, member logging) |
+| `nutritionist` | Dietitian (diet plans, nutrition consultations) |
+| `sports_scientist` | Sports scientist (performance assessments, recovery) |
+| `doctor` | Medical professional (health markers, medical reviews) |
+| `user` | Member / Client (Flutter app access) |
 
 ---
 

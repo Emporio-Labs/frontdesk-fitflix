@@ -34,7 +34,7 @@ export function extractId(value: any): string {
  * open/view medical reports for the given target member (AC FX-07.3).
  *
  * Rules:
- * - Admin / Clinic Admin / Staff / Clinician / Doctor: Always allowed.
+ * - Admin / Super Admin / Manager / Doctor: Always allowed.
  * - Nutritionist: Allowed ONLY for members they look after (assigned client or booked consultation).
  * - Trainer: Allowed ONLY for members they look after (assigned member in PT roster).
  * - Other: Disallowed.
@@ -54,10 +54,10 @@ export function canAccessMemberReports(context: ReportAccessContext): ReportAcce
 
   // 1. Elevated clinical and administrative roles have full access
   const unrestrictedRoles: UserRole[] = [
+    'admin',
     'super_admin',
-    'clinic_admin',
-    'staff',
-    'clinician',
+    'manager',
+    'doctor',
   ]
   if (role && unrestrictedRoles.includes(role)) {
     return { allowed: true }

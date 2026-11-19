@@ -176,6 +176,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const isTrainer = user?.role === 'trainer'
   const isNutritionist = user?.role === 'nutritionist'
+  const isManager = user?.role === 'manager'
   // A trainer an admin has given lead access also gets the lead board.
   const trainerGroups = user?.canAccessLeads
     ? navTrainerGroup.map((g) => ({
@@ -183,7 +184,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         items: [...g.items.slice(0, 1), { title: "Leads", url: "/admin/leads", icon: IconTarget }, ...g.items.slice(1)],
       }))
     : navTrainerGroup
-  const roleGroups: NavGroup[] = isTrainer ? trainerGroups : isNutritionist ? navNutritionistGroup : navGroups
+
+  const managerGroups: NavGroup[] = navGroups
+    .filter((g) => g.label !== "Admin")
+    .map((g) => {
+      if (g.label === "Insights") {
+        return {
+          ...g,
+          items: g.items.filter((item) => item.title !== "Audit Logs"),
+        }
+      }
+      return g
+    })
+
+  const roleGroups: NavGroup[] = isTrainer
+    ? trainerGroups
+    : isNutritionist
+    ? navNutritionistGroup
+    : isManager
+    ? managerGroups
+    : navGroups
 
   // The sidebar is on every staff page, so it owns the chat socket and the
   // unread badge.

@@ -99,6 +99,22 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // Manager role access: block global admin routes
+  const MANAGER_BLOCKED_ADMIN_ROUTES = [
+    '/admin/locations',
+    '/admin/membership-plans',
+    '/admin/credits',
+    '/admin/audit-logs',
+    '/admin/settings',
+  ]
+
+  if (isAuthed && role === 'manager') {
+    const isBlocked = MANAGER_BLOCKED_ADMIN_ROUTES.some((route) => pathname.startsWith(route))
+    if (isBlocked) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
   // Authed, trying to access login → redirect to their start page
   if (isAuthRoute && isAuthed) {
     const target = (role && ROLE_START_PAGES[role]) || '/dashboard'

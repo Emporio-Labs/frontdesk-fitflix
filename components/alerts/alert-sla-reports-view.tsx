@@ -96,7 +96,7 @@ type DateRangePreset = 'today' | '7days' | '30days' | 'all' | 'custom'
 
 export function AlertSlaReportsView() {
   const { role } = useAuth()
-  const isAdmin = role === 'super_admin' || role === 'clinic_admin'
+  const isAdmin = role === 'admin' || role === 'super_admin'
 
   const locationScope = useOptionalLocationScope()
   const currentBranchId = locationScope?.selectedLocationId ?? null
