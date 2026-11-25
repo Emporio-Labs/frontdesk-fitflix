@@ -97,8 +97,11 @@ export interface MemberAssignment {
 }
 
 export const trainerWorkoutService = {
-  getActiveSession: async (userId: string): Promise<{ session: DetailedWorkoutSession | null; elapsedSeconds: number }> => {
-    const { data } = await apiClient.get(`/trainers/me/members/${userId}/workouts/active`)
+  /** `date` (YYYY-MM-DD) looks up a back-filled session for a past day; omitted means today. */
+  getActiveSession: async (userId: string, date?: string): Promise<{ session: DetailedWorkoutSession | null; elapsedSeconds: number }> => {
+    const { data } = await apiClient.get(`/trainers/me/members/${userId}/workouts/active`, {
+      params: date ? { date } : undefined,
+    })
     return data
   },
   startOverseeing: async (userId: string): Promise<{ isOverseen: boolean }> => {
@@ -137,7 +140,7 @@ export const trainerWorkoutService = {
     const { data } = await apiClient.get(`/trainers/me/members/${userId}/workouts/today`)
     return data
   },
-  createSession: async (userId: string, payload?: { notes?: string; planId?: string; exercises?: any[] }): Promise<DetailedWorkoutSession> => {
+  createSession: async (userId: string, payload?: { date?: string; notes?: string; planId?: string; exercises?: any[] }): Promise<DetailedWorkoutSession> => {
     const { data } = await apiClient.post(`/trainers/me/members/${userId}/workouts`, payload ?? {})
     return data
   },

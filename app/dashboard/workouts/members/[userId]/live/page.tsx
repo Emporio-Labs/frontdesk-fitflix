@@ -1,7 +1,7 @@
 'use client'
 
 import { useDeferredValue, useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { trainerWorkoutService } from '@/lib/services/trainer-workout.service'
 import {
   useActiveMemberWorkoutSession,
@@ -74,13 +74,44 @@ const SECTION_CONFIG: Record<
   },
 }
 
+/** YYYY-MM-DD in the browser's timezone (toISOString would shift IST mornings to yesterday). */
+function toLocalDateString(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
 export default function MemberLiveWorkoutPage() {
   const params = useParams()
   const router = useRouter()
   const userId = params.userId as string
+  const searchParams = useSearchParams()
+
+  // Trainers who forgot to log a PT session can back-fill it: `?date=YYYY-MM-DD`
+  // opens (or starts) the session for that past day. Future dates are ignored.
+  const todayStr = toLocalDateString(new Date())
+  const requestedDate = searchParams.get('date')
+  const sessionDate =
+    requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && requestedDate < todayStr
+      ? requestedDate
+      : undefined
+  const isBackfill = !!sessionDate
+  const sessionDateLabel = sessionDate
+    ? new Date(`${sessionDate}T00:00:00`).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : 'Today'
+
+  const setSessionDate = (value: string) => {
+    const next = value && value < todayStr ? `?date=${value}` : ''
+    router.replace(`/dashboard/workouts/members/${userId}/live${next}`)
+  }
 
   const { data: member, isLoading: memberLoading } = useMyMember(userId)
-  const { data: sessionData, isLoading: sessionLoading } = useActiveMemberWorkoutSession(userId)
+  const { data: sessionData, isLoading: sessionLoading } = useActiveMemberWorkoutSession(userId, sessionDate)
 
   const startSessionMutation = useStartMemberWorkoutSession(userId)
   const session = sessionData?.session
@@ -194,10 +225,16 @@ export default function MemberLiveWorkoutPage() {
           <h1 className="text-base font-bold truncate max-w-[180px]">
             {member?.name || member?.username || member?.email || 'Member'}
           </h1>
-          <p className="text-[11px] text-muted-foreground">Live Training Session</p>
+          <p className="text-[11px] text-muted-foreground">
+            {isBackfill ? `Past Session · ${sessionDateLabel}` : 'Live Training Session'}
+          </p>
         </div>
 
-        {session ? (
+        {session && isBackfill ? (
+          <Badge variant="outline" className="text-xs px-2 py-1 border-blue-500 text-blue-600 bg-blue-500/10">
+            {sessionDateLabel}
+          </Badge>
+        ) : session ? (
           <Badge variant="outline" className="text-xs px-2 py-1 border-amber-500 text-amber-600 bg-amber-500/10">
             <IconClock className="w-3 h-3 mr-1 animate-pulse" />
             {formatTimer(elapsedSeconds)}
@@ -217,17 +254,35 @@ export default function MemberLiveWorkoutPage() {
             <div>
               <h2 className="text-lg font-bold">No Active Session</h2>
               <p className="text-xs text-muted-foreground mt-1">
-                Start a live session to log sets for {member?.name || 'this member'}
+                {isBackfill
+                  ? `Log the PT session ${member?.name || 'this member'} did on ${sessionDateLabel}`
+                  : `Start a live session to log sets for ${member?.name || 'this member'}`}
+              </p>
+            </div>
+            <div className="space-y-1.5 text-left">
+              <Label htmlFor="session-date" className="text-xs">
+                Session date
+              </Label>
+              <Input
+                id="session-date"
+                type="date"
+                max={todayStr}
+                value={sessionDate ?? todayStr}
+                onChange={(e) => setSessionDate(e.target.value)}
+                className="h-11"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Missed logging a session? Pick the past date it happened.
               </p>
             </div>
             <Button
               size="lg"
               className="w-full h-12 text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"
-              onClick={() => startSessionMutation.mutate({})}
+              onClick={() => startSessionMutation.mutate(sessionDate ? { date: sessionDate } : {})}
               disabled={startSessionMutation.isPending}
             >
               <IconFlame className="w-5 h-5 mr-2" />
-              Start Live Workout
+              {isBackfill ? `Log Session for ${sessionDateLabel}` : 'Start Live Workout'}
             </Button>
           </Card>
         ) : (

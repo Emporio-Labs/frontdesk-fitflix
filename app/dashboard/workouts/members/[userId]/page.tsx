@@ -448,6 +448,18 @@ export default function MemberSchedulePage() {
               <span className="hidden sm:inline">Start Live Session</span>
             </Link>
           </Button>
+          <Button asChild variant="outline" className="col-span-2 px-3 sm:col-span-1 sm:px-4">
+            <Link
+              href={`/dashboard/workouts/members/${userId}/live?date=${(() => {
+                const d = new Date()
+                d.setDate(d.getDate() - 1)
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+              })()}`}
+            >
+              <IconCalendar className="w-4 h-4 mr-1.5 sm:mr-2" />
+              Log Past Session
+            </Link>
+          </Button>
         </div>
       </div>
 

@@ -32,10 +32,10 @@ export function useMemberAssignments(userIds: string[]) {
   return useQueries({ queries: userIds.map(memberAssignmentQuery) })
 }
 
-export function useActiveMemberWorkoutSession(userId: string) {
+export function useActiveMemberWorkoutSession(userId: string, date?: string) {
   return useQuery({
-    queryKey: ['trainer', 'member-workouts', userId, 'active'],
-    queryFn: () => trainerWorkoutService.getActiveSession(userId),
+    queryKey: ['trainer', 'member-workouts', userId, 'active', date ?? 'today'],
+    queryFn: () => trainerWorkoutService.getActiveSession(userId, date),
     enabled: !!userId,
     refetchInterval: (query: any) => (query.state.data?.session ? 15000 : false),
   })
@@ -44,7 +44,7 @@ export function useActiveMemberWorkoutSession(userId: string) {
 export function useStartMemberWorkoutSession(userId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (payload?: { notes?: string; planId?: string; exercises?: any[] }) =>
+    mutationFn: (payload?: { date?: string; notes?: string; planId?: string; exercises?: any[] }) =>
       trainerWorkoutService.createSession(userId, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['trainer', 'member-workouts', userId] })
