@@ -101,8 +101,11 @@ export default function MemberLiveWorkoutPage() {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
-        year: 'numeric',
       })
+    : 'Today'
+  // Compact form for the header badge, which shares a narrow row with the name.
+  const sessionDateShort = sessionDate
+    ? new Date(`${sessionDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : 'Today'
 
   const setSessionDate = (value: string) => {
@@ -231,8 +234,8 @@ export default function MemberLiveWorkoutPage() {
         </div>
 
         {session && isBackfill ? (
-          <Badge variant="outline" className="text-xs px-2 py-1 border-blue-500 text-blue-600 bg-blue-500/10">
-            {sessionDateLabel}
+          <Badge variant="outline" className="shrink-0 whitespace-nowrap text-xs px-2 py-1 border-blue-500 text-blue-600 bg-blue-500/10">
+            {sessionDateShort}
           </Badge>
         ) : session ? (
           <Badge variant="outline" className="text-xs px-2 py-1 border-amber-500 text-amber-600 bg-amber-500/10">
@@ -255,7 +258,7 @@ export default function MemberLiveWorkoutPage() {
               <h2 className="text-lg font-bold">No Active Session</h2>
               <p className="text-xs text-muted-foreground mt-1">
                 {isBackfill
-                  ? `Log the PT session ${member?.name || 'this member'} did on ${sessionDateLabel}`
+                  ? `Log the PT session ${member?.name || member?.username || 'this member'} did on ${sessionDateLabel}`
                   : `Start a live session to log sets for ${member?.name || 'this member'}`}
               </p>
             </div>
@@ -282,7 +285,7 @@ export default function MemberLiveWorkoutPage() {
               disabled={startSessionMutation.isPending}
             >
               <IconFlame className="w-5 h-5 mr-2" />
-              {isBackfill ? `Log Session for ${sessionDateLabel}` : 'Start Live Workout'}
+              {isBackfill ? `Log Session for ${sessionDateShort}` : 'Start Live Workout'}
             </Button>
           </Card>
         ) : (
