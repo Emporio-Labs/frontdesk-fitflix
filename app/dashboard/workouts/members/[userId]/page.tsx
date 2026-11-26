@@ -448,7 +448,7 @@ export default function MemberSchedulePage() {
               <span className="hidden sm:inline">Start Live Session</span>
             </Link>
           </Button>
-          <Button asChild variant="outline" className="col-span-2 px-3 sm:col-span-1 sm:px-4">
+          <Button asChild variant="outline" className="px-3 sm:px-4">
             <Link
               href={`/dashboard/workouts/members/${userId}/live?date=${(() => {
                 const d = new Date()
@@ -457,7 +457,8 @@ export default function MemberSchedulePage() {
               })()}`}
             >
               <IconCalendar className="w-4 h-4 mr-1.5 sm:mr-2" />
-              Log Past Session
+              <span className="sm:hidden">Past Session</span>
+              <span className="hidden sm:inline">Log Past Session</span>
             </Link>
           </Button>
         </div>
