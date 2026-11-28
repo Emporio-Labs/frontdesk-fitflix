@@ -44,6 +44,7 @@ import {
   IconActivity as IconStretching,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { formatSeconds } from '@/lib/format-seconds'
 
 type WorkoutSectionKey = 'warmup' | 'workout' | 'stretching'
 
@@ -614,8 +615,14 @@ function ExerciseLoggingCard({
             )}
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Target: {workoutExercise.targetSets} sets × {workoutExercise.targetReps} reps
-            {workoutExercise.targetWeightKg ? ` @ ${workoutExercise.targetWeightKg}kg` : ''}
+            {workoutExercise.exercise?.exerciseType === 'cardio' || workoutExercise.durationSeconds ? (
+              <>Target: {formatSeconds(workoutExercise.durationSeconds ?? 0)}</>
+            ) : (
+              <>
+                Target: {workoutExercise.targetSets} sets × {workoutExercise.targetReps} reps
+                {workoutExercise.targetWeightKg ? ` @ ${workoutExercise.targetWeightKg}kg` : ''}
+              </>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-1">

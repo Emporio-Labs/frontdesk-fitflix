@@ -29,6 +29,7 @@ import {
   useLogSet,
 } from '@/hooks/use-workouts'
 import type { SessionStatus, WorkoutExercise } from '@/types/workout'
+import { formatSeconds } from '@/lib/format-seconds'
 
 const STATUS_CLASSES: Record<SessionStatus, string> = {
   Active: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-transparent',
@@ -265,8 +266,14 @@ function ExerciseCard({
             )}
           </div>
           <CardDescription className="text-xs">
-            Target: {exercise.targetSets} × {exercise.targetReps}
-            {exercise.targetWeightKg ? ` @ ${exercise.targetWeightKg} kg` : ''}
+            {exercise.exercise?.exerciseType === 'cardio' || exercise.durationSeconds ? (
+              <>Target: {formatSeconds(exercise.durationSeconds ?? 0)}</>
+            ) : (
+              <>
+                Target: {exercise.targetSets} × {exercise.targetReps}
+                {exercise.targetWeightKg ? ` @ ${exercise.targetWeightKg} kg` : ''}
+              </>
+            )}
             {exercise.restSeconds ? ` · ${exercise.restSeconds}s rest` : ''}
           </CardDescription>
         </div>

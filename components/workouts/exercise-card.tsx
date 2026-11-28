@@ -27,6 +27,10 @@ export function ExerciseCard({
   // Either the backend flagged the reference as dangling, or populate() left no
   // nested exercise at all — both mean the library row is gone.
   const isMissing = exercise.exerciseMissing === true || !exercise.exercise
+  // Cardio is prescribed by time, so it never shows a reps field — even on a
+  // row saved before the exercise was marked cardio.
+  const isCardio = exercise.exercise?.exerciseType === 'cardio'
+  const isTimed = isCardio || exercise.durationSeconds != null
   const sortableId = `exercise-${exercise.orderIndex}`
   const [infoOpen, setInfoOpen] = useState(false)
   const {
@@ -101,18 +105,22 @@ export function ExerciseCard({
 
       {/* Wraps onto its own row on phones so the exercise name keeps its width and inputs fill evenly */}
       <div className="order-last sm:order-none basis-full sm:basis-auto flex items-center justify-between sm:justify-start gap-1.5 pl-6 sm:pl-0">
-        <InlineInput
-          label="Sets"
-          value={exercise.targetSets}
-          onChange={(v) => onUpdate(index, { targetSets: v })}
-        />
-        <span className="text-muted-foreground text-xs">×</span>
+        {!isCardio && (
+          <>
+            <InlineInput
+              label="Sets"
+              value={exercise.targetSets}
+              onChange={(v) => onUpdate(index, { targetSets: v })}
+            />
+            <span className="text-muted-foreground text-xs">×</span>
+          </>
+        )}
         {/* Timed work (plank, cardio, stretches) is prescribed in seconds;
             reps stay at 1 for those, as the import and backend expect. */}
-        {exercise.durationSeconds != null ? (
+        {isTimed ? (
           <InlineInput
             label="Secs"
-            value={exercise.durationSeconds}
+            value={exercise.durationSeconds ?? 0}
             onChange={(v) => onUpdate(index, { durationSeconds: v })}
           />
         ) : (
@@ -122,11 +130,13 @@ export function ExerciseCard({
             onChange={(v) => onUpdate(index, { targetReps: v })}
           />
         )}
-        <InlineInput
-          label="kg"
-          value={exercise.targetWeightKg}
-          onChange={(v) => onUpdate(index, { targetWeightKg: v })}
-        />
+        {!isCardio && (
+          <InlineInput
+            label="kg"
+            value={exercise.targetWeightKg}
+            onChange={(v) => onUpdate(index, { targetWeightKg: v })}
+          />
+        )}
         <InlineInput
           label="rest"
           value={exercise.restSeconds}

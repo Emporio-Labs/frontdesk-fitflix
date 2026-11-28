@@ -11,6 +11,7 @@ import type {
   PlanStatus,
   WorkoutSection,
 } from '@/types/workout'
+import { DEFAULT_CARDIO_SECONDS } from '@/types/workout'
 
 interface WorkoutStore {
   // Persisted plan list (localStorage)
@@ -123,12 +124,25 @@ export const useWorkoutStore = create<WorkoutStore>()(
               equipment: exercise.equipment,
               caloriesPerSet: exercise.caloriesPerSet,
               sectionTypes: exercise.sectionTypes,
+              exerciseType: exercise.exerciseType,
             },
             section,
-            targetSets: 3,
-            targetReps: 12,
-            targetWeightKg: 20,
-            restSeconds: 60,
+            ...(exercise.exerciseType === 'cardio'
+              ? {
+                  // Cardio is done for time. Reps stay at 1 because the
+                  // backend requires a positive value; the app ignores it.
+                  targetSets: 1,
+                  targetReps: 1,
+                  targetWeightKg: 0,
+                  restSeconds: 0,
+                  durationSeconds: DEFAULT_CARDIO_SECONDS,
+                }
+              : {
+                  targetSets: 3,
+                  targetReps: 12,
+                  targetWeightKg: 20,
+                  restSeconds: 60,
+                }),
             orderIndex: exercises.length,
           })
           days[dayIndex] = { ...days[dayIndex], exercises }

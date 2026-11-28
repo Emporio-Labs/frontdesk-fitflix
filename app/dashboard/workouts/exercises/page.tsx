@@ -58,7 +58,7 @@ import {
   Difficulty,
   WorkoutSection,
 } from '@/types/workout'
-import type { Exercise, CreateExercisePayload, UpdateExercisePayload } from '@/types/workout'
+import type { Exercise, CreateExercisePayload, UpdateExercisePayload, ExerciseType } from '@/types/workout'
 import { ExerciseDetailsDialog } from '@/components/workouts/exercise-details-dialog'
 import { ExerciseAnimation } from '@/components/workouts/exercise-animation'
 
@@ -105,6 +105,7 @@ type FormState = {
   muscleGroups: MuscleGroup[]
   difficulty: Difficulty | ''
   sectionTypes: WorkoutSection[]
+  exerciseType: ExerciseType
   equipment: string
   instructions: string
   caloriesPerSet: number | ''
@@ -120,6 +121,7 @@ function defaultForm(): FormState {
     muscleGroups: [],
     difficulty: '',
     sectionTypes: ['workout'],
+    exerciseType: 'strength',
     equipment: '',
     instructions: '',
     caloriesPerSet: '',
@@ -143,6 +145,7 @@ function buildFormFromExercise(ex: Exercise): FormState {
     muscleGroups: ex.muscleGroups || [],
     difficulty: ex.difficulty,
     sectionTypes: ex.sectionTypes?.length ? (ex.sectionTypes as WorkoutSection[]) : ['workout'],
+    exerciseType: ex.exerciseType === 'cardio' ? 'cardio' : 'strength',
     equipment: ex.equipment ?? '',
     instructions: ex.instructions ?? '',
     caloriesPerSet: ex.caloriesPerSet || '',
@@ -207,6 +210,7 @@ function ExerciseFormDialog({
       muscleGroups: form.muscleGroups,
       difficulty: form.difficulty as Difficulty,
       sectionTypes: form.sectionTypes,
+      exerciseType: form.exerciseType,
       equipment: form.equipment.trim() || undefined,
       instructions: form.instructions.trim() || undefined,
       caloriesPerSet: form.caloriesPerSet !== '' ? Number(form.caloriesPerSet) : undefined,
@@ -307,6 +311,27 @@ function ExerciseFormDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>
+                Exercise Type <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={form.exerciseType}
+                onValueChange={(v) => setForm({ ...form, exerciseType: v as ExerciseType })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="strength">Strength — sets × reps</SelectItem>
+                  <SelectItem value="cardio">Cardio — logged by time</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Cardio (treadmill, StairMaster, bike, rower…) is prescribed as a
+                duration and members log it with a timer.
+              </p>
             </div>
           </div>
 
@@ -518,6 +543,11 @@ function ExerciseGridCard({
           >
             {exercise.difficulty}
           </Badge>
+          {exercise.exerciseType === 'cardio' && (
+            <Badge variant="outline" className="text-[10px] border-sky-500/40 text-sky-700 dark:text-sky-300">
+              Cardio · timed
+            </Badge>
+          )}
           {exercise.muscleGroups?.map(m => (
             <Badge key={m} variant="outline" className="text-[10px]">
               {m}
