@@ -1,6 +1,6 @@
 'use client'
 
-import { useDeferredValue, useState, useEffect } from 'react'
+import { createContext, useContext, useDeferredValue, useState, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { trainerWorkoutService } from '@/lib/services/trainer-workout.service'
 import {
@@ -276,7 +276,7 @@ export default function MemberLiveWorkoutPage() {
                 className="h-11"
               />
               <p className="text-[11px] text-muted-foreground">
-                Missed logging a session? Pick the past date it happened.
+                Missed logging a session? Pick the past date it happened (up to 7 days back; older dates need an admin).
               </p>
             </div>
             <Button
@@ -308,6 +308,12 @@ export default function MemberLiveWorkoutPage() {
               </Button>
             </div>
 
+            <SessionDayContext.Provider value={typeof session.date === 'string' ? session.date.slice(0, 10) : undefined}>
+            {isBackfill && (
+              <p className="text-xs rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200 p-2">
+                Back-dated session. Everything you log here is stamped with the time you entered it.
+              </p>
+            )}
             {/* SECTION 1: WARM UP */}
             <SectionBlock
               sectionKey="warmup"
@@ -334,6 +340,7 @@ export default function MemberLiveWorkoutPage() {
               sessionId={session._id}
               onAddClick={() => handleOpenAddDialog('stretching')}
             />
+            </SessionDayContext.Provider>
 
             {/* Sticky Footer: Finish Workout Session */}
             <div className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-40 flex flex-col gap-2">
@@ -529,6 +536,32 @@ function SectionBlock({
   )
 }
 
+/**
+ * The session's calendar day (YYYY-MM-DD). Anything entered on a later day was
+ * back-filled, and gets a "Logged late" stamp showing when it was entered.
+ */
+const SessionDayContext = createContext<string | undefined>(undefined)
+
+function loggedLateLabel(enteredAt: string | undefined, sessionDay: string | undefined): string | null {
+  if (!enteredAt || !sessionDay) return null
+  const entered = new Date(enteredAt)
+  if (Number.isNaN(entered.getTime())) return null
+  if (toLocalDateString(entered) <= sessionDay) return null
+  return entered.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
+}
+
+function LoggedLateBadge({ label }: { label: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className="text-[9px] px-1 py-0 border-amber-500/40 text-amber-700 dark:text-amber-300 bg-amber-500/10"
+      title="Entered after the session date"
+    >
+      Logged late · {label}
+    </Badge>
+  )
+}
+
 function ExerciseLoggingCard({
   userId,
   sessionId,
@@ -563,6 +596,7 @@ function ExerciseLoggingCard({
   const updateExerciseMutation = useUpdateMemberExercise(userId, sessionId)
 
   const sets = workoutExercise.sets ?? []
+  const sessionDay = useContext(SessionDayContext)
   const exerciseName = workoutExercise.exercise?.name || 'Exercise'
 
   const handleLogSet = () => {
@@ -771,6 +805,10 @@ function ExerciseLoggingCard({
                     </span>
                     <span className="font-bold">{setItem.actualWeightKg} kg</span>
                     <span className="text-muted-foreground">× {setItem.actualReps} reps</span>
+                    {(() => {
+                      const late = loggedLateLabel(setItem.createdAt, sessionDay)
+                      return late ? <LoggedLateBadge label={late} /> : null
+                    })()}
                     {setItem.loggedByModel === 'Trainer' && (
                       <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-blue-500/10 text-blue-600 border-blue-500/20">
                         <IconUserCheck className="w-3 h-3 mr-0.5" /> Coach
@@ -796,7 +834,11 @@ function ExerciseLoggingCard({
           <>
             {isCompleted && (workoutExercise.durationSeconds ?? 0) > 0 && (
               <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                Done: {formatSeconds(workoutExercise.durationSeconds)}
+                Done: {formatSeconds(workoutExercise.durationSeconds)}{' '}
+                {(() => {
+                  const late = loggedLateLabel(workoutExercise.updatedAt, sessionDay)
+                  return late ? <LoggedLateBadge label={late} /> : null
+                })()}
               </p>
             )}
             <div className="border rounded-xl p-3 bg-muted/20 text-center space-y-2">
