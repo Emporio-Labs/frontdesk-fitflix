@@ -202,7 +202,7 @@ export function useUpdateMemberExercise(userId: string, sessionId: string) {
       payload,
     }: {
       workoutExerciseId: string
-      payload: { isCompleted?: boolean; notes?: string; targetSets?: number; targetReps?: number; targetWeightKg?: number; section?: string }
+      payload: { isCompleted?: boolean; notes?: string; targetSets?: number; targetReps?: number; targetWeightKg?: number; durationSeconds?: number; section?: string }
     }) => trainerWorkoutService.updateWorkoutExercise(userId, sessionId, workoutExerciseId, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['trainer', 'member-workouts', userId] })

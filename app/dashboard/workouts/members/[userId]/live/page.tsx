@@ -548,6 +548,15 @@ function ExerciseLoggingCard({
   const [editReps, setEditReps] = useState(workoutExercise.targetReps || 10)
   const [editWeight, setEditWeight] = useState(workoutExercise.targetWeightKg || 0)
 
+  // Cardio (treadmill, StairMaster…) is logged by time, not sets × kg × reps.
+  // Same rule as the member app: cardio, or a coach duration with no reps.
+  const isTimed =
+    workoutExercise.exercise?.exerciseType === 'cardio' ||
+    ((workoutExercise.durationSeconds ?? 0) > 0 && (workoutExercise.targetReps ?? 0) <= 1)
+  const initialMinutes = Math.round(((workoutExercise.durationSeconds ?? 0) / 60) * 10) / 10 || 10
+  const [minutes, setMinutes] = useState<number>(initialMinutes)
+  const [editMinutes, setEditMinutes] = useState<number>(initialMinutes)
+
   const logSetMutation = useLogMemberSet(userId, sessionId, workoutExercise._id)
   const deleteSetMutation = useDeleteMemberSet(userId, sessionId, workoutExercise._id)
   const deleteExerciseMutation = useDeleteMemberExercise(userId, sessionId)
@@ -567,6 +576,19 @@ function ExerciseLoggingCard({
   const isCompleted = workoutExercise.isCompleted === true
 
   /**
+   * Record the time done and tick the exercise off. Like the member app's
+   * timer, the actual time is stored as the exercise's duration.
+   */
+  const handleLogTime = () => {
+    const seconds = Math.round(Number(minutes) * 60)
+    if (!Number.isFinite(seconds) || seconds < 1) return
+    updateExerciseMutation.mutate({
+      workoutExerciseId: workoutExercise._id,
+      payload: { durationSeconds: seconds, isCompleted: true },
+    })
+  }
+
+  /**
    * Tick the exercise off (or put it back) on the member's behalf.
    *
    * The member app treats this as the signal to advance its guided player, so
@@ -584,12 +606,17 @@ function ExerciseLoggingCard({
     updateExerciseMutation.mutate(
       {
         workoutExerciseId: workoutExercise._id,
-        payload: {
-          section: editSection,
-          targetSets: Number(editSets),
-          targetReps: Number(editReps),
-          targetWeightKg: Number(editWeight),
-        },
+        payload: isTimed
+          ? {
+              section: editSection,
+              durationSeconds: Math.max(0, Math.round(Number(editMinutes) * 60)),
+            }
+          : {
+              section: editSection,
+              targetSets: Number(editSets),
+              targetReps: Number(editReps),
+              targetWeightKg: Number(editWeight),
+            },
       },
       {
         onSuccess: () => {
@@ -671,6 +698,18 @@ function ExerciseLoggingCard({
                 ))}
               </div>
             </div>
+            {isTimed ? (
+              <div>
+                <Label className="text-[10px] text-muted-foreground uppercase">Target Time (min)</Label>
+                <NumberInput
+                  min={0}
+                  integer={false}
+                  value={editMinutes}
+                  onValueChange={setEditMinutes}
+                  className="h-8 text-xs font-semibold mt-1"
+                />
+              </div>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               <div>
                 <Label className="text-[10px] text-muted-foreground uppercase">Target Sets</Label>
@@ -700,6 +739,7 @@ function ExerciseLoggingCard({
                 />
               </div>
             </div>
+            )}
             <div className="flex justify-end gap-2 pt-1">
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setIsEditingTargets(false)}>
                 Cancel
@@ -752,6 +792,49 @@ function ExerciseLoggingCard({
           </div>
         )}
 
+        {isTimed ? (
+          <>
+            {isCompleted && (workoutExercise.durationSeconds ?? 0) > 0 && (
+              <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                Done: {formatSeconds(workoutExercise.durationSeconds)}
+              </p>
+            )}
+            <div className="border rounded-xl p-3 bg-muted/20 text-center space-y-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase">Time done (min)</span>
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-11 w-11 rounded-lg text-lg font-bold"
+                  aria-label="One minute less"
+                  onClick={() => setMinutes((m) => Math.max(1, Math.round(m) - 1))}
+                >
+                  <IconMinus className="w-5 h-5" />
+                </Button>
+                <span className="text-xl font-extrabold">{minutes}</span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-11 w-11 rounded-lg text-lg font-bold"
+                  aria-label="One minute more"
+                  onClick={() => setMinutes((m) => Math.round(m) + 1)}
+                >
+                  <IconPlus className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+            <Button
+              size="lg"
+              className="w-full h-12 text-base font-bold bg-primary text-primary-foreground shadow flex items-center justify-center gap-2 rounded-xl"
+              onClick={handleLogTime}
+              disabled={updateExerciseMutation.isPending}
+            >
+              <IconCheck className="w-5 h-5" />
+              {isCompleted ? `Update to ${minutes} min` : `Log ${minutes} min & Complete`}
+            </Button>
+          </>
+        ) : (
+          <>
         {/* Mobile Stepper Inputs for Reps & Weight */}
         <div className="grid grid-cols-2 gap-3 pt-2">
           {/* Weight Stepper */}
@@ -814,7 +897,12 @@ function ExerciseLoggingCard({
           Log Set #{sets.length + 1}
         </Button>
 
-        {/* Completing this is what advances the member's guided player. */}
+          </>
+        )}
+
+        {/* Completing this is what advances the member's guided player.
+            Timed exercises complete via "Log … min", so only offer the undo. */}
+        {(!isTimed || isCompleted) && (
         <Button
           size="lg"
           variant={isCompleted ? 'outline' : 'default'}
@@ -829,6 +917,7 @@ function ExerciseLoggingCard({
           <IconCheck className="w-5 h-5" />
           {isCompleted ? 'Mark Incomplete' : 'Complete & Move to Next'}
         </Button>
+        )}
       </CardContent>
     </Card>
   )
