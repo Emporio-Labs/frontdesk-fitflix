@@ -2,7 +2,13 @@
 export type MuscleGroup = 'Chest' | 'Back' | 'Legs' | 'Shoulders' | 'Arms' | 'Core'
 export type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced'
 export type SessionStatus = 'Active' | 'Completed' | 'Abandoned'
-export type ExerciseType = 'Warmup' | 'Main' | 'Mobility' | 'Stretching' | 'Cooldown' | 'Cardio'
+/**
+ * How an exercise is performed and logged. Cardio (treadmill, StairMaster,
+ * bike…) is prescribed and logged by time; strength by sets × reps. Library
+ * rows created before the field existed come back without it — treat that as
+ * strength.
+ */
+export type ExerciseType = 'strength' | 'cardio'
 export type WorkoutSection = 'warmup' | 'workout' | 'stretching'
 
 export type PlanStatus = 'Draft' | 'Published' | 'Active' | 'Paused' | 'Completed' | 'Archived'
@@ -82,6 +88,7 @@ export interface CreateExercisePayload {
   tips?: string[]
   caloriesPerSet?: number
   sectionTypes?: WorkoutSection[]
+  exerciseType?: ExerciseType
   imageUrl?: string
 }
 
@@ -96,6 +103,7 @@ export interface UpdateExercisePayload {
   tips?: string[]
   caloriesPerSet?: number
   sectionTypes?: WorkoutSection[]
+  exerciseType?: ExerciseType
   imageUrl?: string
 }
 
@@ -116,6 +124,7 @@ export interface WorkoutExercise {
     equipment?: string
     caloriesPerSet?: number
     sectionTypes?: WorkoutSection[]
+    exerciseType?: ExerciseType
   }
   /** Set when the referenced Exercise document no longer exists. */
   exerciseMissing?: boolean
@@ -213,7 +222,10 @@ export interface UpdateWorkoutPlanPayload {
 
 export const MUSCLE_GROUPS: MuscleGroup[] = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core']
 export const DIFFICULTIES: Difficulty[] = ['Beginner', 'Intermediate', 'Advanced']
-export const EXERCISE_TYPES: ExerciseType[] = ['Warmup', 'Main', 'Mobility', 'Stretching', 'Cooldown', 'Cardio']
+export const EXERCISE_TYPES: ExerciseType[] = ['strength', 'cardio']
+
+/** Duration a cardio exercise gets when it's added to a plan: 10 minutes. */
+export const DEFAULT_CARDIO_SECONDS = 600
 export const WORKOUT_SECTIONS: WorkoutSection[] = ['warmup', 'workout', 'stretching']
 export const PLAN_GOALS: { value: PlanGoal; label: string }[] = [
   { value: 'MuscleGain', label: 'Muscle Gain' },

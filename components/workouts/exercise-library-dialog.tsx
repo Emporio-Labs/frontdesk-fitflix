@@ -19,15 +19,15 @@ import { useWorkoutStore } from '@/stores/workout-store'
 import { MuscleGroupIcon } from '@/components/workouts/muscle-group-icon'
 import { ExerciseDetailsDialog } from '@/components/workouts/exercise-details-dialog'
 import { MUSCLE_GROUPS, DIFFICULTIES } from '@/types/workout'
-import type { Exercise, MuscleGroup, Difficulty, ExerciseType, WorkoutSection } from '@/types/workout'
+import type { Exercise, MuscleGroup, Difficulty, WorkoutSection } from '@/types/workout'
 
 type CategoryTab = 'all' | 'workout' | 'stretching' | 'warmup'
 
-const CATEGORY_TABS: { label: string; value: CategoryTab; exerciseType?: ExerciseType }[] = [
+const CATEGORY_TABS: { label: string; value: CategoryTab }[] = [
   { label: 'All', value: 'all' },
-  { label: 'Workout', value: 'workout', exerciseType: 'Main' },
-  { label: 'Stretching', value: 'stretching', exerciseType: 'Stretching' },
-  { label: 'Warmup', value: 'warmup', exerciseType: 'Warmup' },
+  { label: 'Workout', value: 'workout' },
+  { label: 'Stretching', value: 'stretching' },
+  { label: 'Warmup', value: 'warmup' },
 ]
 
 function sectionToCategory(section?: WorkoutSection): CategoryTab {
@@ -74,13 +74,11 @@ export function ExerciseLibraryDialog({
 
   // Lock to the section type when opened from a specific section button
   const locked = targetSection !== undefined
-  const activeTabDef = CATEGORY_TABS.find((t) => t.value === activeTab)
 
   const { data, isLoading, isError } = useExercises({
     search: search || undefined,
     muscleGroup: muscleFilter !== 'all' ? muscleFilter : undefined,
     difficulty: difficultyFilter !== 'all' ? difficultyFilter : undefined,
-    exerciseType: activeTabDef?.exerciseType,
     limit: 50,
   })
 
@@ -94,13 +92,7 @@ export function ExerciseLibraryDialog({
       toast.error('Add a day to the plan before adding exercises')
       return
     }
-    const section: WorkoutSection =
-      targetSection ??
-      (exercise.exerciseType === 'Warmup'
-        ? 'warmup'
-        : exercise.exerciseType === 'Stretching'
-        ? 'stretching'
-        : 'workout')
+    const section: WorkoutSection = targetSection ?? 'workout'
     addExerciseToDay(selectedDayIndex, exercise, section)
     setAddedCounts((c) => ({ ...c, [exercise._id]: (c[exercise._id] ?? 0) + 1 }))
     toast.success(`${exercise.name} added to ${section}`)

@@ -45,6 +45,7 @@ import { MemberWearablesCard } from '@/components/wearables/member-wearables-car
 import { AssignOrCreatePlanModal } from '@/components/workouts/assign-or-create-plan-modal'
 import { OnboardingReportsDialog } from '@/components/onboarding-reports-dialog'
 import { useCanAccessMemberReports } from '@/hooks/use-can-access-reports'
+import { DEFAULT_CARDIO_SECONDS } from '@/types/workout'
 
 interface PlanExerciseItem {
   exerciseId: string
@@ -57,6 +58,9 @@ interface PlanExerciseItem {
   targetReps: number
   targetWeightKg: number
   restSeconds: number
+  /** Set for timed work (cardio, holds). Must survive a load → save round trip. */
+  durationSeconds?: number | null
+  exerciseType?: 'strength' | 'cardio'
   orderIndex: number
 }
 
@@ -221,6 +225,7 @@ export default function MemberSchedulePage() {
       targetReps: Math.max(1, Number(ex.targetReps) || 10),
       targetWeightKg: Math.max(0, Number(ex.targetWeightKg) || 0),
       restSeconds: Math.max(0, Number(ex.restSeconds) || 60),
+      durationSeconds: ex.durationSeconds ?? null,
     }))
     setEditingDays((prev) => ({
       ...prev,
@@ -248,7 +253,11 @@ export default function MemberSchedulePage() {
           targetSets: ex.targetSets || 3,
           targetReps: ex.targetReps || 10,
           targetWeightKg: ex.targetWeightKg || 0,
-          restSeconds: ex.restSeconds || 60,
+          restSeconds: ex.restSeconds ?? 60,
+          // Keep the coach's duration: dropping it here turned every timed
+          // exercise (treadmill…) back into sets × reps on the next save.
+          durationSeconds: ex.durationSeconds ?? null,
+          exerciseType: ex.exerciseType,
           orderIndex: ex.orderIndex ?? idx,
         }))
 
@@ -294,7 +303,9 @@ export default function MemberSchedulePage() {
             targetSets: Math.max(1, Number(ex.targetSets) || 3),
             targetReps: Math.max(1, Number(ex.targetReps) || 10),
             targetWeightKg: Math.max(0, Number(ex.targetWeightKg) || 0),
-            restSeconds: Math.max(0, Number(ex.restSeconds) || 60),
+            restSeconds: Math.max(0, Number(ex.restSeconds) || 0),
+            durationSeconds:
+              Number(ex.durationSeconds) > 0 ? Math.round(Number(ex.durationSeconds)) : null,
           }))
           .filter((ex) => ex.exerciseId.length > 0),
       }),
@@ -345,10 +356,16 @@ export default function MemberSchedulePage() {
       // `any` here, so a wrong key fails silently rather than at compile time.)
       muscleGroup: exercise.muscleGroups?.[0] || 'FullBody',
       section: 'workout',
-      targetSets: 3,
-      targetReps: 10,
-      targetWeightKg: 0,
-      restSeconds: 60,
+      exerciseType: exercise.exerciseType,
+      ...(exercise.exerciseType === 'cardio'
+        ? {
+            targetSets: 1,
+            targetReps: 1,
+            targetWeightKg: 0,
+            restSeconds: 0,
+            durationSeconds: DEFAULT_CARDIO_SECONDS,
+          }
+        : { targetSets: 3, targetReps: 10, targetWeightKg: 0, restSeconds: 60 }),
       orderIndex: currentDayExercises.length,
     }
     setEditingDays((prev) => ({
@@ -852,6 +869,31 @@ export default function MemberSchedulePage() {
                             </div>
                           </div>
 
+                          {ex.exerciseType === 'cardio' || (ex.durationSeconds ?? 0) > 0 ? (
+                          <div className="grid w-full md:w-auto grid-cols-2 gap-3 flex-1">
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground uppercase">Duration (min)</Label>
+                              <NumberInput
+                                min={0}
+                                integer={false}
+                                value={Math.round(((ex.durationSeconds ?? 0) / 60) * 10) / 10}
+                                onValueChange={(v) =>
+                                  updateExerciseField(index, 'durationSeconds', Math.round(Number(v) * 60))
+                                }
+                                className="h-9 sm:h-8 text-sm sm:text-xs font-semibold"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground uppercase">Rest (sec)</Label>
+                              <NumberInput
+                                min={0}
+                                value={ex.restSeconds}
+                                onValueChange={(v) => updateExerciseField(index, 'restSeconds', v)}
+                                className="h-9 sm:h-8 text-sm sm:text-xs font-semibold"
+                              />
+                            </div>
+                          </div>
+                          ) : (
                           <div className="grid w-full md:w-auto grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
                             <div>
                               <Label className="text-[10px] text-muted-foreground uppercase">Target Sets</Label>
@@ -890,6 +932,7 @@ export default function MemberSchedulePage() {
                               />
                             </div>
                           </div>
+                          )}
 
                           <Button
                             variant="ghost"

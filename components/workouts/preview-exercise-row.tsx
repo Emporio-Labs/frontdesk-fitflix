@@ -1,6 +1,7 @@
 'use client'
 
 import type { WorkoutExercise } from '@/types/workout'
+import { formatSeconds } from '@/lib/format-seconds'
 
 const MUSCLE_COLORS: Record<string, string> = {
   Chest: 'bg-rose-500',
@@ -31,10 +32,18 @@ export function PreviewExerciseRow({ exercise }: { exercise: WorkoutExercise }) 
         </p>
       </div>
       <div className="text-right shrink-0">
-        <p className="text-white text-[11px] font-semibold">
-          {exercise.targetSets}×{exercise.targetReps}
-        </p>
-        <p className="text-zinc-500 text-[9px]">{exercise.targetWeightKg}kg</p>
+        {exercise.exercise?.exerciseType === 'cardio' || exercise.durationSeconds ? (
+          <p className="text-white text-[11px] font-semibold">
+            {formatSeconds(exercise.durationSeconds ?? 0)}
+          </p>
+        ) : (
+          <>
+            <p className="text-white text-[11px] font-semibold">
+              {exercise.targetSets}×{exercise.targetReps}
+            </p>
+            <p className="text-zinc-500 text-[9px]">{exercise.targetWeightKg}kg</p>
+          </>
+        )}
       </div>
     </div>
   )
